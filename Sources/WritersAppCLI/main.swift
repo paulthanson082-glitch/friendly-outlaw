@@ -3,55 +3,93 @@ import WritersApp
 
 // MARK: - CLI Application
 
-func main() {
-    let app = WritersApp()
+@main
+struct WritersAppCLI {
+    static func main() async {
+        var app = WritersApp()
 
-    print("╔══════════════════════════════════════╗")
-    print("║     Writers App with Templates       ║")
-    print("║           Swift Edition              ║")
-    print("╚══════════════════════════════════════╝")
-    print()
-
-    // Show menu
-    var running = true
-    while running {
-        print("\nMain Menu:")
-        print("1. Browse Templates")
-        print("2. Create Document from Template")
-        print("3. Create Blank Document")
-        print("4. View All Documents")
-        print("5. View Statistics")
-        print("6. Search Templates")
-        print("7. Search Documents")
-        print("8. Exit")
+        print("╔══════════════════════════════════════╗")
+        print("║     Writers App with Templates       ║")
+        print("║        Swift Edition with AI         ║")
+        print("╚══════════════════════════════════════╝")
         print()
-        print("Enter choice: ", terminator: "")
 
-        guard let choice = readLine(), let option = Int(choice) else {
-            print("Invalid input. Please enter a number.")
-            continue
+        // Check for API key in environment
+        if let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"], !apiKey.isEmpty {
+            print("✓ AI features enabled (Claude API)\n")
+            let config = AIConfiguration(apiKey: apiKey, model: .claude35Sonnet)
+            app.enableAI(configuration: config)
+        } else {
+            print("ⓘ AI features disabled (set ANTHROPIC_API_KEY to enable)\n")
         }
 
-        switch option {
-        case 1:
-            browseTemplates(app: app)
-        case 2:
-            createDocumentFromTemplate(app: app)
-        case 3:
-            createBlankDocument(app: app)
-        case 4:
-            viewAllDocuments(app: app)
-        case 5:
-            viewStatistics(app: app)
-        case 6:
-            searchTemplates(app: app)
-        case 7:
-            searchDocuments(app: app)
-        case 8:
-            running = false
-            print("\nThank you for using Writers App!")
-        default:
-            print("Invalid option. Please try again.")
+        // Show menu
+        var running = true
+        while running {
+            print("\nMain Menu:")
+            print("1. Browse Templates")
+            print("2. Create Document from Template")
+            print("3. Create Blank Document")
+            print("4. View All Documents")
+            print("5. View Statistics")
+            print("6. Search Templates")
+            print("7. Search Documents")
+
+            if app.isAIEnabled {
+                print("\nAI Features:")
+                print("10. Continue Writing (AI)")
+                print("11. Improve Document (AI)")
+                print("12. Generate Title Ideas (AI)")
+                print("13. Analyze Document (AI)")
+                print("14. Brainstorm Ideas (AI)")
+                print("15. Develop Character (AI)")
+                print("16. Generate Outline (AI)")
+            }
+
+            print("\n0. Exit")
+            print()
+            print("Enter choice: ", terminator: "")
+
+            guard let choice = readLine(), let option = Int(choice) else {
+                print("Invalid input. Please enter a number.")
+                continue
+            }
+
+            switch option {
+            case 1:
+                browseTemplates(app: app)
+            case 2:
+                createDocumentFromTemplate(app: app)
+            case 3:
+                createBlankDocument(app: app)
+            case 4:
+                viewAllDocuments(app: app)
+            case 5:
+                viewStatistics(app: app)
+            case 6:
+                searchTemplates(app: app)
+            case 7:
+                searchDocuments(app: app)
+            case 10:
+                await continueWritingWithAI(app: app)
+            case 11:
+                await improveDocumentWithAI(app: app)
+            case 12:
+                await generateTitlesWithAI(app: app)
+            case 13:
+                await analyzeDocumentWithAI(app: app)
+            case 14:
+                await brainstormIdeasWithAI(app: app)
+            case 15:
+                await developCharacterWithAI(app: app)
+            case 16:
+                await generateOutlineWithAI(app: app)
+            case 0:
+                running = false
+                print("\nThank you for using Writers App!")
+            default:
+                print("Invalid option. Please try again.")
+            }
         }
     }
 }
@@ -247,5 +285,237 @@ func formatDate(_ date: Date) -> String {
     return formatter.string(from: date)
 }
 
-// Run the application
-main()
+// MARK: - AI Features
+
+func continueWritingWithAI(app: WritersApp) async {
+    print("\n=== Continue Writing with AI ===\n")
+
+    let documents = app.documentManager.getAllDocuments()
+    if documents.isEmpty {
+        print("No documents available. Create one first!")
+        return
+    }
+
+    print("Select document:")
+    for (index, document) in documents.enumerated() {
+        print("\(index + 1). \(document.title) (\(document.wordCount) words)")
+    }
+
+    print("\nDocument number: ", terminator: "")
+    guard let input = readLine(),
+          let docIndex = Int(input),
+          docIndex > 0,
+          docIndex <= documents.count else {
+        print("Invalid selection.")
+        return
+    }
+
+    let document = documents[docIndex - 1]
+
+    print("\nAppend to document? (y/n): ", terminator: "")
+    let shouldAppend = readLine()?.lowercased() == "y"
+
+    print("\n⏳ Generating continuation...")
+
+    do {
+        let continuation = try await app.continueDocument(
+            documentId: document.id,
+            appendToDocument: shouldAppend
+        )
+        print("\n✓ AI Generated Continuation:\n")
+        print(continuation)
+        print()
+
+        if shouldAppend {
+            print("✓ Content appended to document!")
+        }
+    } catch {
+        print("\n✗ Error: \(error.localizedDescription)")
+    }
+}
+
+func improveDocumentWithAI(app: WritersApp) async {
+    print("\n=== Improve Document with AI ===\n")
+
+    let documents = app.documentManager.getAllDocuments()
+    if documents.isEmpty {
+        print("No documents available. Create one first!")
+        return
+    }
+
+    print("Select document:")
+    for (index, document) in documents.enumerated() {
+        print("\(index + 1). \(document.title) (\(document.wordCount) words)")
+    }
+
+    print("\nDocument number: ", terminator: "")
+    guard let input = readLine(),
+          let docIndex = Int(input),
+          docIndex > 0,
+          docIndex <= documents.count else {
+        print("Invalid selection.")
+        return
+    }
+
+    let document = documents[docIndex - 1]
+
+    print("\nReplace original content? (y/n): ", terminator: "")
+    let shouldReplace = readLine()?.lowercased() == "y"
+
+    print("\n⏳ Improving text...")
+
+    do {
+        let improved = try await app.improveDocument(
+            documentId: document.id,
+            replaceContent: shouldReplace
+        )
+        print("\n✓ AI Improved Version:\n")
+        print(improved)
+        print()
+
+        if shouldReplace {
+            print("✓ Document updated with improved version!")
+        }
+    } catch {
+        print("\n✗ Error: \(error.localizedDescription)")
+    }
+}
+
+func generateTitlesWithAI(app: WritersApp) async {
+    print("\n=== Generate Title Ideas with AI ===\n")
+
+    let documents = app.documentManager.getAllDocuments()
+    if documents.isEmpty {
+        print("No documents available. Create one first!")
+        return
+    }
+
+    print("Select document:")
+    for (index, document) in documents.enumerated() {
+        print("\(index + 1). \(document.title) (\(document.wordCount) words)")
+    }
+
+    print("\nDocument number: ", terminator: "")
+    guard let input = readLine(),
+          let docIndex = Int(input),
+          docIndex > 0,
+          docIndex <= documents.count else {
+        print("Invalid selection.")
+        return
+    }
+
+    let document = documents[docIndex - 1]
+
+    print("\n⏳ Generating title ideas...")
+
+    do {
+        let titles = try await app.generateDocumentTitles(documentId: document.id)
+        print("\n✓ Title Suggestions:\n")
+        for (index, title) in titles.enumerated() {
+            print("\(index + 1). \(title)")
+        }
+        print()
+    } catch {
+        print("\n✗ Error: \(error.localizedDescription)")
+    }
+}
+
+func analyzeDocumentWithAI(app: WritersApp) async {
+    print("\n=== Analyze Document with AI ===\n")
+
+    let documents = app.documentManager.getAllDocuments()
+    if documents.isEmpty {
+        print("No documents available. Create one first!")
+        return
+    }
+
+    print("Select document:")
+    for (index, document) in documents.enumerated() {
+        print("\(index + 1). \(document.title) (\(document.wordCount) words)")
+    }
+
+    print("\nDocument number: ", terminator: "")
+    guard let input = readLine(),
+          let docIndex = Int(input),
+          docIndex > 0,
+          docIndex <= documents.count else {
+        print("Invalid selection.")
+        return
+    }
+
+    let document = documents[docIndex - 1]
+
+    print("\n⏳ Analyzing document...")
+
+    do {
+        let analysis = try await app.analyzeDocument(documentId: document.id)
+        print("\n✓ Document Analysis:\n")
+        print(analysis.analysis)
+        print()
+    } catch {
+        print("\n✗ Error: \(error.localizedDescription)")
+    }
+}
+
+func brainstormIdeasWithAI(app: WritersApp) async {
+    print("\n=== Brainstorm Ideas with AI ===\n")
+
+    print("Enter topic or concept: ", terminator: "")
+    guard let topic = readLine(), !topic.isEmpty else {
+        print("Topic is required.")
+        return
+    }
+
+    print("\n⏳ Brainstorming ideas...")
+
+    do {
+        let ideas = try await app.brainstormIdeas(topic: topic)
+        print("\n✓ Ideas:\n")
+        print(ideas)
+        print()
+    } catch {
+        print("\n✗ Error: \(error.localizedDescription)")
+    }
+}
+
+func developCharacterWithAI(app: WritersApp) async {
+    print("\n=== Develop Character with AI ===\n")
+
+    print("Enter character concept or description: ", terminator: "")
+    guard let concept = readLine(), !concept.isEmpty else {
+        print("Character concept is required.")
+        return
+    }
+
+    print("\n⏳ Developing character...")
+
+    do {
+        let development = try await app.developCharacter(characterConcept: concept)
+        print("\n✓ Character Development:\n")
+        print(development)
+        print()
+    } catch {
+        print("\n✗ Error: \(error.localizedDescription)")
+    }
+}
+
+func generateOutlineWithAI(app: WritersApp) async {
+    print("\n=== Generate Outline with AI ===\n")
+
+    print("Enter story or article concept: ", terminator: "")
+    guard let concept = readLine(), !concept.isEmpty else {
+        print("Concept is required.")
+        return
+    }
+
+    print("\n⏳ Generating outline...")
+
+    do {
+        let outline = try await app.generateOutline(concept: concept)
+        print("\n✓ Outline:\n")
+        print(outline)
+        print()
+    } catch {
+        print("\n✗ Error: \(error.localizedDescription)")
+    }
+}
