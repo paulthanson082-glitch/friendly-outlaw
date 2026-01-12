@@ -17,7 +17,7 @@ An interactive Swift Playground for exploring writing app features with AI-power
 ## 📚 What's Inside
 
 ### Core Features
-- **Template System**: 7+ pre-built writing templates
+- **Template System**: 3 pre-built writing templates (Novel, Short Story, Blog)
 - **Document Management**: Create, edit, and organize documents
 - **Word Count Tracking**: Automatic word/character counting
 - **Search Functionality**: Find templates and documents
