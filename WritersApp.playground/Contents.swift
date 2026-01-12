@@ -464,8 +464,8 @@ for template in app.templateManager.getAllTemplates() {
 
 //: ### Example 3: Create a Document from Template
 let templates = app.templateManager.getAllTemplates()
-if let firstTemplate = templates.first {
-    print("\n📄 Creating document from template: \(firstTemplate.name)")
+if let novelTemplate = templates.first(where: { $0.name == "Novel Chapter" }) {
+    print("\n📄 Creating document from template: \(novelTemplate.name)")
 
     let values: [String: String] = [
         "title": "The Beginning",
@@ -476,7 +476,7 @@ if let firstTemplate = templates.first {
         "closing": "As night fell, she knew everything would change."
     ]
 
-    if let document = app.createDocumentFromTemplate(templateId: firstTemplate.id, values: values) {
+    if let document = app.createDocumentFromTemplate(templateId: novelTemplate.id, values: values) {
         print("✓ Document created: \(document.title)")
         print("  Word count: \(document.wordCount)")
         print("  Reading time: \(document.readingTime) min")
