@@ -66,7 +66,7 @@ Powered by Claude API for intelligent writing assistance:
 
 ```
 WritersApp/
-├── Package.swift
+├── Package.swift                    # Swift Package Manager
 ├── Sources/
 │   ├── WritersApp/
 │   │   ├── Models/
@@ -82,10 +82,44 @@ WritersApp/
 │   │   └── WritersApp.swift         # Main app class
 │   └── WritersAppCLI/
 │       └── main.swift               # CLI interface
-└── Tests/
-    └── WritersAppTests/
-        └── WritersAppTests.swift    # Unit tests
+├── Tests/
+│   └── WritersAppTests/
+│       └── WritersAppTests.swift    # Unit tests
+└── WritersApp.playground/           # 🎮 Swift Playground version
+    ├── Contents.swift               # Interactive playground
+    ├── contents.xcplayground        # Playground metadata
+    └── README.md                    # Playground guide
 ```
+
+## 🎮 Swift Playground Version
+
+**NEW!** Try the interactive Swift Playground version for a hands-on learning experience!
+
+### Quick Start with Playground
+
+1. **Open in Xcode:**
+   ```bash
+   open WritersApp.playground
+   ```
+
+2. **Or use Swift Playgrounds app** on Mac/iPad
+
+### Features
+- ✅ Complete app functionality in one file
+- ✅ 6 interactive examples ready to run
+- ✅ Inline documentation and explanations
+- ✅ Challenges to test your skills
+- ✅ AI integration examples (optional)
+- ✅ Perfect for learning Swift and app architecture
+
+### What You Can Do
+- Explore templates and document creation
+- See real-time word counts and statistics
+- Modify examples and see instant results
+- Learn Swift concepts hands-on
+- Experiment with AI features (API key required)
+
+See [WritersApp.playground/README.md](WritersApp.playground/README.md) for detailed instructions.
 
 ## Usage
 
