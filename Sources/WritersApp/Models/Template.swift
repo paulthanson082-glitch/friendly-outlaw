@@ -30,14 +30,34 @@ public struct Template: Codable, Identifiable {
 
     /// Creates a document from this template with filled placeholders
     public func createDocument(with values: [String: String]) -> Document {
-        var processedContent = content
+        // Use regex-based atomic replacement to prevent nested placeholder substitution
+        let pattern = "\\{\\{([^}]+)\\}\\}"
 
-        for placeholder in placeholders {
-            if let value = values[placeholder.key] {
-                processedContent = processedContent.replacingOccurrences(
-                    of: "{{\(placeholder.key)}}",
-                    with: value
-                )
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            // Fallback to original content if regex fails
+            return Document(
+                title: values["title"] ?? name,
+                content: content,
+                templateId: id,
+                category: category
+            )
+        }
+
+        let nsContent = content as NSString
+        let matches = regex.matches(in: content, range: NSRange(location: 0, length: nsContent.length))
+
+        // Replace placeholders in reverse order to maintain correct offsets
+        var processedContent = content
+        for match in matches.reversed() {
+            let keyRange = match.range(at: 1)
+            let fullRange = match.range(at: 0)
+
+            if keyRange.location != NSNotFound {
+                let key = nsContent.substring(with: keyRange)
+                if let value = values[key] {
+                    let range = Range(fullRange, in: processedContent)!
+                    processedContent.replaceSubrange(range, with: value)
+                }
             }
         }
 

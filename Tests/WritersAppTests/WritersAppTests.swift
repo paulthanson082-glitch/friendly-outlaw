@@ -118,4 +118,36 @@ final class WritersAppTests: XCTestCase {
         let document = template.createDocument(with: ["name": "John", "age": "30"])
         XCTAssertEqual(document.content, "Hello John, you are 30 years old.")
     }
+
+    func testNestedPlaceholderPrevention() {
+        // Test that placeholder values containing {{...}} patterns are NOT recursively replaced
+        let template = Template(
+            name: "Nested Test",
+            category: .other,
+            description: "Test nested placeholder prevention",
+            content: "User: {{username}}, Role: {{role}}, Config: {{config}}",
+            placeholders: [
+                Placeholder(key: "username", label: "Username"),
+                Placeholder(key: "role", label: "Role"),
+                Placeholder(key: "config", label: "Config")
+            ]
+        )
+
+        // Value for 'role' contains a placeholder pattern that should NOT be replaced
+        let values = [
+            "username": "Alice",
+            "role": "{{username}}",
+            "config": "Setting: {{role}}"
+        ]
+
+        let document = template.createDocument(with: values)
+
+        // The {{username}} in role value should remain literal, not be replaced with "Alice"
+        // The {{role}} in config value should remain literal, not be replaced
+        XCTAssertEqual(
+            document.content,
+            "User: Alice, Role: {{username}}, Config: Setting: {{role}}",
+            "Placeholder values should not be recursively replaced"
+        )
+    }
 }
