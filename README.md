@@ -62,6 +62,25 @@ Powered by Claude API for intelligent writing assistance:
 - **Tone Adjustment**: Rewrite in different tones (professional, casual, etc.)
 - **Text Expansion/Simplification**: Adjust complexity as needed
 
+## Development Environment
+
+### VS Code Setup for iPad and MacBook Pro
+
+This project includes a complete VS Code configuration for seamless development across iPad and MacBook Pro. See [VSCODE_SETUP.md](VSCODE_SETUP.md) for detailed setup instructions including:
+
+- Complete VS Code configuration (settings, extensions, tasks, debugging)
+- Cross-device synchronization with Settings Sync
+- iPad development options (native app, remote SSH, GitHub Codespaces)
+- Recommended extensions for Swift development
+- Keyboard shortcuts and productivity tips
+- Troubleshooting guide
+
+**Quick Start:**
+1. Open this project in VS Code
+2. Install recommended extensions when prompted
+3. Enable Settings Sync to sync across devices
+4. Use `Cmd+Shift+B` to build or `Cmd+Shift+P` → "Tasks: Run Task" for other commands
+
 ## Project Structure
 
 ```
