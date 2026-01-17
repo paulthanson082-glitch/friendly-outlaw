@@ -1,0 +1,30 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "swift-lldb",
+      "request": "launch",
+      "name": "Debug WritersAppCLI",
+      "program": "${workspaceFolder}/.build/debug/WritersAppCLI",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "Swift: Build"
+    },
+    {
+      "type": "swift-lldb",
+      "request": "launch",
+      "name": "Run Tests",
+      "program": "${workspaceFolder}/.build/debug/WritersAppPackageTests.xctest",
+      "preLaunchTask": "Swift: Build"
+    },
+    {
+      "type": "swift-lldb",
+      "request": "launch",
+      "name": "Debug WritersAppCLI (Release)",
+      "program": "${workspaceFolder}/.build/release/WritersAppCLI",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "Swift: Build Release"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "recommendations": [
+    // Swift Development
+    "vknabel.vscode-swift-development-environment",
+    "sswg.swift-lang",
+
+    // Code Quality
+    "streetsidesoftware.code-spell-checker",
+    "usernamehw.errorlens",
+
+    // Git Integration
+    "eamodio.gitlens",
+    "mhutchie.git-graph",
+
+    // Productivity
+    "gruntfuggly.todo-tree",
+    "wayou.vscode-todo-highlight",
+
+    // Markdown (for documentation)
+    "yzhang.markdown-all-in-one",
+    "davidanson.vscode-markdownlint",
+
+    // Remote Development (for iPad)
+    "ms-vscode-remote.remote-ssh",
+    "ms-vscode.remote-explorer",
+
+    // Theme & Icons (optional but recommended)
+    "pkief.material-icon-theme",
+    "GitHub.github-vscode-theme"
+  ],
+  "unwantedRecommendations": []
+}

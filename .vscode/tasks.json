@@ -1,0 +1,98 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Swift: Build",
+      "type": "shell",
+      "command": "swift build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": ["$swiftc"]
+    },
+    {
+      "label": "Swift: Build Release",
+      "type": "shell",
+      "command": "swift build -c release",
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": ["$swiftc"]
+    },
+    {
+      "label": "Swift: Test",
+      "type": "shell",
+      "command": "swift test",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": ["$swiftc"]
+    },
+    {
+      "label": "Swift: Clean",
+      "type": "shell",
+      "command": "swift package clean",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Swift: Run CLI",
+      "type": "shell",
+      "command": "swift run WritersAppCLI",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated"
+      },
+      "problemMatcher": ["$swiftc"]
+    },
+    {
+      "label": "Swift: Update Dependencies",
+      "type": "shell",
+      "command": "swift package update",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Swift: Resolve Dependencies",
+      "type": "shell",
+      "command": "swift package resolve",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
