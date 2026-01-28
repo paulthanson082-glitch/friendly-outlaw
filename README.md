@@ -391,6 +391,10 @@ To use AI features, you'll need an Anthropic API key:
 
 AI features are completely optional - the app works fully without them.
 
+## Documentation
+
+- [AI Assistant Guide](docs/AI_ASSISTANT_GUIDE.md) — instructions and notes for AI-based contributions and maintainers.
+
 ## License
 
 MIT License - See LICENSE file for details
