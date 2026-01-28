@@ -7,6 +7,10 @@ Its a name let me and my dad used to use all the time so it's in remembrance of 
 
 A comprehensive Swift application for writers featuring template management, document creation, and writing tools.
 
+## Documentation
+
+- [AI Assistant Guide](docs/AI_ASSISTANT_GUIDE.md) — instructions and notes for AI-based contributions and maintainers.
+
 ## Features
 
 ### 📝 Template System
