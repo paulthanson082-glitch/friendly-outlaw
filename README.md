@@ -62,6 +62,10 @@ Powered by Claude API for intelligent writing assistance:
 - **Tone Adjustment**: Rewrite in different tones (professional, casual, etc.)
 - **Text Expansion/Simplification**: Adjust complexity as needed
 
+## Documentation
+
+- [AI Assistant Guide](docs/AI_ASSISTANT_GUIDE.md) — instructions and notes for AI-based contributions and maintainers.
+
 ## Development Environment
 
 ### VS Code Setup for iPad and MacBook Pro
