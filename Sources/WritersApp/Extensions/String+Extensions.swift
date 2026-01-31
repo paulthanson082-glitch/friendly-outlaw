@@ -3,9 +3,19 @@ import Foundation
 extension String {
     /// Counts sentences in the string
     var sentenceCount: Int {
-        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.orthography.rawValue)
-        let matches = detector?.matches(in: self, options: [], range: NSRange(location: 0, length: utf16.count))
-        return matches?.count ?? 0
+        let trimmed = self.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return 0 }
+
+        // Count sentence-ending punctuation marks (. ! ?)
+        var count = 0
+        for char in trimmed {
+            if char == "." || char == "!" || char == "?" {
+                count += 1
+            }
+        }
+
+        // If no sentence terminators found but there's text, count as 1 sentence
+        return count == 0 ? 1 : count
     }
 
     /// Counts paragraphs in the string

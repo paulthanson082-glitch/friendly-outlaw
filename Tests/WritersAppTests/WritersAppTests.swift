@@ -118,4 +118,37 @@ final class WritersAppTests: XCTestCase {
         let document = template.createDocument(with: ["name": "John", "age": "30"])
         XCTAssertEqual(document.content, "Hello John, you are 30 years old.")
     }
+
+    func testSentenceCount() {
+        // Empty string
+        XCTAssertEqual("".sentenceCount, 0)
+        XCTAssertEqual("   ".sentenceCount, 0)
+
+        // Single sentence
+        XCTAssertEqual("Hello world.".sentenceCount, 1)
+        XCTAssertEqual("Hello world!".sentenceCount, 1)
+        XCTAssertEqual("Hello world?".sentenceCount, 1)
+
+        // Sentence without punctuation
+        XCTAssertEqual("Hello world".sentenceCount, 1)
+
+        // Multiple sentences
+        XCTAssertEqual("Hello. World.".sentenceCount, 2)
+        XCTAssertEqual("Hello! How are you? I'm fine.".sentenceCount, 3)
+
+        // Mixed punctuation
+        XCTAssertEqual("What? Really! Yes.".sentenceCount, 3)
+    }
+
+    func testParagraphCount() {
+        // Empty string
+        XCTAssertEqual("".paragraphCount, 0)
+
+        // Single paragraph
+        XCTAssertEqual("Hello world.".paragraphCount, 1)
+
+        // Multiple paragraphs
+        XCTAssertEqual("First paragraph.\n\nSecond paragraph.".paragraphCount, 2)
+        XCTAssertEqual("One.\n\nTwo.\n\nThree.".paragraphCount, 3)
+    }
 }
