@@ -1,11 +1,13 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 extension String {
     /// Counts sentences in the string
     var sentenceCount: Int {
-        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.orthography.rawValue)
-        let matches = detector?.matches(in: self, options: [], range: NSRange(location: 0, length: utf16.count))
-        return matches?.count ?? 0
+        let components = split { ".!?".contains($0) }
+        return components.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
     }
 
     /// Counts paragraphs in the string
