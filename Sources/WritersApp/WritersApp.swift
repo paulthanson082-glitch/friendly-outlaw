@@ -169,8 +169,8 @@ public class WritersApp {
            let index = sessions.firstIndex(where: { $0.id == sessionId }) {
             var session = sessions[index]
             session.endTime = Date()
-            if let start = session.startTime.timeIntervalSince1970 as Double?,
-               let end = session.endTime?.timeIntervalSince1970 {
+            let start = session.startTime.timeIntervalSince1970
+            if let end = session.endTime?.timeIntervalSince1970 {
                 session.durationSeconds = Int(end - start)
             }
             try? databaseManager.updateUserSession(session)

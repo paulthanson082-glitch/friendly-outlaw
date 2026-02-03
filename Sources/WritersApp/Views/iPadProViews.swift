@@ -783,9 +783,11 @@ public class WritersAppViewModel: ObservableObject {
         writersApp = WritersApp()
         updateStatistics()
         
-        // Initialize a default user session for demo purposes
-        let userId = UUID()
-        writersApp?.startSession(userId: userId, multitaskingMode: "Split View")
+        // Initialize a demo user session for testing database features
+        // NOTE: In production, this should use a stable user identifier
+        // from authentication/user management system
+        let demoUserId = UUID()
+        writersApp?.startSession(userId: demoUserId, multitaskingMode: "Split View")
         
         // Load initial data
         loadRecentSuggestions()

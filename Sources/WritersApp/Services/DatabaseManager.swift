@@ -111,8 +111,7 @@ public class DatabaseManager {
         // Create AI_Configurations table
         let createAIConfigurationsTable = """
         CREATE TABLE IF NOT EXISTS AI_Configurations (
-            id TEXT PRIMARY KEY,
-            user_id TEXT NOT NULL,
+            user_id TEXT PRIMARY KEY,
             api_key TEXT NOT NULL,
             model TEXT NOT NULL,
             max_tokens INTEGER DEFAULT 4096,
@@ -764,9 +763,6 @@ public class DatabaseManager {
             earliestSession: earliest,
             latestSession: latest
         )
-        
-        return SessionStats(totalSessions: 0, totalDurationSeconds: 0, averageDurationSeconds: 0, earliestSession: nil, latestSession: nil)
-        
     }
     
     /// Filters sessions by multitasking mode
@@ -850,8 +846,8 @@ public class DatabaseManager {
         let now = Date().timeIntervalSince1970
         
         let sql = """
-        INSERT OR REPLACE INTO AI_Configurations (id, user_id, api_key, model, max_tokens, temperature, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+        INSERT OR REPLACE INTO AI_Configurations (user_id, api_key, model, max_tokens, temperature, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?);
         """
         
         var statement: OpaquePointer?
@@ -867,13 +863,12 @@ public class DatabaseManager {
         }
         
         sqlite3_bind_text(statement, 1, userId.uuidString, -1, SQLITE_TRANSIENT)
-        sqlite3_bind_text(statement, 2, userId.uuidString, -1, SQLITE_TRANSIENT)
-        sqlite3_bind_text(statement, 3, configuration.apiKey, -1, SQLITE_TRANSIENT)
-        sqlite3_bind_text(statement, 4, configuration.model.rawValue, -1, SQLITE_TRANSIENT)
-        sqlite3_bind_int(statement, 5, Int32(configuration.maxTokens))
-        sqlite3_bind_double(statement, 6, configuration.temperature)
+        sqlite3_bind_text(statement, 2, configuration.apiKey, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 3, configuration.model.rawValue, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_int(statement, 4, Int32(configuration.maxTokens))
+        sqlite3_bind_double(statement, 5, configuration.temperature)
+        sqlite3_bind_double(statement, 6, now)
         sqlite3_bind_double(statement, 7, now)
-        sqlite3_bind_double(statement, 8, now)
         
         guard sqlite3_step(statement) == SQLITE_DONE else {
             let errorMessage = String(cString: sqlite3_errmsg(db))
