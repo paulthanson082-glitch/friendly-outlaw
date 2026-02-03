@@ -34,6 +34,11 @@ public class DocumentManager {
 
     /// Searches documents by title or content
     public func searchDocuments(query: String) -> [Document] {
+        // Return all documents if query is empty
+        if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return getAllDocuments()
+        }
+        
         let lowercaseQuery = query.lowercased()
         return documents.values.filter {
             $0.title.lowercased().contains(lowercaseQuery) ||

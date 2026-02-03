@@ -4,23 +4,42 @@ import Foundation
 public class WritersApp {
     public let templateManager: TemplateManager
     public let documentManager: DocumentManager
+    public let databaseManager: DatabaseManager
     public private(set) var aiService: AIService?
+    private var currentUserId: UUID?
+    private var currentSessionId: UUID?
 
     public init() {
         self.templateManager = TemplateManager()
         self.documentManager = DocumentManager()
+        self.databaseManager = DatabaseManager()
+        try? self.databaseManager.initialize()
     }
 
     /// Initialize with AI capabilities
     public init(aiConfiguration: AIConfiguration) {
         self.templateManager = TemplateManager()
         self.documentManager = DocumentManager()
+        self.databaseManager = DatabaseManager()
+        try? self.databaseManager.initialize()
         self.aiService = AIService(configuration: aiConfiguration)
+    }
+    
+    /// Initialize with custom database path
+    public init(databasePath: String? = nil) {
+        self.templateManager = TemplateManager()
+        self.documentManager = DocumentManager()
+        self.databaseManager = DatabaseManager(databasePath: databasePath)
+        try? self.databaseManager.initialize()
     }
 
     /// Enable AI features by providing configuration
-    public func enableAI(configuration: AIConfiguration) {
+    public func enableAI(configuration: AIConfiguration, userId: UUID? = nil) {
         self.aiService = AIService(configuration: configuration)
+        if let uid = userId {
+            self.currentUserId = uid
+            try? self.databaseManager.saveAIConfiguration(userId: uid, configuration: configuration)
+        }
     }
 
     /// Disable AI features
@@ -132,6 +151,47 @@ public class WritersApp {
         return formatter.string(from: date)
     }
 
+    // MARK: - Session Management
+    
+    /// Starts a new user session
+    public func startSession(userId: UUID, multitaskingMode: String? = nil) {
+        self.currentUserId = userId
+        let session = UserSession(userId: userId, multitaskingMode: multitaskingMode)
+        self.currentSessionId = session.id
+        try? databaseManager.insertUserSession(session)
+    }
+    
+    /// Ends the current session
+    public func endSession() {
+        guard let sessionId = currentSessionId, let userId = currentUserId else { return }
+        
+        if let sessions = try? databaseManager.getUserSessions(userId: userId),
+           let index = sessions.firstIndex(where: { $0.id == sessionId }) {
+            var session = sessions[index]
+            session.endTime = Date()
+            if let start = session.startTime.timeIntervalSince1970 as Double?,
+               let end = session.endTime?.timeIntervalSince1970 {
+                session.durationSeconds = Int(end - start)
+            }
+            try? databaseManager.updateUserSession(session)
+        }
+        
+        currentSessionId = nil
+    }
+    
+    /// Updates session statistics
+    public func updateSessionStats(wordsWritten: Int, aiInteractions: Int) {
+        guard let sessionId = currentSessionId, let userId = currentUserId else { return }
+        
+        if let sessions = try? databaseManager.getUserSessions(userId: userId),
+           let index = sessions.firstIndex(where: { $0.id == sessionId }) {
+            var session = sessions[index]
+            session.wordsWritten = wordsWritten
+            session.aiInteractions = aiInteractions
+            try? databaseManager.updateUserSession(session)
+        }
+    }
+
     // MARK: - AI-Powered Features
 
     /// Get AI assistance for a document
@@ -173,6 +233,18 @@ public class WritersApp {
             text: document.content,
             context: context
         )
+        
+        // Log AI suggestion if user is set
+        if let userId = currentUserId {
+            let suggestion = AISuggestion(
+                userId: userId,
+                documentId: documentId,
+                toolUsed: "Continue Writing",
+                prompt: document.content,
+                response: continuation
+            )
+            try? databaseManager.insertAISuggestion(suggestion)
+        }
 
         if appendToDocument {
             var updatedDocument = document
@@ -201,6 +273,18 @@ public class WritersApp {
             text: document.content,
             context: context
         )
+        
+        // Log AI suggestion if user is set
+        if let userId = currentUserId {
+            let suggestion = AISuggestion(
+                userId: userId,
+                documentId: documentId,
+                toolUsed: "Improve Text",
+                prompt: document.content,
+                response: improved
+            )
+            try? databaseManager.insertAISuggestion(suggestion)
+        }
 
         if replaceContent {
             var updatedDocument = document
@@ -296,6 +380,30 @@ public class WritersApp {
     }
 
     // MARK: - Statistics
+    
+    /// Gets AI tool usage statistics
+    public func getAIToolUsageStats(userId: UUID? = nil) throws -> [AIToolUsageStats] {
+        let uid = userId ?? currentUserId ?? UUID()
+        return try databaseManager.getAIToolUsageStats(userId: uid)
+    }
+    
+    /// Gets session statistics
+    public func getSessionStats(userId: UUID? = nil) throws -> SessionStats {
+        let uid = userId ?? currentUserId ?? UUID()
+        return try databaseManager.getSessionStats(userId: uid)
+    }
+    
+    /// Gets AI suggestions with pagination
+    public func getAISuggestions(userId: UUID? = nil, limit: Int = 50, offset: Int = 0) throws -> [AISuggestion] {
+        let uid = userId ?? currentUserId ?? UUID()
+        return try databaseManager.getAISuggestions(userId: uid, limit: limit, offset: offset)
+    }
+    
+    /// Gets user sessions sorted by duration
+    public func getUserSessions(userId: UUID? = nil, sortByDuration: Bool = false) throws -> [UserSession] {
+        let uid = userId ?? currentUserId ?? UUID()
+        return try databaseManager.getUserSessions(userId: uid, sortByDuration: sortByDuration)
+    }
 
     /// Gets application statistics
     public func getStatistics() -> AppStatistics {
