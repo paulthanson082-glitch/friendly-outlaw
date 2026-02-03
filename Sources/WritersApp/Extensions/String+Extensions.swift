@@ -1,11 +1,19 @@
 import Foundation
+#if canImport(AppKit)
+import AppKit
+#endif
 
 extension String {
     /// Counts sentences in the string
     var sentenceCount: Int {
+        #if canImport(AppKit)
         let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.orthography.rawValue)
         let matches = detector?.matches(in: self, options: [], range: NSRange(location: 0, length: utf16.count))
         return matches?.count ?? 0
+        #else
+        // Fallback for Linux/non-macOS platforms
+        return components(separatedBy: CharacterSet(charactersIn: ".!?")).filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
+        #endif
     }
 
     /// Counts paragraphs in the string
