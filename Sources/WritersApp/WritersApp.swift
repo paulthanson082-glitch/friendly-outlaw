@@ -6,7 +6,7 @@ public class WritersApp {
     public let documentManager: DocumentManager
     public let databaseManager: DatabaseManager
     public private(set) var aiService: AIService?
-    private var currentUserId: UUID?
+    public private(set) var currentUserId: UUID?
     private var currentSessionId: UUID?
 
     public init() {
