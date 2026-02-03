@@ -3,17 +3,17 @@
 This document provides essential context for AI assistants and contributors working with the friendly-outlaw codebase.
 
 Table of contents
-- <a>Project overview</a>
-- <a>Quick commands</a>
-- <a>Project structure</a>
-- <a>Architecture &amp; patterns</a>
-- <a>Key APIs</a>
-- <a>AI integration</a>
-- <a>Testing</a>
-- <a>Environment variables &amp; secrets</a>
-- <a>Common tasks for AI assistants</a>
-- <a>Where not to edit lightly</a>
-- <a>Git workflow &amp; VS Code</a>
+- [Project overview](#project-overview)
+- [Quick commands](#quick-commands)
+- [Project structure](#project-structure)
+- [Architecture & patterns](#architecture--patterns)
+- [Key APIs](#key-apis-high-level)
+- [AI integration](#ai-integration)
+- [Testing](#testing)
+- [Environment variables & secrets](#environment-variables--secrets)
+- [Common tasks for AI assistants](#common-tasks-for-ai-assistants)
+- [Where not to edit lightly](#where-not-to-edit-lightly)
+- [Git workflow & VS Code](#git-workflow--vs-code)
 
 ## Project overview
 
@@ -66,7 +66,7 @@ swift package clean
 └── README.md
 ```
 
-## Architecture &amp; patterns
+## Architecture & patterns
 
 - Manager pattern: TemplateManager, DocumentManager
 - Service pattern: AIService for all Anthropic API operations
@@ -124,7 +124,7 @@ swift test
 
 If you add AI tests, do not store real keys in the repo. Use CI secret stores or local environment variables.
 
-## Environment variables &amp; secrets
+## Environment variables & secrets
 
 - ANTHROPIC_API_KEY — Anthropic / Claude API key
 
