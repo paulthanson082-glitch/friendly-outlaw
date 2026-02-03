@@ -16,9 +16,11 @@ let package = Package(
             targets: ["WritersAppCLI"])
     ],
     targets: [
+        .systemLibrary(
+            name: "CSQLite"),
         .target(
             name: "WritersApp",
-            dependencies: []),
+            dependencies: ["CSQLite"]),
         .executableTarget(
             name: "WritersAppCLI",
             dependencies: ["WritersApp"]),
