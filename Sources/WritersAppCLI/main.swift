@@ -10,17 +10,25 @@ struct WritersAppCLI {
 
         print("╔══════════════════════════════════════╗")
         print("║     Writers App with Templates       ║")
-        print("║        Swift Edition with AI         ║")
+        print("║      Swift Edition with AI & Plugins ║")
         print("╚══════════════════════════════════════╝")
         print()
 
         // Check for API key in environment
         if let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"], !apiKey.isEmpty {
-            print("✓ AI features enabled (Claude API)\n")
+            print("✓ AI features enabled (Claude API)")
             let config = AIConfiguration(apiKey: apiKey, model: .claude35Sonnet)
             app.enableAI(configuration: config)
         } else {
-            print("ⓘ AI features disabled (set ANTHROPIC_API_KEY to enable)\n")
+            print("ⓘ AI features disabled (set ANTHROPIC_API_KEY to enable)")
+        }
+
+        // Initialize Claude Memory plugin
+        do {
+            try await app.enableMemoryPlugin()
+            print("✓ Claude Memory plugin enabled\n")
+        } catch {
+            print("ⓘ Memory plugin initialization failed: \(error.localizedDescription)\n")
         }
 
         // Show menu
@@ -45,6 +53,19 @@ struct WritersAppCLI {
                 print("15. Develop Character (AI)")
                 print("16. Generate Outline (AI)")
             }
+
+            if app.isMemoryPluginEnabled {
+                print("\nMemory Plugin:")
+                print("20. Store Memory")
+                print("21. Retrieve Memory")
+                print("22. Search Memories")
+                print("23. List Memories")
+                print("24. Clear Memory")
+                print("25. Memory Statistics")
+            }
+
+            print("\nPlugin Management:")
+            print("30. List Plugins")
 
             print("\n0. Exit")
             print()
@@ -84,7 +105,22 @@ struct WritersAppCLI {
                 await developCharacterWithAI(app: app)
             case 16:
                 await generateOutlineWithAI(app: app)
+            case 20:
+                await storeMemory(app: app)
+            case 21:
+                await retrieveMemory(app: app)
+            case 22:
+                await searchMemories(app: app)
+            case 23:
+                await listMemories(app: app)
+            case 24:
+                await clearMemory(app: app)
+            case 25:
+                await viewMemoryStats(app: app)
+            case 30:
+                listPlugins(app: app)
             case 0:
+                await app.shutdownPlugins()
                 running = false
                 print("\nThank you for using Writers App!")
             default:
@@ -517,5 +553,251 @@ func generateOutlineWithAI(app: WritersApp) async {
         print()
     } catch {
         print("\n✗ Error: \(error.localizedDescription)")
+    }
+}
+
+// MARK: - Memory Plugin Functions
+
+func storeMemory(app: WritersApp) async {
+    print("\n=== Store Memory ===\n")
+
+    print("Enter memory key: ", terminator: "")
+    guard let key = readLine(), !key.isEmpty else {
+        print("Key is required.")
+        return
+    }
+
+    print("Enter memory value: ", terminator: "")
+    guard let value = readLine(), !value.isEmpty else {
+        print("Value is required.")
+        return
+    }
+
+    print("Enter category (default: general): ", terminator: "")
+    let categoryInput = readLine() ?? ""
+    let category = categoryInput.isEmpty ? "general" : categoryInput
+
+    print("Enter tags (comma-separated, optional): ", terminator: "")
+    let tagsInput = readLine() ?? ""
+    let tags = tagsInput.isEmpty ? [] : tagsInput.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+
+    print("Enter importance (0.0-1.0, default: 0.5): ", terminator: "")
+    let importanceStr = readLine() ?? "0.5"
+    let importance = Double(importanceStr) ?? 0.5
+
+    do {
+        try await app.storeMemory(key: key, value: value, category: category, tags: tags, importance: importance)
+        print("\n✓ Memory stored successfully!")
+        print("  Key: \(key)")
+        print("  Category: \(category)")
+        if !tags.isEmpty {
+            print("  Tags: \(tags.joined(separator: ", "))")
+        }
+        print()
+    } catch {
+        print("\n✗ Error: \(error.localizedDescription)")
+    }
+}
+
+func retrieveMemory(app: WritersApp) async {
+    print("\n=== Retrieve Memory ===\n")
+
+    print("Enter memory key: ", terminator: "")
+    guard let key = readLine(), !key.isEmpty else {
+        print("Key is required.")
+        return
+    }
+
+    do {
+        if let value = try await app.retrieveMemory(key: key) {
+            print("\n✓ Memory found:")
+            print("  Key: \(key)")
+            print("  Value: \(value)")
+            print()
+        } else {
+            print("\nMemory not found for key: \(key)")
+        }
+    } catch {
+        print("\n✗ Error: \(error.localizedDescription)")
+    }
+}
+
+func searchMemories(app: WritersApp) async {
+    print("\n=== Search Memories ===\n")
+
+    print("Enter search query: ", terminator: "")
+    guard let query = readLine(), !query.isEmpty else {
+        print("Query is required.")
+        return
+    }
+
+    print("Filter by category (optional, press Enter to skip): ", terminator: "")
+    let categoryInput = readLine()
+    let category: String? = categoryInput?.isEmpty == true ? nil : categoryInput
+
+    do {
+        let results = try await app.searchMemories(query: query, category: category, limit: 10)
+
+        if results.isEmpty {
+            print("\nNo memories found matching '\(query)'")
+            return
+        }
+
+        print("\n✓ Found \(results.count) memory/memories:\n")
+        for (index, result) in results.enumerated() {
+            let key = result["key"] as? String ?? "unknown"
+            let value = result["value"] as? String ?? ""
+            let score = result["score"] as? Double ?? 0.0
+            let memCategory = result["category"] as? String ?? "general"
+
+            print("\(index + 1). \(key)")
+            print("   Category: \(memCategory)")
+            print("   Score: \(String(format: "%.2f", score))")
+            print("   Value: \(value.prefix(100))\(value.count > 100 ? "..." : "")")
+            print()
+        }
+    } catch {
+        print("\n✗ Error: \(error.localizedDescription)")
+    }
+}
+
+func listMemories(app: WritersApp) async {
+    print("\n=== List Memories ===\n")
+
+    print("Filter by category (optional, press Enter to skip): ", terminator: "")
+    let categoryInput = readLine()
+    let category: String? = categoryInput?.isEmpty == true ? nil : categoryInput
+
+    print("Sort by (created/accessed/importance, default: created): ", terminator: "")
+    let sortByInput = readLine() ?? ""
+    let sortBy = sortByInput.isEmpty ? "created" : sortByInput
+
+    do {
+        let memories = try await app.listMemories(category: category, limit: 50, sortBy: sortBy)
+
+        if memories.isEmpty {
+            print("\nNo memories found.")
+            return
+        }
+
+        print("\n✓ Found \(memories.count) memory/memories:\n")
+        for (index, memory) in memories.enumerated() {
+            let key = memory["key"] as? String ?? "unknown"
+            let memCategory = memory["category"] as? String ?? "general"
+            let importance = memory["importance"] as? Double ?? 0.5
+            let accessCount = memory["accessCount"] as? Int ?? 0
+            let created = memory["created"] as? String ?? "unknown"
+
+            print("\(index + 1). \(key)")
+            print("   Category: \(memCategory)")
+            print("   Importance: \(String(format: "%.1f", importance))")
+            print("   Access Count: \(accessCount)")
+            print("   Created: \(created)")
+            print()
+        }
+    } catch {
+        print("\n✗ Error: \(error.localizedDescription)")
+    }
+}
+
+func clearMemory(app: WritersApp) async {
+    print("\n=== Clear Memory ===\n")
+
+    print("Options:")
+    print("1. Clear specific memory by key")
+    print("2. Clear all memories in a category")
+    print("3. Clear ALL memories")
+    print("\nSelect option: ", terminator: "")
+
+    guard let input = readLine(), let option = Int(input) else {
+        print("Invalid input.")
+        return
+    }
+
+    do {
+        var cleared = 0
+
+        switch option {
+        case 1:
+            print("Enter memory key to clear: ", terminator: "")
+            guard let key = readLine(), !key.isEmpty else {
+                print("Key is required.")
+                return
+            }
+            cleared = try await app.clearMemory(key: key)
+
+        case 2:
+            print("Enter category to clear: ", terminator: "")
+            guard let category = readLine(), !category.isEmpty else {
+                print("Category is required.")
+                return
+            }
+            cleared = try await app.clearMemory(category: category)
+
+        case 3:
+            print("Are you sure you want to clear ALL memories? (yes/no): ", terminator: "")
+            guard readLine()?.lowercased() == "yes" else {
+                print("Operation cancelled.")
+                return
+            }
+            cleared = try await app.clearMemory()
+
+        default:
+            print("Invalid option.")
+            return
+        }
+
+        print("\n✓ Cleared \(cleared) memory/memories.")
+    } catch {
+        print("\n✗ Error: \(error.localizedDescription)")
+    }
+}
+
+func viewMemoryStats(app: WritersApp) async {
+    print("\n=== Memory Statistics ===\n")
+
+    do {
+        let stats = try await app.getMemoryStats()
+
+        let totalMemories = stats["totalMemories"] as? Int ?? 0
+        let totalAccessCount = stats["totalAccessCount"] as? Int ?? 0
+        let avgImportance = stats["averageImportance"] as? Double ?? 0.0
+        let categoryCounts = stats["categoryCounts"] as? [String: Int] ?? [:]
+
+        print("Total Memories: \(totalMemories)")
+        print("Total Access Count: \(totalAccessCount)")
+        print("Average Importance: \(String(format: "%.2f", avgImportance))")
+
+        if !categoryCounts.isEmpty {
+            print("\nMemories by Category:")
+            for (category, count) in categoryCounts.sorted(by: { $0.value > $1.value }) {
+                print("  \(category): \(count)")
+            }
+        }
+        print()
+    } catch {
+        print("\n✗ Error: \(error.localizedDescription)")
+    }
+}
+
+// MARK: - Plugin Management
+
+func listPlugins(app: WritersApp) {
+    print("\n=== Installed Plugins ===\n")
+
+    let plugins = app.getPlugins()
+
+    if plugins.isEmpty {
+        print("No plugins installed.")
+        return
+    }
+
+    for (index, plugin) in plugins.enumerated() {
+        print("\(index + 1). \(plugin.name) (v\(plugin.version))")
+        print("   ID: \(plugin.id)")
+        print("   Status: \(plugin.isEnabled ? "Enabled" : "Disabled")")
+        print("   Description: \(plugin.description)")
+        print("   Capabilities: \(plugin.capabilities.map { $0.rawValue }.joined(separator: ", "))")
+        print()
     }
 }

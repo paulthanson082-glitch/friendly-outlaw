@@ -5,14 +5,17 @@ public class WritersApp {
     public let templateManager: TemplateManager
     public let documentManager: DocumentManager
     public let databaseManager: DatabaseManager
+    public let pluginManager: PluginManager
     public private(set) var aiService: AIService?
     public private(set) var currentUserId: UUID?
     private var currentSessionId: UUID?
+    private var memoryPlugin: ClaudeMemoryPlugin?
 
     public init() {
         self.templateManager = TemplateManager()
         self.documentManager = DocumentManager()
         self.databaseManager = DatabaseManager()
+        self.pluginManager = PluginManager.shared
         try? self.databaseManager.initialize()
     }
 
@@ -21,15 +24,17 @@ public class WritersApp {
         self.templateManager = TemplateManager()
         self.documentManager = DocumentManager()
         self.databaseManager = DatabaseManager()
+        self.pluginManager = PluginManager.shared
         try? self.databaseManager.initialize()
         self.aiService = AIService(configuration: aiConfiguration)
     }
-    
+
     /// Initialize with custom database path
     public init(databasePath: String? = nil) {
         self.templateManager = TemplateManager()
         self.documentManager = DocumentManager()
         self.databaseManager = DatabaseManager(databasePath: databasePath)
+        self.pluginManager = PluginManager.shared
         try? self.databaseManager.initialize()
     }
 
@@ -50,6 +55,152 @@ public class WritersApp {
     /// Check if AI is available
     public var isAIEnabled: Bool {
         return aiService != nil
+    }
+
+    // MARK: - Plugin Management
+
+    /// Enable the Claude Memory plugin
+    public func enableMemoryPlugin() async throws {
+        memoryPlugin = pluginManager.installClaudeMemoryPlugin()
+        try await memoryPlugin?.initialize()
+    }
+
+    /// Check if memory plugin is enabled
+    public var isMemoryPluginEnabled: Bool {
+        return memoryPlugin?.isEnabled ?? false
+    }
+
+    /// Store a memory
+    public func storeMemory(key: String, value: String, category: String = "general", tags: [String] = [], importance: Double = 0.5) async throws {
+        guard let plugin = memoryPlugin, plugin.isEnabled else {
+            throw PluginError.notInitialized
+        }
+
+        let action = PluginAction(type: .storeMemory, parameters: [
+            "key": key,
+            "value": value,
+            "category": category,
+            "tags": tags,
+            "importance": importance
+        ])
+
+        let result = try await plugin.execute(action: action)
+        if !result.success, let error = result.error {
+            throw error
+        }
+    }
+
+    /// Retrieve a memory by key
+    public func retrieveMemory(key: String) async throws -> String? {
+        guard let plugin = memoryPlugin, plugin.isEnabled else {
+            throw PluginError.notInitialized
+        }
+
+        let action = PluginAction(type: .retrieveMemory, parameters: ["key": key])
+        let result = try await plugin.execute(action: action)
+
+        if result.success {
+            return result.data as? String
+        }
+
+        return nil
+    }
+
+    /// Search memories
+    public func searchMemories(query: String, category: String? = nil, limit: Int = 10) async throws -> [[String: Any]] {
+        guard let plugin = memoryPlugin, plugin.isEnabled else {
+            throw PluginError.notInitialized
+        }
+
+        var params: [String: Any] = ["query": query, "limit": limit]
+        if let cat = category {
+            params["category"] = cat
+        }
+
+        let action = PluginAction(type: .searchMemory, parameters: params)
+        let result = try await plugin.execute(action: action)
+
+        if result.success, let data = result.data as? [[String: Any]] {
+            return data
+        }
+
+        return []
+    }
+
+    /// List all memories
+    public func listMemories(category: String? = nil, limit: Int = 100, sortBy: String = "created") async throws -> [[String: Any]] {
+        guard let plugin = memoryPlugin, plugin.isEnabled else {
+            throw PluginError.notInitialized
+        }
+
+        var params: [String: Any] = ["limit": limit, "sortBy": sortBy]
+        if let cat = category {
+            params["category"] = cat
+        }
+
+        let action = PluginAction(type: .listMemories, parameters: params)
+        let result = try await plugin.execute(action: action)
+
+        if result.success, let data = result.data as? [[String: Any]] {
+            return data
+        }
+
+        return []
+    }
+
+    /// Clear a specific memory or all memories
+    public func clearMemory(key: String? = nil, category: String? = nil) async throws -> Int {
+        guard let plugin = memoryPlugin, plugin.isEnabled else {
+            throw PluginError.notInitialized
+        }
+
+        var params: [String: Any] = [:]
+        if let k = key {
+            params["key"] = k
+        }
+        if let cat = category {
+            params["category"] = cat
+        }
+
+        let action = PluginAction(type: .clearMemory, parameters: params)
+        let result = try await plugin.execute(action: action)
+
+        if result.success, let data = result.data as? [String: Any], let cleared = data["cleared"] as? Int {
+            return cleared
+        }
+
+        return 0
+    }
+
+    /// Get memory plugin statistics
+    public func getMemoryStats() async throws -> [String: Any] {
+        guard let plugin = memoryPlugin, plugin.isEnabled else {
+            throw PluginError.notInitialized
+        }
+
+        let action = PluginAction(type: .custom, parameters: ["action": "getStats"])
+        let result = try await plugin.execute(action: action)
+
+        if result.success, let data = result.data as? [String: Any] {
+            return data
+        }
+
+        return [:]
+    }
+
+    /// Get all registered plugins
+    public func getPlugins() -> [Plugin] {
+        return pluginManager.getAllPlugins()
+    }
+
+    /// Get enabled plugins
+    public func getEnabledPlugins() -> [Plugin] {
+        return pluginManager.getEnabledPlugins()
+    }
+
+    /// Shutdown all plugins
+    public func shutdownPlugins() async {
+        await pluginManager.shutdownAll()
     }
 
     // MARK: - Document Creation from Templates
