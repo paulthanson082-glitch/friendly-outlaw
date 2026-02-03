@@ -185,17 +185,26 @@ struct EditorToolbarView: View {
         HStack(spacing: 16) {
             // Formatting buttons
             Group {
-                Button(action: { viewModel.toggleBold() }) {
+                Button(action: { 
+                    viewModel.toggleBold()
+                    viewModel.logToolbarInteraction("bold")
+                }) {
                     Image(systemName: "bold")
                 }
                 .keyboardShortcut("b", modifiers: .command)
 
-                Button(action: { viewModel.toggleItalic() }) {
+                Button(action: { 
+                    viewModel.toggleItalic()
+                    viewModel.logToolbarInteraction("italic")
+                }) {
                     Image(systemName: "italic")
                 }
                 .keyboardShortcut("i", modifiers: .command)
 
-                Button(action: { viewModel.toggleUnderline() }) {
+                Button(action: { 
+                    viewModel.toggleUnderline()
+                    viewModel.logToolbarInteraction("underline")
+                }) {
                     Image(systemName: "underline")
                 }
                 .keyboardShortcut("u", modifiers: .command)
@@ -206,20 +215,38 @@ struct EditorToolbarView: View {
 
             // Heading buttons
             Menu {
-                Button("Heading 1") { viewModel.applyHeading(level: 1) }
-                Button("Heading 2") { viewModel.applyHeading(level: 2) }
-                Button("Heading 3") { viewModel.applyHeading(level: 3) }
-                Button("Body") { viewModel.applyBodyStyle() }
+                Button("Heading 1") { 
+                    viewModel.applyHeading(level: 1)
+                    viewModel.logToolbarInteraction("heading1")
+                }
+                Button("Heading 2") { 
+                    viewModel.applyHeading(level: 2)
+                    viewModel.logToolbarInteraction("heading2")
+                }
+                Button("Heading 3") { 
+                    viewModel.applyHeading(level: 3)
+                    viewModel.logToolbarInteraction("heading3")
+                }
+                Button("Body") { 
+                    viewModel.applyBodyStyle()
+                    viewModel.logToolbarInteraction("body_style")
+                }
             } label: {
                 Label("Style", systemImage: "textformat")
             }
 
             // List buttons
             Menu {
-                Button(action: { viewModel.toggleBulletList() }) {
+                Button(action: { 
+                    viewModel.toggleBulletList()
+                    viewModel.logToolbarInteraction("bullet_list")
+                }) {
                     Label("Bullet List", systemImage: "list.bullet")
                 }
-                Button(action: { viewModel.toggleNumberedList() }) {
+                Button(action: { 
+                    viewModel.toggleNumberedList()
+                    viewModel.logToolbarInteraction("numbered_list")
+                }) {
                     Label("Numbered List", systemImage: "list.number")
                 }
             } label: {
@@ -229,26 +256,41 @@ struct EditorToolbarView: View {
             Spacer()
 
             // AI button
-            Button(action: { viewModel.toggleAIPanel() }) {
+            Button(action: { 
+                viewModel.toggleAIPanel()
+                viewModel.logToolbarInteraction("toggle_ai_panel")
+            }) {
                 Label("AI Assistant", systemImage: "sparkles")
             }
             .keyboardShortcut("a", modifiers: [.command, .option])
 
             // Focus mode button
-            Button(action: { viewModel.toggleFocusMode() }) {
+            Button(action: { 
+                viewModel.toggleFocusMode()
+                viewModel.logToolbarInteraction("toggle_focus_mode")
+            }) {
                 Image(systemName: viewModel.isFocusMode ? "eye.slash" : "eye")
             }
             .keyboardShortcut("d", modifiers: [.command, .shift])
 
             // More options
             Menu {
-                Button(action: { viewModel.exportDocument() }) {
+                Button(action: { 
+                    viewModel.exportDocument()
+                    viewModel.logToolbarInteraction("export")
+                }) {
                     Label("Export", systemImage: "square.and.arrow.up")
                 }
-                Button(action: { viewModel.showDocumentInfo() }) {
+                Button(action: { 
+                    viewModel.showDocumentInfo()
+                    viewModel.logToolbarInteraction("document_info")
+                }) {
                     Label("Document Info", systemImage: "info.circle")
                 }
-                Button(action: { viewModel.showWordCount() }) {
+                Button(action: { 
+                    viewModel.showWordCount()
+                    viewModel.logToolbarInteraction("word_count")
+                }) {
                     Label("Word Count", systemImage: "number")
                 }
             } label: {
@@ -370,32 +412,50 @@ struct AISidebarView: View {
                             AIQuickActionButton(
                                 title: "Continue",
                                 icon: "arrow.right.circle",
-                                action: { viewModel.aiContinueWriting() }
+                                action: { 
+                                    viewModel.aiContinueWriting()
+                                    viewModel.logToolUsage("ai_continue")
+                                }
                             )
                             AIQuickActionButton(
                                 title: "Improve",
                                 icon: "wand.and.stars",
-                                action: { viewModel.aiImproveText() }
+                                action: { 
+                                    viewModel.aiImproveText()
+                                    viewModel.logToolUsage("ai_improve")
+                                }
                             )
                             AIQuickActionButton(
                                 title: "Expand",
                                 icon: "arrow.up.left.and.arrow.down.right",
-                                action: { viewModel.aiExpandText() }
+                                action: { 
+                                    viewModel.aiExpandText()
+                                    viewModel.logToolUsage("ai_expand")
+                                }
                             )
                             AIQuickActionButton(
                                 title: "Simplify",
                                 icon: "text.badge.minus",
-                                action: { viewModel.aiSimplifyText() }
+                                action: { 
+                                    viewModel.aiSimplifyText()
+                                    viewModel.logToolUsage("ai_simplify")
+                                }
                             )
                             AIQuickActionButton(
                                 title: "Grammar",
                                 icon: "checkmark.circle",
-                                action: { viewModel.aiCheckGrammar() }
+                                action: { 
+                                    viewModel.aiCheckGrammar()
+                                    viewModel.logToolUsage("ai_grammar")
+                                }
                             )
                             AIQuickActionButton(
                                 title: "Summarize",
                                 icon: "text.badge.checkmark",
-                                action: { viewModel.aiSummarize() }
+                                action: { 
+                                    viewModel.aiSummarize()
+                                    viewModel.logToolUsage("ai_summarize")
+                                }
                             )
                         }
                     }
@@ -413,35 +473,50 @@ struct AISidebarView: View {
                             title: "Brainstorm Ideas",
                             icon: "lightbulb",
                             description: "Generate creative ideas for your topic",
-                            action: { viewModel.aiBrainstorm() }
+                            action: { 
+                                viewModel.aiBrainstorm()
+                                viewModel.logToolUsage("ai_brainstorm")
+                            }
                         )
 
                         AIToolButton(
                             title: "Generate Outline",
                             icon: "list.bullet.indent",
                             description: "Create a structured outline",
-                            action: { viewModel.aiGenerateOutline() }
+                            action: { 
+                                viewModel.aiGenerateOutline()
+                                viewModel.logToolUsage("ai_outline")
+                            }
                         )
 
                         AIToolButton(
                             title: "Character Development",
                             icon: "person.2",
                             description: "Develop rich, complex characters",
-                            action: { viewModel.aiDevelopCharacter() }
+                            action: { 
+                                viewModel.aiDevelopCharacter()
+                                viewModel.logToolUsage("ai_character")
+                            }
                         )
 
                         AIToolButton(
                             title: "Improve Dialogue",
                             icon: "bubble.left.and.bubble.right",
                             description: "Make dialogue more natural",
-                            action: { viewModel.aiImproveDialogue() }
+                            action: { 
+                                viewModel.aiImproveDialogue()
+                                viewModel.logToolUsage("ai_dialogue")
+                            }
                         )
 
                         AIToolButton(
                             title: "Generate Titles",
                             icon: "textformat",
                             description: "Suggest compelling titles",
-                            action: { viewModel.aiGenerateTitles() }
+                            action: { 
+                                viewModel.aiGenerateTitles()
+                                viewModel.logToolUsage("ai_titles")
+                            }
                         )
                     }
 
@@ -460,6 +535,7 @@ struct AISidebarView: View {
 
                         Button(action: {
                             viewModel.aiCustomRequest(prompt: aiPrompt)
+                            viewModel.logToolUsage("ai_custom")
                             aiPrompt = ""
                         }) {
                             Label("Send", systemImage: "paperplane.fill")
@@ -674,18 +750,34 @@ public class WritersAppViewModel: ObservableObject {
     public let multitaskingManager = MultitaskingManager()
     public let keyboardShortcutManager = KeyboardShortcutManager()
     public let applePencilManager = ApplePencilManager()
+    public let databaseService = DatabaseService()
 
     // MARK: - Private Properties
 
     private var currentDocument: Document?
     private var writersApp: WritersApp?
-
+    private var currentSession: UserSession?
+    
     // MARK: - Initialization
 
     public init() {}
 
     public func initialize() {
         writersApp = WritersApp()
+        
+        // Initialize database
+        do {
+            try databaseService.initialize()
+            
+            // Start a new session
+            currentSession = UserSession(
+                screenSize: "\(UIScreen.main.bounds.width)x\(UIScreen.main.bounds.height)"
+            )
+            try databaseService.createUserSession(currentSession!)
+        } catch {
+            print("Failed to initialize database: \(error)")
+        }
+        
         updateStatistics()
     }
 
@@ -841,6 +933,16 @@ public class WritersAppViewModel: ObservableObject {
         if !layout.showAIPanel {
             showAIPanel = false
         }
+        
+        // Log multitasking mode change
+        if let sessionId = currentSession?.id {
+            var updatedSession = currentSession
+            updatedSession?.multitaskingMode = layout.showAIPanel ? "split" : "fullscreen"
+            updatedSession?.screenSize = "\(size.width)x\(size.height)"
+            currentSession = updatedSession
+            
+            try? databaseService.updateUserSession(updatedSession!)
+        }
     }
 
     // MARK: - Statistics
@@ -850,6 +952,61 @@ public class WritersAppViewModel: ObservableObject {
         wordCount = words.filter { !$0.isEmpty }.count
         characterCount = currentDocumentContent.count
         readingTime = max(1, wordCount / 200)
+    }
+    
+    // MARK: - Database Logging
+    
+    /// Log an AI interaction to the database
+    private func logAIInteraction(tool: String, prompt: String, output: String, model: String? = nil) {
+        guard let sessionId = currentSession?.id else { return }
+        
+        let suggestion = AISuggestion(
+            promptText: prompt,
+            outputText: output,
+            aiTool: tool,
+            aiModel: model,
+            documentId: currentDocument?.id
+        )
+        
+        do {
+            try databaseService.saveAISuggestion(suggestion)
+            try databaseService.incrementAIInteractionCount(sessionId: sessionId)
+        } catch {
+            print("Failed to log AI interaction: \(error)")
+        }
+    }
+    
+    /// Log a toolbar interaction
+    public func logToolbarInteraction(_ interaction: String) {
+        guard let sessionId = currentSession?.id else { return }
+        
+        do {
+            try databaseService.logToolbarInteraction(sessionId: sessionId, interaction: interaction)
+        } catch {
+            print("Failed to log toolbar interaction: \(error)")
+        }
+    }
+    
+    /// Log a tool usage
+    public func logToolUsage(_ tool: String) {
+        guard let sessionId = currentSession?.id else { return }
+        
+        do {
+            try databaseService.logToolUsage(sessionId: sessionId, tool: tool)
+        } catch {
+            print("Failed to log tool usage: \(error)")
+        }
+    }
+    
+    /// End the current session
+    public func endSession() {
+        guard let sessionId = currentSession?.id else { return }
+        
+        do {
+            try databaseService.endSession(id: sessionId)
+        } catch {
+            print("Failed to end session: \(error)")
+        }
     }
 }
 
