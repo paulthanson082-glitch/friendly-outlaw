@@ -937,8 +937,7 @@ public class WritersAppViewModel: ObservableObject {
         }
         
         // Log multitasking mode change
-        if let sessionId = currentSession?.id,
-           var updatedSession = currentSession {
+        if var updatedSession = currentSession {
             updatedSession.multitaskingMode = layout.showAIPanel ? "split" : "fullscreen"
             updatedSession.screenSize = "\(size.width)x\(size.height)"
             currentSession = updatedSession

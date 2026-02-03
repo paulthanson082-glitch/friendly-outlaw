@@ -17,7 +17,11 @@ public class SQLiteDatabase {
         } else {
             // Default to Application Support directory
             let fileManager = FileManager.default
-            let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            guard let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+                // Fallback to temporary directory if Application Support is not available
+                self.dbPath = fileManager.temporaryDirectory.appendingPathComponent("WritersApp/writersapp.db").path
+                return
+            }
             let dbDirectory = appSupportURL.appendingPathComponent("WritersApp", isDirectory: true)
             
             // Create directory if it doesn't exist

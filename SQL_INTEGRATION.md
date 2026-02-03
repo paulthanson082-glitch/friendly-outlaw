@@ -213,16 +213,19 @@ let aiConfig = AIConfiguration(
     temperature: 0.7
 )
 
-let configStorage = AIConfigurationStorage.from(
+if let configStorage = AIConfigurationStorage.from(
     aiConfiguration: aiConfig,
     userId: "user-123"
-)!
-
-try databaseService.saveAIConfiguration(configStorage)
+) {
+    try databaseService.saveAIConfiguration(configStorage)
+}
 
 // Retrieve configuration
-let retrieved = try databaseService.getAIConfiguration(userId: "user-123")
-let decodedConfig = retrieved?.toAIConfiguration()
+if let retrieved = try databaseService.getAIConfiguration(userId: "user-123"),
+   let decodedConfig = retrieved.toAIConfiguration() {
+    // Use the configuration
+    print("API Key: \(decodedConfig.apiKey)")
+}
 ```
 
 ### Analytics Queries

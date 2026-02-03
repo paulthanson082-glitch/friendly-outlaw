@@ -107,6 +107,24 @@ public class DatabaseService {
     
     // MARK: - User Sessions Operations
     
+    /// Helper function to serialize string arrays to JSON
+    private func serializeToJSON(_ array: [String]) -> String {
+        if let jsonData = try? JSONSerialization.data(withJSONObject: array),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            return jsonString
+        }
+        return "[]"
+    }
+    
+    /// Helper function to serialize dictionary to JSON
+    private func serializeToJSON(_ dictionary: [String: String]) -> String? {
+        if let jsonData = try? JSONSerialization.data(withJSONObject: dictionary),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            return jsonString
+        }
+        return nil
+    }
+    
     /// Create a new user session
     public func createUserSession(_ session: UserSession) throws {
         let sql = """
@@ -116,42 +134,17 @@ public class DatabaseService {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         
-        let toolsUsedJSON: Any
-        if let jsonData = try? JSONSerialization.data(withJSONObject: session.toolsUsed),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
-            toolsUsedJSON = jsonString
-        } else {
-            toolsUsedJSON = "[]"
-        }
-        
-        let toolbarInteractionsJSON: Any
-        if let jsonData = try? JSONSerialization.data(withJSONObject: session.toolbarInteractions),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
-            toolbarInteractionsJSON = jsonString
-        } else {
-            toolbarInteractionsJSON = "[]"
-        }
-        
-        let metadataString: Any
-        if let metadata = session.metadata,
-           let jsonData = try? JSONSerialization.data(withJSONObject: metadata),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
-            metadataString = jsonString
-        } else {
-            metadataString = NSNull()
-        }
-        
         let parameters: [Any] = [
             session.id.uuidString,
             session.sessionStart.timeIntervalSince1970,
             session.sessionEnd?.timeIntervalSince1970 ?? NSNull(),
-            toolsUsedJSON,
+            serializeToJSON(session.toolsUsed),
             session.multitaskingMode ?? NSNull(),
             session.screenSize ?? NSNull(),
             session.aiInteractionsCount,
-            toolbarInteractionsJSON,
+            serializeToJSON(session.toolbarInteractions),
             session.durationSeconds ?? NSNull(),
-            metadataString
+            session.metadata.flatMap { serializeToJSON($0) } ?? NSNull()
         ]
         
         try database.executeWithBindings(sql, parameters: parameters)
@@ -167,40 +160,15 @@ public class DatabaseService {
             WHERE id = ?
         """
         
-        let toolsUsedJSON: Any
-        if let jsonData = try? JSONSerialization.data(withJSONObject: session.toolsUsed),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
-            toolsUsedJSON = jsonString
-        } else {
-            toolsUsedJSON = "[]"
-        }
-        
-        let toolbarInteractionsJSON: Any
-        if let jsonData = try? JSONSerialization.data(withJSONObject: session.toolbarInteractions),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
-            toolbarInteractionsJSON = jsonString
-        } else {
-            toolbarInteractionsJSON = "[]"
-        }
-        
-        let metadataString: Any
-        if let metadata = session.metadata,
-           let jsonData = try? JSONSerialization.data(withJSONObject: metadata),
-           let jsonString = String(data: jsonData, encoding: .utf8) {
-            metadataString = jsonString
-        } else {
-            metadataString = NSNull()
-        }
-        
         let parameters: [Any] = [
             session.sessionEnd?.timeIntervalSince1970 ?? NSNull(),
-            toolsUsedJSON,
+            serializeToJSON(session.toolsUsed),
             session.multitaskingMode ?? NSNull(),
             session.screenSize ?? NSNull(),
             session.aiInteractionsCount,
-            toolbarInteractionsJSON,
+            serializeToJSON(session.toolbarInteractions),
             session.durationSeconds ?? NSNull(),
-            metadataString,
+            session.metadata.flatMap { serializeToJSON($0) } ?? NSNull(),
             session.id.uuidString
         ]
         
