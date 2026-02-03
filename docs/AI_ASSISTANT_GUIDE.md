@@ -146,7 +146,7 @@ Security guidance:
 - Tests — ensure they continue to pass
 - CLI UX — coordinate with maintainers
 
-## Git workflow &amp; VS Code
+## Git workflow & VS Code
 
 - Feature branch per change; PRs for reviews
 - Suggested labels: documentation, needs-review, security-check
