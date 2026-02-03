@@ -101,10 +101,24 @@ WritersApp/
 │   │   └── WritersApp.swift         # Main app class
 │   └── WritersAppCLI/
 │       └── main.swift               # CLI interface
-└── Tests/
-    └── WritersAppTests/
-        └── WritersAppTests.swift    # Unit tests
+├── Tests/
+│   └── WritersAppTests/
+│       └── WritersAppTests.swift    # Unit tests
+└── examples/
+    ├── python_ai_service.py         # Python SDK examples
+    ├── requirements.txt             # Python dependencies
+    └── README.md                    # Python examples guide
 ```
+
+## Python Examples
+
+For developers preferring Python, comprehensive examples are available in the `examples/` directory. These examples demonstrate how to use the Anthropic API with the official Python SDK, mirroring the functionality of the Swift AIService.
+
+See [examples/README.md](examples/README.md) for:
+- Complete Python implementation using the official Anthropic SDK
+- Usage examples for all major features
+- Setup and installation instructions
+- Comparison with the Swift implementation
 
 ## Usage
 
