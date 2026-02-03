@@ -236,13 +236,25 @@ public class SQLiteDatabase {
     
     /// Check if a table exists
     public func tableExists(_ tableName: String) throws -> Bool {
+        // Validate table name to prevent SQL injection
+        let allowedTables = ["AI_Suggestions", "User_Sessions", "AI_Configurations", "sqlite_master"]
+        guard allowedTables.contains(tableName) else {
+            throw SQLiteError.bind(message: "Invalid table name")
+        }
+        
         let sql = "SELECT name FROM sqlite_master WHERE type='table' AND name=?"
         let results = try query(sql, parameters: [tableName])
         return !results.isEmpty
     }
-    
+
     /// Delete all data from a table (for testing)
     public func clearTable(_ tableName: String) throws {
+        // Validate table name to prevent SQL injection
+        let allowedTables = ["AI_Suggestions", "User_Sessions", "AI_Configurations"]
+        guard allowedTables.contains(tableName) else {
+            throw SQLiteError.bind(message: "Invalid table name")
+        }
+        
         try execute("DELETE FROM \(tableName)")
     }
 }

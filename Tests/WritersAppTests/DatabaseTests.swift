@@ -165,7 +165,9 @@ final class DatabaseTests: XCTestCase {
         let endedSession = try databaseService.getUserSession(id: session.id)
         XCTAssertNotNil(endedSession?.sessionEnd)
         XCTAssertNotNil(endedSession?.durationSeconds)
-        XCTAssert(endedSession!.durationSeconds! >= 0)
+        if let duration = endedSession?.durationSeconds {
+            XCTAssertGreaterThanOrEqual(duration, 0)
+        }
     }
     
     func testLogToolUsage() throws {

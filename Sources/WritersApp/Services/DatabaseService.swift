@@ -116,6 +116,22 @@ public class DatabaseService {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         
+        let toolsUsedJSON: Any
+        if let jsonData = try? JSONSerialization.data(withJSONObject: session.toolsUsed),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            toolsUsedJSON = jsonString
+        } else {
+            toolsUsedJSON = "[]"
+        }
+        
+        let toolbarInteractionsJSON: Any
+        if let jsonData = try? JSONSerialization.data(withJSONObject: session.toolbarInteractions),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            toolbarInteractionsJSON = jsonString
+        } else {
+            toolbarInteractionsJSON = "[]"
+        }
+        
         let metadataString: Any
         if let metadata = session.metadata,
            let jsonData = try? JSONSerialization.data(withJSONObject: metadata),
@@ -129,11 +145,11 @@ public class DatabaseService {
             session.id.uuidString,
             session.sessionStart.timeIntervalSince1970,
             session.sessionEnd?.timeIntervalSince1970 ?? NSNull(),
-            session.toolsUsed.joined(separator: ","),
+            toolsUsedJSON,
             session.multitaskingMode ?? NSNull(),
             session.screenSize ?? NSNull(),
             session.aiInteractionsCount,
-            session.toolbarInteractions.joined(separator: ","),
+            toolbarInteractionsJSON,
             session.durationSeconds ?? NSNull(),
             metadataString
         ]
@@ -151,6 +167,22 @@ public class DatabaseService {
             WHERE id = ?
         """
         
+        let toolsUsedJSON: Any
+        if let jsonData = try? JSONSerialization.data(withJSONObject: session.toolsUsed),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            toolsUsedJSON = jsonString
+        } else {
+            toolsUsedJSON = "[]"
+        }
+        
+        let toolbarInteractionsJSON: Any
+        if let jsonData = try? JSONSerialization.data(withJSONObject: session.toolbarInteractions),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            toolbarInteractionsJSON = jsonString
+        } else {
+            toolbarInteractionsJSON = "[]"
+        }
+        
         let metadataString: Any
         if let metadata = session.metadata,
            let jsonData = try? JSONSerialization.data(withJSONObject: metadata),
@@ -162,11 +194,11 @@ public class DatabaseService {
         
         let parameters: [Any] = [
             session.sessionEnd?.timeIntervalSince1970 ?? NSNull(),
-            session.toolsUsed.joined(separator: ","),
+            toolsUsedJSON,
             session.multitaskingMode ?? NSNull(),
             session.screenSize ?? NSNull(),
             session.aiInteractionsCount,
-            session.toolbarInteractions.joined(separator: ","),
+            toolbarInteractionsJSON,
             session.durationSeconds ?? NSNull(),
             metadataString,
             session.id.uuidString

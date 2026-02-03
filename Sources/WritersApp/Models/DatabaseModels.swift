@@ -145,10 +145,24 @@ public struct UserSession: Codable, Identifiable {
         var dict: [String: Any] = [
             "id": id.uuidString,
             "session_start": sessionStart.timeIntervalSince1970,
-            "tools_used": toolsUsed.joined(separator: ","),
-            "ai_interactions_count": aiInteractionsCount,
-            "toolbar_interactions": toolbarInteractions.joined(separator: ",")
+            "ai_interactions_count": aiInteractionsCount
         ]
+        
+        // Serialize toolsUsed as JSON
+        if let jsonData = try? JSONSerialization.data(withJSONObject: toolsUsed),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            dict["tools_used"] = jsonString
+        } else {
+            dict["tools_used"] = "[]"
+        }
+        
+        // Serialize toolbarInteractions as JSON
+        if let jsonData = try? JSONSerialization.data(withJSONObject: toolbarInteractions),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            dict["toolbar_interactions"] = jsonString
+        } else {
+            dict["toolbar_interactions"] = "[]"
+        }
         
         if let sessionEnd = sessionEnd {
             dict["session_end"] = sessionEnd.timeIntervalSince1970
@@ -186,7 +200,15 @@ public struct UserSession: Codable, Identifiable {
         }
         
         let sessionStart = Date(timeIntervalSince1970: sessionStartTimestamp)
-        let toolsUsed = toolsUsedString.isEmpty ? [] : toolsUsedString.components(separatedBy: ",")
+        
+        // Deserialize toolsUsed from JSON
+        let toolsUsed: [String]
+        if let jsonData = toolsUsedString.data(using: .utf8),
+           let array = try? JSONSerialization.jsonObject(with: jsonData) as? [String] {
+            toolsUsed = array
+        } else {
+            toolsUsed = []
+        }
         
         let sessionEnd: Date?
         if let sessionEndTimestamp = dictionary["session_end"] as? Double {
@@ -199,8 +221,16 @@ public struct UserSession: Codable, Identifiable {
         let screenSize = dictionary["screen_size"] as? String
         let durationSeconds = dictionary["duration_seconds"] as? Int
         
-        let toolbarInteractionsString = dictionary["toolbar_interactions"] as? String ?? ""
-        let toolbarInteractions = toolbarInteractionsString.isEmpty ? [] : toolbarInteractionsString.components(separatedBy: ",")
+        let toolbarInteractionsString = dictionary["toolbar_interactions"] as? String ?? "[]"
+        
+        // Deserialize toolbarInteractions from JSON
+        let toolbarInteractions: [String]
+        if let jsonData = toolbarInteractionsString.data(using: .utf8),
+           let array = try? JSONSerialization.jsonObject(with: jsonData) as? [String] {
+            toolbarInteractions = array
+        } else {
+            toolbarInteractions = []
+        }
         
         let metadata: [String: String]?
         if let metadataString = dictionary["metadata"] as? String,

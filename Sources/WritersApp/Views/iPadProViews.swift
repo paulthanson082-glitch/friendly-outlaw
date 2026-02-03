@@ -773,7 +773,9 @@ public class WritersAppViewModel: ObservableObject {
             currentSession = UserSession(
                 screenSize: "\(UIScreen.main.bounds.width)x\(UIScreen.main.bounds.height)"
             )
-            try databaseService.createUserSession(currentSession!)
+            if let session = currentSession {
+                try databaseService.createUserSession(session)
+            }
         } catch {
             print("Failed to initialize database: \(error)")
         }
@@ -935,13 +937,13 @@ public class WritersAppViewModel: ObservableObject {
         }
         
         // Log multitasking mode change
-        if let sessionId = currentSession?.id {
-            var updatedSession = currentSession
-            updatedSession?.multitaskingMode = layout.showAIPanel ? "split" : "fullscreen"
-            updatedSession?.screenSize = "\(size.width)x\(size.height)"
+        if let sessionId = currentSession?.id,
+           var updatedSession = currentSession {
+            updatedSession.multitaskingMode = layout.showAIPanel ? "split" : "fullscreen"
+            updatedSession.screenSize = "\(size.width)x\(size.height)"
             currentSession = updatedSession
             
-            try? databaseService.updateUserSession(updatedSession!)
+            try? databaseService.updateUserSession(updatedSession)
         }
     }
 
