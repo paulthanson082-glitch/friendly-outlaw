@@ -184,14 +184,8 @@ public class ProductivityAnalytics {
             $0.startTime >= startDate && $0.startTime <= endDate && $0.state == .completed
         }
 
-        // Single-pass calculation
-        var totalWords = 0
-        var totalFocusMinutes: TimeInterval = 0.0
-        
-        for session in sessions {
-            totalWords += session.wordsWritten
-            totalFocusMinutes += session.actualDuration / 60
-        }
+        let totalWords = sessions.reduce(0) { $0 + $1.wordsWritten }
+        let totalFocusMinutes = sessions.reduce(0.0) { $0 + $1.actualDuration / 60 }
 
         let calendar = Calendar.current
         let dayCount = max(1, calendar.dateComponents([.day], from: startDate, to: endDate).day ?? 1)
@@ -227,18 +221,9 @@ public class ProductivityAnalytics {
     public func getTodaySummary() -> DailyProductivity {
         let todaySessions = focusManager.getTodaySessions().filter { $0.state == .completed }
 
-        // Single-pass calculation with set for document tracking
-        var words = 0
-        var focusMinutes: TimeInterval = 0.0
-        var documentIds = Set<UUID>()
-        
-        for session in todaySessions {
-            words += session.wordsWritten
-            focusMinutes += session.actualDuration / 60
-            if let docId = session.documentId {
-                documentIds.insert(docId)
-            }
-        }
+        let words = todaySessions.reduce(0) { $0 + $1.wordsWritten }
+        let focusMinutes = todaySessions.reduce(0.0) { $0 + $1.actualDuration / 60 }
+        let documentsWorked = Set(todaySessions.compactMap { $0.documentId }).count
 
         let todayGoals = goalManager.getDailyGoals()
         let achievedGoals = todayGoals.filter { $0.isAchieved }.count
@@ -249,7 +234,7 @@ public class ProductivityAnalytics {
             sessionsCompleted: todaySessions.count,
             focusMinutes: focusMinutes,
             goalsAchieved: achievedGoals,
-            documentsWorkedOn: documentIds.count
+            documentsWorkedOn: documentsWorked
         )
     }
 
@@ -439,21 +424,16 @@ public class ProductivityAnalytics {
             currentDate = nextDay
         }
 
-        // Populate with session data - track documents per day
-        var documentsByDay: [Date: Set<UUID>] = [:]
+        // Populate with session data
         for session in sessions {
             let day = calendar.startOfDay(for: session.startTime)
             if var daily = dailyMap[day] {
                 daily.wordsWritten += session.wordsWritten
                 daily.sessionsCompleted += 1
                 daily.focusMinutes += session.actualDuration / 60
-                
-                // Track unique documents safely
                 if let docId = session.documentId {
-                    documentsByDay[day, default: []].insert(docId)
-                    daily.documentsWorkedOn = documentsByDay[day]?.count ?? 0
+                    daily.documentsWorkedOn = Set([docId]).count // Simplified
                 }
-                
                 dailyMap[day] = daily
             }
         }
