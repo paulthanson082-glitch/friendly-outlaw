@@ -122,7 +122,8 @@ public struct WritingGoal: Codable, Identifiable {
         guard let end = endDate else { return nil }
         let calendar = Calendar.current
         let components = calendar.dateComponents([.day], from: Date(), to: end)
-        return components.day
+        guard let dayCount = components.day else { return nil }
+        return max(0, dayCount)
     }
 
     /// Required daily progress to meet goal

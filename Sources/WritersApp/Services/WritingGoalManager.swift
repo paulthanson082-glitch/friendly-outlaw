@@ -1,6 +1,9 @@
 import Foundation
 
 /// Manages writing goals, progress tracking, and streaks
+/// 
+/// Note: All data is stored in memory and will be lost when the application exits.
+/// Persistence to disk should be added in a future update for production use.
 public class WritingGoalManager {
     private var goals: [UUID: WritingGoal]
     private var progressHistory: [GoalProgressEntry]
@@ -189,20 +192,22 @@ public class WritingGoalManager {
                 // Wrote yesterday, extend streak
                 streak.currentStreak += 1
                 streak.longestStreak = max(streak.longestStreak, streak.currentStreak)
+                streak.totalDaysWritten += 1
             } else {
                 // Streak broken, start new one
                 streak.currentStreak = 1
                 streak.streakStartDate = today
+                streak.totalDaysWritten += 1
             }
         } else {
             // First time writing
             streak.currentStreak = 1
             streak.longestStreak = 1
             streak.streakStartDate = today
+            streak.totalDaysWritten += 1
         }
 
         streak.lastWritingDate = Date()
-        streak.totalDaysWritten += 1
     }
 
     /// Checks and updates streak status (call at app start)
@@ -277,9 +282,19 @@ public class WritingGoalManager {
         return goals.values.filter { goal in
             guard goal.isActive,
                   let daysRemaining = goal.daysRemaining,
-                  daysRemaining > 0 else { return false }
+                  daysRemaining > 0,
+                  let endDate = goal.endDate else {
+                return false
+            }
 
-            let expectedProgress = 1.0 - (Double(daysRemaining) / Double(goal.daysRemaining ?? 1))
+            let calendar = Calendar.current
+            let totalDays = calendar.dateComponents([.day], from: goal.startDate, to: endDate).day ?? 0
+            guard totalDays > 0, daysRemaining <= totalDays else {
+                return false
+            }
+
+            let daysElapsed = totalDays - daysRemaining
+            let expectedProgress = Double(daysElapsed) / Double(totalDays)
             return goal.progress < expectedProgress * 0.8 // More than 20% behind
         }.sorted { $0.progress < $1.progress }
     }
