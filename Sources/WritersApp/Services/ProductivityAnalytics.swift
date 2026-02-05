@@ -448,10 +448,10 @@ public class ProductivityAnalytics {
                 daily.sessionsCompleted += 1
                 daily.focusMinutes += session.actualDuration / 60
                 
-                // Track unique documents
+                // Track unique documents safely
                 if let docId = session.documentId {
                     documentsByDay[day, default: []].insert(docId)
-                    daily.documentsWorkedOn = documentsByDay[day]!.count
+                    daily.documentsWorkedOn = documentsByDay[day]?.count ?? 0
                 }
                 
                 dailyMap[day] = daily

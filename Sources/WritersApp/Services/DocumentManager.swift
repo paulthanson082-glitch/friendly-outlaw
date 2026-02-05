@@ -39,11 +39,10 @@ public class DocumentManager {
             return getAllDocuments()
         }
         
-        let lowercaseQuery = query.lowercased()
+        // Use localizedCaseInsensitiveContains which handles case conversion internally
         return documents.values.filter { doc in
-            // Use localizedCaseInsensitiveContains for more efficient comparison
-            doc.title.localizedCaseInsensitiveContains(lowercaseQuery) ||
-            doc.content.localizedCaseInsensitiveContains(lowercaseQuery)
+            doc.title.localizedCaseInsensitiveContains(query) ||
+            doc.content.localizedCaseInsensitiveContains(query)
         }.sorted { $0.metadata.modified > $1.metadata.modified }
     }
 

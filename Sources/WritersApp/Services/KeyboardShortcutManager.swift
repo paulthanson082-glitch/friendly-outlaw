@@ -444,9 +444,9 @@ public class KeyboardShortcutManager {
 
     /// Find shortcut for a key combination
     public func findShortcut(key: String, modifiers: Set<KeyModifier>) -> KeyboardShortcut? {
-        let lowercaseKey = key.lowercased()
+        // Use localizedCaseInsensitiveCompare which handles case conversion internally
         return getAllShortcuts().first { shortcut in
-            shortcut.key.localizedCaseInsensitiveCompare(lowercaseKey) == .orderedSame &&
+            shortcut.key.localizedCaseInsensitiveCompare(key) == .orderedSame &&
             shortcut.modifiers == modifiers
         }
     }
