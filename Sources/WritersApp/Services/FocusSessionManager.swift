@@ -21,7 +21,7 @@ public class FocusSessionManager {
         currentWordCount: Int = 0,
         customDuration: TimeInterval? = nil
     ) -> FocusSession {
-        // End any existing session first, marking it as cancelled since it's being interrupted
+        // End any existing session first, marking it as cancelled (completed: false) since it's being interrupted
         if let current = currentSession {
             _ = endSession(id: current.id, finalWordCount: current.wordsAtStart, completed: false)
         }

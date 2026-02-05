@@ -160,6 +160,9 @@ public class ProductivityAnalytics {
     private let focusManager: FocusSessionManager
     private let goalManager: WritingGoalManager
     private var wordCountHistory: [(date: Date, documentId: UUID, wordCount: Int)]
+    
+    // UserDefaults keys
+    private static let lastRecordStreakKey = "ProductivityAnalytics.lastRecordStreak"
 
     public init(focusManager: FocusSessionManager, goalManager: WritingGoalManager) {
         self.focusManager = focusManager
@@ -261,10 +264,9 @@ public class ProductivityAnalytics {
         let streak = goalManager.getStreak()
         if streak.currentStreak > 0 {
             // Track when a new record streak was last acknowledged to avoid duplicate "New Record!" insights
-            let lastRecordKey = "ProductivityAnalytics.lastRecordStreak"
             let defaults = UserDefaults.standard
-            let previousRecord = defaults.integer(forKey: lastRecordKey)
-            let hasPreviousRecord = defaults.object(forKey: lastRecordKey) != nil
+            let previousRecord = defaults.integer(forKey: Self.lastRecordStreakKey)
+            let hasPreviousRecord = defaults.object(forKey: Self.lastRecordStreakKey) != nil
 
             // On first run, initialize the stored record to the current longest streak,
             // so we only celebrate when the user actually surpasses their existing record.
@@ -277,7 +279,7 @@ public class ProductivityAnalytics {
                     message: "You're on your longest writing streak: \(streak.currentStreak) days! Keep it up!",
                     priority: 0
                 ))
-                defaults.set(streak.currentStreak, forKey: lastRecordKey)
+                defaults.set(streak.currentStreak, forKey: Self.lastRecordStreakKey)
             } else if streak.currentStreak >= 7 {
                 insights.append(ProductivityInsight(
                     type: .streak,
