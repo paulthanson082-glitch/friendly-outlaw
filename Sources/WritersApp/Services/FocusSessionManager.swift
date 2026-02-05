@@ -168,9 +168,18 @@ public class FocusSessionManager {
     public func getStats() -> FocusSessionStats {
         let completed = sessionHistory.filter { $0.state == .completed }
 
-        let totalTime = completed.reduce(0.0) { $0 + $1.actualDuration }
-        let totalWords = completed.reduce(0) { $0 + $1.wordsWritten }
-        let totalPomodoros = completed.reduce(0) { $0 + $1.completedPomodoros }
+        // Single-pass calculation of time, words, and pomodoros
+        var totalTime: TimeInterval = 0.0
+        var totalWords: Int = 0
+        var totalPomodoros: Int = 0
+        var typeCounts: [FocusSessionType: Int] = [:]
+        
+        for session in completed {
+            totalTime += session.actualDuration
+            totalWords += session.wordsWritten
+            totalPomodoros += session.completedPomodoros
+            typeCounts[session.type, default: 0] += 1
+        }
 
         let avgWPM: Double
         if totalTime > 0 {
@@ -180,10 +189,6 @@ public class FocusSessionManager {
         }
 
         // Find favorite session type
-        var typeCounts: [FocusSessionType: Int] = [:]
-        for session in completed {
-            typeCounts[session.type, default: 0] += 1
-        }
         let favorite = typeCounts.max(by: { $0.value < $1.value })?.key
 
         // Calculate streaks
@@ -206,9 +211,16 @@ public class FocusSessionManager {
     public func getTodayStats() -> FocusSessionStats {
         let todaySessions = getTodaySessions().filter { $0.state == .completed }
 
-        let totalTime = todaySessions.reduce(0.0) { $0 + $1.actualDuration }
-        let totalWords = todaySessions.reduce(0) { $0 + $1.wordsWritten }
-        let totalPomodoros = todaySessions.reduce(0) { $0 + $1.completedPomodoros }
+        // Single-pass calculation
+        var totalTime: TimeInterval = 0.0
+        var totalWords: Int = 0
+        var totalPomodoros: Int = 0
+        
+        for session in todaySessions {
+            totalTime += session.actualDuration
+            totalWords += session.wordsWritten
+            totalPomodoros += session.completedPomodoros
+        }
 
         let avgWPM: Double
         if totalTime > 0 {
@@ -240,10 +252,10 @@ public class FocusSessionManager {
         let calendar = Calendar.current
         var dates = Set<Date>()
 
+        // Collect unique dates with single calendar operation per session
         for session in sessionHistory where session.state == .completed {
-            if let day = calendar.date(from: calendar.dateComponents([.year, .month, .day], from: session.startTime)) {
-                dates.insert(day)
-            }
+            let day = calendar.startOfDay(for: session.startTime)
+            dates.insert(day)
         }
 
         let sortedDates = dates.sorted(by: >)

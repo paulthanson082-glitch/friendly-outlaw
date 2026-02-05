@@ -35,9 +35,10 @@ public class TemplateManager {
     /// Searches templates by name or description
     public func searchTemplates(query: String) -> [Template] {
         let lowercaseQuery = query.lowercased()
-        return templates.values.filter {
-            $0.name.lowercased().contains(lowercaseQuery) ||
-            $0.description.lowercased().contains(lowercaseQuery)
+        return templates.values.filter { template in
+            // Use localizedCaseInsensitiveContains for more efficient comparison
+            template.name.localizedCaseInsensitiveContains(lowercaseQuery) ||
+            template.description.localizedCaseInsensitiveContains(lowercaseQuery)
         }.sorted { $0.name < $1.name }
     }
 
