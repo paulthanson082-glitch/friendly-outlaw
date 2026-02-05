@@ -3,14 +3,20 @@ import WritersApp
 
 // MARK: - CLI Application
 
+// Global productivity managers
+var focusManager = FocusSessionManager()
+var goalManager = WritingGoalManager()
+var analyticsService: ProductivityAnalytics!
+
 @main
 struct WritersAppCLI {
     static func main() async {
         var app = WritersApp()
+        analyticsService = ProductivityAnalytics(focusManager: focusManager, goalManager: goalManager)
 
         print("╔══════════════════════════════════════╗")
         print("║     Writers App with Templates       ║")
-        print("║      Swift Edition with AI & Plugins ║")
+        print("║   Swift Edition - Productivity Plus  ║")
         print("╚══════════════════════════════════════╝")
         print()
 
@@ -67,6 +73,18 @@ struct WritersAppCLI {
             print("\nPlugin Management:")
             print("30. List Plugins")
 
+            print("\nProductivity Features:")
+            print("40. Start Focus Session")
+            print("41. View Current Session")
+            print("42. End Focus Session")
+            print("43. Focus Session Stats")
+            print("44. Set Daily Writing Goal")
+            print("45. View Goals & Progress")
+            print("46. Record Progress")
+            print("47. View Writing Streak")
+            print("48. Productivity Report")
+            print("49. Productivity Insights")
+
             print("\n0. Exit")
             print()
             print("Enter choice: ", terminator: "")
@@ -119,6 +137,26 @@ struct WritersAppCLI {
                 await viewMemoryStats(app: app)
             case 30:
                 listPlugins(app: app)
+            case 40:
+                startFocusSession(app: app)
+            case 41:
+                viewCurrentSession()
+            case 42:
+                endFocusSession(app: app)
+            case 43:
+                viewFocusSessionStats()
+            case 44:
+                setDailyWritingGoal()
+            case 45:
+                viewGoalsAndProgress()
+            case 46:
+                recordProgress()
+            case 47:
+                viewWritingStreak()
+            case 48:
+                viewProductivityReport()
+            case 49:
+                viewProductivityInsights()
             case 0:
                 await app.shutdownPlugins()
                 running = false
@@ -800,4 +838,390 @@ func listPlugins(app: WritersApp) {
         print("   Capabilities: \(plugin.capabilities.map { $0.rawValue }.joined(separator: ", "))")
         print()
     }
+}
+
+// MARK: - Productivity Features
+
+func startFocusSession(app: WritersApp) {
+    print("\n=== Start Focus Session ===\n")
+
+    print("Select session type:")
+    for (index, sessionType) in FocusSessionType.allCases.enumerated() {
+        let duration = sessionType.defaultDuration > 0 ? " (\(Int(sessionType.defaultDuration / 60)) min)" : " (no time limit)"
+        print("\(index + 1). \(sessionType.displayName)\(duration)")
+    }
+
+    print("\nSession type: ", terminator: "")
+    guard let input = readLine(),
+          let typeIndex = Int(input),
+          typeIndex > 0,
+          typeIndex <= FocusSessionType.allCases.count else {
+        print("Invalid selection.")
+        return
+    }
+
+    let sessionType = FocusSessionType.allCases[typeIndex - 1]
+
+    // Optionally link to a document
+    var documentId: UUID? = nil
+    var currentWordCount = 0
+
+    let documents = app.documentManager.getAllDocuments()
+    if !documents.isEmpty {
+        print("\nLink to a document? (y/n): ", terminator: "")
+        if readLine()?.lowercased() == "y" {
+            print("\nSelect document:")
+            for (index, doc) in documents.enumerated() {
+                print("\(index + 1). \(doc.title) (\(doc.wordCount) words)")
+            }
+            print("\nDocument number: ", terminator: "")
+            if let docInput = readLine(),
+               let docIndex = Int(docInput),
+               docIndex > 0,
+               docIndex <= documents.count {
+                let doc = documents[docIndex - 1]
+                documentId = doc.id
+                currentWordCount = doc.wordCount
+            }
+        }
+    }
+
+    let session = focusManager.startSession(
+        type: sessionType,
+        documentId: documentId,
+        currentWordCount: currentWordCount
+    )
+
+    print("\n✓ Focus session started!")
+    print("  Type: \(session.type.displayName)")
+    if session.targetDuration > 0 {
+        print("  Duration: \(FocusSessionManager.formatTimeRemaining(session.targetDuration))")
+    }
+    if documentId != nil {
+        print("  Linked document: Yes")
+    }
+    print("\nHappy writing! Use option 42 to end your session.\n")
+}
+
+func viewCurrentSession() {
+    print("\n=== Current Focus Session ===\n")
+
+    guard let session = focusManager.getCurrentSession() else {
+        print("No active focus session.")
+        print("Start one with option 40!")
+        return
+    }
+
+    print("Type: \(session.type.displayName)")
+    print("State: \(session.state.rawValue)")
+    print("Started: \(formatDate(session.startTime))")
+    print("Duration: \(FocusSessionManager.formatDuration(session.actualDuration))")
+
+    if session.targetDuration > 0 {
+        print("Time remaining: \(FocusSessionManager.formatTimeRemaining(session.timeRemaining))")
+        print("Progress: \(Int(session.progress * 100))%")
+    }
+
+    if session.documentId != nil {
+        print("Document linked: Yes")
+        print("Words at start: \(session.wordsAtStart)")
+    }
+    print()
+}
+
+func endFocusSession(app: WritersApp) {
+    print("\n=== End Focus Session ===\n")
+
+    guard let session = focusManager.getCurrentSession() else {
+        print("No active focus session to end.")
+        return
+    }
+
+    var finalWordCount = session.wordsAtStart
+
+    // If linked to document, get current word count
+    if let docId = session.documentId,
+       let doc = app.documentManager.getDocument(id: docId) {
+        finalWordCount = doc.wordCount
+    } else {
+        print("Enter final word count (or press Enter to skip): ", terminator: "")
+        if let input = readLine(), let count = Int(input) {
+            finalWordCount = count
+        }
+    }
+
+    guard let endedSession = focusManager.endSession(
+        id: session.id,
+        finalWordCount: finalWordCount,
+        completed: true
+    ) else {
+        print("Failed to end session.")
+        return
+    }
+
+    // Record progress toward daily goals
+    if endedSession.wordsWritten > 0 {
+        for goal in goalManager.getDailyGoals() {
+            if goal.unit == .words {
+                _ = goalManager.recordProgress(goalId: goal.id, amount: endedSession.wordsWritten)
+            }
+        }
+        analyticsService.recordWordCount(documentId: session.documentId ?? UUID(), wordCount: finalWordCount)
+    }
+
+    print("\n✓ Focus session completed!")
+    print("\nSession Summary:")
+    print("  Duration: \(FocusSessionManager.formatDuration(endedSession.actualDuration))")
+    print("  Words written: \(endedSession.wordsWritten)")
+    if endedSession.actualDuration > 60 {
+        print("  Words/minute: \(String(format: "%.1f", endedSession.wordsPerMinute))")
+    }
+
+    if endedSession.type == .pomodoro {
+        print("  Pomodoros completed: \(endedSession.completedPomodoros + 1)")
+    }
+    print()
+}
+
+func viewFocusSessionStats() {
+    print("\n=== Focus Session Statistics ===\n")
+
+    let stats = focusManager.getStats()
+
+    print("Overall Stats:")
+    print("  Total sessions: \(stats.totalSessions)")
+    print("  Completed sessions: \(stats.completedSessions)")
+    print("  Completion rate: \(String(format: "%.1f", stats.completionRate))%")
+    print("  Total focus time: \(FocusSessionManager.formatDuration(stats.totalFocusTime))")
+    print("  Total words written: \(stats.totalWordsWritten)")
+    print("  Average words/minute: \(String(format: "%.1f", stats.averageWordsPerMinute))")
+    print("  Pomodoros completed: \(stats.pomodorosCompleted)")
+
+    if let favorite = stats.favoriteSessionType {
+        print("  Favorite session type: \(favorite.displayName)")
+    }
+
+    print("\nToday's Stats:")
+    let todayStats = focusManager.getTodayStats()
+    print("  Sessions: \(todayStats.totalSessions)")
+    print("  Focus time: \(FocusSessionManager.formatDuration(todayStats.totalFocusTime))")
+    print("  Words written: \(todayStats.totalWordsWritten)")
+    print()
+}
+
+func setDailyWritingGoal() {
+    print("\n=== Set Daily Writing Goal ===\n")
+
+    print("Enter daily word count target: ", terminator: "")
+    guard let input = readLine(), let target = Int(input), target > 0 else {
+        print("Invalid target. Please enter a positive number.")
+        return
+    }
+
+    print("Enter goal name (or press Enter for default): ", terminator: "")
+    let nameInput = readLine() ?? ""
+    let name = nameInput.isEmpty ? "Daily Writing Goal" : nameInput
+
+    let goal = goalManager.createDailyWordGoal(target: target, name: name)
+
+    print("\n✓ Daily goal created!")
+    print("  Name: \(goal.name)")
+    print("  Target: \(goal.target) words")
+    print("  Resets at midnight")
+    print()
+}
+
+func viewGoalsAndProgress() {
+    print("\n=== Goals & Progress ===\n")
+
+    let goals = goalManager.getAllGoals()
+
+    if goals.isEmpty {
+        print("No goals set. Create one with option 44!")
+        return
+    }
+
+    for (index, goal) in goals.enumerated() {
+        let status = goal.isAchieved ? "ACHIEVED" : (goal.isActive ? "Active" : "Inactive")
+        let progressBar = generateProgressBar(goal.progress)
+
+        print("\(index + 1). \(goal.name) [\(status)]")
+        print("   Type: \(goal.type.displayName)")
+        print("   Progress: \(goal.current)/\(goal.target) \(goal.unit.displayName.lowercased())")
+        print("   \(progressBar) \(goal.progressPercentage)%")
+
+        if let daysLeft = goal.daysRemaining {
+            print("   Days remaining: \(daysLeft)")
+            if let dailyRequired = goal.requiredDailyProgress {
+                print("   Required daily: \(dailyRequired) \(goal.unit.displayName.lowercased())")
+            }
+        }
+        print()
+    }
+}
+
+func recordProgress() {
+    print("\n=== Record Progress ===\n")
+
+    let goals = goalManager.getActiveGoals()
+
+    if goals.isEmpty {
+        print("No active goals. Create one with option 44!")
+        return
+    }
+
+    print("Select goal:")
+    for (index, goal) in goals.enumerated() {
+        print("\(index + 1). \(goal.name) (\(goal.current)/\(goal.target) \(goal.unit.displayName.lowercased()))")
+    }
+
+    print("\nGoal number: ", terminator: "")
+    guard let input = readLine(),
+          let goalIndex = Int(input),
+          goalIndex > 0,
+          goalIndex <= goals.count else {
+        print("Invalid selection.")
+        return
+    }
+
+    let goal = goals[goalIndex - 1]
+
+    print("Enter progress amount: ", terminator: "")
+    guard let amountInput = readLine(), let amount = Int(amountInput), amount > 0 else {
+        print("Invalid amount.")
+        return
+    }
+
+    if let updatedGoal = goalManager.recordProgress(goalId: goal.id, amount: amount) {
+        print("\n✓ Progress recorded!")
+        print("  New total: \(updatedGoal.current)/\(updatedGoal.target)")
+        print("  Progress: \(updatedGoal.progressPercentage)%")
+
+        if updatedGoal.isAchieved {
+            print("\n  Congratulations! Goal achieved!")
+        }
+    }
+    print()
+}
+
+func viewWritingStreak() {
+    print("\n=== Writing Streak ===\n")
+
+    goalManager.checkStreakStatus()
+    let streak = goalManager.getStreak()
+
+    if streak.currentStreak == 0 && streak.totalDaysWritten == 0 {
+        print("No writing streak yet.")
+        print("Start writing to build your streak!")
+        return
+    }
+
+    print("Current streak: \(streak.currentStreak) day(s)")
+    print("Longest streak: \(streak.longestStreak) day(s)")
+    print("Total days written: \(streak.totalDaysWritten)")
+
+    if let lastDate = streak.lastWritingDate {
+        print("Last writing: \(formatDate(lastDate))")
+    }
+
+    if streak.wroteToday {
+        print("\nYou've written today! Keep it up!")
+    } else if streak.isStreakActive {
+        print("\nWrite today to maintain your streak!")
+    } else {
+        print("\nStart a new streak today!")
+    }
+    print()
+}
+
+func viewProductivityReport() {
+    print("\n=== Productivity Report ===\n")
+
+    print("Select time period:")
+    print("1. Today")
+    print("2. This Week")
+    print("3. This Month")
+    print("4. All Time")
+
+    print("\nPeriod: ", terminator: "")
+    guard let input = readLine(), let option = Int(input) else {
+        print("Invalid selection.")
+        return
+    }
+
+    let period: AnalyticsPeriod
+    switch option {
+    case 1: period = .today
+    case 2: period = .thisWeek
+    case 3: period = .thisMonth
+    case 4: period = .allTime
+    default:
+        print("Invalid selection.")
+        return
+    }
+
+    let report = analyticsService.generateReport(for: period)
+
+    print("\n\(period.displayName) Report:")
+    print("─────────────────────────────")
+    print("Total words: \(report.totalWords)")
+    print("Total sessions: \(report.totalSessions)")
+    print("Focus time: \(FocusSessionManager.formatDuration(report.totalFocusMinutes * 60))")
+    print("Avg words/day: \(String(format: "%.0f", report.averageWordsPerDay))")
+    print("Avg words/session: \(String(format: "%.0f", report.averageWordsPerSession))")
+    print("Avg session length: \(String(format: "%.0f", report.averageSessionLength)) min")
+
+    if let peakHour = report.peakHour {
+        print("Peak writing hour: \(formatHour(peakHour))")
+    }
+
+    print()
+}
+
+func viewProductivityInsights() {
+    print("\n=== Productivity Insights ===\n")
+
+    let insights = analyticsService.generateInsights()
+
+    if insights.isEmpty {
+        print("Not enough data for insights yet.")
+        print("Complete more focus sessions to get personalized recommendations!")
+        return
+    }
+
+    for (index, insight) in insights.enumerated() {
+        let icon: String
+        switch insight.type {
+        case .peakTime: icon = "🕐"
+        case .streak: icon = "🔥"
+        case .improvement: icon = "📈"
+        case .goalProgress: icon = "🎯"
+        case .suggestion: icon = "💡"
+        case .warning: icon = "⚠️"
+        case .achievement: icon = "🏆"
+        }
+
+        print("\(index + 1). \(icon) \(insight.title)")
+        print("   \(insight.message)")
+        print()
+    }
+}
+
+// MARK: - Helper Functions for Productivity
+
+func generateProgressBar(_ progress: Double, width: Int = 20) -> String {
+    let filled = Int(progress * Double(width))
+    let empty = width - filled
+    return "[" + String(repeating: "█", count: filled) + String(repeating: "░", count: empty) + "]"
+}
+
+func formatHour(_ hour: Int) -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "h a"
+    var components = DateComponents()
+    components.hour = hour
+    if let date = Calendar.current.date(from: components) {
+        return formatter.string(from: date)
+    }
+    return "\(hour):00"
 }
