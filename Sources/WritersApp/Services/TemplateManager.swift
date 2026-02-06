@@ -34,10 +34,10 @@ public class TemplateManager {
 
     /// Searches templates by name or description
     public func searchTemplates(query: String) -> [Template] {
-        // Use localizedCaseInsensitiveContains which handles case conversion internally
-        return templates.values.filter { template in
-            template.name.localizedCaseInsensitiveContains(query) ||
-            template.description.localizedCaseInsensitiveContains(query)
+        let lowercaseQuery = query.lowercased()
+        return templates.values.filter {
+            $0.name.lowercased().contains(lowercaseQuery) ||
+            $0.description.lowercased().contains(lowercaseQuery)
         }.sorted { $0.name < $1.name }
     }
 

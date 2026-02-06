@@ -253,28 +253,21 @@ public class WritingGoalManager {
 
     /// Gets a summary of all goals
     public func getSummary() -> GoalsSummary {
-        // Single-pass calculation
-        var activeCount = 0
-        var achievedCount = 0
-        var totalProgress: Double = 0.0
-        
-        for goal in goals.values {
-            if goal.isActive {
-                activeCount += 1
-                totalProgress += goal.progress
-            }
-            if goal.isAchieved {
-                achievedCount += 1
-            }
+        let active = goals.values.filter { $0.isActive }
+        let achieved = goals.values.filter { $0.isAchieved }
+
+        let totalProgress: Double
+        if !active.isEmpty {
+            totalProgress = active.reduce(0.0) { $0 + $1.progress } / Double(active.count)
+        } else {
+            totalProgress = 0
         }
-        
-        let avgProgress = activeCount > 0 ? totalProgress / Double(activeCount) : 0
 
         return GoalsSummary(
-            activeGoals: activeCount,
-            achievedGoals: achievedCount,
+            activeGoals: active.count,
+            achievedGoals: achieved.count,
             totalGoals: goals.count,
-            overallProgress: avgProgress,
+            overallProgress: totalProgress,
             streak: streak
         )
     }
