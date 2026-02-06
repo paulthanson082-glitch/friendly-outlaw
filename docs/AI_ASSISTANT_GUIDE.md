@@ -11,6 +11,7 @@ Table of contents
 - [AI integration](#ai-integration)
 - [Testing](#testing)
 - [Environment variables & secrets](#environment-variables--secrets)
+- [Plugin system](#plugin-system)
 - [Common tasks for AI assistants](#common-tasks-for-ai-assistants)
 - [Where not to edit lightly](#where-not-to-edit-lightly)
 - [Git workflow & VS Code](#git-workflow--vs-code)
@@ -54,12 +55,17 @@ swift package clean
 │   ├── WritersApp/
 │   │   ├── Models/          # Template.swift, Document.swift, AIModels.swift
 │   │   ├── Services/        # TemplateManager.swift, DocumentManager.swift, AIService.swift
+│   │   ├── Plugins/         # Plugin system and Claude Memory plugin
+│   │   │   ├── Plugin.swift            # Plugin protocol, types, errors
+│   │   │   ├── PluginManager.swift     # Plugin lifecycle and registration
+│   │   │   ├── ClaudeMemoryPlugin.swift # Built-in memory storage plugin
+│   │   │   └── MCPClient.swift         # Model Context Protocol client
 │   │   ├── Extensions/
 │   │   └── WritersApp.swift
 │   └── WritersAppCLI/
 │       └── main.swift
 ├── Tests/
-│   └── WritersAppTests/
+│   └── WritersAppTests/     # Includes PluginTests.swift
 ├── examples/
 ├── .vscode/
 ├── Package.swift
@@ -133,10 +139,56 @@ Security guidance:
 - Use your OS keyring or CI secret store.
 - Add a secret-scan step to CI (see suggested GitHub Action example below).
 
+## Plugin system
+
+The app includes a plugin architecture with MCP (Model Context Protocol) support.
+
+### Built-in plugins
+
+- **Claude Memory Plugin** (`claude-memory`): Persistent memory storage for Claude AI interactions with relevance-scored search, TTL support, import/export, and category-based organization.
+
+### Plugin architecture
+
+All plugins conform to the `Plugin` protocol defined in `Sources/WritersApp/Plugins/Plugin.swift`:
+- `initialize()` / `shutdown()` — lifecycle management
+- `execute(action:)` — action dispatch
+- `capabilities` — declares what the plugin provides (memory, tools, resources, prompts, etc.)
+
+### Key plugin types
+
+- `PluginManager` — singleton that handles registration, lifecycle, and action routing
+- `PluginAction` / `PluginActionType` — action dispatch system
+- `PluginResult` — success/failure result wrapper
+- `MCPPlugin` / `MCPClient` — MCP protocol integration for external plugins
+- `PluginManifest` / `PluginConfiguration` — plugin metadata and settings persistence
+
+### Memory plugin operations
+
+Available through `WritersApp`:
+```swift
+app.enableMemoryPlugin()
+app.storeMemory(key:value:category:tags:importance:)
+app.retrieveMemory(key:)
+app.searchMemories(query:category:limit:)
+app.listMemories(category:limit:sortBy:)
+app.clearMemory(key:category:)
+app.getMemoryStats()
+```
+
+### Adding a new plugin
+
+1. Create a class conforming to `Plugin` in `Sources/WritersApp/Plugins/`
+2. Implement `initialize()`, `shutdown()`, and `execute(action:)`
+3. Register via `PluginManager.shared.register(plugin:)`
+4. Add tests in `Tests/WritersAppTests/PluginTests.swift`
+5. Optionally expose convenience methods in `WritersApp.swift`
+6. Add CLI menu options in `main.swift` if needed
+
 ## Common tasks for AI assistants
 
 - Adding a template: edit `Sources/WritersApp/Services/TemplateManager.swift` and update `loadDefaultTemplates()`. Add placeholders with the `Placeholder` struct and update tests.
 - Adding an AI feature: add method in `Sources/WritersApp/Services/AIService.swift`, create prompt templates, add assistance type to `AIAssistanceType` in `AIModels.swift`, expose via `WritersApp.swift`, and add CLI options if needed.
+- Adding a plugin: create a class conforming to `Plugin` in `Sources/WritersApp/Plugins/`, register via `PluginManager`, add tests in `PluginTests.swift`, expose in `WritersApp.swift` and `main.swift`.
 - Adding export format: extend export enum and implement in `exportDocument()`; update tests.
 
 ## Where not to edit lightly
