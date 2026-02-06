@@ -39,10 +39,10 @@ public class DocumentManager {
             return getAllDocuments()
         }
         
-        let lowercaseQuery = query.lowercased()
-        return documents.values.filter {
-            $0.title.lowercased().contains(lowercaseQuery) ||
-            $0.content.lowercased().contains(lowercaseQuery)
+        // Use localizedCaseInsensitiveContains which handles case conversion internally
+        return documents.values.filter { doc in
+            doc.title.localizedCaseInsensitiveContains(query) ||
+            doc.content.localizedCaseInsensitiveContains(query)
         }.sorted { $0.metadata.modified > $1.metadata.modified }
     }
 
@@ -83,6 +83,8 @@ public class DocumentManager {
 
     /// Gets recently modified documents
     public func getRecentDocuments(limit: Int = 10) -> [Document] {
-        return getAllDocuments().prefix(limit).map { $0 }
+        // Optimize by using partial sort instead of full sort
+        let sortedDocs = documents.values.sorted { $0.metadata.modified > $1.metadata.modified }
+        return Array(sortedDocs.prefix(limit))
     }
 }
