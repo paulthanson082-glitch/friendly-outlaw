@@ -492,11 +492,101 @@ struct AISidebarView: View {
                                 .cornerRadius(8)
                         }
                     }
+                    
+                    // Recent AI Suggestions
+                    if !viewModel.recentAISuggestions.isEmpty {
+                        Divider()
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Recent Suggestions")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.secondary)
+                                
+                                Spacer()
+                                
+                                Button(action: { viewModel.loadMoreSuggestions() }) {
+                                    Text("View All")
+                                        .font(.caption)
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                            
+                            ForEach(viewModel.recentAISuggestions.prefix(5), id: \.id) { suggestion in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack {
+                                        Text(suggestion.toolUsed)
+                                            .font(.caption)
+                                            .fontWeight(.semibold)
+                                        
+                                        Spacer()
+                                        
+                                        Text(formatSuggestionDate(suggestion.timestamp))
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    Text(suggestion.response)
+                                        .font(.caption)
+                                        .lineLimit(3)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(8)
+                                .background(Color(uiColor: .tertiarySystemBackground))
+                                .cornerRadius(6)
+                            }
+                        }
+                    }
+                    
+                    // AI Tool Usage Stats
+                    if !viewModel.toolUsageStats.isEmpty {
+                        Divider()
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Tool Usage Statistics")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.secondary)
+                            
+                            ForEach(viewModel.toolUsageStats.prefix(5), id: \.toolName) { stat in
+                                HStack {
+                                    Text(stat.toolName)
+                                        .font(.caption)
+                                    
+                                    Spacer()
+                                    
+                                    Text("\(stat.usageCount)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                    }
                 }
                 .padding()
             }
         }
         .background(Color(uiColor: .systemBackground))
+    }
+    
+    private func formatSuggestionDate(_ date: Date) -> String {
+        let now = Date()
+        let interval = now.timeIntervalSince(date)
+        
+        if interval < 60 {
+            return "Just now"
+        } else if interval < 3600 {
+            let minutes = Int(interval / 60)
+            return "\(minutes)m ago"
+        } else if interval < 86400 {
+            let hours = Int(interval / 3600)
+            return "\(hours)h ago"
+        } else {
+            let days = Int(interval / 86400)
+            return "\(days)d ago"
+        }
     }
 }
 
@@ -659,6 +749,11 @@ public class WritersAppViewModel: ObservableObject {
     @Published public var characterCount: Int = 0
     @Published public var readingTime: Int = 1
     @Published public var wordCountGoal: Int? = nil
+    
+    // AI Suggestions and Stats
+    @Published public var recentAISuggestions: [AISuggestion] = []
+    @Published public var toolUsageStats: [AIToolUsageStats] = []
+    @Published public var currentSessionStats: SessionStats?
 
     // Layout
     @Published public var bodyFontSize: Double = 17
@@ -683,6 +778,16 @@ public class WritersAppViewModel: ObservableObject {
     public func initialize() {
         writersApp = WritersApp()
         updateStatistics()
+        
+        // Initialize a demo user session for testing database features
+        // NOTE: In production, this should use a stable user identifier
+        // from authentication/user management system
+        let demoUserId = UUID()
+        writersApp?.startSession(userId: demoUserId, multitaskingMode: "Split View")
+        
+        // Load initial data
+        loadRecentSuggestions()
+        loadToolUsageStats()
     }
 
     // MARK: - Document Operations
@@ -819,6 +924,43 @@ public class WritersAppViewModel: ObservableObject {
         currentDocumentContent += "\n\n" + aiResponse
         aiResponse = ""
         updateStatistics()
+    }
+    
+    // MARK: - Database Operations
+    
+    public func loadRecentSuggestions() {
+        if let userId = writersApp?.currentUserId {
+            do {
+                recentAISuggestions = try writersApp?.getAISuggestions(userId: userId, limit: 10, offset: 0) ?? []
+            } catch {
+                print("Failed to load AI suggestions: \(error)")
+            }
+        }
+    }
+    
+    public func loadToolUsageStats() {
+        if let userId = writersApp?.currentUserId {
+            do {
+                toolUsageStats = try writersApp?.getAIToolUsageStats(userId: userId) ?? []
+            } catch {
+                print("Failed to load tool usage stats: \(error)")
+            }
+        }
+    }
+    
+    public func loadSessionStats() {
+        if let userId = writersApp?.currentUserId {
+            do {
+                currentSessionStats = try writersApp?.getSessionStats(userId: userId)
+            } catch {
+                print("Failed to load session stats: \(error)")
+            }
+        }
+    }
+    
+    public func loadMoreSuggestions() {
+        // Navigate to a full view of all suggestions
+        // This would typically present a sheet or navigate to a new screen
     }
 
     // MARK: - Multitasking

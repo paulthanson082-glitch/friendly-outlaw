@@ -7,6 +7,14 @@ Its a name let me and my dad used to use all the time so it's in remembrance of 
 
 A comprehensive Swift application for writers featuring template management, document creation, and writing tools.
 
+## 🚀 Quick Start
+
+**Want to get started quickly?** See the [Quick Start Guide](QUICKSTART.md) for the fastest way to build and run the application!
+
+```bash
+./run.sh  # That's it!
+```
+
 ## Features
 
 ### 📝 Template System
@@ -45,6 +53,13 @@ A comprehensive Swift application for writers featuring template management, doc
 - Plain text
 - HTML with styling
 
+### 📧 Email & Communication
+Integration options for sharing and sending documents:
+- **MessageUI Framework** - Native iOS/macOS mail composer for user-initiated emails
+- **MailSlurp** - Swift SDK for automated email sending/receiving and inbox management
+- **Sidemail** - Email API for sending transactional emails (via HTTP API)
+- **SwiftMail** - SMTP and IMAP library for direct email sending
+
 ### 🤖 AI-Powered Writing Assistant (NEW!)
 Powered by Claude API for intelligent writing assistance:
 - **Continue Writing**: AI generates natural continuations matching your style
@@ -61,6 +76,33 @@ Powered by Claude API for intelligent writing assistance:
 - **Outline Generation**: Structured outlines from concepts
 - **Tone Adjustment**: Rewrite in different tones (professional, casual, etc.)
 - **Text Expansion/Simplification**: Adjust complexity as needed
+
+### 💾 Database & Persistence (NEW!)
+SQLite-powered persistent storage for tracking and analytics:
+- **AI Suggestion History**: Complete log of all AI-generated suggestions
+  - Track which tools were used and when
+  - Store prompts and responses for review
+  - Mark suggestions as applied/unapplied
+  - Pagination support for large datasets
+- **Session Tracking**: Comprehensive writing session analytics
+  - Track start/end times and session duration
+  - Monitor words written per session
+  - Count AI interactions during each session
+  - Record multitasking mode (Split View, Full Screen, etc.)
+  - Aggregate statistics (total sessions, average duration, etc.)
+- **AI Configuration Storage**: Persist user-specific AI settings
+  - API keys and model preferences
+  - Token limits and temperature settings
+  - Automatic configuration per user
+- **Advanced SQL Operations**:
+  - Indexed queries for fast performance
+  - Pagination for efficient data loading
+  - JOIN operations for related data
+  - GROUP BY for usage statistics
+  - Aggregation functions (SUM, AVG, COUNT, MIN, MAX)
+  - Filtering and sorting capabilities
+
+See [DATABASE.md](DATABASE.md) for complete database documentation including schema, API reference, and usage examples.
 
 ## Development Environment
 
@@ -87,17 +129,27 @@ This project includes a complete VS Code configuration for seamless development 
 WritersApp/
 ├── Package.swift
 ├── Sources/
+│   ├── CSQLite/                      # SQLite3 module wrapper
+│   │   └── module.modulemap          # C module map for SQLite
 │   ├── WritersApp/
 │   │   ├── Models/
-│   │   │   ├── Template.swift       # Template data structures
-│   │   │   ├── Document.swift       # Document data structures
-│   │   │   └── AIModels.swift       # AI configuration & types
+│   │   │   ├── Template.swift        # Template data structures
+│   │   │   ├── Document.swift        # Document data structures
+│   │   │   ├── AIModels.swift        # AI configuration & types
+│   │   │   ├── AISuggestion.swift    # AI suggestion & session models
+│   │   │   └── iPadProModels.swift   # iPad-specific models
 │   │   ├── Services/
-│   │   │   ├── TemplateManager.swift   # Template CRUD operations
-│   │   │   ├── DocumentManager.swift   # Document CRUD operations
-│   │   │   └── AIService.swift         # AI-powered assistance
+│   │   │   ├── TemplateManager.swift     # Template CRUD operations
+│   │   │   ├── DocumentManager.swift     # Document CRUD operations
+│   │   │   ├── AIService.swift           # AI-powered assistance
+│   │   │   ├── DatabaseManager.swift     # SQLite database operations
+│   │   │   ├── MultitaskingManager.swift # iPad multitasking support
+│   │   │   ├── ApplePencilManager.swift  # Apple Pencil integration
+│   │   │   └── KeyboardShortcutManager.swift # Keyboard shortcuts
+│   │   ├── Views/
+│   │   │   └── iPadProViews.swift        # SwiftUI views for iPad Pro
 │   │   ├── Extensions/
-│   │   │   └── String+Extensions.swift # String utilities
+│   │   │   └── String+Extensions.swift   # String utilities
 │   │   └── WritersApp.swift         # Main app class
 │   └── WritersAppCLI/
 │       └── main.swift               # CLI interface
