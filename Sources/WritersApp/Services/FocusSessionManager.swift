@@ -80,6 +80,11 @@ public class FocusSessionManager {
         session.endTime = Date()
         session.wordsAtEnd = finalWordCount
         session.state = completed ? .completed : .cancelled
+        
+        // Increment completedPomodoros if this is a completed pomodoro that reached its target
+        if completed && session.type == .pomodoro && session.isTargetReached {
+            session.completedPomodoros += 1
+        }
 
         sessions[session.id] = session
         sessionHistory.append(session)
@@ -92,15 +97,18 @@ public class FocusSessionManager {
     }
 
     /// Starts a break after a pomodoro session
-    public func startBreak() -> FocusSession? {
+    /// - Parameter currentWordCount: The current word count to record for the completed pomodoro
+    public func startBreak(currentWordCount: Int? = nil) -> FocusSession? {
         guard let activeSession = currentSession,
               activeSession.type == .pomodoro,
               activeSession.isTargetReached else {
             return nil
         }
 
-        // Finalize the completed pomodoro session so it is recorded in history
-        let finalWordCount = activeSession.wordsAtEnd ?? activeSession.wordsAtStart
+        // Determine final word count: use provided value, or wordsAtEnd if already set, or wordsAtStart as fallback
+        let finalWordCount = currentWordCount ?? activeSession.wordsAtEnd ?? activeSession.wordsAtStart
+        
+        // End the completed pomodoro session and record it in history
         guard let completedSession = endSession(
             id: activeSession.id,
             finalWordCount: finalWordCount,
@@ -109,10 +117,17 @@ public class FocusSessionManager {
             return nil
         }
 
-        // Start a break session (represented as a special state)
-        var breakSession = completedSession
-        breakSession.state = .onBreak
-        breakSession.completedPomodoros += 1
+        // Create a new break session with a fresh ID
+        let breakSession = FocusSession(
+            type: .pomodoro,
+            state: .onBreak,
+            documentId: completedSession.documentId,
+            startTime: Date(),
+            targetDuration: activeSession.type.breakDuration,
+            wordsAtStart: finalWordCount,
+            completedPomodoros: completedSession.completedPomodoros
+        )
+        
         sessions[breakSession.id] = breakSession
         currentSession = breakSession
         return breakSession

@@ -288,7 +288,10 @@ public class WritingGoalManager {
             }
 
             let calendar = Calendar.current
-            let totalDays = calendar.dateComponents([.day], from: goal.startDate, to: endDate).day ?? 0
+            let startOfStartDate = calendar.startOfDay(for: goal.startDate)
+            let startOfEndDate = calendar.startOfDay(for: endDate)
+            let dayDifference = calendar.dateComponents([.day], from: startOfStartDate, to: startOfEndDate).day ?? 0
+            let totalDays = max(dayDifference + 1, 1) // Inclusive day count
             guard totalDays > 0, daysRemaining <= totalDays else {
                 return false
             }
