@@ -12,15 +12,16 @@ extension String {
         
         let pattern = "[.!?]+(?=\\s|$)"
         guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
-            // Fallback: count common sentence endings
-            let endings = [".", "!", "?"]
-            return endings.reduce(0) { count, ending in
-                count + self.components(separatedBy: ending).count - 1
-            }
+            // Fallback: count sentence endings using a single regex-like approach
+            let pattern = CharacterSet(charactersIn: ".!?")
+            let components = self.components(separatedBy: pattern)
+            let nonEmpty = components.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            return max(0, nonEmpty.count)
         }
         
         let matches = regex.matches(in: trimmed, options: [], range: NSRange(location: 0, length: trimmed.utf16.count))
-        return max(1, matches.count) // At least 1 sentence if there's content
+        // Return the count of matches; if no punctuation found but text exists, count as 1 sentence
+        return matches.isEmpty ? 1 : matches.count
     }
 
     /// Counts paragraphs in the string
