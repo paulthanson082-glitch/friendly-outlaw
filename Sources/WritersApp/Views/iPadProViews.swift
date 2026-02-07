@@ -833,7 +833,7 @@ public class WritersAppViewModel: ObservableObject {
         let fonts = multitaskingManager.getRecommendedFontSizes()
 
         bodyFontSize = fonts.body
-        lineSpacing = fonts.lineHeight * bodyFontSize
+        lineSpacing = (fonts.lineHeight - 1) * bodyFontSize
 
         if !layout.showAIPanel {
             showAIPanel = false
