@@ -45,6 +45,13 @@ A comprehensive Swift application for writers featuring template management, doc
 - Plain text
 - HTML with styling
 
+### 📧 Email & Communication
+Integration options for sharing and sending documents:
+- **MessageUI Framework** - Native iOS/macOS mail composer for user-initiated emails
+- **MailSlurp** - Swift SDK for automated email sending/receiving and inbox management
+- **Sidemail** - Email API for sending transactional emails (via HTTP API)
+- **SwiftMail** - SMTP and IMAP library for direct email sending
+
 ### 🤖 AI-Powered Writing Assistant (NEW!)
 Powered by Claude API for intelligent writing assistance:
 - **Continue Writing**: AI generates natural continuations matching your style
