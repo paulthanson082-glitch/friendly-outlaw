@@ -116,8 +116,15 @@ public class ApplePencilManager {
     /// Convert pencil stroke to text using handwriting recognition
     public func convertToText(strokes: [PencilStroke]) -> HandwritingResult {
         // TODO: Integrate with Apple's handwriting recognition APIs
-        // This method is not yet fully implemented and returns a placeholder
-        fatalError("convertToText(strokes:) is not implemented. Apple Pencil handwriting recognition requires platform-specific APIs.")
+        // This method is not yet implemented. Returning empty result to prevent crashes.
+        // Developers should check for zero confidence before using the result.
+        print("WARNING: convertToText(strokes:) is not implemented. Returning empty result.")
+        return HandwritingResult(
+            recognizedText: "",
+            confidence: 0.0,
+            alternatives: [],
+            language: configuration.handwritingLanguage
+        )
     }
 
     /// Check if Scribble is enabled for text fields
