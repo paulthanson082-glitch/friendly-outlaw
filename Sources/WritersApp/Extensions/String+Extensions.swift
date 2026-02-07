@@ -1,11 +1,26 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 extension String {
     /// Counts sentences in the string
     var sentenceCount: Int {
-        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.orthography.rawValue)
-        let matches = detector?.matches(in: self, options: [], range: NSRange(location: 0, length: utf16.count))
-        return matches?.count ?? 0
+        // Simple sentence counting by looking for sentence-ending punctuation followed by space or end of string
+        let trimmed = self.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return 0 }
+        
+        let pattern = "[.!?]+(?=\\s|$)"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+            // Fallback: count common sentence endings
+            let endings = [".", "!", "?"]
+            return endings.reduce(0) { count, ending in
+                count + self.components(separatedBy: ending).count - 1
+            }
+        }
+        
+        let matches = regex.matches(in: trimmed, options: [], range: NSRange(location: 0, length: trimmed.utf16.count))
+        return max(1, matches.count) // At least 1 sentence if there's content
     }
 
     /// Counts paragraphs in the string
