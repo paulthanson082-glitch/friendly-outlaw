@@ -1,4 +1,6 @@
 import Foundation
+
+#if canImport(CoreGraphics)
 import CoreGraphics
 
 // MARK: - CoreGraphics Codable Extensions
@@ -46,3 +48,5 @@ extension CGRect: @retroactive Codable {
         try container.encode(size.height, forKey: .height)
     }
 }
+
+#endif
