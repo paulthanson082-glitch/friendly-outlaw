@@ -461,6 +461,3 @@ public enum WindowStyle: String, Codable {
         }
     }
 }
-
-// MARK: - CGSize Extension for Codable
-// Note: CGSize already conforms to Codable in Foundation

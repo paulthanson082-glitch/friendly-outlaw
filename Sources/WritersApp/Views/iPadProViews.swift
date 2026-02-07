@@ -129,14 +129,12 @@ enum SidebarSection: Hashable {
 struct DocumentEditorView: View {
     @ObservedObject var viewModel: WritersAppViewModel
     @FocusState private var isEditorFocused: Bool
-    @State private var showFormatting = false
 
     var body: some View {
         VStack(spacing: 0) {
             // Toolbar
             EditorToolbarView(
-                viewModel: viewModel,
-                showFormatting: $showFormatting
+                viewModel: viewModel
             )
 
             Divider()
@@ -179,7 +177,6 @@ struct DocumentEditorView: View {
 @available(iOS 16.0, macOS 13.0, *)
 struct EditorToolbarView: View {
     @ObservedObject var viewModel: WritersAppViewModel
-    @Binding var showFormatting: Bool
 
     var body: some View {
         HStack(spacing: 16) {
@@ -332,7 +329,6 @@ struct EditorStatusBarView: View {
 struct AISidebarView: View {
     @ObservedObject var viewModel: WritersAppViewModel
     @State private var aiPrompt = ""
-    @State private var selectedAssistance: AIAssistanceType?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -808,6 +804,7 @@ public class WritersAppViewModel: ObservableObject {
         doc.title = currentDocumentTitle
         doc.content = currentDocumentContent
         doc.metadata.modified = Date()
+        currentDocument = doc
 
         isSaving = true
 
@@ -818,45 +815,45 @@ public class WritersAppViewModel: ObservableObject {
     }
 
     public func exportDocument() {
-        // Export functionality
+        // TODO: Implement document export functionality
     }
 
     public func showDocumentInfo() {
-        // Show document info
+        // TODO: Implement document info display
     }
 
     public func showWordCount() {
-        // Show detailed word count
+        // TODO: Implement detailed word count display
     }
 
     // MARK: - Formatting
 
     public func toggleBold() {
-        // Apply bold formatting
+        // TODO: Implement bold formatting
     }
 
     public func toggleItalic() {
-        // Apply italic formatting
+        // TODO: Implement italic formatting
     }
 
     public func toggleUnderline() {
-        // Apply underline formatting
+        // TODO: Implement underline formatting
     }
 
     public func applyHeading(level: Int) {
-        // Apply heading style
+        // TODO: Implement heading style for the given level
     }
 
     public func applyBodyStyle() {
-        // Apply body style
+        // TODO: Implement body text style
     }
 
     public func toggleBulletList() {
-        // Toggle bullet list
+        // TODO: Implement bullet list toggling
     }
 
     public func toggleNumberedList() {
-        // Toggle numbered list
+        // TODO: Implement numbered list toggling
     }
 
     // MARK: - View Controls
@@ -876,51 +873,51 @@ public class WritersAppViewModel: ObservableObject {
     // MARK: - AI Operations
 
     public func aiContinueWriting() {
-        // Continue writing with AI
+        // TODO: Implement AI continue writing functionality
     }
 
     public func aiImproveText() {
-        // Improve text with AI
+        // TODO: Implement AI text improvement functionality
     }
 
     public func aiExpandText() {
-        // Expand text with AI
+        // TODO: Implement AI text expansion functionality
     }
 
     public func aiSimplifyText() {
-        // Simplify text with AI
+        // TODO: Implement AI text simplification functionality
     }
 
     public func aiCheckGrammar() {
-        // Check grammar with AI
+        // TODO: Implement AI grammar checking functionality
     }
 
     public func aiSummarize() {
-        // Summarize with AI
+        // TODO: Implement AI summarization functionality
     }
 
     public func aiBrainstorm() {
-        // Brainstorm with AI
+        // TODO: Implement AI brainstorming functionality
     }
 
     public func aiGenerateOutline() {
-        // Generate outline with AI
+        // TODO: Implement AI outline generation functionality
     }
 
     public func aiDevelopCharacter() {
-        // Develop character with AI
+        // TODO: Implement AI character development functionality
     }
 
     public func aiImproveDialogue() {
-        // Improve dialogue with AI
+        // TODO: Implement AI dialogue improvement functionality
     }
 
     public func aiGenerateTitles() {
-        // Generate titles with AI
+        // TODO: Implement AI title generation functionality
     }
 
     public func aiCustomRequest(prompt: String) {
-        // Custom AI request
+        // TODO: Implement custom AI request functionality
     }
 
     public func insertAIResponse() {
@@ -978,7 +975,7 @@ public class WritersAppViewModel: ObservableObject {
         let fonts = multitaskingManager.getRecommendedFontSizes()
 
         bodyFontSize = fonts.body
-        lineSpacing = fonts.lineHeight * 4
+        lineSpacing = (fonts.lineHeight - 1) * bodyFontSize
 
         if !layout.showAIPanel {
             showAIPanel = false
@@ -1028,10 +1025,6 @@ extension TemplateCategory {
         case .resume: return "Resume"
         case .other: return "Other"
         }
-    }
-
-    public static var allCases: [TemplateCategory] {
-        [.novel, .shortStory, .screenplay, .blogPost, .article, .essay, .poetry, .businessLetter, .proposal, .resume, .other]
     }
 }
 

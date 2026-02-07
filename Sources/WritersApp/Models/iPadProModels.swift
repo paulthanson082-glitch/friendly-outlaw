@@ -102,8 +102,8 @@ public enum MultitaskingMode: String, Codable, CaseIterable {
 /// iPad Pro screen size configurations
 public struct iPadProScreenSize: Codable {
     public let model: iPadProModel
-    public let width: Double
-    public let height: Double
+    public let widthInches: Double
+    public let heightInches: Double
     public let ppi: Int
     public let supportsProMotion: Bool
     public let supportsApplePencil: ApplePencilGeneration
@@ -111,16 +111,16 @@ public struct iPadProScreenSize: Codable {
 
     public init(
         model: iPadProModel,
-        width: Double,
-        height: Double,
+        widthInches: Double,
+        heightInches: Double,
         ppi: Int,
         supportsProMotion: Bool,
         supportsApplePencil: ApplePencilGeneration,
         supportsFaceID: Bool
     ) {
         self.model = model
-        self.width = width
-        self.height = height
+        self.widthInches = widthInches
+        self.heightInches = heightInches
         self.ppi = ppi
         self.supportsProMotion = supportsProMotion
         self.supportsApplePencil = supportsApplePencil
@@ -129,7 +129,7 @@ public struct iPadProScreenSize: Codable {
 
     /// Diagonal screen size in inches
     public var diagonalInches: Double {
-        return sqrt(width * width + height * height)
+        return sqrt(widthInches * widthInches + heightInches * heightInches)
     }
 
     /// Optimal font size for this screen
@@ -165,7 +165,7 @@ public enum iPadProModel: String, Codable, CaseIterable {
         case .iPadPro11:
             return iPadProScreenSize(
                 model: self,
-                width: 8.46, height: 5.80,
+                widthInches: 8.46, heightInches: 5.80,
                 ppi: 264,
                 supportsProMotion: true,
                 supportsApplePencil: .secondGeneration,
@@ -174,7 +174,7 @@ public enum iPadProModel: String, Codable, CaseIterable {
         case .iPadPro13:
             return iPadProScreenSize(
                 model: self,
-                width: 10.32, height: 7.74,
+                widthInches: 10.32, heightInches: 7.74,
                 ppi: 264,
                 supportsProMotion: true,
                 supportsApplePencil: .secondGeneration,
@@ -183,7 +183,7 @@ public enum iPadProModel: String, Codable, CaseIterable {
         case .iPadProM4_11:
             return iPadProScreenSize(
                 model: self,
-                width: 8.46, height: 5.80,
+                widthInches: 8.46, heightInches: 5.80,
                 ppi: 264,
                 supportsProMotion: true,
                 supportsApplePencil: .pro,
@@ -192,7 +192,7 @@ public enum iPadProModel: String, Codable, CaseIterable {
         case .iPadProM4_13:
             return iPadProScreenSize(
                 model: self,
-                width: 11.09, height: 8.32,
+                widthInches: 11.09, heightInches: 8.32,
                 ppi: 264,
                 supportsProMotion: true,
                 supportsApplePencil: .pro,

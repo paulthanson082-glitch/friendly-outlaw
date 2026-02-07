@@ -477,6 +477,7 @@ public class KeyboardShortcutManager {
         }
 
         // Update in default shortcuts
+        // Note: This modifies the active default shortcuts. Call resetToDefaults() to restore original values.
         if let index = shortcuts.firstIndex(where: { $0.id == id }) {
             shortcuts[index].key = key
             shortcuts[index].modifiers = modifiers

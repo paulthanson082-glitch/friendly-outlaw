@@ -123,9 +123,15 @@ public class StageManagerSupport {
         count: Int,
         screenSize: CGSize
     ) -> [CGRect] {
+        // Validate input
+        guard count > 0 else {
+            return []
+        }
+
+        let windowCount = min(count, 10)
         var positions: [CGRect] = []
 
-        switch count {
+        switch windowCount {
         case 1:
             // Single window, centered
             let width = min(screenSize.width * 0.8, 1200)
@@ -510,6 +516,3 @@ public enum ExternalDisplayContent: String, Codable {
     case outline
     case reference
 }
-
-// MARK: - CGRect Codable Extension
-// Note: CGRect already conforms to Codable in Foundation
