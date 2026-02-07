@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Simple script to build and run the Writers App CLI
+# Note: This builds in debug mode. For release builds, see QUICKSTART.md
 
 echo "╔══════════════════════════════════════╗"
 echo "║  Writers App CLI - Build and Run     ║"
