@@ -180,6 +180,8 @@ public class WritingGoalManager {
         let today = calendar.startOfDay(for: Date())
 
         if let lastDate = streak.lastWritingDate {
+            let lastDay = calendar.startOfDay(for: lastDate)
+
             if calendar.isDateInToday(lastDate) {
                 // Already wrote today, no change needed
                 return
