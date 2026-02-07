@@ -12,7 +12,8 @@ A comprehensive Swift application for writers featuring template management, doc
 **Want to get started quickly?** See the [Quick Start Guide](QUICKSTART.md) for the fastest way to build and run the application!
 
 ```bash
-./run.sh  # That's it!
+chmod +x run.sh  # Make the script executable (needed only once)
+./run.sh         # That's it!
 ```
 
 ## Features
