@@ -116,10 +116,6 @@ This project includes a complete VS Code configuration for seamless development 
 3. Enable Settings Sync to sync across devices
 4. Use `Cmd+Shift+B` to build or `Cmd+Shift+P` → "Tasks: Run Task" for other commands
 
-## Documentation
-
-- [AI Assistant Guide](docs/AI_ASSISTANT_GUIDE.md) — instructions and notes for AI-based contributions and maintainers.
-
 ## Project Structure
 
 ```
