@@ -118,7 +118,9 @@ public class ApplePencilManager {
         // TODO: Integrate with Apple's handwriting recognition APIs
         // This method is not yet implemented. Returning empty result to prevent crashes.
         // Developers should check for zero confidence before using the result.
+        #if DEBUG
         print("WARNING: convertToText(strokes:) is not implemented. Returning empty result.")
+        #endif
         return HandwritingResult(
             recognizedText: "",
             confidence: 0.0,
