@@ -59,7 +59,7 @@ struct AdaptiveLayoutView: View {
                 }
             }
         }
-        .onChange(of: availableSize) { newSize in
+        .onChange(of: availableSize) { _, newSize in
             viewModel.updateMultitaskingState(size: newSize)
         }
     }
