@@ -7,14 +7,6 @@ Its a name let me and my dad used to use all the time so it's in remembrance of 
 
 A comprehensive Swift application for writers featuring template management, document creation, and writing tools.
 
-## 🚀 Quick Start
-
-**Want to get started quickly?** See the [Quick Start Guide](QUICKSTART.md) for the fastest way to build and run the application!
-
-```bash
-./run.sh  # That's it!
-```
-
 ## Features
 
 ### 📝 Template System
