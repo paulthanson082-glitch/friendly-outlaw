@@ -52,7 +52,9 @@ public class ApplePencilManager {
 
     /// Add a point to the current stroke
     public func addPoint(_ point: PencilPoint) {
-        currentStroke?.points.append(point)
+        guard var stroke = currentStroke else { return }
+        stroke.points.append(point)
+        currentStroke = stroke
     }
 
     /// End the current stroke
@@ -113,14 +115,9 @@ public class ApplePencilManager {
 
     /// Convert pencil stroke to text using handwriting recognition
     public func convertToText(strokes: [PencilStroke]) -> HandwritingResult {
-        // This would integrate with Apple's handwriting recognition
-        // For now, return a placeholder result
-        HandwritingResult(
-            recognizedText: "",
-            confidence: 0.0,
-            alternatives: [],
-            language: configuration.handwritingLanguage
-        )
+        // TODO: Integrate with Apple's handwriting recognition APIs
+        // This method is not yet fully implemented and returns a placeholder
+        fatalError("convertToText(strokes:) is not implemented. Apple Pencil handwriting recognition requires platform-specific APIs.")
     }
 
     /// Check if Scribble is enabled for text fields
