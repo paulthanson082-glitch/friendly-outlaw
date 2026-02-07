@@ -124,13 +124,14 @@ public class StageManagerSupport {
         screenSize: CGSize
     ) -> [CGRect] {
         // Validate input
-        guard count > 0 && count <= 10 else {
+        guard count > 0 else {
             return []
         }
-        
+
+        let windowCount = min(count, 10)
         var positions: [CGRect] = []
 
-        switch count {
+        switch windowCount {
         case 1:
             // Single window, centered
             let width = min(screenSize.width * 0.8, 1200)
