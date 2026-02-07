@@ -160,6 +160,9 @@ public class ProductivityAnalytics {
     private let focusManager: FocusSessionManager
     private let goalManager: WritingGoalManager
     private var wordCountHistory: [(date: Date, documentId: UUID, wordCount: Int)]
+    
+    // UserDefaults keys
+    private static let lastRecordStreakKey = "ProductivityAnalytics.lastRecordStreak"
 
     public init(focusManager: FocusSessionManager, goalManager: WritingGoalManager) {
         self.focusManager = focusManager
@@ -188,7 +191,8 @@ public class ProductivityAnalytics {
         let totalFocusMinutes = sessions.reduce(0.0) { $0 + $1.actualDuration / 60 }
 
         let calendar = Calendar.current
-        let dayCount = max(1, calendar.dateComponents([.day], from: startDate, to: endDate).day ?? 1)
+        let dayDifference = calendar.dateComponents([.day], from: startDate, to: endDate).day ?? 0
+        let dayCount = max(1, dayDifference + 1)
 
         let avgWordsPerDay = Double(totalWords) / Double(dayCount)
         let avgWordsPerSession = sessions.isEmpty ? 0 : Double(totalWords) / Double(sessions.count)
@@ -259,13 +263,23 @@ public class ProductivityAnalytics {
         // Streak insight
         let streak = goalManager.getStreak()
         if streak.currentStreak > 0 {
-            if streak.currentStreak >= streak.longestStreak && streak.currentStreak > 1 {
+            // Track when a new record streak was last acknowledged to avoid duplicate "New Record!" insights
+            let defaults = UserDefaults.standard
+            let previousRecord = defaults.integer(forKey: Self.lastRecordStreakKey)
+            let hasPreviousRecord = defaults.object(forKey: Self.lastRecordStreakKey) != nil
+
+            // On first run, initialize the stored record to the current longest streak,
+            // so we only celebrate when the user actually surpasses their existing record.
+            let effectivePreviousRecord = hasPreviousRecord ? previousRecord : streak.longestStreak
+
+            if streak.currentStreak > effectivePreviousRecord && streak.currentStreak > 1 {
                 insights.append(ProductivityInsight(
                     type: .achievement,
                     title: "New Record!",
                     message: "You're on your longest writing streak: \(streak.currentStreak) days! Keep it up!",
                     priority: 0
                 ))
+                defaults.set(streak.currentStreak, forKey: Self.lastRecordStreakKey)
             } else if streak.currentStreak >= 7 {
                 insights.append(ProductivityInsight(
                     type: .streak,
@@ -425,15 +439,23 @@ public class ProductivityAnalytics {
         }
 
         // Populate with session data
+        var dailyDocuments: [Date: Set<UUID>] = [:]
         for session in sessions {
             let day = calendar.startOfDay(for: session.startTime)
             if var daily = dailyMap[day] {
                 daily.wordsWritten += session.wordsWritten
                 daily.sessionsCompleted += 1
                 daily.focusMinutes += session.actualDuration / 60
+                
+                // Track unique documents per day
                 if let docId = session.documentId {
-                    daily.documentsWorkedOn = Set([docId]).count // Simplified
+                    if dailyDocuments[day] == nil {
+                        dailyDocuments[day] = Set()
+                    }
+                    dailyDocuments[day]?.insert(docId)
+                    daily.documentsWorkedOn = dailyDocuments[day]?.count ?? 0
                 }
+                
                 dailyMap[day] = daily
             }
         }

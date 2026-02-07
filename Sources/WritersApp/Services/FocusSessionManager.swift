@@ -21,9 +21,9 @@ public class FocusSessionManager {
         currentWordCount: Int = 0,
         customDuration: TimeInterval? = nil
     ) -> FocusSession {
-        // End any existing session first
+        // End any existing session first, marking it as cancelled (completed: false) since it's being interrupted
         if let current = currentSession {
-            _ = endSession(id: current.id, finalWordCount: current.wordsAtStart)
+            _ = endSession(id: current.id, finalWordCount: current.wordsAtStart, completed: false)
         }
 
         var session = FocusSession(
@@ -50,19 +50,24 @@ public class FocusSessionManager {
         }
 
         session.state = .paused
+        session.pauseStartTime = Date()
         sessions[session.id] = session
         currentSession = session
         return session
     }
 
     /// Resumes a paused session
-    public func resumeSession(pausedDuration: TimeInterval) -> FocusSession? {
-        guard var session = currentSession, session.state == .paused else {
+    public func resumeSession() -> FocusSession? {
+        guard var session = currentSession, 
+              session.state == .paused,
+              let pauseStart = session.pauseStartTime else {
             return nil
         }
 
         session.state = .active
-        session.pausedTime += pausedDuration
+        let pauseDuration = Date().timeIntervalSince(pauseStart)
+        session.pausedTime += pauseDuration
+        session.pauseStartTime = nil
         sessions[session.id] = session
         currentSession = session
         return session
@@ -88,17 +93,29 @@ public class FocusSessionManager {
 
     /// Starts a break after a pomodoro session
     public func startBreak() -> FocusSession? {
-        guard var session = currentSession,
-              session.type == .pomodoro,
-              session.isTargetReached else {
+        guard let activeSession = currentSession,
+              activeSession.type == .pomodoro,
+              activeSession.isTargetReached else {
             return nil
         }
 
-        session.state = .onBreak
-        session.completedPomodoros += 1
-        sessions[session.id] = session
-        currentSession = session
-        return session
+        // Finalize the completed pomodoro session so it is recorded in history
+        let finalWordCount = activeSession.wordsAtEnd ?? activeSession.wordsAtStart
+        guard let completedSession = endSession(
+            id: activeSession.id,
+            finalWordCount: finalWordCount,
+            completed: true
+        ) else {
+            return nil
+        }
+
+        // Start a break session (represented as a special state)
+        var breakSession = completedSession
+        breakSession.state = .onBreak
+        breakSession.completedPomodoros += 1
+        sessions[breakSession.id] = breakSession
+        currentSession = breakSession
+        return breakSession
     }
 
     /// Ends break and starts next pomodoro
@@ -128,9 +145,13 @@ public class FocusSessionManager {
         return sessions[id]
     }
 
-    /// Gets all sessions
+    /// Gets all sessions (historical sessions plus the current active session, if any)
     public func getAllSessions() -> [FocusSession] {
-        return Array(sessions.values).sorted { $0.startTime > $1.startTime }
+        var allSessions = sessionHistory
+        if let current = currentSession {
+            allSessions.append(current)
+        }
+        return allSessions.sorted { $0.startTime > $1.startTime }
     }
 
     /// Gets completed sessions

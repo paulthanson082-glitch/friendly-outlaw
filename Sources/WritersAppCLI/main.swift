@@ -6,13 +6,12 @@ import WritersApp
 // Global productivity managers
 var focusManager = FocusSessionManager()
 var goalManager = WritingGoalManager()
-var analyticsService: ProductivityAnalytics!
+var analyticsService = ProductivityAnalytics(focusManager: focusManager, goalManager: goalManager)
 
 @main
 struct WritersAppCLI {
     static func main() async {
         var app = WritersApp()
-        analyticsService = ProductivityAnalytics(focusManager: focusManager, goalManager: goalManager)
 
         print("╔══════════════════════════════════════╗")
         print("║     Writers App with Templates       ║")
@@ -966,7 +965,9 @@ func endFocusSession(app: WritersApp) {
                 _ = goalManager.recordProgress(goalId: goal.id, amount: endedSession.wordsWritten)
             }
         }
-        analyticsService.recordWordCount(documentId: session.documentId ?? UUID(), wordCount: finalWordCount)
+        if let documentId = session.documentId {
+            analyticsService.recordWordCount(documentId: documentId, wordCount: finalWordCount)
+        }
     }
 
     print("\n✓ Focus session completed!")
@@ -978,7 +979,7 @@ func endFocusSession(app: WritersApp) {
     }
 
     if endedSession.type == .pomodoro {
-        print("  Pomodoros completed: \(endedSession.completedPomodoros + 1)")
+        print("  Pomodoros completed: \(endedSession.completedPomodoros)")
     }
     print()
 }

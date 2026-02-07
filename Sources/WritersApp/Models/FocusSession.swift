@@ -56,6 +56,7 @@ public struct FocusSession: Codable, Identifiable {
     public let startTime: Date
     public var endTime: Date?
     public var pausedTime: TimeInterval
+    public var pauseStartTime: Date?
     public var targetDuration: TimeInterval
     public var wordsAtStart: Int
     public var wordsAtEnd: Int?
@@ -70,6 +71,7 @@ public struct FocusSession: Codable, Identifiable {
         startTime: Date = Date(),
         endTime: Date? = nil,
         pausedTime: TimeInterval = 0,
+        pauseStartTime: Date? = nil,
         targetDuration: TimeInterval? = nil,
         wordsAtStart: Int = 0,
         wordsAtEnd: Int? = nil,
@@ -83,6 +85,7 @@ public struct FocusSession: Codable, Identifiable {
         self.startTime = startTime
         self.endTime = endTime
         self.pausedTime = pausedTime
+        self.pauseStartTime = pauseStartTime
         self.targetDuration = targetDuration ?? type.defaultDuration
         self.wordsAtStart = wordsAtStart
         self.wordsAtEnd = wordsAtEnd
