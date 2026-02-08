@@ -2,6 +2,7 @@
 import XCTest
 @testable import WritersApp
 
+@MainActor
 final class MetalDashboardTests: XCTestCase {
 
     // MARK: - MetalMantra Tests

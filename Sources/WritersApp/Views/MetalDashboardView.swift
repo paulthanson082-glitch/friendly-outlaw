@@ -17,6 +17,11 @@ import SwiftUI
 public struct MetalDashboardView: View {
     @StateObject private var viewModel: MetalDashboardViewModel
 
+
+    @MainActor
+    public init(viewModel: MetalDashboardViewModel? = nil) {
+        let vm = viewModel ?? MetalDashboardViewModel()
+        _viewModel = StateObject(wrappedValue: vm)
     @MainActor
     public init(viewModel: MetalDashboardViewModel = MetalDashboardViewModel()) {
         _viewModel = StateObject(wrappedValue: viewModel)
