@@ -1,5 +1,5 @@
 module CSQLite [system] {
-    header "/usr/include/sqlite3.h"
+    header "/opt/homebrew/opt/sqlite/include/sqlite3.h"
     link "sqlite3"
     export *
 }
