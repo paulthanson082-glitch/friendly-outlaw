@@ -1,6 +1,6 @@
 # Metal Dashboard Preview
 
-This branch adds the Metal Dashboard UI (preview) files for testing and review.
+This change adds the Metal Dashboard UI (preview) files for testing and review.
 
 ## Test results (automated)
 
