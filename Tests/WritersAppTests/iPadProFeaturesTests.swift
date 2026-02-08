@@ -40,7 +40,7 @@ final class iPadProFeaturesTests: XCTestCase {
         XCTAssertTrue(iPadPro11.supportsProMotion)
         XCTAssertTrue(iPadPro11.supportsFaceID)
 
-        XCTAssertGreaterThan(iPadPro13.width, iPadPro11.width)
+        XCTAssertGreaterThan(iPadPro13.widthInches, iPadPro11.widthInches)
         XCTAssertEqual(iPadProM4_13.supportsApplePencil, .pro)
     }
 
