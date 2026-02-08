@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 import XCTest
 @testable import WritersApp
 
@@ -246,9 +247,10 @@ final class MetalDashboardTests: XCTestCase {
 
     func testIconForFocusType() {
         let vm = MetalDashboardViewModel()
-        XCTAssertEqual(vm.iconForFocusType(.freeWrite), "flame.fill")
-        XCTAssertEqual(vm.iconForFocusType(.pomodoro), "timer")
-        XCTAssertEqual(vm.iconForFocusType(.sprint), "bolt.fill")
-        XCTAssertEqual(vm.iconForFocusType(.deepWork), "moon.fill")
+        XCTAssertEqual(vm.iconForFocusType(FocusSessionType.freeWrite), "flame.fill")
+        XCTAssertEqual(vm.iconForFocusType(FocusSessionType.pomodoro), "timer")
+        XCTAssertEqual(vm.iconForFocusType(FocusSessionType.sprint), "bolt.fill")
+        XCTAssertEqual(vm.iconForFocusType(FocusSessionType.deepWork), "moon.fill")
     }
 }
+#endif
