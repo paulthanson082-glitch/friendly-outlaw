@@ -22,6 +22,9 @@ public struct MetalDashboardView: View {
     public init(viewModel: MetalDashboardViewModel? = nil) {
         let vm = viewModel ?? MetalDashboardViewModel()
         _viewModel = StateObject(wrappedValue: vm)
+    @MainActor
+    public init(viewModel: MetalDashboardViewModel = MetalDashboardViewModel()) {
+        _viewModel = StateObject(wrappedValue: viewModel)
     }
 
     public var body: some View {
