@@ -296,7 +296,17 @@ if let ai = app.aiService {
 
 ### As a CLI Tool
 
-Build and run the CLI:
+#### Quick Start
+
+Use the convenient run script:
+
+```bash
+./run.sh                 # Run in debug mode
+./run.sh --release       # Run in release mode (optimized)
+./run.sh --help          # Show help and options
+```
+
+Or build and run manually:
 
 ```bash
 swift build
@@ -316,10 +326,16 @@ Set your Anthropic API key as an environment variable:
 
 ```bash
 export ANTHROPIC_API_KEY="your-api-key-here"
-swift run WritersAppCLI
+./run.sh
 ```
 
 Or inline:
+
+```bash
+ANTHROPIC_API_KEY="your-key" ./run.sh
+```
+
+Or with swift run:
 
 ```bash
 ANTHROPIC_API_KEY="your-key" swift run WritersAppCLI
