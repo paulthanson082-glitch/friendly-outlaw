@@ -11,7 +11,7 @@ var analyticsService: ProductivityAnalytics!
 @main
 struct WritersAppCLI {
     static func main() async {
-        var app = WritersApp()
+        let app = WritersApp()
         analyticsService = ProductivityAnalytics(focusManager: focusManager, goalManager: goalManager)
 
         print("╔══════════════════════════════════════╗")
