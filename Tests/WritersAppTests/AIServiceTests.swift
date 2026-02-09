@@ -13,6 +13,7 @@ final class AIServiceTests: XCTestCase {
         XCTAssertEqual(config.model, .claude35Sonnet)
         XCTAssertEqual(config.maxTokens, 4096)
         XCTAssertEqual(config.temperature, 0.7)
+        XCTAssertEqual(config.speed, .normal)
     }
 
     func testAIConfigurationCustomValues() {
@@ -27,6 +28,18 @@ final class AIServiceTests: XCTestCase {
         XCTAssertEqual(config.model, .claude3Haiku)
         XCTAssertEqual(config.maxTokens, 2048)
         XCTAssertEqual(config.temperature, 0.5)
+        XCTAssertEqual(config.speed, .normal)
+    }
+
+    func testAIConfigurationFastMode() {
+        let config = AIConfiguration(
+            apiKey: "test-key",
+            model: .claude35Sonnet,
+            speed: .fast
+        )
+
+        XCTAssertEqual(config.speed, .fast)
+        XCTAssertEqual(config.model, .claude35Sonnet)
     }
 
     // MARK: - AIModel Tests
@@ -237,6 +250,22 @@ final class AIServiceTests: XCTestCase {
         }
         let networkError = AIServiceError.networkError(MockError())
         XCTAssertTrue(networkError.errorDescription?.contains("Network error") ?? false)
+    }
+
+    // MARK: - AISpeed Tests
+
+    func testAISpeedRawValues() {
+        XCTAssertEqual(AISpeed.normal.rawValue, "normal")
+        XCTAssertEqual(AISpeed.fast.rawValue, "fast")
+    }
+
+    func testAISpeedDisplayNames() {
+        XCTAssertEqual(AISpeed.normal.displayName, "Normal")
+        XCTAssertEqual(AISpeed.fast.displayName, "Fast")
+    }
+
+    func testAISpeedFastModeBetaHeader() {
+        XCTAssertEqual(AISpeed.fastModeBetaHeader, "fast-mode-2026-02-01")
     }
 
     // MARK: - AIError Tests

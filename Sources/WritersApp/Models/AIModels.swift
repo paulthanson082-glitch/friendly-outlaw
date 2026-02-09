@@ -2,23 +2,42 @@ import Foundation
 
 // MARK: - AI Configuration
 
+/// Speed mode for API requests
+public enum AISpeed: String {
+    case normal = "normal"
+    case fast = "fast"
+
+    public var displayName: String {
+        switch self {
+        case .normal: return "Normal"
+        case .fast: return "Fast"
+        }
+    }
+
+    /// The beta header value required when fast mode is enabled
+    public static let fastModeBetaHeader = "fast-mode-2026-02-01"
+}
+
 /// Configuration for AI service
 public struct AIConfiguration {
     public let apiKey: String
     public let model: AIModel
     public let maxTokens: Int
     public let temperature: Double
+    public let speed: AISpeed
 
     public init(
         apiKey: String,
         model: AIModel = .claude35Sonnet,
         maxTokens: Int = 4096,
-        temperature: Double = 0.7
+        temperature: Double = 0.7,
+        speed: AISpeed = .normal
     ) {
         self.apiKey = apiKey
         self.model = model
         self.maxTokens = maxTokens
         self.temperature = temperature
+        self.speed = speed
     }
 }
 

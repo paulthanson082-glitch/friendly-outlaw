@@ -22,9 +22,14 @@ struct WritersAppCLI {
 
         // Check for API key in environment
         if let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"], !apiKey.isEmpty {
-            print("✓ AI features enabled (Claude API)")
-            let config = AIConfiguration(apiKey: apiKey, model: .claude35Sonnet)
+            let speed: AISpeed = ProcessInfo.processInfo.environment["ANTHROPIC_FAST_MODE"] == "1" ? .fast : .normal
+            let config = AIConfiguration(apiKey: apiKey, model: .claude35Sonnet, speed: speed)
             app.enableAI(configuration: config)
+            if speed == .fast {
+                print("✓ AI features enabled (Claude API - Fast Mode)")
+            } else {
+                print("✓ AI features enabled (Claude API)")
+            }
         } else {
             print("ⓘ AI features disabled (set ANTHROPIC_API_KEY to enable)")
         }

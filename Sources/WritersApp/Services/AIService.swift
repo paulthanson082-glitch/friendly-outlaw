@@ -250,7 +250,11 @@ public class AIService {
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.setValue("application/json", forHTTPHeaderField: "content-type")
 
-        let requestBody: [String: Any] = [
+        if configuration.speed == .fast {
+            request.setValue(AISpeed.fastModeBetaHeader, forHTTPHeaderField: "anthropic-beta")
+        }
+
+        var requestBody: [String: Any] = [
             "model": configuration.model.rawValue,
             "max_tokens": configuration.maxTokens,
             "temperature": configuration.temperature,
@@ -261,6 +265,10 @@ public class AIService {
                 ]
             ]
         ]
+
+        if configuration.speed == .fast {
+            requestBody["speed"] = configuration.speed.rawValue
+        }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
 
