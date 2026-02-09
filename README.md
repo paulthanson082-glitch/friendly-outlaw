@@ -96,6 +96,19 @@ SQLite-powered persistent storage for tracking and analytics:
 
 See [DATABASE.md](DATABASE.md) for complete database documentation including schema, API reference, and usage examples.
 
+### 🤘 Metal Dashboard (iPad Pro) (NEW!)
+Heavy metal-themed command center optimized for iPad Pro:
+- **The Mantra**: Rotating metal-inspired motivational quotes
+- **Kill Count**: Real-time statistics dashboard (words, documents, streaks)
+- **The Armory**: Quick-start focus sessions (Pomodoro, Sprint, Deep Work, Marathon)
+- **War Room**: Recent documents with quick access
+- **The Gauntlet**: Writing goals and progress tracking
+- **The Forge**: Quick actions for creating new content
+- **Dark Theme**: Brutal color scheme inspired by Whitechapel and Lamb of God
+- **SwiftUI**: Modern, responsive interface optimized for iPad displays
+
+See [PREVIEW_METAL_DASHBOARD.md](PREVIEW_METAL_DASHBOARD.md) for complete Metal Dashboard documentation including design system, architecture, and usage examples.
+
 ## Development Environment
 
 ### VS Code Setup for iPad and MacBook Pro
@@ -139,7 +152,12 @@ WritersApp/
 │   │   │   ├── ApplePencilManager.swift  # Apple Pencil integration
 │   │   │   └── KeyboardShortcutManager.swift # Keyboard shortcuts
 │   │   ├── Views/
-│   │   │   └── iPadProViews.swift        # SwiftUI views for iPad Pro
+│   │   │   ├── iPadProViews.swift        # SwiftUI views for iPad Pro
+│   │   │   ├── MetalDashboardView.swift  # Metal Dashboard UI
+│   │   │   ├── MetalDashboardViewModel.swift # Dashboard state management
+│   │   │   └── MetalTheme.swift          # Metal color scheme and styling
+│   │   ├── Previews/
+│   │   │   └── MetalDashboardPreview.swift # SwiftUI preview provider
 │   │   ├── Extensions/
 │   │   │   └── String+Extensions.swift   # String utilities
 │   │   └── WritersApp.swift         # Main app class
