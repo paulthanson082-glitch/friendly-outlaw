@@ -48,6 +48,7 @@ struct WritersAppCLI {
             print("5. View Statistics")
             print("6. Search Templates")
             print("7. Search Documents")
+            print("8. Open Document")
 
             if app.isAIEnabled {
                 print("\nAI Features:")
@@ -109,6 +110,8 @@ struct WritersAppCLI {
                 searchTemplates(app: app)
             case 7:
                 searchDocuments(app: app)
+            case 8:
+                await openDocument(app: app)
             case 10:
                 await continueWritingWithAI(app: app)
             case 11:
@@ -285,6 +288,183 @@ func viewAllDocuments(app: WritersApp) {
     }
 }
 
+func openDocument(app: WritersApp) async {
+    print("\n=== Open Document ===\n")
+    
+    let documents = app.documentManager.getAllDocuments()
+    
+    if documents.isEmpty {
+        print("No documents found. Create one to get started!")
+        return
+    }
+    
+    // Display list of documents
+    for (index, document) in documents.enumerated() {
+        print("\(index + 1). \(document.title)")
+        print("   Category: \(document.category.rawValue)")
+        print("   Words: \(document.wordCount)")
+        print()
+    }
+    
+    print("Enter document number to open (0 to cancel): ", terminator: "")
+    guard let input = readLine(), let choice = Int(input) else {
+        print("Invalid input.")
+        return
+    }
+    
+    if choice == 0 {
+        return
+    }
+    
+    guard choice > 0 && choice <= documents.count else {
+        print("Invalid document number.")
+        return
+    }
+    
+    let documentId = documents[choice - 1].id
+    
+    // Display document details
+    var viewingDocument = true
+    while viewingDocument {
+        // Fetch the latest version of the document
+        guard let document = app.documentManager.getDocument(id: documentId) else {
+            print("Document not found.")
+            return
+        }
+        
+        // Update last opened date on first view
+        if document.metadata.lastOpened == nil {
+            var updatedDocument = document
+            updatedDocument.metadata.lastOpened = Date()
+            app.documentManager.updateDocument(updatedDocument)
+        }
+        
+        print("\n" + String(repeating: "=", count: 60))
+        print("Document: \(document.title)")
+        print(String(repeating: "=", count: 60))
+        print()
+        print("Category: \(document.category.rawValue)")
+        print("Created: \(formatDate(document.metadata.created))")
+        print("Modified: \(formatDate(document.metadata.modified))")
+        if let lastOpened = document.metadata.lastOpened {
+            print("Last Opened: \(formatDate(lastOpened))")
+        }
+        print()
+        print("Word Count: \(document.wordCount)")
+        print("Character Count: \(document.characterCount)")
+        print("Reading Time: \(document.readingTime) min")
+        
+        if let goal = document.metadata.wordCountGoal {
+            let progress = Double(document.wordCount) / Double(goal) * 100.0
+            print("Goal Progress: \(document.wordCount)/\(goal) words (\(String(format: "%.1f", progress))%)")
+        }
+        
+        if !document.metadata.tags.isEmpty {
+            print("Tags: \(document.metadata.tags.joined(separator: ", "))")
+        }
+        
+        if !document.metadata.notes.isEmpty {
+            print("Notes: \(document.metadata.notes)")
+        }
+        
+        print()
+        print(String(repeating: "-", count: 60))
+        print("CONTENT:")
+        print(String(repeating: "-", count: 60))
+        print()
+        
+        if document.content.isEmpty {
+            print("[Empty document - no content yet]")
+        } else {
+            print(document.content)
+        }
+        
+        print()
+        print(String(repeating: "=", count: 60))
+        print()
+        
+        // Document action menu
+        print("Document Actions:")
+        print("1. Edit Content")
+        print("2. Export Document")
+        print("3. Update Title")
+        print("4. Add/Update Tags")
+        print("5. Add/Update Notes")
+        print("6. Set Word Count Goal")
+        
+        if app.isAIEnabled {
+            print("\nAI Actions:")
+            print("10. Continue Writing (AI)")
+            print("11. Improve Document (AI)")
+            print("12. Generate Title Ideas (AI)")
+            print("13. Analyze Document (AI)")
+        }
+        
+        print("\n0. Back to Main Menu")
+        print()
+        print("Enter choice: ", terminator: "")
+        
+        guard let actionInput = readLine(), let action = Int(actionInput) else {
+            print("Invalid input.")
+            continue
+        }
+        
+        switch action {
+        case 0:
+            viewingDocument = false
+            
+        case 1:
+            await editDocumentContent(app: app, documentId: documentId)
+            
+        case 2:
+            exportDocument(app: app, documentId: documentId)
+            
+        case 3:
+            updateDocumentTitle(app: app, documentId: documentId)
+            
+        case 4:
+            updateDocumentTags(app: app, documentId: documentId)
+            
+        case 5:
+            updateDocumentNotes(app: app, documentId: documentId)
+            
+        case 6:
+            setDocumentWordGoal(app: app, documentId: documentId)
+            
+        case 10:
+            if app.isAIEnabled {
+                await continueWritingForDocument(app: app, documentId: documentId)
+            } else {
+                print("AI features are not enabled.")
+            }
+            
+        case 11:
+            if app.isAIEnabled {
+                await improveSpecificDocument(app: app, documentId: documentId)
+            } else {
+                print("AI features are not enabled.")
+            }
+            
+        case 12:
+            if app.isAIEnabled {
+                await generateTitlesForDocument(app: app, documentId: documentId)
+            } else {
+                print("AI features are not enabled.")
+            }
+            
+        case 13:
+            if app.isAIEnabled {
+                await analyzeSpecificDocument(app: app, documentId: documentId)
+            } else {
+                print("AI features are not enabled.")
+            }
+            
+        default:
+            print("Invalid choice.")
+        }
+    }
+}
+
 func viewStatistics(app: WritersApp) {
     print("\n=== Application Statistics ===\n")
 
@@ -357,6 +537,301 @@ func formatDate(_ date: Date) -> String {
     formatter.dateStyle = .medium
     formatter.timeStyle = .short
     return formatter.string(from: date)
+}
+
+// MARK: - Document Action Functions
+
+func editDocumentContent(app: WritersApp, documentId: UUID) async {
+    guard var document = app.documentManager.getDocument(id: documentId) else {
+        print("Document not found.")
+        return
+    }
+    
+    print("\n=== Edit Document Content ===\n")
+    print("Current content:")
+    print(String(repeating: "-", count: 60))
+    print(document.content.isEmpty ? "[Empty]" : document.content)
+    print(String(repeating: "-", count: 60))
+    print()
+    print("Enter new content (type END on a new line when finished):")
+    
+    var lines: [String] = []
+    while true {
+        guard let line = readLine() else { break }
+        if line == "END" {
+            break
+        }
+        lines.append(line)
+    }
+    
+    let newContent = lines.joined(separator: "\n")
+    document.content = newContent
+    document.metadata.modified = Date()
+    app.documentManager.updateDocument(document)
+    
+    print("\n✓ Document content updated!")
+    print("New word count: \(document.wordCount)")
+}
+
+func exportDocument(app: WritersApp, documentId: UUID) {
+    print("\n=== Export Document ===\n")
+    print("Select format:")
+    print("1. Markdown")
+    print("2. Plain Text")
+    print("3. HTML")
+    print()
+    print("Enter choice: ", terminator: "")
+    
+    guard let input = readLine(), let choice = Int(input) else {
+        print("Invalid input.")
+        return
+    }
+    
+    let format: ExportFormat
+    let ext: String
+    
+    switch choice {
+    case 1:
+        format = .markdown
+        ext = "md"
+    case 2:
+        format = .plainText
+        ext = "txt"
+    case 3:
+        format = .html
+        ext = "html"
+    default:
+        print("Invalid choice.")
+        return
+    }
+    
+    guard let content = app.exportDocument(id: documentId, format: format) else {
+        print("Failed to export document.")
+        return
+    }
+    
+    guard let document = app.documentManager.getDocument(id: documentId) else {
+        print("Document not found.")
+        return
+    }
+    
+    let filename = document.title.replacingOccurrences(of: " ", with: "_") + "." + ext
+    print("\nExported content:\n")
+    print(String(repeating: "=", count: 60))
+    print(content)
+    print(String(repeating: "=", count: 60))
+    print("\n✓ Document exported as: \(filename)")
+}
+
+func updateDocumentTitle(app: WritersApp, documentId: UUID) {
+    guard var document = app.documentManager.getDocument(id: documentId) else {
+        print("Document not found.")
+        return
+    }
+    
+    print("\n=== Update Title ===\n")
+    print("Current title: \(document.title)")
+    print("Enter new title: ", terminator: "")
+    
+    guard let newTitle = readLine(), !newTitle.isEmpty else {
+        print("Invalid title.")
+        return
+    }
+    
+    document.title = newTitle
+    document.metadata.modified = Date()
+    app.documentManager.updateDocument(document)
+    
+    print("\n✓ Title updated!")
+}
+
+func updateDocumentTags(app: WritersApp, documentId: UUID) {
+    guard var document = app.documentManager.getDocument(id: documentId) else {
+        print("Document not found.")
+        return
+    }
+    
+    print("\n=== Update Tags ===\n")
+    if !document.metadata.tags.isEmpty {
+        print("Current tags: \(document.metadata.tags.joined(separator: ", "))")
+    } else {
+        print("No tags set.")
+    }
+    print("Enter tags (comma-separated): ", terminator: "")
+    
+    guard let input = readLine() else {
+        print("Invalid input.")
+        return
+    }
+    
+    let tags = input.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    document.metadata.tags = tags
+    document.metadata.modified = Date()
+    app.documentManager.updateDocument(document)
+    
+    print("\n✓ Tags updated!")
+}
+
+func updateDocumentNotes(app: WritersApp, documentId: UUID) {
+    guard var document = app.documentManager.getDocument(id: documentId) else {
+        print("Document not found.")
+        return
+    }
+    
+    print("\n=== Update Notes ===\n")
+    if !document.metadata.notes.isEmpty {
+        print("Current notes: \(document.metadata.notes)")
+    } else {
+        print("No notes set.")
+    }
+    print("Enter notes: ", terminator: "")
+    
+    guard let notes = readLine() else {
+        print("Invalid input.")
+        return
+    }
+    
+    document.metadata.notes = notes
+    document.metadata.modified = Date()
+    app.documentManager.updateDocument(document)
+    
+    print("\n✓ Notes updated!")
+}
+
+func setDocumentWordGoal(app: WritersApp, documentId: UUID) {
+    guard var document = app.documentManager.getDocument(id: documentId) else {
+        print("Document not found.")
+        return
+    }
+    
+    print("\n=== Set Word Count Goal ===\n")
+    if let goal = document.metadata.wordCountGoal {
+        print("Current goal: \(goal) words")
+    } else {
+        print("No goal set.")
+    }
+    print("Enter word count goal (0 to remove): ", terminator: "")
+    
+    guard let input = readLine(), let goal = Int(input) else {
+        print("Invalid input.")
+        return
+    }
+    
+    document.metadata.wordCountGoal = goal > 0 ? goal : nil
+    document.metadata.modified = Date()
+    app.documentManager.updateDocument(document)
+    
+    print("\n✓ Word count goal updated!")
+}
+
+func continueWritingForDocument(app: WritersApp, documentId: UUID) async {
+    guard let document = app.documentManager.getDocument(id: documentId) else {
+        print("Document not found.")
+        return
+    }
+    
+    print("\n=== Continue Writing (AI) ===\n")
+    
+    if document.content.isEmpty {
+        print("Document is empty. Please add some content first.")
+        return
+    }
+    
+    print("Generating continuation...")
+    
+    do {
+        let continuation = try await app.continueDocument(documentId: documentId, appendToDocument: true)
+        print("\n✓ AI-generated continuation added to document!\n")
+        print("Added text:")
+        print(String(repeating: "-", count: 60))
+        print(continuation)
+        print(String(repeating: "-", count: 60))
+    } catch {
+        print("\n✗ Error: \(error.localizedDescription)")
+    }
+}
+
+func improveSpecificDocument(app: WritersApp, documentId: UUID) async {
+    guard let document = app.documentManager.getDocument(id: documentId) else {
+        print("Document not found.")
+        return
+    }
+    
+    print("\n=== Improve Document (AI) ===\n")
+    
+    if document.content.isEmpty {
+        print("Document is empty. Please add some content first.")
+        return
+    }
+    
+    print("Analyzing and improving document...")
+    
+    do {
+        let improved = try await app.improveDocument(documentId: documentId, replaceContent: false)
+        print("\n✓ Improved version:\n")
+        print(String(repeating: "=", count: 60))
+        print(improved)
+        print(String(repeating: "=", count: 60))
+        print()
+        print("Apply improvements? (y/n): ", terminator: "")
+        
+        if let response = readLine()?.lowercased(), response == "y" || response == "yes" {
+            _ = try await app.improveDocument(documentId: documentId, replaceContent: true)
+            print("\n✓ Improvements applied to document!")
+        }
+    } catch {
+        print("\n✗ Error: \(error.localizedDescription)")
+    }
+}
+
+func generateTitlesForDocument(app: WritersApp, documentId: UUID) async {
+    guard let document = app.documentManager.getDocument(id: documentId) else {
+        print("Document not found.")
+        return
+    }
+    
+    print("\n=== Generate Title Ideas (AI) ===\n")
+    
+    if document.content.isEmpty {
+        print("Document is empty. Please add some content first.")
+        return
+    }
+    
+    print("Generating title suggestions...")
+    
+    do {
+        let titles = try await app.generateDocumentTitles(documentId: documentId)
+        print("\n✓ Title suggestions:\n")
+        print(titles)
+    } catch {
+        print("\n✗ Error: \(error.localizedDescription)")
+    }
+}
+
+func analyzeSpecificDocument(app: WritersApp, documentId: UUID) async {
+    guard let document = app.documentManager.getDocument(id: documentId) else {
+        print("Document not found.")
+        return
+    }
+    
+    print("\n=== Analyze Document (AI) ===\n")
+    
+    if document.content.isEmpty {
+        print("Document is empty. Please add some content first.")
+        return
+    }
+    
+    print("Analyzing document...")
+    
+    do {
+        let analysis = try await app.analyzeDocument(documentId: documentId)
+        print("\n✓ Analysis:\n")
+        print(String(repeating: "=", count: 60))
+        print(analysis.analysis)
+        print(String(repeating: "=", count: 60))
+    } catch {
+        print("\n✗ Error: \(error.localizedDescription)")
+    }
 }
 
 // MARK: - AI Features
