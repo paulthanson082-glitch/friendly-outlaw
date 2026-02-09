@@ -436,9 +436,11 @@ sudo dnf install sqlite-devel
 
 macOS users with Homebrew (if system SQLite is not found):
 ```bash
-brew install sqlite3
-# Ensure pkg-config can find it
-export PKG_CONFIG_PATH="/opt/homebrew/opt/sqlite/lib/pkgconfig"
+brew install sqlite
+# Ensure pkg-config can find it (Apple Silicon default prefix)
+export PKG_CONFIG_PATH="/opt/homebrew/opt/sqlite/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+# For Intel macOS Homebrew installs, use:
+# export PKG_CONFIG_PATH="/usr/local/opt/sqlite/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 ```
 
 ## Getting an API Key
