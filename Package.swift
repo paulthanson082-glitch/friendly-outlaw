@@ -20,7 +20,7 @@ let package = Package(
             name: "CSQLite",
             pkgConfig: "sqlite3",
             providers: [
-                .brew(["sqlite3"]),
+                .brew(["sqlite"]),
                 .apt(["libsqlite3-dev"]),
                 .yum(["sqlite-devel"])
             ]),
