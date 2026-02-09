@@ -423,13 +423,22 @@ Tests cover:
 - macOS 13+, iOS 16+, or Linux (with SQLite3 development libraries)
 - Anthropic API key (for AI features - optional)
 
-**Note for Linux users:** SQLite3 development libraries must be installed:
+**Platform-specific setup:**
+
+Linux users need SQLite3 development libraries:
 ```bash
 # Ubuntu/Debian
 sudo apt-get install libsqlite3-dev
 
 # Fedora/RHEL
 sudo dnf install sqlite-devel
+```
+
+macOS users with Homebrew (if system SQLite is not found):
+```bash
+brew install sqlite3
+# Ensure pkg-config can find it
+export PKG_CONFIG_PATH="/opt/homebrew/opt/sqlite/lib/pkgconfig"
 ```
 
 ## Getting an API Key
