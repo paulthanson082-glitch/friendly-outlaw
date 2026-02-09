@@ -17,7 +17,8 @@ let package = Package(
     ],
     targets: [
         .systemLibrary(
-            name: "CSQLite"),
+            name: "CSQLite",
+            pkgConfig: "sqlite3"),
         .target(
             name: "WritersApp",
             dependencies: ["CSQLite"]),

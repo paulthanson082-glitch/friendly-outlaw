@@ -420,8 +420,26 @@ Tests cover:
 ## Requirements
 
 - Swift 5.9+
-- macOS 13+ or iOS 16+
+- macOS 13+, iOS 16+, or Linux (with SQLite3 development libraries)
 - Anthropic API key (for AI features - optional)
+
+**Platform-specific setup:**
+
+Linux users need SQLite3 development libraries:
+```bash
+# Ubuntu/Debian
+sudo apt-get install libsqlite3-dev
+
+# Fedora/RHEL
+sudo dnf install sqlite-devel
+```
+
+macOS users with Homebrew (if system SQLite is not found):
+```bash
+brew install sqlite3
+# Ensure pkg-config can find it
+export PKG_CONFIG_PATH="/opt/homebrew/opt/sqlite/lib/pkgconfig"
+```
 
 ## Getting an API Key
 
