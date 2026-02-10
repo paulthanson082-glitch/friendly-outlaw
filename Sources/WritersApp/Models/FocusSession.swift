@@ -6,6 +6,7 @@ public enum FocusSessionType: String, Codable, CaseIterable {
     case pomodoro = "pomodoro"
     case sprint = "sprint"
     case deepWork = "deep_work"
+    case marathon = "marathon"
 
     public var displayName: String {
         switch self {
@@ -13,6 +14,7 @@ public enum FocusSessionType: String, Codable, CaseIterable {
         case .pomodoro: return "Pomodoro (25 min)"
         case .sprint: return "Writing Sprint"
         case .deepWork: return "Deep Work (90 min)"
+        case .marathon: return "Marathon (120 min)"
         }
     }
 
@@ -23,6 +25,7 @@ public enum FocusSessionType: String, Codable, CaseIterable {
         case .pomodoro: return 25 * 60 // 25 minutes
         case .sprint: return 15 * 60 // 15 minutes
         case .deepWork: return 90 * 60 // 90 minutes
+        case .marathon: return 120 * 60 // 120 minutes
         }
     }
 
@@ -33,6 +36,7 @@ public enum FocusSessionType: String, Codable, CaseIterable {
         case .pomodoro: return 5 * 60 // 5 minutes
         case .sprint: return 3 * 60 // 3 minutes
         case .deepWork: return 15 * 60 // 15 minutes
+        case .marathon: return 20 * 60 // 20 minutes
         }
     }
 }

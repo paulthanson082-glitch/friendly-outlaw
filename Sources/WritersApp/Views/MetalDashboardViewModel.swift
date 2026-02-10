@@ -207,6 +207,7 @@ public class MetalDashboardViewModel: ObservableObject {
         case .pomodoro: return "timer"
         case .sprint: return "bolt.fill"
         case .deepWork: return "moon.fill"
+        case .marathon: return "flag.fill"
         }
     }
 }
