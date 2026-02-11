@@ -527,14 +527,16 @@ let finalSession = focusManager.endSession(
 goalManager.updateProgress(goalId: goal.id, amount: 1200)
 
 // 6. Get AI feedback
-if app.aiService != nil {
-    let analysis = try await app.analyzeDocument(documentId: doc.id)
+if app.aiService != nil, let document = doc {
+    let analysis = try await app.analyzeDocument(documentId: document.id)
     print("AI Analysis:\n\(analysis.analysis)")
 }
 
 // 7. Export
-let markdown = app.exportDocument(id: doc.id, format: .markdown)
-try? markdown?.write(toFile: "chapter-3.md", atomically: true, encoding: .utf8)
+if let document = doc {
+    let markdown = app.exportDocument(id: document.id, format: .markdown)
+    try? markdown?.write(toFile: "chapter-3.md", atomically: true, encoding: .utf8)
+}
 
 // 8. Review statistics
 let sessionStats = focusManager.getStats()
