@@ -13,7 +13,10 @@ let package = Package(
             targets: ["WritersApp"]),
         .executable(
             name: "WritersAppCLI",
-            targets: ["WritersAppCLI"])
+            targets: ["WritersAppCLI"]),
+        .executable(
+            name: "StatuslineCounter",
+            targets: ["StatuslineCounter"])
     ],
     targets: [
         .systemLibrary(
@@ -25,6 +28,9 @@ let package = Package(
         .executableTarget(
             name: "WritersAppCLI",
             dependencies: ["WritersApp"]),
+        .executableTarget(
+            name: "StatuslineCounter",
+            dependencies: ["CSQLite"]),
         .testTarget(
             name: "WritersAppTests",
             dependencies: ["WritersApp"])

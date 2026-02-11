@@ -90,7 +90,8 @@ public class DatabaseManager {
             prompt TEXT NOT NULL,
             response TEXT NOT NULL,
             timestamp REAL NOT NULL,
-            is_applied INTEGER DEFAULT 0
+            is_applied INTEGER DEFAULT 0,
+            project TEXT
         );
         """
         
@@ -104,7 +105,8 @@ public class DatabaseManager {
             duration_seconds INTEGER,
             words_written INTEGER DEFAULT 0,
             ai_interactions INTEGER DEFAULT 0,
-            multitasking_mode TEXT
+            multitasking_mode TEXT,
+            project TEXT
         );
         """
         
@@ -125,6 +127,45 @@ public class DatabaseManager {
         try execute(createUserSessionsTable)
         try execute(createAIConfigurationsTable)
         
+        // Migrate existing tables to add project column if it doesn't exist
+        try migrateProjectColumn()
+        
+    }
+    
+    
+    private func migrateProjectColumn() throws {
+        // Check if project column exists in AI_Suggestions table
+        let checkColumn = "PRAGMA table_info(AI_Suggestions);"
+        var hasProjectColumn = false
+        
+        guard let db = db else {
+            throw DatabaseError.notInitialized
+        }
+        
+        var statement: OpaquePointer?
+        defer {
+            if statement != nil {
+                sqlite3_finalize(statement)
+            }
+        }
+        
+        if sqlite3_prepare_v2(db, checkColumn, -1, &statement, nil) == SQLITE_OK {
+            while sqlite3_step(statement) == SQLITE_ROW {
+                if let columnName = sqlite3_column_text(statement, 1) {
+                    let name = String(cString: columnName)
+                    if name == "project" {
+                        hasProjectColumn = true
+                        break
+                    }
+                }
+            }
+        }
+        
+        // Add project column if it doesn't exist
+        if !hasProjectColumn {
+            try execute("ALTER TABLE AI_Suggestions ADD COLUMN project TEXT;")
+            try execute("ALTER TABLE User_Sessions ADD COLUMN project TEXT;")
+        }
     }
     
     private func createIndexes() throws {
@@ -134,8 +175,10 @@ public class DatabaseManager {
             "CREATE INDEX IF NOT EXISTS idx_ai_suggestions_tool ON AI_Suggestions(tool_used);",
             "CREATE INDEX IF NOT EXISTS idx_ai_suggestions_user ON AI_Suggestions(user_id);",
             "CREATE INDEX IF NOT EXISTS idx_ai_suggestions_timestamp ON AI_Suggestions(timestamp);",
+            "CREATE INDEX IF NOT EXISTS idx_ai_suggestions_project ON AI_Suggestions(project);",
             "CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON User_Sessions(user_id);",
             "CREATE INDEX IF NOT EXISTS idx_user_sessions_start ON User_Sessions(start_time);",
+            "CREATE INDEX IF NOT EXISTS idx_user_sessions_project ON User_Sessions(project);",
             "CREATE INDEX IF NOT EXISTS idx_ai_configs_user ON AI_Configurations(user_id);"
         ]
         
@@ -181,8 +224,8 @@ public class DatabaseManager {
         }
         
         let sql = """
-        INSERT INTO AI_Suggestions (id, user_id, document_id, tool_used, prompt, response, timestamp, is_applied)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+        INSERT INTO AI_Suggestions (id, user_id, document_id, tool_used, prompt, response, timestamp, is_applied, project)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         
         var statement: OpaquePointer?
@@ -209,12 +252,17 @@ public class DatabaseManager {
         sqlite3_bind_text(statement, 6, suggestion.response, -1, SQLITE_TRANSIENT)
         sqlite3_bind_double(statement, 7, suggestion.timestamp.timeIntervalSince1970)
         sqlite3_bind_int(statement, 8, suggestion.isApplied ? 1 : 0)
+        if let project = suggestion.project {
+            sqlite3_bind_text(statement, 9, project, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(statement, 9)
+        }
         
         guard sqlite3_step(statement) == SQLITE_DONE else {
             let errorMessage = String(cString: sqlite3_errmsg(db))
             throw DatabaseError.queryFailed("Insert failed: \(errorMessage)")
         }
-        
+                
     }
     
     /// Retrieves AI suggestions with pagination
@@ -225,7 +273,7 @@ public class DatabaseManager {
         }
         
         let sql = """
-        SELECT id, user_id, document_id, tool_used, prompt, response, timestamp, is_applied
+        SELECT id, user_id, document_id, tool_used, prompt, response, timestamp, is_applied, project
         FROM AI_Suggestions
         WHERE user_id = ?
         ORDER BY timestamp DESC
@@ -265,6 +313,8 @@ public class DatabaseManager {
             let response = String(cString: sqlite3_column_text(statement, 5))
             let timestamp = Date(timeIntervalSince1970: sqlite3_column_double(statement, 6))
             let isApplied = sqlite3_column_int(statement, 7) == 1
+            let project = sqlite3_column_type(statement, 8) != SQLITE_NULL ?
+                String(cString: sqlite3_column_text(statement, 8)) : nil
             
             let suggestion = AISuggestion(
                 id: id,
@@ -274,7 +324,8 @@ public class DatabaseManager {
                 prompt: prompt,
                 response: response,
                 timestamp: timestamp,
-                isApplied: isApplied
+                isApplied: isApplied,
+                project: project
             )
             suggestions.append(suggestion)
         }
@@ -539,8 +590,8 @@ public class DatabaseManager {
         }
         
         let sql = """
-        INSERT INTO User_Sessions (id, user_id, start_time, end_time, duration_seconds, words_written, ai_interactions, multitasking_mode)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+        INSERT INTO User_Sessions (id, user_id, start_time, end_time, duration_seconds, words_written, ai_interactions, multitasking_mode, project)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         
         var statement: OpaquePointer?
@@ -578,6 +629,12 @@ public class DatabaseManager {
             sqlite3_bind_text(statement, 8, mode, -1, SQLITE_TRANSIENT)
         } else {
             sqlite3_bind_null(statement, 8)
+        }
+        
+        if let project = session.project {
+            sqlite3_bind_text(statement, 9, project, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(statement, 9)
         }
         
         guard sqlite3_step(statement) == SQLITE_DONE else {
@@ -651,7 +708,7 @@ public class DatabaseManager {
         
         let orderClause = sortByDuration ? "ORDER BY duration_seconds DESC" : "ORDER BY start_time DESC"
         let sql = """
-        SELECT id, user_id, start_time, end_time, duration_seconds, words_written, ai_interactions, multitasking_mode
+        SELECT id, user_id, start_time, end_time, duration_seconds, words_written, ai_interactions, multitasking_mode, project
         FROM User_Sessions
         WHERE user_id = ?
         \(orderClause);
@@ -693,6 +750,9 @@ public class DatabaseManager {
             let multitaskingMode = sqlite3_column_type(statement, 7) != SQLITE_NULL ?
                 String(cString: sqlite3_column_text(statement, 7)) : nil
             
+            let project = sqlite3_column_type(statement, 8) != SQLITE_NULL ?
+                String(cString: sqlite3_column_text(statement, 8)) : nil
+            
             let session = UserSession(
                 id: id,
                 userId: userId,
@@ -701,7 +761,8 @@ public class DatabaseManager {
                 durationSeconds: durationSeconds,
                 wordsWritten: wordsWritten,
                 aiInteractions: aiInteractions,
-                multitaskingMode: multitaskingMode
+                multitaskingMode: multitaskingMode,
+                project: project
             )
             sessions.append(session)
         }

@@ -94,7 +94,40 @@ SQLite-powered persistent storage for tracking and analytics:
   - Aggregation functions (SUM, AVG, COUNT, MIN, MAX)
   - Filtering and sorting capabilities
 
-See [DATABASE.md](DATABASE.md) for complete database documentation including schema, API reference, and usage examples.
+See [DATABASE.md](DATABASE.md) for complete database documentation including schema, API reference, statusline counter usage, and examples.
+
+### 📊 Statusline Counter for VS Code (NEW!)
+Lightweight command-line tool for VS Code statusLineCommand integration:
+- **Project-Scoped Counts**: Get AI suggestions and session counts per project
+- **Fast Performance**: Direct SQLite reads (~15ms, no HTTP/worker dependency)
+- **JSON Output**: `{"suggestions": N, "sessions": M, "project": "name"}`
+- **Graceful Errors**: Returns zeros on any database/connection issues
+- **Environment Variable**: Respects `WRITERS_APP_DATA_DIR` for custom database locations
+
+**Usage:**
+```bash
+# Run the counter
+.build/debug/StatuslineCounter /path/to/project
+
+# Use the convenience script
+./plugin/scripts/statusline-counts.sh /path/to/project
+```
+
+**VS Code Integration:**
+```json
+{
+  "statusLineCommand.commands": [{
+    "id": "writersapp.counts",
+    "name": "WritersApp",
+    "command": "/path/to/.build/debug/StatuslineCounter",
+    "arguments": ["${workspaceFolder}"],
+    "interval": 30000,
+    "format": "WA: {suggestions}s/{sessions}t"
+  }]
+}
+```
+
+See [DATABASE.md](DATABASE.md#statusline-counter) for complete statusline counter documentation.
 
 ### 🤘 Metal Dashboard (iPad Pro) (NEW!)
 Heavy metal-themed command center optimized for iPad Pro:

@@ -24,13 +24,15 @@ CREATE TABLE AI_Suggestions (
     prompt TEXT NOT NULL,
     response TEXT NOT NULL,
     timestamp REAL NOT NULL,
-    is_applied INTEGER DEFAULT 0
+    is_applied INTEGER DEFAULT 0,
+    project TEXT
 );
 
 -- Indexes for performance
 CREATE INDEX idx_ai_suggestions_tool ON AI_Suggestions(tool_used);
 CREATE INDEX idx_ai_suggestions_user ON AI_Suggestions(user_id);
 CREATE INDEX idx_ai_suggestions_timestamp ON AI_Suggestions(timestamp);
+CREATE INDEX idx_ai_suggestions_project ON AI_Suggestions(project);
 ```
 
 **Fields:**
@@ -42,6 +44,7 @@ CREATE INDEX idx_ai_suggestions_timestamp ON AI_Suggestions(timestamp);
 - `response`: AI-generated suggestion
 - `timestamp`: When the suggestion was created
 - `is_applied`: Whether the user applied the suggestion (0 = false, 1 = true)
+- `project`: Optional project name for scoping suggestions to specific projects
 
 ### User_Sessions Table
 
@@ -56,12 +59,14 @@ CREATE TABLE User_Sessions (
     duration_seconds INTEGER,
     words_written INTEGER DEFAULT 0,
     ai_interactions INTEGER DEFAULT 0,
-    multitasking_mode TEXT
+    multitasking_mode TEXT,
+    project TEXT
 );
 
 -- Indexes for performance
 CREATE INDEX idx_user_sessions_user ON User_Sessions(user_id);
 CREATE INDEX idx_user_sessions_start ON User_Sessions(start_time);
+CREATE INDEX idx_user_sessions_project ON User_Sessions(project);
 ```
 
 **Fields:**
@@ -73,6 +78,7 @@ CREATE INDEX idx_user_sessions_start ON User_Sessions(start_time);
 - `words_written`: Number of words written during session
 - `ai_interactions`: Number of AI tool uses
 - `multitasking_mode`: iPad multitasking mode (e.g., "Split View", "Full Screen")
+- `project`: Optional project name for scoping sessions to specific projects
 
 ### AI_Configurations Table
 
@@ -401,6 +407,55 @@ for suggestion in recent {
     print("Applied: \(suggestion.isApplied)")
 }
 ```
+
+## Statusline Counter
+
+A lightweight command-line tool for VS Code statusLineCommand integration that provides project-scoped counts.
+
+### Features
+
+- **Fast Performance**: Direct SQLite reads (~15ms)
+- **Project Scoping**: Filter counts by project name
+- **Graceful Fallback**: Returns zeros on any error
+- **Environment Variable Support**: Respects `WRITERS_APP_DATA_DIR`
+- **JSON Output**: Easy to parse in VS Code extensions
+
+### Usage
+
+```bash
+# Run the statusline counter
+.build/debug/StatuslineCounter /path/to/project
+
+# Output format
+{"suggestions": 42, "sessions": 15, "project": "my-project"}
+
+# With environment variable
+WRITERS_APP_DATA_DIR=/custom/path .build/debug/StatuslineCounter /path/to/project
+
+# Using the convenience script
+./plugin/scripts/statusline-counts.sh /path/to/project
+```
+
+### VS Code Integration
+
+Add to your VS Code settings.json:
+
+```json
+{
+  "statusLineCommand.commands": [
+    {
+      "id": "writersapp.counts",
+      "name": "WritersApp",
+      "command": "/path/to/friendly-outlaw/.build/debug/StatuslineCounter",
+      "arguments": ["${workspaceFolder}"],
+      "interval": 30000,
+      "format": "WA: {suggestions}s/{sessions}t"
+    }
+  ]
+}
+```
+
+The counter reads directly from the SQLite database without requiring the app to be running, making it suitable for statusline displays that update frequently.
 
 ## Security Considerations
 
