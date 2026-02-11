@@ -7,7 +7,9 @@
     {
       "id": "writersapp.counts",
       "name": "WritersApp",
-      "command": "/absolute/path/to/friendly-outlaw/.build/debug/StatuslineCounter",
+      // Note: The wrapper script automatically uses release build if available, otherwise debug
+      // You can also point directly to .build/release/StatuslineCounter for production use
+      "command": "/absolute/path/to/friendly-outlaw/plugin/scripts/statusline-counts.sh",
       "arguments": ["${workspaceFolder}"],
       "interval": 30000,
       "format": "WA: {suggestions}s / {sessions}t",

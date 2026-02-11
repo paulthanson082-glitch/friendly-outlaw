@@ -644,8 +644,8 @@ public class DatabaseManager {
             let errorMessage = String(cString: sqlite3_errmsg(db))
             throw DatabaseError.queryFailed("Insert failed: \(errorMessage)")
         }
-        
     }
+
     
     /// Updates a user session
     public func updateUserSession(_ session: UserSession) throws {

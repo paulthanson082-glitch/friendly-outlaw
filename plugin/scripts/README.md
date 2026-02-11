@@ -77,10 +77,12 @@ swift build
 
 ### Performance
 
-- **Average execution time**: ~15ms
+- **Average execution time**: ~15ms (measured on modern hardware with typical database sizes <1000 records)
 - **No dependencies**: Direct SQLite access, no HTTP calls
 - **Lightweight**: No worker process required
 - **Safe**: Read-only database access
+
+Performance may vary based on database size, hardware, and system load.
 
 ### Environment Variables
 
