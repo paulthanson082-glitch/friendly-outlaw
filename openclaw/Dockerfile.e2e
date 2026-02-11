@@ -1,0 +1,31 @@
+# E2E Testing Dockerfile for Friendly Outlaw OpenClaw Plugin
+# 
+# This Dockerfile creates an environment for end-to-end testing
+# of the plugin integration with OpenClaw gateway.
+
+FROM node:20-alpine
+
+# Install dependencies
+RUN apk add --no-cache bash jq curl
+
+# Set working directory
+WORKDIR /app
+
+# Copy plugin files
+COPY openclaw.plugin.json /app/openclaw/openclaw.plugin.json
+COPY package.json /app/openclaw/package.json
+COPY tsconfig.json /app/openclaw/tsconfig.json
+COPY src /app/openclaw/src
+COPY dist /app/openclaw/dist
+COPY test-sse-consumer.js /app/openclaw/test-sse-consumer.js
+COPY e2e-verify.sh /app/openclaw/e2e-verify.sh
+
+# Make scripts executable
+RUN chmod +x /app/openclaw/test-sse-consumer.js /app/openclaw/e2e-verify.sh
+
+# Install plugin dependencies (if needed in the future)
+WORKDIR /app/openclaw
+# RUN npm install --production
+
+# Run E2E verification
+CMD ["/app/openclaw/e2e-verify.sh"]

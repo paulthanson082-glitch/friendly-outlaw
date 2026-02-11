@@ -1,0 +1,36 @@
+{
+  "name": "@friendly-outlaw/openclaw-plugin",
+  "version": "1.0.0",
+  "description": "OpenClaw plugin for friendly-outlaw WritersApp - enables live observation streaming to messaging channels",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test src/index.test.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "openclaw",
+    "plugin",
+    "writers-app",
+    "claude",
+    "memory",
+    "sse",
+    "messaging"
+  ],
+  "author": "friendly-outlaw",
+  "license": "MIT",
+  "peerDependencies": {},
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "id": "friendly-outlaw",
+  "name": "Friendly Outlaw Writers App",
+  "version": "1.0.0",
+  "description": "OpenClaw plugin for the Friendly Outlaw Writers App with Claude-powered writing assistance. Streams observations to messaging channels and provides writer context.",
+  "author": "friendly-outlaw",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "workerPort": {
+        "type": "number",
+        "description": "Port for the Writers App service",
+        "default": 37777
+      },
+      "project": {
+        "type": "string",
+        "description": "Project identifier for Writers App workspace",
+        "default": "default"
+      },
+      "observationFeed": {
+        "type": "object",
+        "description": "Configuration for streaming document observations to messaging channels",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Enable live observation streaming",
+            "default": false
+          },
+          "channel": {
+            "type": "string",
+            "description": "Messaging channel to send observations to",
+            "enum": ["telegram", "discord", "signal", "slack", "whatsapp", "line"]
+          },
+          "to": {
+            "type": "string",
+            "description": "Target chat/channel ID or phone number"
+          }
+        },
+        "required": ["enabled"]
+      }
+    },
+    "required": ["workerPort"]
+  }
+}
