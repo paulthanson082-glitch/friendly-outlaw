@@ -1,0 +1,31 @@
+{
+  // Statusline Counter Integration Example
+  // Requires the "statusLineCommand" VS Code extension
+  // Install: https://marketplace.visualstudio.com/items?itemName=ldd-vs-code.statuslinecommand
+  
+  "statusLineCommand.commands": [
+    {
+      "id": "writersapp.counts",
+      "name": "WritersApp",
+      "command": "/absolute/path/to/friendly-outlaw/.build/debug/StatuslineCounter",
+      "arguments": ["${workspaceFolder}"],
+      "interval": 30000,
+      "format": "WA: {suggestions}s / {sessions}t",
+      "color": "#00ff00",
+      "priority": 100
+    }
+  ],
+  
+  // Alternative format options:
+  // "format": "✍️ {suggestions} | 📊 {sessions}"
+  // "format": "Suggestions: {suggestions} Sessions: {sessions}"
+  // "format": "{suggestions}/{sessions}"
+  
+  // Environment variable example (if using custom database location):
+  "terminal.integrated.env.osx": {
+    "WRITERS_APP_DATA_DIR": "${env:HOME}/.writersapp"
+  },
+  "terminal.integrated.env.linux": {
+    "WRITERS_APP_DATA_DIR": "${env:HOME}/.writersapp"
+  }
+}
