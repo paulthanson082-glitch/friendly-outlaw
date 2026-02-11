@@ -30,7 +30,11 @@ import WritersApp
 // 1. Create the app
 let app = WritersApp()
 
-// 2. Create a document from a template
+// 2. Browse templates
+let templates = app.templateManager.getAllTemplates()
+let novelTemplate = templates.first { $0.category == .novel }!
+
+// 3. Create a document from a template
 let doc = app.createDocumentFromTemplate(
     templateId: novelTemplate.id,
     values: [
@@ -40,15 +44,15 @@ let doc = app.createDocumentFromTemplate(
     ]
 )
 
-// 3. Start a focus session
-let session = app.focusSessionManager.startSession(
-    type: .pomodoro,
-    documentId: doc?.id,
-    currentWordCount: doc?.wordCount ?? 0
-)
-
-// 4. Export when done
-let markdown = app.exportDocument(id: doc.id, format: .markdown)
+// 4. Work with the document
+if let document = doc {
+    print("Created: \(document.title)")
+    print("Word count: \(document.wordCount)")
+    
+    // Export when done
+    let markdown = app.exportDocument(id: document.id, format: .markdown)
+    print("Exported to Markdown")
+}
 ```
 
 ## Features
@@ -378,10 +382,11 @@ if let ai = app.aiService {
 import WritersApp
 
 let app = WritersApp()
+let focusManager = FocusSessionManager()
 let doc = app.createBlankDocument(title: "My Novel", category: .novel)
 
 // Start a Pomodoro session
-let session = app.focusSessionManager.startSession(
+let session = focusManager.startSession(
     type: .pomodoro,
     documentId: doc.id,
     currentWordCount: doc.wordCount
@@ -391,19 +396,19 @@ print("Session started! Type: \(session.type.displayName)")
 print("Target duration: \(session.targetDuration / 60) minutes")
 
 // During writing...
-if let current = app.focusSessionManager.getCurrentSession() {
+if let current = focusManager.getCurrentSession() {
     print("Time remaining: \(current.timeRemaining / 60) minutes")
     print("Progress: \(Int(current.progress * 100))%")
 }
 
 // Pause when needed
-app.focusSessionManager.pauseSession()
+focusManager.pauseSession()
 
 // Resume after break
-app.focusSessionManager.resumeSession(pausedDuration: 300) // 5 minutes
+focusManager.resumeSession(pausedDuration: 300) // 5 minutes
 
 // End session
-let completed = app.focusSessionManager.endSession(
+let completed = focusManager.endSession(
     id: session.id,
     finalWordCount: 1250,
     completed: true
@@ -416,7 +421,7 @@ if let final = completed {
 }
 
 // Get statistics
-let stats = app.focusSessionManager.getStatistics()
+let stats = focusManager.getStats()
 print("Total sessions: \(stats.totalSessions)")
 print("Total focus time: \(stats.totalFocusTime / 3600) hours")
 print("Current streak: \(stats.currentStreak) days")
@@ -431,25 +436,24 @@ let app = WritersApp()
 let goalManager = WritingGoalManager()
 
 // Create a daily word count goal
-let dailyGoal = WritingGoal(
+let dailyGoal = goalManager.createGoal(
     name: "Daily Writing",
     type: .daily,
     unit: .words,
     target: 1000,
     reminderEnabled: true
 )
-goalManager.createGoal(dailyGoal)
+
+// Or use the convenience method
+let dailyGoal2 = goalManager.createDailyWordGoal(target: 1000)
 
 // Create a project-specific goal
-let novelGoal = WritingGoal(
-    name: "Finish First Draft",
-    type: .project,
-    unit: .words,
-    target: 80000,
+let novelGoal = goalManager.createProjectGoal(
     documentId: myNovelDoc.id,
-    endDate: Calendar.current.date(byAdding: .month, value: 3, to: Date())
+    target: 80000,
+    unit: .words,
+    name: "Finish First Draft"
 )
-goalManager.createGoal(novelGoal)
 
 // Update progress
 goalManager.updateProgress(goalId: dailyGoal.id, amount: 500)
@@ -486,10 +490,10 @@ import WritersApp
 // 1. Setup
 let app = WritersApp()
 let goalManager = WritingGoalManager()
+let focusManager = FocusSessionManager()
 
 // Set daily goal
-let goal = WritingGoal(name: "Daily 1K", type: .daily, unit: .words, target: 1000)
-goalManager.createGoal(goal)
+let goal = goalManager.createDailyWordGoal(target: 1000, name: "Daily 1K")
 
 // 2. Start writing session
 let doc = app.createDocumentFromTemplate(
@@ -502,7 +506,7 @@ let doc = app.createDocumentFromTemplate(
 )
 
 // 3. Begin focus session
-let session = app.focusSessionManager.startSession(
+let session = focusManager.startSession(
     type: .deepWork,
     documentId: doc?.id,
     currentWordCount: doc?.wordCount ?? 0
@@ -514,7 +518,7 @@ print("Deep work session started - 90 minutes of focused writing!")
 // ... user writes 1200 words ...
 
 // 5. End session and update goals
-let finalSession = app.focusSessionManager.endSession(
+let finalSession = focusManager.endSession(
     id: session.id,
     finalWordCount: 1200,
     completed: true
@@ -533,7 +537,7 @@ let markdown = app.exportDocument(id: doc.id, format: .markdown)
 try? markdown?.write(toFile: "chapter-3.md", atomically: true, encoding: .utf8)
 
 // 8. Review statistics
-let sessionStats = app.focusSessionManager.getStatistics()
+let sessionStats = focusManager.getStats()
 let goalSummary = goalManager.getSummary()
 
 print("""
@@ -702,11 +706,14 @@ Professional business correspondence format with proper addressing and structure
 - `getCurrentSession()` - Get the active session
 - `getSession(id:)` - Get a specific session by ID
 - `getSessionHistory(limit:)` - Get past sessions
-- `getStatistics()` - Get focus session statistics
-- `calculateStreak()` - Calculate current writing streak
+- `getStats()` - Get focus session statistics
+- `calculateStreaks()` - Calculate current writing streak
 
 ### WritingGoalManager
-- `createGoal(_:)` - Create a new writing goal
+- `createGoal(name:type:unit:target:documentId:endDate:reminderEnabled:reminderTime:)` - Create a new writing goal
+- `createDailyWordGoal(target:name:)` - Convenience method for daily word goals
+- `createWeeklyWordGoal(target:name:)` - Convenience method for weekly word goals
+- `createProjectGoal(documentId:target:unit:name:)` - Create a project-specific goal
 - `getGoal(id:)` - Retrieve a goal by ID
 - `getAllGoals()` - Get all goals
 - `getActiveGoals()` - Get active goals only
