@@ -409,7 +409,7 @@ public class DatabaseManager {
         }
         
         let sql = """
-        SELECT id, user_id, document_id, tool_used, prompt, response, timestamp, is_applied
+        SELECT id, user_id, document_id, tool_used, prompt, response, timestamp, is_applied, project
         FROM AI_Suggestions
         WHERE user_id = ? AND tool_used = ?
         ORDER BY timestamp DESC;
@@ -447,6 +447,8 @@ public class DatabaseManager {
             let response = String(cString: sqlite3_column_text(statement, 5))
             let timestamp = Date(timeIntervalSince1970: sqlite3_column_double(statement, 6))
             let isApplied = sqlite3_column_int(statement, 7) == 1
+            let project = sqlite3_column_type(statement, 8) != SQLITE_NULL ?
+                String(cString: sqlite3_column_text(statement, 8)) : nil
             
             let suggestion = AISuggestion(
                 id: id,
@@ -456,7 +458,8 @@ public class DatabaseManager {
                 prompt: prompt,
                 response: response,
                 timestamp: timestamp,
-                isApplied: isApplied
+                isApplied: isApplied,
+                project: project
             )
             suggestions.append(suggestion)
         }
@@ -834,7 +837,7 @@ public class DatabaseManager {
         }
         
         let sql = """
-        SELECT id, user_id, start_time, end_time, duration_seconds, words_written, ai_interactions, multitasking_mode
+        SELECT id, user_id, start_time, end_time, duration_seconds, words_written, ai_interactions, multitasking_mode, project
         FROM User_Sessions
         WHERE user_id = ? AND multitasking_mode = ?
         ORDER BY start_time DESC;
@@ -877,6 +880,9 @@ public class DatabaseManager {
             let multitaskingMode = sqlite3_column_type(statement, 7) != SQLITE_NULL ?
                 String(cString: sqlite3_column_text(statement, 7)) : nil
             
+            let project = sqlite3_column_type(statement, 8) != SQLITE_NULL ?
+                String(cString: sqlite3_column_text(statement, 8)) : nil
+            
             let session = UserSession(
                 id: id,
                 userId: userId,
@@ -885,7 +891,8 @@ public class DatabaseManager {
                 durationSeconds: durationSeconds,
                 wordsWritten: wordsWritten,
                 aiInteractions: aiInteractions,
-                multitaskingMode: multitaskingMode
+                multitaskingMode: multitaskingMode,
+                project: project
             )
             sessions.append(session)
         }
