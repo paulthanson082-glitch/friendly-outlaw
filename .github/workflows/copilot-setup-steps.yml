@@ -23,7 +23,7 @@ jobs:
 
       - name: Install Swift dependencies
         run: |
-          # Install SQLite3 development libraries if needed
+          # Install sqlite development libraries if needed
           brew list sqlite || brew install sqlite
 
       - name: Build project
