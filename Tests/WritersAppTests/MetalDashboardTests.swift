@@ -252,6 +252,22 @@ final class MetalDashboardTests: XCTestCase {
         XCTAssertEqual(vm.iconForFocusType(FocusSessionType.pomodoro), "timer")
         XCTAssertEqual(vm.iconForFocusType(FocusSessionType.sprint), "bolt.fill")
         XCTAssertEqual(vm.iconForFocusType(FocusSessionType.deepWork), "moon.fill")
+        XCTAssertEqual(vm.iconForFocusType(FocusSessionType.marathon), "flag.fill")
+    }
+    
+    func testMarathonSessionType() {
+        // Test marathon session properties
+        XCTAssertEqual(FocusSessionType.marathon.displayName, "Marathon (120 min)")
+        XCTAssertEqual(FocusSessionType.marathon.defaultDuration, 120 * 60)
+        XCTAssertEqual(FocusSessionType.marathon.breakDuration, 20 * 60)
+    }
+    
+    func testAllFocusSessionTypesHaveIcons() {
+        let vm = MetalDashboardViewModel()
+        for type in FocusSessionType.allCases {
+            let icon = vm.iconForFocusType(type)
+            XCTAssertFalse(icon.isEmpty, "Focus type \(type.rawValue) should have an icon")
+        }
     }
 }
 #endif
