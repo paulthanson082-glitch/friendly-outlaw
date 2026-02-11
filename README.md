@@ -7,6 +7,50 @@ Its a name let me and my dad used to use all the time so it's in remembrance of 
 
 A comprehensive Swift application for writers featuring template management, document creation, and writing tools.
 
+## 🚀 Quick Start
+
+```bash
+# Clone and build
+git clone https://github.com/paulthanson082-glitch/friendly-outlaw.git
+cd friendly-outlaw
+swift build
+
+# Run the CLI
+swift run WritersAppCLI
+
+# Or use the convenience script
+./run.sh
+```
+
+### Basic Usage Example
+
+```swift
+import WritersApp
+
+// 1. Create the app
+let app = WritersApp()
+
+// 2. Create a document from a template
+let doc = app.createDocumentFromTemplate(
+    templateId: novelTemplate.id,
+    values: [
+        "title": "The Last Frontier",
+        "chapter_number": "1",
+        "chapter_title": "A New Beginning"
+    ]
+)
+
+// 3. Start a focus session
+let session = app.focusSessionManager.startSession(
+    type: .pomodoro,
+    documentId: doc?.id,
+    currentWordCount: doc?.wordCount ?? 0
+)
+
+// 4. Export when done
+let markdown = app.exportDocument(id: doc.id, format: .markdown)
+```
+
 ## Features
 
 ### 📝 Template System
@@ -109,6 +153,30 @@ Heavy metal-themed command center optimized for iPad Pro:
 
 See [PREVIEW_METAL_DASHBOARD.md](PREVIEW_METAL_DASHBOARD.md) for complete Metal Dashboard documentation including design system, architecture, and usage examples.
 
+### ⏱️ Focus Sessions (NEW!)
+Stay productive with structured writing sessions:
+- **Pomodoro (25 min)**: Classic focus technique with 5-minute breaks
+- **Writing Sprint (15 min)**: Quick bursts of focused writing
+- **Deep Work (90 min)**: Extended concentration periods with 15-minute breaks
+- **Marathon (120 min)**: Ultra-focus sessions with 20-minute breaks
+- **Free Write**: Unlimited time for creative flow
+
+Track your productivity:
+- Words written per session
+- Words per minute calculation
+- Session streaks and statistics
+- Automatic pause/resume functionality
+- Integration with writing goals
+
+### 🎯 Writing Goals (NEW!)
+Set and track your writing targets:
+- **Goal Types**: Daily, weekly, monthly, project-specific, or custom
+- **Units**: Track by words, pages, minutes, sessions, or chapters
+- **Progress Tracking**: Real-time progress visualization
+- **Streaks**: Monitor daily writing streaks to build consistency
+- **Reminders**: Optional notifications to keep you on track
+- **Analytics**: See completion rates, average progress, and trends
+
 ## Development Environment
 
 ### VS Code Setup for iPad and MacBook Pro
@@ -142,15 +210,25 @@ WritersApp/
 │   │   │   ├── Document.swift        # Document data structures
 │   │   │   ├── AIModels.swift        # AI configuration & types
 │   │   │   ├── AISuggestion.swift    # AI suggestion & session models
+│   │   │   ├── FocusSession.swift    # Focus session models
+│   │   │   ├── WritingGoal.swift     # Writing goal models
 │   │   │   └── iPadProModels.swift   # iPad-specific models
 │   │   ├── Services/
-│   │   │   ├── TemplateManager.swift     # Template CRUD operations
-│   │   │   ├── DocumentManager.swift     # Document CRUD operations
-│   │   │   ├── AIService.swift           # AI-powered assistance
-│   │   │   ├── DatabaseManager.swift     # SQLite database operations
-│   │   │   ├── MultitaskingManager.swift # iPad multitasking support
-│   │   │   ├── ApplePencilManager.swift  # Apple Pencil integration
+│   │   │   ├── TemplateManager.swift        # Template CRUD operations
+│   │   │   ├── DocumentManager.swift        # Document CRUD operations
+│   │   │   ├── AIService.swift              # AI-powered assistance
+│   │   │   ├── DatabaseManager.swift        # SQLite database operations
+│   │   │   ├── FocusSessionManager.swift    # Focus session management
+│   │   │   ├── WritingGoalManager.swift     # Writing goal tracking
+│   │   │   ├── ProductivityAnalytics.swift  # Analytics and insights
+│   │   │   ├── MultitaskingManager.swift    # iPad multitasking support
+│   │   │   ├── ApplePencilManager.swift     # Apple Pencil integration
 │   │   │   └── KeyboardShortcutManager.swift # Keyboard shortcuts
+│   │   ├── Plugins/
+│   │   │   ├── Plugin.swift                 # Plugin protocol
+│   │   │   ├── PluginManager.swift          # Plugin management
+│   │   │   ├── MCPClient.swift              # MCP protocol client
+│   │   │   └── ClaudeMemoryPlugin.swift     # Claude memory integration
 │   │   ├── Views/
 │   │   │   ├── iPadProViews.swift        # SwiftUI views for iPad Pro
 │   │   │   ├── MetalDashboardView.swift  # Metal Dashboard UI
@@ -294,6 +372,185 @@ if let ai = app.aiService {
 }
 ```
 
+#### With Focus Sessions
+
+```swift
+import WritersApp
+
+let app = WritersApp()
+let doc = app.createBlankDocument(title: "My Novel", category: .novel)
+
+// Start a Pomodoro session
+let session = app.focusSessionManager.startSession(
+    type: .pomodoro,
+    documentId: doc.id,
+    currentWordCount: doc.wordCount
+)
+
+print("Session started! Type: \(session.type.displayName)")
+print("Target duration: \(session.targetDuration / 60) minutes")
+
+// During writing...
+if let current = app.focusSessionManager.getCurrentSession() {
+    print("Time remaining: \(current.timeRemaining / 60) minutes")
+    print("Progress: \(Int(current.progress * 100))%")
+}
+
+// Pause when needed
+app.focusSessionManager.pauseSession()
+
+// Resume after break
+app.focusSessionManager.resumeSession(pausedDuration: 300) // 5 minutes
+
+// End session
+let completed = app.focusSessionManager.endSession(
+    id: session.id,
+    finalWordCount: 1250,
+    completed: true
+)
+
+if let final = completed {
+    print("Session complete!")
+    print("Words written: \(final.wordsWritten)")
+    print("Words per minute: \(String(format: "%.1f", final.wordsPerMinute))")
+}
+
+// Get statistics
+let stats = app.focusSessionManager.getStatistics()
+print("Total sessions: \(stats.totalSessions)")
+print("Total focus time: \(stats.totalFocusTime / 3600) hours")
+print("Current streak: \(stats.currentStreak) days")
+```
+
+#### With Writing Goals
+
+```swift
+import WritersApp
+
+let app = WritersApp()
+let goalManager = WritingGoalManager()
+
+// Create a daily word count goal
+let dailyGoal = WritingGoal(
+    name: "Daily Writing",
+    type: .daily,
+    unit: .words,
+    target: 1000,
+    reminderEnabled: true
+)
+goalManager.createGoal(dailyGoal)
+
+// Create a project-specific goal
+let novelGoal = WritingGoal(
+    name: "Finish First Draft",
+    type: .project,
+    unit: .words,
+    target: 80000,
+    documentId: myNovelDoc.id,
+    endDate: Calendar.current.date(byAdding: .month, value: 3, to: Date())
+)
+goalManager.createGoal(novelGoal)
+
+// Update progress
+goalManager.updateProgress(goalId: dailyGoal.id, amount: 500)
+
+// Check progress
+if let goal = goalManager.getGoal(id: dailyGoal.id) {
+    print("Progress: \(goal.progressPercentage)%")
+    print("Remaining: \(goal.remaining) \(goal.unit.displayName)")
+    
+    if let days = goal.daysRemaining {
+        print("Days remaining: \(days)")
+        if let required = goal.requiredDailyProgress {
+            print("Required daily: \(required) \(goal.unit.displayName)")
+        }
+    }
+    
+    if goal.isAchieved {
+        print("🎉 Goal achieved!")
+    }
+}
+
+// Get summary of all goals
+let summary = goalManager.getSummary()
+print("Active goals: \(summary.activeGoals)")
+print("Overall progress: \(Int(summary.overallProgress * 100))%")
+print("Writing streak: \(summary.streak.currentStreak) days")
+```
+
+#### Complete Writing Workflow Example
+
+```swift
+import WritersApp
+
+// 1. Setup
+let app = WritersApp()
+let goalManager = WritingGoalManager()
+
+// Set daily goal
+let goal = WritingGoal(name: "Daily 1K", type: .daily, unit: .words, target: 1000)
+goalManager.createGoal(goal)
+
+// 2. Start writing session
+let doc = app.createDocumentFromTemplate(
+    templateId: novelChapterTemplate.id,
+    values: [
+        "title": "The Chronicles of Swift",
+        "chapter_number": "3",
+        "chapter_title": "The Debug Session"
+    ]
+)
+
+// 3. Begin focus session
+let session = app.focusSessionManager.startSession(
+    type: .deepWork,
+    documentId: doc?.id,
+    currentWordCount: doc?.wordCount ?? 0
+)
+
+print("Deep work session started - 90 minutes of focused writing!")
+
+// 4. Write (simulated)
+// ... user writes 1200 words ...
+
+// 5. End session and update goals
+let finalSession = app.focusSessionManager.endSession(
+    id: session.id,
+    finalWordCount: 1200,
+    completed: true
+)
+
+goalManager.updateProgress(goalId: goal.id, amount: 1200)
+
+// 6. Get AI feedback
+if app.aiService != nil {
+    let analysis = try await app.analyzeDocument(documentId: doc.id)
+    print("AI Analysis:\n\(analysis.analysis)")
+}
+
+// 7. Export
+let markdown = app.exportDocument(id: doc.id, format: .markdown)
+try? markdown?.write(toFile: "chapter-3.md", atomically: true, encoding: .utf8)
+
+// 8. Review statistics
+let sessionStats = app.focusSessionManager.getStatistics()
+let goalSummary = goalManager.getSummary()
+
+print("""
+📊 Today's Writing Session
+─────────────────────────
+Words written: \(finalSession?.wordsWritten ?? 0)
+Session duration: \(Int((finalSession?.actualDuration ?? 0) / 60)) minutes
+Words per minute: \(String(format: "%.1f", finalSession?.wordsPerMinute ?? 0))
+
+🎯 Goal Progress
+────────────────
+Daily goal: \(goal.progressPercentage)% complete
+Current streak: \(goalSummary.streak.currentStreak) days
+Total words this week: \(goalSummary.overallProgress)
+""")
+```
+
 ### As a CLI Tool
 
 #### Quick Start
@@ -434,6 +691,42 @@ Professional business correspondence format with proper addressing and structure
 - `customRequest(text:instruction:context:)` - Custom AI request
 - `analyzeDocument(document:)` - Analyze document comprehensively
 - `getWritingInsights(document:)` - Get writing insights
+
+### FocusSessionManager
+- `startSession(type:documentId:currentWordCount:customDuration:)` - Start a focus session
+- `pauseSession()` - Pause the current session
+- `resumeSession(pausedDuration:)` - Resume a paused session
+- `endSession(id:finalWordCount:completed:)` - End a session
+- `startBreak()` - Start break after completing a Pomodoro
+- `endBreak()` - End break and resume session
+- `getCurrentSession()` - Get the active session
+- `getSession(id:)` - Get a specific session by ID
+- `getSessionHistory(limit:)` - Get past sessions
+- `getStatistics()` - Get focus session statistics
+- `calculateStreak()` - Calculate current writing streak
+
+### WritingGoalManager
+- `createGoal(_:)` - Create a new writing goal
+- `getGoal(id:)` - Retrieve a goal by ID
+- `getAllGoals()` - Get all goals
+- `getActiveGoals()` - Get active goals only
+- `updateGoal(_:)` - Update an existing goal
+- `deleteGoal(id:)` - Delete a goal
+- `updateProgress(goalId:amount:)` - Update goal progress
+- `addProgressEntry(goalId:amount:notes:)` - Add a progress entry
+- `getProgressHistory(goalId:)` - Get progress history for a goal
+- `getSummary()` - Get summary of all goals
+- `updateStreak()` - Update writing streak
+- `getStreak()` - Get current writing streak
+- `checkDeadlines()` - Check goals approaching deadlines
+
+### ProductivityAnalytics
+- `getWritingTrends(days:)` - Get writing trends over time
+- `getBestWritingTimes()` - Analyze peak productivity periods
+- `getSessionAnalysis()` - Detailed focus session analysis
+- `getGoalInsights()` - Insights about goal progress
+- `getMotivationalQuote()` - Get a motivational quote
+- `exportAnalytics(format:)` - Export analytics data
 
 ## Testing
 
