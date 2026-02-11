@@ -52,6 +52,17 @@ Integration options for sharing and sending documents:
 - **Sidemail** - Email API for sending transactional emails (via HTTP API)
 - **SwiftMail** - SMTP and IMAP library for direct email sending
 
+### 🔌 OpenClaw Integration (NEW!)
+Real-time observation streaming to messaging channels:
+- **Live Observations**: Stream writing events to Telegram, Discord, Signal, Slack, WhatsApp, or Line
+- **SSE-Based**: Server-Sent Events for real-time updates
+- **Auto-Reconnect**: Exponential backoff reconnection on failures (1s → 30s max)
+- **Status Monitoring**: `/friendly-outlaw-feed` command for connection status
+- **Channel-Agnostic**: Works with any messaging platform supported by OpenClaw
+- **TypeScript Plugin**: Node.js-based plugin with comprehensive test suite (18+ tests)
+
+See [OPENCLAW_INTEGRATION.md](OPENCLAW_INTEGRATION.md) for complete integration guide.
+
 ### 🤖 AI-Powered Writing Assistant (NEW!)
 Powered by Claude API for intelligent writing assistance:
 - **Continue Writing**: AI generates natural continuations matching your style
