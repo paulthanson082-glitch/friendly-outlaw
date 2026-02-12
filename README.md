@@ -109,6 +109,22 @@ Heavy metal-themed command center optimized for iPad Pro:
 
 See [PREVIEW_METAL_DASHBOARD.md](PREVIEW_METAL_DASHBOARD.md) for complete Metal Dashboard documentation including design system, architecture, and usage examples.
 
+### 💫 Encouragement System (NEW!)
+A positive, motivational feedback system that celebrates your writing achievements:
+- **Context-Aware Messages**: Encouragement adapts to word count, session duration, and writing patterns
+- **Milestone Celebrations**: Automatic recognition of achievements (1K, 5K, 10K+ words, etc.)
+- **Configurable**: Enable/disable encouragement or adjust frequency to your preference
+- **Variety**: Dozens of unique messages across different categories:
+  - Word count achievements (small to massive writing sessions)
+  - Session duration recognition (from quick sprints to marathon sessions)
+  - Perseverance messages for consistent writing
+  - General encouragement to keep you motivated
+- **History Tracking**: Review past encouragements to see your progress
+- **CLI Integration**: Encouragement appears automatically after editing documents
+- **No Distractions**: Thoughtfully designed to motivate without interrupting your flow
+
+The encouragement system is enabled by default and can be toggled on/off through the CLI menu (option 51). Get instant positive feedback as you write!
+
 ## Development Environment
 
 ### VS Code Setup for iPad and MacBook Pro
@@ -209,6 +225,60 @@ let novelTemplates = app.templateManager.searchTemplates(query: "novel")
 let stats = app.getStatistics()
 print("Total documents: \(stats.totalDocuments)")
 print("Total words: \(stats.totalWordCount)")
+```
+
+#### With Encouragement Features
+
+```swift
+import WritersApp
+
+let app = WritersApp()
+
+// Get encouragement after updating a document
+let document = app.createBlankDocument(title: "My Novel", category: .novel)
+// ... user writes content ...
+
+// Get encouragement for progress
+if let encouragement = app.getEncouragementForDocument(
+    document,
+    previousWordCount: 0
+) {
+    print("💫 \(encouragement.message)")
+    // Output: "Great start! You're building momentum."
+}
+
+// Get encouragement after a writing session
+if let sessionEncouragement = app.getSessionEncouragement(
+    durationMinutes: 30,
+    wordsWritten: 500
+) {
+    print("⏱️ \(sessionEncouragement.message)")
+    // Output: "Productive session! You're making excellent progress."
+}
+
+// Celebrate milestones
+let milestone = WritingMilestone(type: .totalWords, value: 1000)
+if let milestoneEncouragement = app.getMilestoneEncouragement(milestone: milestone) {
+    print("🏆 \(milestoneEncouragement.message)")
+    // Output: "Your first thousand words! A fantastic milestone!"
+}
+
+// Get general encouragement anytime
+let encouragement = app.getGeneralEncouragement()
+print("💫 \(encouragement.message)")
+
+// Check if encouragement is enabled
+print("Encouragement enabled: \(app.isEncouragementEnabled)")
+
+// Toggle encouragement
+app.setEncouragementEnabled(false)  // Disable
+app.setEncouragementEnabled(true)   // Enable
+
+// View encouragement history
+let history = app.encouragementService.getHistory(limit: 10)
+for enc in history {
+    print("\(enc.type): \(enc.message)")
+}
 ```
 
 #### With AI Features
@@ -377,6 +447,25 @@ When AI is enabled, additional menu options will appear:
 - Develop Character (AI)
 - Generate Outline (AI)
 
+#### Encouragement Features in CLI
+
+The CLI includes built-in encouragement features to keep you motivated:
+
+**Automatic Encouragement:**
+- Receive positive feedback when editing documents
+- Messages adapt to word count progress
+- Encouragement appears after saving document changes
+
+**Encouragement Menu Options:**
+- **Option 50: Get Encouragement** - Receive an immediate motivational message
+  - General encouragement
+  - Perseverance messages
+  - Progress-based encouragement
+- **Option 51: Toggle Encouragement** - Enable or disable the encouragement system
+- **Option 52: View Encouragement History** - Review your past encouragements and achievements
+
+Encouragement is enabled by default but can be turned off if you prefer a minimal experience.
+
 ## Templates Included
 
 ### 1. Novel Chapter
@@ -440,6 +529,23 @@ Professional business correspondence format with proper addressing and structure
 - `brainstormIdeas(topic:context:)` - Brainstorm ideas
 - `generateOutline(concept:context:)` - Generate outline
 - `developCharacter(characterConcept:context:)` - Develop character
+
+**Encouragement Features:**
+- `getEncouragementForDocument(_:previousWordCount:)` - Get encouragement for document progress
+- `getSessionEncouragement(durationMinutes:wordsWritten:)` - Get encouragement for writing session
+- `getMilestoneEncouragement(milestone:)` - Get encouragement for achievements
+- `getGeneralEncouragement()` - Get a motivational message
+- `isEncouragementEnabled` - Check if encouragement is enabled
+- `setEncouragementEnabled(_:)` - Enable or disable encouragement
+
+### EncouragementService
+- `getWordCountEncouragement(wordCount:previousCount:)` - Get encouragement based on words written
+- `getSessionEncouragement(durationMinutes:wordsWritten:)` - Get encouragement for session completion
+- `getMilestoneEncouragement(milestone:)` - Get encouragement for milestone achievement
+- `getGeneralEncouragement()` - Get a random general encouragement message
+- `getPerseveranceEncouragement()` - Get perseverance-focused encouragement
+- `getHistory(limit:)` - Retrieve encouragement history
+- `clearHistory()` - Clear encouragement history
 
 ### AIService
 - `getAssistance(text:type:context:)` - Get AI assistance for any text
