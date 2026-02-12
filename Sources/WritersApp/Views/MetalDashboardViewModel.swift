@@ -204,6 +204,7 @@ public class MetalDashboardViewModel: ObservableObject {
     public func iconForFocusType(_ type: FocusSessionType) -> String {
         switch type {
         case .freeWrite: return "flame.fill"
+        case .openRun: return "figure.run"
         case .pomodoro: return "timer"
         case .sprint: return "bolt.fill"
         case .deepWork: return "moon.fill"

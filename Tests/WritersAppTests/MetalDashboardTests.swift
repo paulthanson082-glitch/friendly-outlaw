@@ -249,6 +249,7 @@ final class MetalDashboardTests: XCTestCase {
     func testIconForFocusType() {
         let vm = MetalDashboardViewModel()
         XCTAssertEqual(vm.iconForFocusType(FocusSessionType.freeWrite), "flame.fill")
+        XCTAssertEqual(vm.iconForFocusType(FocusSessionType.openRun), "figure.run")
         XCTAssertEqual(vm.iconForFocusType(FocusSessionType.pomodoro), "timer")
         XCTAssertEqual(vm.iconForFocusType(FocusSessionType.sprint), "bolt.fill")
         XCTAssertEqual(vm.iconForFocusType(FocusSessionType.deepWork), "moon.fill")
@@ -260,6 +261,13 @@ final class MetalDashboardTests: XCTestCase {
         XCTAssertEqual(FocusSessionType.marathon.displayName, "Marathon (120 min)")
         XCTAssertEqual(FocusSessionType.marathon.defaultDuration, 120 * 60)
         XCTAssertEqual(FocusSessionType.marathon.breakDuration, 20 * 60)
+    }
+    
+    func testOpenRunSessionType() {
+        // Test Open Run session properties
+        XCTAssertEqual(FocusSessionType.openRun.displayName, "Open Run")
+        XCTAssertEqual(FocusSessionType.openRun.defaultDuration, 0) // No time limit
+        XCTAssertEqual(FocusSessionType.openRun.breakDuration, 0) // No breaks
     }
     
     func testAllFocusSessionTypesHaveIcons() {

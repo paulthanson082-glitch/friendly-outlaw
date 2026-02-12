@@ -100,7 +100,7 @@ See [DATABASE.md](DATABASE.md) for complete database documentation including sch
 Heavy metal-themed command center optimized for iPad Pro:
 - **The Mantra**: Rotating metal-inspired motivational quotes
 - **Kill Count**: Real-time statistics dashboard (words, documents, streaks)
-- **The Armory**: Quick-start focus sessions (Pomodoro, Sprint, Deep Work, Marathon)
+- **The Armory**: Quick-start focus sessions (Pomodoro, Sprint, Deep Work, Marathon, Open Run)
 - **War Room**: Recent documents with quick access
 - **The Gauntlet**: Writing goals and progress tracking
 - **The Forge**: Quick actions for creating new content

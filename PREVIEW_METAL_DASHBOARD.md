@@ -31,6 +31,7 @@ Quick-start focus sessions:
 - **Sprint** (15 min) — Short, intense writing burst
 - **Deep Work** (90 min) — Extended concentration session
 - **Marathon** (120 min) — Long-form sustained writing
+- **Open Run** — Flexible, unstructured writing session
 
 #### 📜 War Room
 Recent documents list with:
