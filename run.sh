@@ -30,7 +30,9 @@ show_help() {
     echo "  ./run.sh --release                          # Run in release mode (interactive)"
     echo "  ./run.sh --list                             # List all documents"
     echo "  ./run.sh --open \"My Story\"                  # Open a document by title"
+    echo "  ./run.sh --run 5                            # Run menu option 5 (View Statistics)"
     echo "  ./run.sh --release --open <document-id>     # Open document in release mode"
+    echo "  ./run.sh --release --run 1                  # Run menu option 1 in release mode"
     echo "  ANTHROPIC_API_KEY=sk-... ./run.sh          # Run with AI features"
 }
 

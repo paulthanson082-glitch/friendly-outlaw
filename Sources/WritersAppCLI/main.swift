@@ -36,6 +36,14 @@ struct WritersAppCLI {
                 }
                 await openDocumentByIdOrTitle(app: app, searchTerm: arguments[2])
                 return
+            case "--run", "-r":
+                if arguments.count < 3 {
+                    print("Error: --run requires a menu option number")
+                    print("Usage: WritersAppCLI --run <option-number>")
+                    return
+                }
+                await runMenuOption(app: app, optionString: arguments[2])
+                return
             default:
                 print("Unknown option: \(command)")
                 print("Use --help for usage information")
@@ -1748,12 +1756,22 @@ func showHelp() {
         --help, -h              Show this help message
         --list, -l              List all documents
         --open, -o <id|title>   Open a document by ID or title
+        --run, -r <option>      Run a menu option non-interactively
 
     EXAMPLES:
         WritersAppCLI                              # Start interactive mode
         WritersAppCLI --list                       # List all documents
         WritersAppCLI --open "My Story"            # Open document by title
         WritersAppCLI --open <document-id>         # Open document by ID
+        WritersAppCLI --run 5                      # View statistics
+        WritersAppCLI --run 1                      # Browse templates
+
+    MENU OPTIONS (for --run):
+        1-8:   Document operations (browse, create, view, search)
+        10-16: AI features (requires ANTHROPIC_API_KEY)
+        20-25: Memory plugin features
+        30:    List plugins
+        40-49: Productivity features (focus sessions, goals, streaks)
 
     ENVIRONMENT VARIABLES:
         ANTHROPIC_API_KEY      Set this to enable AI features
@@ -1830,6 +1848,152 @@ func openDocumentByIdOrTitle(app: WritersApp, searchTerm: String) async {
         print("\(index + 1). \(document.title) (ID: \(String(document.id.uuidString.prefix(uuidDisplayLength))))")
     }
     print("\nPlease use a more specific title or document ID.")
+}
+
+func runMenuOption(app: WritersApp, optionString: String) async {
+    guard let option = Int(optionString) else {
+        print("Error: Invalid option number '\(optionString)'")
+        print("Option must be a valid menu number")
+        return
+    }
+    
+    // Check if API key is needed for this option
+    if let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"], !apiKey.isEmpty {
+        let config = AIConfiguration(apiKey: apiKey, model: .claude35Sonnet)
+        app.enableAI(configuration: config)
+    }
+    
+    // Initialize memory plugin if needed
+    do {
+        try await app.enableMemoryPlugin()
+    } catch {
+        // Silently fail if memory plugin not available
+    }
+    
+    switch option {
+    case 1:
+        browseTemplates(app: app)
+    case 2:
+        createDocumentFromTemplate(app: app)
+    case 3:
+        createBlankDocument(app: app)
+    case 4:
+        viewAllDocuments(app: app)
+    case 5:
+        viewStatistics(app: app)
+    case 6:
+        searchTemplates(app: app)
+    case 7:
+        searchDocuments(app: app)
+    case 8:
+        await openDocument(app: app)
+    case 10:
+        if !app.isAIEnabled {
+            print("Error: AI features are not enabled. Set ANTHROPIC_API_KEY environment variable.")
+            return
+        }
+        await continueWritingWithAI(app: app)
+    case 11:
+        if !app.isAIEnabled {
+            print("Error: AI features are not enabled. Set ANTHROPIC_API_KEY environment variable.")
+            return
+        }
+        await improveDocumentWithAI(app: app)
+    case 12:
+        if !app.isAIEnabled {
+            print("Error: AI features are not enabled. Set ANTHROPIC_API_KEY environment variable.")
+            return
+        }
+        await generateTitlesWithAI(app: app)
+    case 13:
+        if !app.isAIEnabled {
+            print("Error: AI features are not enabled. Set ANTHROPIC_API_KEY environment variable.")
+            return
+        }
+        await analyzeDocumentWithAI(app: app)
+    case 14:
+        if !app.isAIEnabled {
+            print("Error: AI features are not enabled. Set ANTHROPIC_API_KEY environment variable.")
+            return
+        }
+        await brainstormIdeasWithAI(app: app)
+    case 15:
+        if !app.isAIEnabled {
+            print("Error: AI features are not enabled. Set ANTHROPIC_API_KEY environment variable.")
+            return
+        }
+        await developCharacterWithAI(app: app)
+    case 16:
+        if !app.isAIEnabled {
+            print("Error: AI features are not enabled. Set ANTHROPIC_API_KEY environment variable.")
+            return
+        }
+        await generateOutlineWithAI(app: app)
+    case 20:
+        if !app.isMemoryPluginEnabled {
+            print("Error: Memory plugin is not enabled.")
+            return
+        }
+        await storeMemory(app: app)
+    case 21:
+        if !app.isMemoryPluginEnabled {
+            print("Error: Memory plugin is not enabled.")
+            return
+        }
+        await retrieveMemory(app: app)
+    case 22:
+        if !app.isMemoryPluginEnabled {
+            print("Error: Memory plugin is not enabled.")
+            return
+        }
+        await searchMemories(app: app)
+    case 23:
+        if !app.isMemoryPluginEnabled {
+            print("Error: Memory plugin is not enabled.")
+            return
+        }
+        await listMemories(app: app)
+    case 24:
+        if !app.isMemoryPluginEnabled {
+            print("Error: Memory plugin is not enabled.")
+            return
+        }
+        await clearMemory(app: app)
+    case 25:
+        if !app.isMemoryPluginEnabled {
+            print("Error: Memory plugin is not enabled.")
+            return
+        }
+        await viewMemoryStats(app: app)
+    case 30:
+        listPlugins(app: app)
+    case 40:
+        startFocusSession(app: app)
+    case 41:
+        viewCurrentSession()
+    case 42:
+        endFocusSession(app: app)
+    case 43:
+        viewFocusSessionStats()
+    case 44:
+        setDailyWritingGoal()
+    case 45:
+        viewGoalsAndProgress()
+    case 46:
+        recordProgress()
+    case 47:
+        viewWritingStreak()
+    case 48:
+        viewProductivityReport()
+    case 49:
+        viewProductivityInsights()
+    default:
+        print("Error: Invalid menu option '\(option)'")
+        print("Use --help to see available options")
+    }
+    
+    // Shutdown plugins before exit
+    await app.shutdownPlugins()
 }
 
 func displayDocument(app: WritersApp, document: Document) async {

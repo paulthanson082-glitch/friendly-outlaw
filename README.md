@@ -341,8 +341,18 @@ swift run WritersAppCLI --open "My Story"
 ./run.sh --open <document-uuid>
 swift run WritersAppCLI --open <document-uuid>
 
+# Run a specific menu option
+./run.sh --run 5
+swift run WritersAppCLI --run 5
+
+# Run menu options (1-8: documents, 10-16: AI features, 40-49: productivity)
+./run.sh --run 1                        # Browse templates
+./run.sh --run 5                        # View statistics
+./run.sh --run 40                       # Start focus session
+
 # Combine with release mode
 ./run.sh --release --open "My Story"
+./run.sh --release --run 5
 ```
 
 These arguments allow for quick operations without entering the interactive menu system, making it easier to integrate with scripts and workflows.
