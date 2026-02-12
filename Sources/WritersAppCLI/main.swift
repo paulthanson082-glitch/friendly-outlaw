@@ -1732,6 +1732,11 @@ func formatHour(_ hour: Int) -> String {
 
 // MARK: - Command-Line Argument Handlers
 
+// Constants for formatting
+private let uuidDisplayLength = 8
+private let titleColumnWidth = 24
+private let categoryColumnWidth = 13
+
 func showHelp() {
     print("""
     Writers App CLI - Command-Line Interface
@@ -1767,13 +1772,16 @@ func listDocuments(app: WritersApp) {
         return
     }
     
-    print("ID                                    | Title                    | Category      | Words")
-    print(String(repeating: "-", count: 90))
+    // ID (8) + " | " (3) + Title (24) + " | " (3) + Category (13) + " | Words" (8) = ~59
+    let headerSeparatorWidth = uuidDisplayLength + 3 + titleColumnWidth + 3 + categoryColumnWidth + 10
+    
+    print("ID       | Title                    | Category      | Words")
+    print(String(repeating: "-", count: headerSeparatorWidth))
     
     for document in documents {
-        let id = String(document.id.uuidString.prefix(8))
-        let title = String(document.title.prefix(24)).padding(toLength: 24, withPad: " ", startingAt: 0)
-        let category = String(document.category.rawValue.prefix(13)).padding(toLength: 13, withPad: " ", startingAt: 0)
+        let id = String(document.id.uuidString.prefix(uuidDisplayLength))
+        let title = String(document.title.prefix(titleColumnWidth)).padding(toLength: titleColumnWidth, withPad: " ", startingAt: 0)
+        let category = String(document.category.rawValue.prefix(categoryColumnWidth)).padding(toLength: categoryColumnWidth, withPad: " ", startingAt: 0)
         print("\(id) | \(title) | \(category) | \(document.wordCount)")
     }
     
@@ -1819,7 +1827,7 @@ func openDocumentByIdOrTitle(app: WritersApp, searchTerm: String) async {
     // Multiple matches found
     print("Multiple documents found matching '\(searchTerm)':\n")
     for (index, document) in matches.enumerated() {
-        print("\(index + 1). \(document.title) (ID: \(String(document.id.uuidString.prefix(8))))")
+        print("\(index + 1). \(document.title) (ID: \(String(document.id.uuidString.prefix(uuidDisplayLength))))")
     }
     print("\nPlease use a more specific title or document ID.")
 }
