@@ -6,6 +6,7 @@ public class WritersApp {
     public let documentManager: DocumentManager
     public let databaseManager: DatabaseManager
     public let pluginManager: PluginManager
+    public let encouragementService: EncouragementService
     public private(set) var aiService: AIService?
     public private(set) var currentUserId: UUID?
     private var currentSessionId: UUID?
@@ -16,6 +17,7 @@ public class WritersApp {
         self.documentManager = DocumentManager()
         self.databaseManager = DatabaseManager()
         self.pluginManager = PluginManager.shared
+        self.encouragementService = EncouragementService()
         try? self.databaseManager.initialize()
     }
 
@@ -25,6 +27,7 @@ public class WritersApp {
         self.documentManager = DocumentManager()
         self.databaseManager = DatabaseManager()
         self.pluginManager = PluginManager.shared
+        self.encouragementService = EncouragementService()
         try? self.databaseManager.initialize()
         self.aiService = AIService(configuration: aiConfiguration)
     }
@@ -35,6 +38,7 @@ public class WritersApp {
         self.documentManager = DocumentManager()
         self.databaseManager = DatabaseManager(databasePath: databasePath)
         self.pluginManager = PluginManager.shared
+        self.encouragementService = EncouragementService()
         try? self.databaseManager.initialize()
     }
 
@@ -574,6 +578,44 @@ public class WritersApp {
             totalTemplates: templateCount,
             documentsByCategory: categoryCounts
         )
+    }
+    
+    // MARK: - Encouragement Features
+    
+    /// Get encouragement for a document update
+    public func getEncouragementForDocument(_ document: Document, previousWordCount: Int = 0) -> EncouragementMessage? {
+        return encouragementService.getWordCountEncouragement(
+            wordCount: document.wordCount,
+            previousCount: previousWordCount
+        )
+    }
+    
+    /// Get encouragement for a writing session
+    public func getSessionEncouragement(durationMinutes: Int, wordsWritten: Int) -> EncouragementMessage? {
+        return encouragementService.getSessionEncouragement(
+            durationMinutes: durationMinutes,
+            wordsWritten: wordsWritten
+        )
+    }
+    
+    /// Get encouragement for a milestone
+    public func getMilestoneEncouragement(milestone: WritingMilestone) -> EncouragementMessage? {
+        return encouragementService.getMilestoneEncouragement(milestone: milestone)
+    }
+    
+    /// Get a general encouragement message
+    public func getGeneralEncouragement() -> EncouragementMessage {
+        return encouragementService.getGeneralEncouragement()
+    }
+    
+    /// Check if encouragement is enabled
+    public var isEncouragementEnabled: Bool {
+        return encouragementService.configuration.enabled
+    }
+    
+    /// Enable or disable encouragement
+    public func setEncouragementEnabled(_ enabled: Bool) {
+        encouragementService.configuration.enabled = enabled
     }
 }
 
