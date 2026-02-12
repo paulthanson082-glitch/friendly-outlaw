@@ -1,33 +1,43 @@
 #!/bin/bash
 # Convenient script to run the Writers App CLI
-# Usage: ./run.sh [options]
+# Usage: ./run.sh [options] [CLI arguments]
 # 
 # Options:
 #   --release    Build and run in release mode
 #   --help       Show this help message
+#
+# Any additional arguments are passed to the CLI application
 
 set -e
 
 show_help() {
     echo "Writers App CLI Runner"
     echo ""
-    echo "Usage: ./run.sh [options]"
+    echo "Usage: ./run.sh [options] [CLI arguments]"
     echo ""
     echo "Options:"
     echo "  --release    Build and run in release mode (optimized)"
     echo "  --help       Show this help message"
     echo ""
+    echo "CLI Arguments:"
+    echo "  Any arguments after --release (or without it) are passed to the CLI"
+    echo ""
     echo "Environment Variables:"
     echo "  ANTHROPIC_API_KEY    Set this to enable AI features"
     echo ""
     echo "Examples:"
-    echo "  ./run.sh                                    # Run in debug mode"
-    echo "  ./run.sh --release                          # Run in release mode"
+    echo "  ./run.sh                                    # Run in debug mode (interactive)"
+    echo "  ./run.sh --release                          # Run in release mode (interactive)"
+    echo "  ./run.sh --list                             # List all documents"
+    echo "  ./run.sh --open \"My Story\"                  # Open a document by title"
+    echo "  ./run.sh --release --open <document-id>     # Open document in release mode"
     echo "  ANTHROPIC_API_KEY=sk-... ./run.sh          # Run with AI features"
 }
 
 # Parse arguments
 BUILD_CONFIG="debug"
+CLI_ARGS=()
+
 while [[ $# -gt 0 ]]; do
     case $1 in
         --release)
@@ -39,9 +49,9 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         *)
-            echo "Unknown option: $1"
-            echo "Use --help for usage information"
-            exit 1
+            # Collect remaining arguments for CLI
+            CLI_ARGS+=("$1")
+            shift
             ;;
     esac
 done
@@ -60,11 +70,15 @@ if [ "$BUILD_CONFIG" = "release" ]; then
     swift build -c release
     echo ""
     echo "Running Writers App CLI (release)..."
-    .build/release/WritersAppCLI
+    .build/release/WritersAppCLI "${CLI_ARGS[@]}"
 else
     echo "Building in debug mode..."
     swift build
     echo ""
     echo "Running Writers App CLI (debug)..."
-    swift run WritersAppCLI
+    if [ ${#CLI_ARGS[@]} -eq 0 ]; then
+        swift run WritersAppCLI
+    else
+        swift run WritersAppCLI "${CLI_ARGS[@]}"
+    fi
 fi
