@@ -317,42 +317,10 @@ func viewAllDocuments(app: WritersApp) {
     }
 }
 
-func openDocument(app: WritersApp) async {
-    print("\n=== Open Document ===\n")
-    
-    let documents = app.documentManager.getAllDocuments()
-    
-    if documents.isEmpty {
-        print("No documents found. Create one to get started!")
-        return
-    }
-    
-    // Display list of documents
-    for (index, document) in documents.enumerated() {
-        print("\(index + 1). \(document.title)")
-        print("   Category: \(document.category.rawValue)")
-        print("   Words: \(document.wordCount)")
-        print()
-    }
-    
-    print("Enter document number to open (0 to cancel): ", terminator: "")
-    guard let input = readLine(), let choice = Int(input) else {
-        print("Invalid input.")
-        return
-    }
-    
-    if choice == 0 {
-        return
-    }
-    
-    guard choice > 0 && choice <= documents.count else {
-        print("Invalid document number.")
-        return
-    }
-    
-    let documentId = documents[choice - 1].id
-    
-    // Display document details
+// MARK: - Document Viewing
+
+/// Displays a document interactively with a menu of actions
+func viewDocumentInteractive(app: WritersApp, documentId: UUID) async {
     var viewingDocument = true
     while viewingDocument {
         // Fetch the latest version of the document
@@ -492,6 +460,43 @@ func openDocument(app: WritersApp) async {
             print("Invalid choice.")
         }
     }
+}
+
+func openDocument(app: WritersApp) async {
+    print("\n=== Open Document ===\n")
+    
+    let documents = app.documentManager.getAllDocuments()
+    
+    if documents.isEmpty {
+        print("No documents found. Create one to get started!")
+        return
+    }
+    
+    // Display list of documents
+    for (index, document) in documents.enumerated() {
+        print("\(index + 1). \(document.title)")
+        print("   Category: \(document.category.rawValue)")
+        print("   Words: \(document.wordCount)")
+        print()
+    }
+    
+    print("Enter document number to open (0 to cancel): ", terminator: "")
+    guard let input = readLine(), let choice = Int(input) else {
+        print("Invalid input.")
+        return
+    }
+    
+    if choice == 0 {
+        return
+    }
+    
+    guard choice > 0 && choice <= documents.count else {
+        print("Invalid document number.")
+        return
+    }
+    
+    let documentId = documents[choice - 1].id
+    await viewDocumentInteractive(app: app, documentId: documentId)
 }
 
 func viewStatistics(app: WritersApp) {
@@ -1798,15 +1803,15 @@ func openDocumentByIdOrTitle(app: WritersApp, searchTerm: String) async {
     
     // Try to find by ID first
     if let uuid = UUID(uuidString: searchTerm) {
-        if let document = app.documentManager.getDocument(id: uuid) {
-            await displayDocument(app: app, document: document)
+        if app.documentManager.getDocument(id: uuid) != nil {
+            await viewDocumentInteractive(app: app, documentId: uuid)
             return
         }
     }
     
     // Try to find by exact title match
     if let document = documents.first(where: { $0.title.lowercased() == searchTerm.lowercased() }) {
-        await displayDocument(app: app, document: document)
+        await viewDocumentInteractive(app: app, documentId: document.id)
         return
     }
     
@@ -1820,7 +1825,7 @@ func openDocumentByIdOrTitle(app: WritersApp, searchTerm: String) async {
     }
     
     if matches.count == 1 {
-        await displayDocument(app: app, document: matches[0])
+        await viewDocumentInteractive(app: app, documentId: matches[0].id)
         return
     }
     
