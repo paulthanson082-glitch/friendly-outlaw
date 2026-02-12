@@ -1867,7 +1867,20 @@ func runMenuOption(app: WritersApp, optionString: String) async {
     do {
         try await app.enableMemoryPlugin()
     } catch {
-        // Silently fail if memory plugin not available
+        // Plugin initialization failed - plugin may not be available
+        // This is expected in some environments, so we continue silently
+    }
+    
+    // Check prerequisites for AI-only options (10-16)
+    if (10...16).contains(option) && !app.isAIEnabled {
+        print("Error: AI features are not enabled. Set ANTHROPIC_API_KEY environment variable.")
+        return
+    }
+    
+    // Check prerequisites for memory plugin options (20-25)
+    if (20...25).contains(option) && !app.isMemoryPluginEnabled {
+        print("Error: Memory plugin is not enabled.")
+        return
     }
     
     switch option {
@@ -1888,82 +1901,30 @@ func runMenuOption(app: WritersApp, optionString: String) async {
     case 8:
         await openDocument(app: app)
     case 10:
-        if !app.isAIEnabled {
-            print("Error: AI features are not enabled. Set ANTHROPIC_API_KEY environment variable.")
-            return
-        }
         await continueWritingWithAI(app: app)
     case 11:
-        if !app.isAIEnabled {
-            print("Error: AI features are not enabled. Set ANTHROPIC_API_KEY environment variable.")
-            return
-        }
         await improveDocumentWithAI(app: app)
     case 12:
-        if !app.isAIEnabled {
-            print("Error: AI features are not enabled. Set ANTHROPIC_API_KEY environment variable.")
-            return
-        }
         await generateTitlesWithAI(app: app)
     case 13:
-        if !app.isAIEnabled {
-            print("Error: AI features are not enabled. Set ANTHROPIC_API_KEY environment variable.")
-            return
-        }
         await analyzeDocumentWithAI(app: app)
     case 14:
-        if !app.isAIEnabled {
-            print("Error: AI features are not enabled. Set ANTHROPIC_API_KEY environment variable.")
-            return
-        }
         await brainstormIdeasWithAI(app: app)
     case 15:
-        if !app.isAIEnabled {
-            print("Error: AI features are not enabled. Set ANTHROPIC_API_KEY environment variable.")
-            return
-        }
         await developCharacterWithAI(app: app)
     case 16:
-        if !app.isAIEnabled {
-            print("Error: AI features are not enabled. Set ANTHROPIC_API_KEY environment variable.")
-            return
-        }
         await generateOutlineWithAI(app: app)
     case 20:
-        if !app.isMemoryPluginEnabled {
-            print("Error: Memory plugin is not enabled.")
-            return
-        }
         await storeMemory(app: app)
     case 21:
-        if !app.isMemoryPluginEnabled {
-            print("Error: Memory plugin is not enabled.")
-            return
-        }
         await retrieveMemory(app: app)
     case 22:
-        if !app.isMemoryPluginEnabled {
-            print("Error: Memory plugin is not enabled.")
-            return
-        }
         await searchMemories(app: app)
     case 23:
-        if !app.isMemoryPluginEnabled {
-            print("Error: Memory plugin is not enabled.")
-            return
-        }
         await listMemories(app: app)
     case 24:
-        if !app.isMemoryPluginEnabled {
-            print("Error: Memory plugin is not enabled.")
-            return
-        }
         await clearMemory(app: app)
     case 25:
-        if !app.isMemoryPluginEnabled {
-            print("Error: Memory plugin is not enabled.")
-            return
-        }
         await viewMemoryStats(app: app)
     case 30:
         listPlugins(app: app)
