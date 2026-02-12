@@ -114,6 +114,11 @@ struct WritersAppCLI {
             print("47. View Writing Streak")
             print("48. Productivity Report")
             print("49. Productivity Insights")
+            
+            print("\nEncouragement:")
+            print("50. Get Encouragement")
+            print("51. Toggle Encouragement")
+            print("52. View Encouragement History")
 
             print("\n0. Exit")
             print()
@@ -189,6 +194,12 @@ struct WritersAppCLI {
                 viewProductivityReport()
             case 49:
                 viewProductivityInsights()
+            case 50:
+                getEncouragement(app: app)
+            case 51:
+                toggleEncouragement(app: app)
+            case 52:
+                viewEncouragementHistory(app: app)
             case 0:
                 await app.shutdownPlugins()
                 running = false
@@ -576,6 +587,8 @@ func editDocumentContent(app: WritersApp, documentId: UUID) async {
         return
     }
     
+    let previousWordCount = document.wordCount
+    
     print("\n=== Edit Document Content ===\n")
     print("Current content:")
     print(String(repeating: "-", count: 60))
@@ -600,6 +613,13 @@ func editDocumentContent(app: WritersApp, documentId: UUID) async {
     
     print("\n✓ Document content updated!")
     print("New word count: \(document.wordCount)")
+    
+    // Show encouragement if enabled and words were added
+    if app.isEncouragementEnabled {
+        if let encouragement = app.getEncouragementForDocument(document, previousWordCount: previousWordCount) {
+            print("\n💫 \(encouragement.message)")
+        }
+    }
 }
 
 func exportDocument(app: WritersApp, documentId: UUID) {
@@ -1883,3 +1903,135 @@ func displayDocument(app: WritersApp, document: Document) async {
     print(String(repeating: "=", count: 60))
     print()
 }
+
+// MARK: - Encouragement Functions
+
+func getEncouragement(app: WritersApp) {
+    print("\n=== Get Encouragement ===\n")
+    
+    if !app.isEncouragementEnabled {
+        print("❌ Encouragement is currently disabled.")
+        print("Use option 51 to enable it.")
+        return
+    }
+    
+    print("Choose encouragement type:")
+    print("1. General encouragement")
+    print("2. Perseverance message")
+    print("3. Based on total words written")
+    print()
+    print("Enter choice: ", terminator: "")
+    
+    guard let input = readLine(), let choice = Int(input) else {
+        print("Invalid input.")
+        return
+    }
+    
+    switch choice {
+    case 1:
+        let encouragement = app.getGeneralEncouragement()
+        print("\n💫 \(encouragement.message)\n")
+        
+    case 2:
+        let encouragement = app.encouragementService.getPerseveranceEncouragement()
+        print("\n💪 \(encouragement.message)\n")
+        
+    case 3:
+        let stats = app.getStatistics()
+        if stats.totalWordCount >= 50 {
+            let encouragement = app.encouragementService.getWordCountEncouragement(
+                wordCount: stats.totalWordCount,
+                previousCount: 0
+            )
+            if let enc = encouragement {
+                print("\n💫 \(enc.message)")
+                print("   Total words across all documents: \(stats.totalWordCount)\n")
+            }
+        } else {
+            print("\n📝 Keep writing! You have \(stats.totalWordCount) words so far.")
+            print("   Get to 50 words for your first encouragement!\n")
+        }
+        
+    default:
+        print("Invalid choice.")
+    }
+}
+
+func toggleEncouragement(app: WritersApp) {
+    print("\n=== Toggle Encouragement ===\n")
+    
+    let currentStatus = app.isEncouragementEnabled ? "enabled" : "disabled"
+    print("Encouragement is currently: \(currentStatus)")
+    print()
+    print("Would you like to \(app.isEncouragementEnabled ? "disable" : "enable") it? (yes/no): ", terminator: "")
+    
+    guard let input = readLine()?.lowercased() else {
+        print("Invalid input.")
+        return
+    }
+    
+    if input == "yes" || input == "y" {
+        app.setEncouragementEnabled(!app.isEncouragementEnabled)
+        let newStatus = app.isEncouragementEnabled ? "enabled" : "disabled"
+        print("\n✓ Encouragement has been \(newStatus)!")
+        
+        if app.isEncouragementEnabled {
+            let encouragement = app.getGeneralEncouragement()
+            print("\n💫 \(encouragement.message)\n")
+        }
+    } else {
+        print("\nNo changes made.")
+    }
+}
+
+func viewEncouragementHistory(app: WritersApp) {
+    print("\n=== Encouragement History ===\n")
+    
+    let history = app.encouragementService.getHistory(limit: 20)
+    
+    if history.isEmpty {
+        print("No encouragement history yet.")
+        print("Start writing and receive encouraging messages!\n")
+        return
+    }
+    
+    print("Recent encouragements:\n")
+    
+    for (index, encouragement) in history.enumerated().reversed() {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        
+        let typeEmoji: String
+        switch encouragement.type {
+        case .wordCount:
+            typeEmoji = "📝"
+        case .sessionDuration:
+            typeEmoji = "⏱️"
+        case .milestone:
+            typeEmoji = "🏆"
+        case .general:
+            typeEmoji = "💫"
+        case .perseverance:
+            typeEmoji = "💪"
+        case .creativity:
+            typeEmoji = "✨"
+        case .consistency:
+            typeEmoji = "🎯"
+        }
+        
+        print("\(history.count - index). \(typeEmoji) \(encouragement.message)")
+        print("   \(formatter.string(from: encouragement.timestamp))")
+        
+        if let context = encouragement.context {
+            if let wordsWritten = context["words_written"] {
+                print("   Words written: \(wordsWritten)")
+            }
+            if let duration = context["duration_minutes"] {
+                print("   Session duration: \(duration) minutes")
+            }
+        }
+        print()
+    }
+}
+
