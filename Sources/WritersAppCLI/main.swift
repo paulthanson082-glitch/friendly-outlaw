@@ -14,6 +14,35 @@ struct WritersAppCLI {
         let app = WritersApp()
         analyticsService = ProductivityAnalytics(focusManager: focusManager, goalManager: goalManager)
 
+        // Parse command-line arguments
+        let arguments = CommandLine.arguments
+        
+        // Handle command-line arguments
+        if arguments.count > 1 {
+            let command = arguments[1]
+            
+            switch command {
+            case "--help", "-h":
+                showHelp()
+                return
+            case "--list", "-l":
+                listDocuments(app: app)
+                return
+            case "--open", "-o":
+                if arguments.count < 3 {
+                    print("Error: --open requires a document ID or title")
+                    print("Usage: WritersAppCLI --open <document-id-or-title>")
+                    return
+                }
+                await openDocumentByIdOrTitle(app: app, searchTerm: arguments[2])
+                return
+            default:
+                print("Unknown option: \(command)")
+                print("Use --help for usage information")
+                return
+            }
+        }
+
         print("╔══════════════════════════════════════╗")
         print("║     Writers App with Templates       ║")
         print("║   Swift Edition - Productivity Plus  ║")
@@ -1699,4 +1728,158 @@ func formatHour(_ hour: Int) -> String {
         return formatter.string(from: date)
     }
     return "\(hour):00"
+}
+
+// MARK: - Command-Line Argument Handlers
+
+// Constants for formatting
+private let uuidDisplayLength = 8
+private let titleColumnWidth = 24
+private let categoryColumnWidth = 13
+
+func showHelp() {
+    print("""
+    Writers App CLI - Command-Line Interface
+
+    USAGE:
+        WritersAppCLI [OPTIONS]
+
+    OPTIONS:
+        --help, -h              Show this help message
+        --list, -l              List all documents
+        --open, -o <id|title>   Open a document by ID or title
+
+    EXAMPLES:
+        WritersAppCLI                              # Start interactive mode
+        WritersAppCLI --list                       # List all documents
+        WritersAppCLI --open "My Story"            # Open document by title
+        WritersAppCLI --open <document-id>         # Open document by ID
+
+    ENVIRONMENT VARIABLES:
+        ANTHROPIC_API_KEY      Set this to enable AI features
+
+    For interactive mode, run without arguments.
+    """)
+}
+
+func listDocuments(app: WritersApp) {
+    print("\n=== All Documents ===\n")
+    
+    let documents = app.documentManager.getAllDocuments()
+    
+    if documents.isEmpty {
+        print("No documents found. Create one to get started!")
+        return
+    }
+    
+    // ID (8) + " | " (3) + Title (24) + " | " (3) + Category (13) + " | Words" (8) = ~59
+    let headerSeparatorWidth = uuidDisplayLength + 3 + titleColumnWidth + 3 + categoryColumnWidth + 10
+    
+    print("ID       | Title                    | Category      | Words")
+    print(String(repeating: "-", count: headerSeparatorWidth))
+    
+    for document in documents {
+        let id = String(document.id.uuidString.prefix(uuidDisplayLength))
+        let title = String(document.title.prefix(titleColumnWidth)).padding(toLength: titleColumnWidth, withPad: " ", startingAt: 0)
+        let category = String(document.category.rawValue.prefix(categoryColumnWidth)).padding(toLength: categoryColumnWidth, withPad: " ", startingAt: 0)
+        print("\(id) | \(title) | \(category) | \(document.wordCount)")
+    }
+    
+    print()
+}
+
+func openDocumentByIdOrTitle(app: WritersApp, searchTerm: String) async {
+    let documents = app.documentManager.getAllDocuments()
+    
+    if documents.isEmpty {
+        print("No documents found. Create one to get started!")
+        return
+    }
+    
+    // Try to find by ID first
+    if let uuid = UUID(uuidString: searchTerm) {
+        if let document = app.documentManager.getDocument(id: uuid) {
+            await displayDocument(app: app, document: document)
+            return
+        }
+    }
+    
+    // Try to find by exact title match
+    if let document = documents.first(where: { $0.title.lowercased() == searchTerm.lowercased() }) {
+        await displayDocument(app: app, document: document)
+        return
+    }
+    
+    // Try to find by partial title match
+    let matches = documents.filter { $0.title.lowercased().contains(searchTerm.lowercased()) }
+    
+    if matches.isEmpty {
+        print("No document found matching: \(searchTerm)")
+        print("Use --list to see all documents")
+        return
+    }
+    
+    if matches.count == 1 {
+        await displayDocument(app: app, document: matches[0])
+        return
+    }
+    
+    // Multiple matches found
+    print("Multiple documents found matching '\(searchTerm)':\n")
+    for (index, document) in matches.enumerated() {
+        print("\(index + 1). \(document.title) (ID: \(String(document.id.uuidString.prefix(uuidDisplayLength))))")
+    }
+    print("\nPlease use a more specific title or document ID.")
+}
+
+func displayDocument(app: WritersApp, document: Document) async {
+    // Update last opened date
+    var updatedDocument = document
+    updatedDocument.metadata.lastOpened = Date()
+    app.documentManager.updateDocument(updatedDocument)
+    
+    print("\n" + String(repeating: "=", count: 60))
+    print("Document: \(document.title)")
+    print(String(repeating: "=", count: 60))
+    print()
+    print("ID: \(document.id.uuidString)")
+    print("Category: \(document.category.rawValue)")
+    print("Created: \(formatDate(document.metadata.created))")
+    print("Modified: \(formatDate(document.metadata.modified))")
+    if let lastOpened = document.metadata.lastOpened {
+        print("Last Opened: \(formatDate(lastOpened))")
+    }
+    print()
+    print("Word Count: \(document.wordCount)")
+    print("Character Count: \(document.characterCount)")
+    print("Reading Time: \(document.readingTime) min")
+    
+    if let goal = document.metadata.wordCountGoal {
+        let progress = Double(document.wordCount) / Double(goal) * 100.0
+        print("Goal Progress: \(document.wordCount)/\(goal) words (\(String(format: "%.1f", progress))%)")
+    }
+    
+    if !document.metadata.tags.isEmpty {
+        print("Tags: \(document.metadata.tags.joined(separator: ", "))")
+    }
+    
+    if !document.metadata.notes.isEmpty {
+        print("Notes: \(document.metadata.notes)")
+    }
+    
+    print()
+    print(String(repeating: "-", count: 60))
+    print("CONTENT:")
+    print(String(repeating: "-", count: 60))
+    print()
+    
+    if document.content.isEmpty {
+        print("[Empty document - no content yet]")
+    } else {
+        print(document.content)
+    }
+    
+    print()
+    print(String(repeating: "=", count: 60))
+    print()
 }

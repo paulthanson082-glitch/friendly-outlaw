@@ -301,7 +301,7 @@ if let ai = app.aiService {
 Use the convenient run script:
 
 ```bash
-./run.sh                 # Run in debug mode
+./run.sh                 # Run in debug mode (interactive)
 ./run.sh --release       # Run in release mode (optimized)
 ./run.sh --help          # Show help and options
 ```
@@ -319,6 +319,33 @@ Or build a release version:
 swift build -c release
 .build/release/WritersAppCLI
 ```
+
+#### Command-Line Arguments (NEW!)
+
+The CLI now supports direct command-line operations without entering interactive mode:
+
+```bash
+# Show help
+./run.sh --help
+swift run WritersAppCLI --help
+
+# List all documents
+./run.sh --list
+swift run WritersAppCLI --list
+
+# Open a document by title
+./run.sh --open "My Story"
+swift run WritersAppCLI --open "My Story"
+
+# Open a document by ID
+./run.sh --open <document-uuid>
+swift run WritersAppCLI --open <document-uuid>
+
+# Combine with release mode
+./run.sh --release --open "My Story"
+```
+
+These arguments allow for quick operations without entering the interactive menu system, making it easier to integrate with scripts and workflows.
 
 #### Enabling AI Features in CLI
 
