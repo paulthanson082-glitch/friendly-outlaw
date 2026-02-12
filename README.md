@@ -303,6 +303,8 @@ Use the convenient run script:
 ```bash
 ./run.sh                 # Run in debug mode
 ./run.sh --release       # Run in release mode (optimized)
+./run.sh --open          # Open in new Terminal window (macOS only)
+./run.sh --release --open # Run release build in new Terminal window
 ./run.sh --help          # Show help and options
 ```
 
