@@ -279,6 +279,197 @@ final class iPadProFeaturesTests: XCTestCase {
         XCTAssertFalse(ApplePencilGeneration.secondGeneration.supportsSqueeze)
     }
 
+    // MARK: - Handwriting Recognition Tests
+
+    func testConvertToTextWithEmptyStrokes() {
+        let manager = ApplePencilManager()
+        let result = manager.convertToText(strokes: [])
+        
+        XCTAssertEqual(result.recognizedText, "")
+        XCTAssertEqual(result.confidence, 0.0)
+        XCTAssertEqual(result.alternatives.count, 0)
+    }
+
+    func testConvertToTextWithVerticalLine() {
+        let manager = ApplePencilManager()
+        
+        // Create a vertical line stroke (should be recognized as 'I')
+        let points = [
+            PencilPoint(x: 10, y: 0, pressure: 0.8),
+            PencilPoint(x: 10, y: 10, pressure: 0.8),
+            PencilPoint(x: 10, y: 20, pressure: 0.8)
+        ]
+        
+        let stroke = PencilStroke(
+            startTime: Date(),
+            endTime: Date(),
+            points: points,
+            tool: .pen
+        )
+        
+        let result = manager.convertToText(strokes: [stroke])
+        
+        XCTAssertEqual(result.recognizedText, "I")
+        XCTAssertGreaterThan(result.confidence, 0.0)
+        XCTAssertLessThanOrEqual(result.confidence, 1.0)
+    }
+
+    func testConvertToTextWithHorizontalLine() {
+        let manager = ApplePencilManager()
+        
+        // Create a horizontal line stroke (should be recognized as '-')
+        let points = [
+            PencilPoint(x: 0, y: 10, pressure: 0.8),
+            PencilPoint(x: 10, y: 10, pressure: 0.8),
+            PencilPoint(x: 20, y: 10, pressure: 0.8),
+            PencilPoint(x: 30, y: 10, pressure: 0.8)
+        ]
+        
+        let stroke = PencilStroke(
+            startTime: Date(),
+            endTime: Date(),
+            points: points,
+            tool: .pen
+        )
+        
+        let result = manager.convertToText(strokes: [stroke])
+        
+        XCTAssertEqual(result.recognizedText, "-")
+        XCTAssertGreaterThan(result.confidence, 0.0)
+    }
+
+    func testConvertToTextWithCircularShape() {
+        let manager = ApplePencilManager()
+        
+        // Create a circular stroke (should be recognized as 'O')
+        let points = [
+            PencilPoint(x: 10, y: 0, pressure: 0.8),
+            PencilPoint(x: 20, y: 0, pressure: 0.8),
+            PencilPoint(x: 20, y: 10, pressure: 0.8),
+            PencilPoint(x: 20, y: 20, pressure: 0.8),
+            PencilPoint(x: 10, y: 20, pressure: 0.8),
+            PencilPoint(x: 0, y: 20, pressure: 0.8),
+            PencilPoint(x: 0, y: 10, pressure: 0.8),
+            PencilPoint(x: 0, y: 0, pressure: 0.8),
+            PencilPoint(x: 10, y: 0, pressure: 0.8)
+        ]
+        
+        let stroke = PencilStroke(
+            startTime: Date(),
+            endTime: Date(),
+            points: points,
+            tool: .pen
+        )
+        
+        let result = manager.convertToText(strokes: [stroke])
+        
+        XCTAssertEqual(result.recognizedText, "O")
+        XCTAssertGreaterThan(result.confidence, 0.0)
+    }
+
+    func testConvertToTextWithMultipleStrokes() {
+        let manager = ApplePencilManager()
+        
+        // Create multiple strokes
+        let verticalStroke = PencilStroke(
+            startTime: Date(),
+            endTime: Date(),
+            points: [
+                PencilPoint(x: 10, y: 0, pressure: 0.8),
+                PencilPoint(x: 10, y: 10, pressure: 0.8),
+                PencilPoint(x: 10, y: 20, pressure: 0.8)
+            ],
+            tool: .pen
+        )
+        
+        let horizontalStroke = PencilStroke(
+            startTime: Date(),
+            endTime: Date(),
+            points: [
+                PencilPoint(x: 0, y: 10, pressure: 0.8),
+                PencilPoint(x: 10, y: 10, pressure: 0.8),
+                PencilPoint(x: 20, y: 10, pressure: 0.8),
+                PencilPoint(x: 30, y: 10, pressure: 0.8)
+            ],
+            tool: .pen
+        )
+        
+        let result = manager.convertToText(strokes: [verticalStroke, horizontalStroke])
+        
+        XCTAssertEqual(result.recognizedText, "I-")
+        XCTAssertGreaterThan(result.confidence, 0.0)
+    }
+
+    func testConvertToTextReturnsAlternatives() {
+        let manager = ApplePencilManager()
+        
+        // Create a vertical line stroke
+        let points = [
+            PencilPoint(x: 10, y: 0, pressure: 0.8),
+            PencilPoint(x: 10, y: 10, pressure: 0.8),
+            PencilPoint(x: 10, y: 20, pressure: 0.8)
+        ]
+        
+        let stroke = PencilStroke(
+            startTime: Date(),
+            endTime: Date(),
+            points: points,
+            tool: .pen
+        )
+        
+        let result = manager.convertToText(strokes: [stroke])
+        
+        // Should return alternatives for 'I'
+        XCTAssertGreaterThan(result.alternatives.count, 0)
+        XCTAssertLessThanOrEqual(result.alternatives.count, 3)
+    }
+
+    func testConvertToTextConfidenceRange() {
+        let manager = ApplePencilManager()
+        
+        // Create a stroke with varying pressure (lower confidence)
+        let points = [
+            PencilPoint(x: 10, y: 0, pressure: 0.2),
+            PencilPoint(x: 10, y: 10, pressure: 0.9),
+            PencilPoint(x: 10, y: 20, pressure: 0.3)
+        ]
+        
+        let stroke = PencilStroke(
+            startTime: Date(),
+            endTime: Date(),
+            points: points,
+            tool: .pen
+        )
+        
+        let result = manager.convertToText(strokes: [stroke])
+        
+        // Confidence should be between 0 and 1
+        XCTAssertGreaterThanOrEqual(result.confidence, 0.0)
+        XCTAssertLessThanOrEqual(result.confidence, 1.0)
+    }
+
+    func testConvertToTextLanguageConfiguration() {
+        let config = PencilConfiguration(handwritingLanguage: "fr-FR")
+        let manager = ApplePencilManager(configuration: config)
+        
+        let points = [
+            PencilPoint(x: 10, y: 0, pressure: 0.8),
+            PencilPoint(x: 10, y: 10, pressure: 0.8)
+        ]
+        
+        let stroke = PencilStroke(
+            startTime: Date(),
+            endTime: Date(),
+            points: points,
+            tool: .pen
+        )
+        
+        let result = manager.convertToText(strokes: [stroke])
+        
+        // Should respect the configured language
+        XCTAssertEqual(result.language, "fr-FR")
+    }
+
     // MARK: - Stage Manager Support Tests
 
     func testStageManagerWindowConfiguration() {
