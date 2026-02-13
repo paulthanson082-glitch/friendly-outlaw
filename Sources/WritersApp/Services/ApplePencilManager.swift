@@ -16,6 +16,32 @@ public class ApplePencilManager {
 
     private var strokeHistory: [PencilStroke] = []
     private var currentStroke: PencilStroke?
+    
+    // MARK: - Handwriting Recognition Constants
+    
+    /// Minimum height threshold to prevent division by zero
+    private let minimumHeightThreshold = 0.001
+    
+    /// Aspect ratio threshold for vertical line detection (height >> width)
+    private let verticalLineAspectRatioThreshold = 0.3
+    
+    /// Aspect ratio threshold for horizontal line detection (width >> height)
+    private let horizontalLineAspectRatioThreshold = 3.0
+    
+    /// Minimum aspect ratio for circular shape detection
+    private let circularShapeMinAspectRatio = 0.7
+    
+    /// Maximum aspect ratio for circular shape detection
+    private let circularShapeMaxAspectRatio = 1.3
+    
+    /// Minimum number of points required for reliable shape recognition
+    private let minimumPointCountForRecognition = 2
+    
+    /// Threshold for detecting closed loops (as fraction of bounding box width)
+    private let closedLoopThreshold = 0.2
+    
+    /// Optimal number of points for high-confidence recognition
+    private let optimalPointCount = 20.0
 
     // MARK: - Initialization
 
@@ -158,22 +184,22 @@ public class ApplePencilManager {
     /// Recognize a single character from a stroke
     private func recognizeCharacter(from stroke: PencilStroke) -> String? {
         let box = stroke.boundingBox
-        let aspectRatio = box.width / max(box.height, 0.001)
+        let aspectRatio = box.width / max(box.height, minimumHeightThreshold)
         let pointCount = stroke.points.count
         
         // Basic heuristic-based character recognition
         // Vertical lines (like 'I', 'l')
-        if aspectRatio < 0.3 && pointCount > 2 {
+        if aspectRatio < verticalLineAspectRatioThreshold && pointCount > minimumPointCountForRecognition {
             return "I"
         }
         
         // Horizontal lines (like '-', '_')
-        if aspectRatio > 3.0 && pointCount > 2 {
+        if aspectRatio > horizontalLineAspectRatioThreshold && pointCount > minimumPointCountForRecognition {
             return "-"
         }
         
         // Circular shapes (like 'O', '0')
-        if aspectRatio > 0.7 && aspectRatio < 1.3 && isCircularStroke(stroke) {
+        if aspectRatio > circularShapeMinAspectRatio && aspectRatio < circularShapeMaxAspectRatio && isCircularStroke(stroke) {
             return "O"
         }
         
@@ -193,7 +219,7 @@ public class ApplePencilManager {
         let dy = lastPoint.y - firstPoint.y
         let distance = sqrt(dx * dx + dy * dy)
         
-        let threshold = stroke.boundingBox.width * 0.2
+        let threshold = stroke.boundingBox.width * closedLoopThreshold
         return distance < threshold
     }
     
@@ -210,9 +236,9 @@ public class ApplePencilManager {
             let smoothnessScore = 1.0 - min(pressureVariation, 1.0)
             
             // 2. Point density (enough data points)
-            let densityScore = min(Double(stroke.points.count) / 20.0, 1.0)
+            let densityScore = min(Double(stroke.points.count) / optimalPointCount, 1.0)
             
-            // 3. Stroke completeness
+            // 3. Stroke completeness (has end time recorded)
             let completenessScore = stroke.endTime != nil ? 1.0 : 0.5
             
             totalConfidence += (smoothnessScore + densityScore + completenessScore) / 3.0
