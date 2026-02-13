@@ -1,5 +1,9 @@
 import Foundation
 
+#if canImport(CoreGraphics)
+import CoreGraphics
+#endif
+
 // MARK: - Multitasking Manager
 
 /// Manages iPad Pro multitasking features including Split View, Slide Over, and Stage Manager
