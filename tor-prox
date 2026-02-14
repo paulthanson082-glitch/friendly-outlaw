@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# tor-prox: Switch TORSOCKS_CONF_FILE to a specific Tor instance
+# Usage: source tor-prox <instance_number>
+#        Then run: torify bash (or torify <command>)
+#
+# Example:
+#   source tor-prox 4    # switch to instance 4 (port 9054)
+#   torify bash           # open a shell routed through instance 4
+#   torify curl ifconfig.me  # check your exit IP
+
+config_dir=~/etc/tor
+proxy=${1:-1}
+port=$((9050 + proxy))
+
+if [ ! -f "${config_dir}/torsocks_${proxy}.conf" ]; then
+  echo "Error: torsocks_${proxy}.conf not found in ${config_dir}"
+  echo "Run tor-army first to generate configs."
+  return 1 2>/dev/null || exit 1
+fi
+
+# If Tor instance isn't running, start it
+if ! netstat -an 2>/dev/null | grep -q "127.0.0.1:${port}" && \
+   ! ss -tln 2>/dev/null | grep -q ":${port} "; then
+  echo "Instance ${proxy} not running. Starting tor on port ${port}..."
+  nohup tor -f "${config_dir}/torrc_${proxy}" >"${config_dir}/${proxy}.log" 2>&1 &
+  sleep 3
+fi
+
+export TORSOCKS_CONF_FILE="${config_dir}/torsocks_${proxy}.conf"
+echo "Switched to Tor instance ${proxy} (SOCKS port ${port})"
+echo "TORSOCKS_CONF_FILE=${TORSOCKS_CONF_FILE}"
+echo ""
+echo "Now run: torify bash"
