@@ -16,7 +16,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: Install SQLite3 development libraries
+      - name: Verify SQLite3 availability
         run: |
           # SQLite3 is pre-installed on macOS runners
           # Verify it's available
