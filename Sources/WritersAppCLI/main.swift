@@ -1489,27 +1489,9 @@ func startFocusSessionDirect(app: WritersApp, sessionTypeName: String?) {
         return
     }
     
-    // Parse session type from argument or default to freeWrite
-    let sessionType: FocusSessionType
-    if let typeName = sessionTypeName?.lowercased() {
-        switch typeName {
-        case "freewrite", "free":
-            sessionType = .freeWrite
-        case "pomodoro", "pomo":
-            sessionType = .pomodoro
-        case "sprint", "writing-sprint":
-            sessionType = .sprint
-        case "deepwork", "deep":
-            sessionType = .deepWork
-        case "marathon":
-            sessionType = .marathon
-        default:
-            print("Error: Unknown session type '\(typeName)'")
-            print("Valid types: freewrite, pomodoro, sprint, deepwork, marathon")
-            return
-        }
-    } else {
-        sessionType = .freeWrite
+    // Parse session type using helper function
+    guard let sessionType = parseSessionType(sessionTypeName) else {
+        return
     }
     
     // Start the session without document linking for CLI simplicity
@@ -1528,52 +1510,80 @@ func startFocusSessionDirect(app: WritersApp, sessionTypeName: String?) {
     print("Run 'WritersAppCLI' in interactive mode to view or end your session.\n")
 }
 
-func openDocumentAndStartSession(app: WritersApp, searchTerm: String, sessionTypeName: String?) async {
-    // First, find the document
+// MARK: - Helper Functions for Document Lookup and Session Management
+
+/// Finds a document by ID or title with fuzzy matching
+/// Returns nil if not found or multiple ambiguous matches exist
+func findDocument(app: WritersApp, searchTerm: String) -> Document? {
     let documents = app.documentManager.getAllDocuments()
     
     if documents.isEmpty {
         print("No documents found. Create one to get started!")
-        return
+        return nil
     }
-    
-    var targetDocument: Document? = nil
     
     // Try to find by ID first
     if let uuid = UUID(uuidString: searchTerm) {
-        targetDocument = app.documentManager.getDocument(id: uuid)
-    }
-    
-    // If not found by ID, try to find by exact title match
-    if targetDocument == nil {
-        targetDocument = documents.first(where: { $0.title.lowercased() == searchTerm.lowercased() })
-    }
-    
-    // If still not found, try partial title match
-    if targetDocument == nil {
-        let matches = documents.filter { $0.title.lowercased().contains(searchTerm.lowercased()) }
-        
-        if matches.isEmpty {
-            print("No document found matching: \(searchTerm)")
-            print("Use --list to see all documents")
-            return
-        }
-        
-        if matches.count == 1 {
-            targetDocument = matches[0]
-        } else {
-            // Multiple matches found
-            print("Multiple documents found matching '\(searchTerm)':\n")
-            for (index, document) in matches.enumerated() {
-                print("\(index + 1). \(document.title) (ID: \(String(document.id.uuidString.prefix(8))))")
-            }
-            print("\nPlease use a more specific title or document ID.")
-            return
+        if let document = app.documentManager.getDocument(id: uuid) {
+            return document
         }
     }
     
-    guard let document = targetDocument else {
-        print("Error: Could not find document matching: \(searchTerm)")
+    // Try to find by exact title match
+    if let document = documents.first(where: { $0.title.lowercased() == searchTerm.lowercased() }) {
+        return document
+    }
+    
+    // Try partial title match
+    let matches = documents.filter { $0.title.lowercased().contains(searchTerm.lowercased()) }
+    
+    if matches.isEmpty {
+        print("No document found matching: \(searchTerm)")
+        print("Use --list to see all documents")
+        return nil
+    }
+    
+    if matches.count == 1 {
+        return matches[0]
+    }
+    
+    // Multiple matches found
+    print("Multiple documents found matching '\(searchTerm)':\n")
+    for (index, document) in matches.enumerated() {
+        print("\(index + 1). \(document.title) (ID: \(String(document.id.uuidString.prefix(8))))")
+    }
+    print("\nPlease use a more specific title or document ID.")
+    return nil
+}
+
+/// Parses a session type name into a FocusSessionType enum
+/// Returns nil if the type name is invalid
+func parseSessionType(_ typeName: String?) -> FocusSessionType? {
+    guard let typeName = typeName?.lowercased() else {
+        return .freeWrite // Default
+    }
+    
+    switch typeName {
+    case "freewrite", "free":
+        return .freeWrite
+    case "pomodoro", "pomo":
+        return .pomodoro
+    case "sprint", "writing-sprint":
+        return .sprint
+    case "deepwork", "deep":
+        return .deepWork
+    case "marathon":
+        return .marathon
+    default:
+        print("Error: Unknown session type '\(typeName)'")
+        print("Valid types: freewrite, pomodoro, sprint, deepwork, marathon")
+        return nil
+    }
+}
+
+func openDocumentAndStartSession(app: WritersApp, searchTerm: String, sessionTypeName: String?) async {
+    // Find the document using helper function
+    guard let document = findDocument(app: app, searchTerm: searchTerm) else {
         return
     }
     
@@ -1584,27 +1594,9 @@ func openDocumentAndStartSession(app: WritersApp, searchTerm: String, sessionTyp
         return
     }
     
-    // Parse session type from argument or default to freeWrite
-    let sessionType: FocusSessionType
-    if let typeName = sessionTypeName?.lowercased() {
-        switch typeName {
-        case "freewrite", "free":
-            sessionType = .freeWrite
-        case "pomodoro", "pomo":
-            sessionType = .pomodoro
-        case "sprint", "writing-sprint":
-            sessionType = .sprint
-        case "deepwork", "deep":
-            sessionType = .deepWork
-        case "marathon":
-            sessionType = .marathon
-        default:
-            print("Error: Unknown session type '\(typeName)'")
-            print("Valid types: freewrite, pomodoro, sprint, deepwork, marathon")
-            return
-        }
-    } else {
-        sessionType = .freeWrite
+    // Parse session type using helper function
+    guard let sessionType = parseSessionType(sessionTypeName) else {
+        return
     }
     
     // Start the session linked to the document
