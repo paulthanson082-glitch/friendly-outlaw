@@ -592,6 +592,8 @@ Tests cover:
 - Export functionality
 - Statistics generation
 
+For detailed runtime verification and test results, see [RUN_VERIFICATION.md](RUN_VERIFICATION.md).
+
 ## Requirements
 
 - Swift 5.9+
@@ -616,6 +618,8 @@ brew install sqlite3
 export PKG_CONFIG_PATH="/opt/homebrew/opt/sqlite/lib/pkgconfig"
 ```
 
+For detailed setup verification steps and system requirements, see [SETUP_VERIFICATION.md](SETUP_VERIFICATION.md).
+
 ## Getting an API Key
 
 To use AI features, you'll need an Anthropic API key:
@@ -630,7 +634,12 @@ AI features are completely optional - the app works fully without them.
 
 ## Additional Resources
 
-See [TECH_TIPS.md](TECH_TIPS.md) for useful technical tips and hidden browser commands.
+- [SETUP_VERIFICATION.md](SETUP_VERIFICATION.md) - Detailed setup verification and system requirements
+- [RUN_VERIFICATION.md](RUN_VERIFICATION.md) - Runtime verification and test results
+- [TECH_TIPS.md](TECH_TIPS.md) - Useful technical tips and hidden browser commands
+- [DATABASE.md](DATABASE.md) - Complete database documentation
+- [QUICK_START.md](QUICK_START.md) - Quick start guide
+- [VSCODE_SETUP.md](VSCODE_SETUP.md) - VS Code setup guide
 
 ## License
 
