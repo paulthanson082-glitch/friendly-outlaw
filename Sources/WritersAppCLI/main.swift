@@ -1503,7 +1503,7 @@ func openDocumentAndStartRun(app: WritersApp, searchTerm: String, sessionTypeNam
     }
     
     // Find document by ID or title (same logic as openDocumentByIdOrTitle)
-    var targetDocument: Document? = nil
+    var targetDocument: Document?
     
     // Try to find by ID first
     if let uuid = UUID(uuidString: searchTerm) {
@@ -1942,10 +1942,10 @@ func showHelp() {
         WritersAppCLI [OPTIONS]
 
     OPTIONS:
-        --help, -h                      Show this help message
-        --list, -l                      List all documents
-        --open, -o <id|title>           Open a document by ID or title
-        --run, -r [type]                Start a focus session (types: freewrite, pomodoro, sprint, deepwork, marathon)
+        --help, -h                          Show this help message
+        --list, -l                          List all documents
+        --open, -o <id|title>               Open a document by ID or title
+        --run, -r [type]                    Start a focus session (types: freewrite, pomodoro, sprint, deepwork, marathon)
         --open-run, -or <id|title> [type]   Open a document and start a focus session on it
 
     EXAMPLES:
