@@ -19,30 +19,80 @@ struct WritersAppCLI {
         
         // Handle command-line arguments
         if arguments.count > 1 {
-            let command = arguments[1]
+            // Parse all arguments to support combined commands
+            var openArg: String? = nil
+            var runArg: String? = nil
+            var shouldShowHelp = false
+            var listDocs = false
             
-            switch command {
-            case "--help", "-h":
-                showHelp()
-                return
-            case "--list", "-l":
-                listDocuments(app: app)
-                return
-            case "--open", "-o":
-                if arguments.count < 3 {
-                    print("Error: --open requires a document ID or title")
-                    print("Usage: WritersAppCLI --open <document-id-or-title>")
+            var i = 1
+            while i < arguments.count {
+                let arg = arguments[i]
+                
+                switch arg {
+                case "--help", "-h":
+                    shouldShowHelp = true
+                    i += 1
+                case "--list", "-l":
+                    listDocs = true
+                    i += 1
+                case "--open", "-o":
+                    if i + 1 < arguments.count {
+                        openArg = arguments[i + 1]
+                        i += 2
+                    } else {
+                        print("Error: --open requires a document ID or title")
+                        print("Usage: WritersAppCLI --open <document-id-or-title>")
+                        return
+                    }
+                case "--run", "-r":
+                    if i + 1 < arguments.count && !arguments[i + 1].starts(with: "-") {
+                        runArg = arguments[i + 1]
+                        i += 2
+                    } else {
+                        runArg = "" // Empty string means freewrite (default)
+                        i += 1
+                    }
+                default:
+                    print("Unknown option: \(arg)")
+                    print("Use --help for usage information")
                     return
                 }
-                await openDocumentByIdOrTitle(app: app, searchTerm: arguments[2])
+            }
+            
+            // Execute commands
+            if shouldShowHelp {
+                showHelp()
                 return
-            case "--run", "-r":
-                let sessionTypeArg = arguments.count > 2 ? arguments[2] : nil
-                startFocusSessionDirect(app: app, sessionTypeName: sessionTypeArg)
+            }
+            
+            if listDocs {
+                listDocuments(app: app)
                 return
-            default:
-                print("Unknown option: \(command)")
-                print("Use --help for usage information")
+            }
+            
+            // Handle combined --open and --run
+            if let openDocArg = openArg, let runSessionArg = runArg {
+                await openDocumentAndStartSession(
+                    app: app, 
+                    searchTerm: openDocArg, 
+                    sessionTypeName: runSessionArg.isEmpty ? nil : runSessionArg
+                )
+                return
+            }
+            
+            // Handle --open alone
+            if let openDocArg = openArg {
+                await openDocumentByIdOrTitle(app: app, searchTerm: openDocArg)
+                return
+            }
+            
+            // Handle --run alone
+            if let runSessionArg = runArg {
+                startFocusSessionDirect(
+                    app: app, 
+                    sessionTypeName: runSessionArg.isEmpty ? nil : runSessionArg
+                )
                 return
             }
         }
@@ -1478,6 +1528,125 @@ func startFocusSessionDirect(app: WritersApp, sessionTypeName: String?) {
     print("Run 'WritersAppCLI' in interactive mode to view or end your session.\n")
 }
 
+func openDocumentAndStartSession(app: WritersApp, searchTerm: String, sessionTypeName: String?) async {
+    // First, find the document
+    let documents = app.documentManager.getAllDocuments()
+    
+    if documents.isEmpty {
+        print("No documents found. Create one to get started!")
+        return
+    }
+    
+    var targetDocument: Document? = nil
+    
+    // Try to find by ID first
+    if let uuid = UUID(uuidString: searchTerm) {
+        targetDocument = app.documentManager.getDocument(id: uuid)
+    }
+    
+    // If not found by ID, try to find by exact title match
+    if targetDocument == nil {
+        targetDocument = documents.first(where: { $0.title.lowercased() == searchTerm.lowercased() })
+    }
+    
+    // If still not found, try partial title match
+    if targetDocument == nil {
+        let matches = documents.filter { $0.title.lowercased().contains(searchTerm.lowercased()) }
+        
+        if matches.isEmpty {
+            print("No document found matching: \(searchTerm)")
+            print("Use --list to see all documents")
+            return
+        }
+        
+        if matches.count == 1 {
+            targetDocument = matches[0]
+        } else {
+            // Multiple matches found
+            print("Multiple documents found matching '\(searchTerm)':\n")
+            for (index, document) in matches.enumerated() {
+                print("\(index + 1). \(document.title) (ID: \(String(document.id.uuidString.prefix(8))))")
+            }
+            print("\nPlease use a more specific title or document ID.")
+            return
+        }
+    }
+    
+    guard let document = targetDocument else {
+        print("Error: Could not find document matching: \(searchTerm)")
+        return
+    }
+    
+    // Check if a session is already active
+    if focusManager.getCurrentSession() != nil {
+        print("Error: A focus session is already active.")
+        print("Please end the current session before starting a new one.")
+        return
+    }
+    
+    // Parse session type from argument or default to freeWrite
+    let sessionType: FocusSessionType
+    if let typeName = sessionTypeName?.lowercased() {
+        switch typeName {
+        case "freewrite", "free":
+            sessionType = .freeWrite
+        case "pomodoro", "pomo":
+            sessionType = .pomodoro
+        case "sprint", "writing-sprint":
+            sessionType = .sprint
+        case "deepwork", "deep":
+            sessionType = .deepWork
+        case "marathon":
+            sessionType = .marathon
+        default:
+            print("Error: Unknown session type '\(typeName)'")
+            print("Valid types: freewrite, pomodoro, sprint, deepwork, marathon")
+            return
+        }
+    } else {
+        sessionType = .freeWrite
+    }
+    
+    // Start the session linked to the document
+    let session = focusManager.startSession(
+        type: sessionType,
+        documentId: document.id,
+        currentWordCount: document.wordCount
+    )
+    
+    // Update last opened date
+    var updatedDocument = document
+    updatedDocument.metadata.lastOpened = Date()
+    app.documentManager.updateDocument(updatedDocument)
+    
+    // Display document info
+    print("\n" + String(repeating: "=", count: 60))
+    print("Document Opened: \(document.title)")
+    print(String(repeating: "=", count: 60))
+    print()
+    print("Category: \(document.category.rawValue)")
+    print("Word Count: \(document.wordCount)")
+    print("Character Count: \(document.characterCount)")
+    
+    if let goal = document.metadata.wordCountGoal {
+        let progress = Double(document.wordCount) / Double(goal) * 100.0
+        print("Goal Progress: \(document.wordCount)/\(goal) words (\(String(format: "%.1f", progress))%)")
+    }
+    print()
+    
+    // Display session info
+    print("✓ Focus session started!")
+    print("  Type: \(session.type.displayName)")
+    if session.targetDuration > 0 {
+        print("  Duration: \(FocusSessionManager.formatTimeRemaining(session.targetDuration))")
+    }
+    print("  Linked to: \(document.title)")
+    print("  Starting word count: \(document.wordCount)")
+    print()
+    print("Happy writing! The session is tracking this document.")
+    print("Run 'WritersAppCLI' in interactive mode to view or end your session.\n")
+}
+
 func viewCurrentSession() {
     print("\n=== Current Focus Session ===\n")
 
@@ -1821,6 +1990,10 @@ func showHelp() {
         --open, -o <id|title>   Open a document by ID or title
         --run, -r [type]        Start a focus session (types: freewrite, pomodoro, sprint, deepwork, marathon)
 
+    COMBINED OPTIONS:
+        --open <id|title> --run [type]   Open a document and start a focus session on it
+        --run [type] --open <id|title>   Start a focus session linked to a document (order doesn't matter)
+
     EXAMPLES:
         WritersAppCLI                              # Start interactive mode
         WritersAppCLI --list                       # List all documents
@@ -1829,6 +2002,9 @@ func showHelp() {
         WritersAppCLI --run pomodoro               # Start a 25-minute Pomodoro session
         WritersAppCLI --run sprint                 # Start a 15-minute writing sprint
         WritersAppCLI --run                        # Start a free write session (no time limit)
+        WritersAppCLI --open "My Novel" --run pomodoro    # Open "My Novel" and start 25-min session
+        WritersAppCLI --run sprint --open "Chapter 1"     # Same as above, order doesn't matter
+        WritersAppCLI --open <doc-id> --run deepwork      # Open by ID and start 90-min deep work
 
     ENVIRONMENT VARIABLES:
         ANTHROPIC_API_KEY      Set this to enable AI features
