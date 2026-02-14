@@ -36,6 +36,10 @@ struct WritersAppCLI {
                 }
                 await openDocumentByIdOrTitle(app: app, searchTerm: arguments[2])
                 return
+            case "--run", "-r":
+                let sessionTypeArg = arguments.count > 2 ? arguments[2] : nil
+                startFocusSessionDirect(app: app, sessionTypeName: sessionTypeArg)
+                return
             default:
                 print("Unknown option: \(command)")
                 print("Use --help for usage information")
@@ -1427,6 +1431,53 @@ func startFocusSession(app: WritersApp) {
     print("\nHappy writing! Use option 42 to end your session.\n")
 }
 
+func startFocusSessionDirect(app: WritersApp, sessionTypeName: String?) {
+    // Check if session is already active
+    if focusManager.getCurrentSession() != nil {
+        print("Error: A focus session is already active.")
+        print("Please end the current session before starting a new one.")
+        return
+    }
+    
+    // Parse session type from argument or default to freeWrite
+    let sessionType: FocusSessionType
+    if let typeName = sessionTypeName?.lowercased() {
+        switch typeName {
+        case "freewrite", "free":
+            sessionType = .freeWrite
+        case "pomodoro", "pomo":
+            sessionType = .pomodoro
+        case "sprint", "writing-sprint":
+            sessionType = .sprint
+        case "deepwork", "deep":
+            sessionType = .deepWork
+        case "marathon":
+            sessionType = .marathon
+        default:
+            print("Error: Unknown session type '\(typeName)'")
+            print("Valid types: freewrite, pomodoro, sprint, deepwork, marathon")
+            return
+        }
+    } else {
+        sessionType = .freeWrite
+    }
+    
+    // Start the session without document linking for CLI simplicity
+    let session = focusManager.startSession(
+        type: sessionType,
+        documentId: nil,
+        currentWordCount: 0
+    )
+    
+    print("\n✓ Focus session started!")
+    print("  Type: \(session.type.displayName)")
+    if session.targetDuration > 0 {
+        print("  Duration: \(FocusSessionManager.formatTimeRemaining(session.targetDuration))")
+    }
+    print("\nHappy writing! The session is now running in the background.")
+    print("Run 'WritersAppCLI' in interactive mode to view or end your session.\n")
+}
+
 func viewCurrentSession() {
     print("\n=== Current Focus Session ===\n")
 
@@ -1768,12 +1819,16 @@ func showHelp() {
         --help, -h              Show this help message
         --list, -l              List all documents
         --open, -o <id|title>   Open a document by ID or title
+        --run, -r [type]        Start a focus session (types: freewrite, pomodoro, sprint, deepwork, marathon)
 
     EXAMPLES:
         WritersAppCLI                              # Start interactive mode
         WritersAppCLI --list                       # List all documents
         WritersAppCLI --open "My Story"            # Open document by title
         WritersAppCLI --open <document-id>         # Open document by ID
+        WritersAppCLI --run pomodoro               # Start a 25-minute Pomodoro session
+        WritersAppCLI --run sprint                 # Start a 15-minute writing sprint
+        WritersAppCLI --run                        # Start a free write session (no time limit)
 
     ENVIRONMENT VARIABLES:
         ANTHROPIC_API_KEY      Set this to enable AI features

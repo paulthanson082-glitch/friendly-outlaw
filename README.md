@@ -411,6 +411,14 @@ swift run WritersAppCLI --open "My Story"
 ./run.sh --open <document-uuid>
 swift run WritersAppCLI --open <document-uuid>
 
+# Start a focus session (NEW!)
+./run.sh --run pomodoro           # 25-minute Pomodoro session
+./run.sh --run sprint             # 15-minute writing sprint
+./run.sh --run deepwork           # 90-minute Deep Work session
+./run.sh --run marathon           # 120-minute Marathon session
+./run.sh --run                    # Free write (no time limit)
+swift run WritersAppCLI --run pomodoro
+
 # Combine with release mode
 ./run.sh --release --open "My Story"
 ```
