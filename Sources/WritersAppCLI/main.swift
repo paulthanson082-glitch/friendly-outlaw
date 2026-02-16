@@ -24,6 +24,7 @@ struct WritersAppCLI {
             var runArg: String? = nil
             var shouldShowHelp = false
             var listDocs = false
+            var analyzeTraces = false
             
             var i = 1
             while i < arguments.count {
@@ -53,6 +54,9 @@ struct WritersAppCLI {
                         runArg = "" // Empty string means freewrite (default)
                         i += 1
                     }
+                case "--analyze-traces":
+                    analyzeTraces = true
+                    i += 1
                 default:
                     print("Unknown option: \(arg)")
                     print("Use --help for usage information")
@@ -68,6 +72,11 @@ struct WritersAppCLI {
             
             if listDocs {
                 listDocuments(app: app)
+                return
+            }
+
+            if analyzeTraces {
+                runTraceAnalysis(app: app)
                 return
             }
             
@@ -1989,6 +1998,7 @@ func showHelp() {
         --list, -l              List all documents
         --open, -o <id|title>   Open a document by ID or title
         --run, -r [type]        Start a focus session (types: freewrite, pomodoro, sprint, deepwork, marathon)
+        --analyze-traces        Run trace analysis report (productivity by session length, tool usage)
 
     COMBINED OPTIONS:
         --open <id|title> --run [type]   Open a document and start a focus session on it
@@ -2212,6 +2222,21 @@ func toggleEncouragement(app: WritersApp) {
         }
     } else {
         print("\nNo changes made.")
+    }
+}
+
+// MARK: - Trace Analysis
+
+func runTraceAnalysis(app: WritersApp) {
+    print("\n=== Trace Analysis Report ===\n")
+
+    let traceAnalysis = TraceAnalysisService(databaseManager: app.databaseManager)
+
+    do {
+        let report = try traceAnalysis.runFullAnalysis()
+        print(TraceAnalysisService.formatReport(report))
+    } catch {
+        print("Error running trace analysis: \(error.localizedDescription)")
     }
 }
 

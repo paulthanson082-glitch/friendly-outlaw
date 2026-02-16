@@ -121,10 +121,39 @@ public class DatabaseManager {
         );
         """
         
+        // Create Traces table
+        let createTracesTable = """
+        CREATE TABLE IF NOT EXISTS Traces (
+            id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            start_time REAL NOT NULL,
+            end_time REAL,
+            metadata TEXT
+        );
+        """
+
+        // Create Observations table
+        let createObservationsTable = """
+        CREATE TABLE IF NOT EXISTS Observations (
+            id TEXT PRIMARY KEY,
+            trace_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            start_time REAL NOT NULL,
+            end_time REAL,
+            input TEXT,
+            output TEXT,
+            status_message TEXT,
+            FOREIGN KEY (trace_id) REFERENCES Traces(id)
+        );
+        """
+
         try execute(createAISuggestionsTable)
         try execute(createUserSessionsTable)
         try execute(createAIConfigurationsTable)
-        
+        try execute(createTracesTable)
+        try execute(createObservationsTable)
+
     }
     
     private func createIndexes() throws {
@@ -136,7 +165,11 @@ public class DatabaseManager {
             "CREATE INDEX IF NOT EXISTS idx_ai_suggestions_timestamp ON AI_Suggestions(timestamp);",
             "CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON User_Sessions(user_id);",
             "CREATE INDEX IF NOT EXISTS idx_user_sessions_start ON User_Sessions(start_time);",
-            "CREATE INDEX IF NOT EXISTS idx_ai_configs_user ON AI_Configurations(user_id);"
+            "CREATE INDEX IF NOT EXISTS idx_ai_configs_user ON AI_Configurations(user_id);",
+            "CREATE INDEX IF NOT EXISTS idx_traces_session ON Traces(session_id);",
+            "CREATE INDEX IF NOT EXISTS idx_traces_start ON Traces(start_time);",
+            "CREATE INDEX IF NOT EXISTS idx_observations_trace ON Observations(trace_id);",
+            "CREATE INDEX IF NOT EXISTS idx_observations_name ON Observations(name);"
         ]
         
         for index in indexes {
@@ -924,7 +957,191 @@ public class DatabaseManager {
             maxTokens: maxTokens,
             temperature: temperature
         )
-        
-        
+
+
+    }
+
+    // MARK: - Trace Operations
+
+    /// Inserts a new trace
+    public func insertTrace(_ trace: Trace) throws {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+
+        let sql = """
+        INSERT INTO Traces (id, session_id, name, start_time, end_time, metadata)
+        VALUES (?, ?, ?, ?, ?, ?);
+        """
+
+        var statement: OpaquePointer?
+        defer { if statement != nil { sqlite3_finalize(statement) } }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+
+        sqlite3_bind_text(statement, 1, trace.id.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 2, trace.sessionId, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 3, trace.name, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_double(statement, 4, trace.startTime.timeIntervalSince1970)
+
+        if let endTime = trace.endTime {
+            sqlite3_bind_double(statement, 5, endTime.timeIntervalSince1970)
+        } else {
+            sqlite3_bind_null(statement, 5)
+        }
+
+        if let metadata = trace.metadata {
+            sqlite3_bind_text(statement, 6, metadata, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(statement, 6)
+        }
+
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Insert failed: \(errorMessage)")
+        }
+    }
+
+    /// Retrieves all traces, optionally filtered by session ID
+    public func getTraces(sessionId: String? = nil) throws -> [Trace] {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+
+        let sql: String
+        if sessionId != nil {
+            sql = "SELECT id, session_id, name, start_time, end_time, metadata FROM Traces WHERE session_id = ? ORDER BY start_time;"
+        } else {
+            sql = "SELECT id, session_id, name, start_time, end_time, metadata FROM Traces ORDER BY start_time;"
+        }
+
+        var statement: OpaquePointer?
+        defer { if statement != nil { sqlite3_finalize(statement) } }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+
+        if let sid = sessionId {
+            sqlite3_bind_text(statement, 1, sid, -1, SQLITE_TRANSIENT)
+        }
+
+        var traces: [Trace] = []
+        while sqlite3_step(statement) == SQLITE_ROW {
+            guard let id = UUID(uuidString: String(cString: sqlite3_column_text(statement, 0))) else { continue }
+            let sid = String(cString: sqlite3_column_text(statement, 1))
+            let name = String(cString: sqlite3_column_text(statement, 2))
+            let startTime = Date(timeIntervalSince1970: sqlite3_column_double(statement, 3))
+            let endTime = sqlite3_column_type(statement, 4) != SQLITE_NULL ?
+                Date(timeIntervalSince1970: sqlite3_column_double(statement, 4)) : nil
+            let metadata = sqlite3_column_type(statement, 5) != SQLITE_NULL ?
+                String(cString: sqlite3_column_text(statement, 5)) : nil
+
+            traces.append(Trace(id: id, sessionId: sid, name: name, startTime: startTime, endTime: endTime, metadata: metadata))
+        }
+
+        return traces
+    }
+
+    // MARK: - Observation Operations
+
+    /// Inserts a new observation
+    public func insertObservation(_ observation: Observation) throws {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+
+        let sql = """
+        INSERT INTO Observations (id, trace_id, name, start_time, end_time, input, output, status_message)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+        """
+
+        var statement: OpaquePointer?
+        defer { if statement != nil { sqlite3_finalize(statement) } }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+
+        sqlite3_bind_text(statement, 1, observation.id.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 2, observation.traceId.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 3, observation.name, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_double(statement, 4, observation.startTime.timeIntervalSince1970)
+
+        if let endTime = observation.endTime {
+            sqlite3_bind_double(statement, 5, endTime.timeIntervalSince1970)
+        } else {
+            sqlite3_bind_null(statement, 5)
+        }
+
+        if let input = observation.input {
+            sqlite3_bind_text(statement, 6, input, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(statement, 6)
+        }
+
+        if let output = observation.output {
+            sqlite3_bind_text(statement, 7, output, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(statement, 7)
+        }
+
+        if let statusMessage = observation.statusMessage {
+            sqlite3_bind_text(statement, 8, statusMessage, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(statement, 8)
+        }
+
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Insert failed: \(errorMessage)")
+        }
+    }
+
+    /// Retrieves observations for a given trace
+    public func getObservations(traceId: UUID) throws -> [Observation] {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+
+        let sql = """
+        SELECT id, trace_id, name, start_time, end_time, input, output, status_message
+        FROM Observations WHERE trace_id = ? ORDER BY start_time;
+        """
+
+        var statement: OpaquePointer?
+        defer { if statement != nil { sqlite3_finalize(statement) } }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+
+        sqlite3_bind_text(statement, 1, traceId.uuidString, -1, SQLITE_TRANSIENT)
+
+        var observations: [Observation] = []
+        while sqlite3_step(statement) == SQLITE_ROW {
+            guard let id = UUID(uuidString: String(cString: sqlite3_column_text(statement, 0))),
+                  let tid = UUID(uuidString: String(cString: sqlite3_column_text(statement, 1))) else { continue }
+            let name = String(cString: sqlite3_column_text(statement, 2))
+            let startTime = Date(timeIntervalSince1970: sqlite3_column_double(statement, 3))
+            let endTime = sqlite3_column_type(statement, 4) != SQLITE_NULL ?
+                Date(timeIntervalSince1970: sqlite3_column_double(statement, 4)) : nil
+            let input = sqlite3_column_type(statement, 5) != SQLITE_NULL ?
+                String(cString: sqlite3_column_text(statement, 5)) : nil
+            let output = sqlite3_column_type(statement, 6) != SQLITE_NULL ?
+                String(cString: sqlite3_column_text(statement, 6)) : nil
+            let statusMessage = sqlite3_column_type(statement, 7) != SQLITE_NULL ?
+                String(cString: sqlite3_column_text(statement, 7)) : nil
+
+            observations.append(Observation(id: id, traceId: tid, name: name, startTime: startTime, endTime: endTime, input: input, output: output, statusMessage: statusMessage))
+        }
+
+        return observations
     }
 }
