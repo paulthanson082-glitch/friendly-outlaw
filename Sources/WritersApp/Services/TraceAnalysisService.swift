@@ -7,12 +7,30 @@ import CSQLite
 /// - Productivity by session length (changes per turn bucketed by session size)
 /// - Tool usage breakdown
 /// - Per-session metrics
+/// - Optional export to Langfuse when TRACE_TO_LANGFUSE=true
 public class TraceAnalysisService {
 
     private let databaseManager: DatabaseManager
+    private let langfuseExporter: LangfuseExporter?
 
-    public init(databaseManager: DatabaseManager) {
+    public init(databaseManager: DatabaseManager, langfuseExporter: LangfuseExporter? = nil) {
         self.databaseManager = databaseManager
+        self.langfuseExporter = langfuseExporter ?? LangfuseExporter.fromEnvironment()
+    }
+
+    /// Whether Langfuse export is available
+    public var isLangfuseEnabled: Bool {
+        return langfuseExporter != nil
+    }
+
+    // MARK: - Langfuse Export
+
+    /// Exports all local traces and observations to Langfuse
+    public func exportToLangfuse() async throws -> (traces: Int, observations: Int) {
+        guard let exporter = langfuseExporter else {
+            throw LangfuseError.notConfigured
+        }
+        return try await exporter.exportAll(from: databaseManager)
     }
 
     // MARK: - Full Analysis

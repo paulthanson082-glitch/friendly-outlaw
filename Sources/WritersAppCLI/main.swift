@@ -25,6 +25,7 @@ struct WritersAppCLI {
             var shouldShowHelp = false
             var listDocs = false
             var analyzeTraces = false
+            var exportLangfuse = false
             
             var i = 1
             while i < arguments.count {
@@ -57,6 +58,9 @@ struct WritersAppCLI {
                 case "--analyze-traces":
                     analyzeTraces = true
                     i += 1
+                case "--export-langfuse":
+                    exportLangfuse = true
+                    i += 1
                 default:
                     print("Unknown option: \(arg)")
                     print("Use --help for usage information")
@@ -76,7 +80,12 @@ struct WritersAppCLI {
             }
 
             if analyzeTraces {
-                runTraceAnalysis(app: app)
+                await runTraceAnalysis(app: app, exportToLangfuse: exportLangfuse)
+                return
+            }
+
+            if exportLangfuse {
+                await exportTracesToLangfuse(app: app)
                 return
             }
             
@@ -1999,6 +2008,7 @@ func showHelp() {
         --open, -o <id|title>   Open a document by ID or title
         --run, -r [type]        Start a focus session (types: freewrite, pomodoro, sprint, deepwork, marathon)
         --analyze-traces        Run trace analysis report (productivity by session length, tool usage)
+        --export-langfuse       Export local traces to Langfuse (requires TRACE_TO_LANGFUSE=true)
 
     COMBINED OPTIONS:
         --open <id|title> --run [type]   Open a document and start a focus session on it
@@ -2227,16 +2237,49 @@ func toggleEncouragement(app: WritersApp) {
 
 // MARK: - Trace Analysis
 
-func runTraceAnalysis(app: WritersApp) {
+func runTraceAnalysis(app: WritersApp, exportToLangfuse: Bool = false) async {
     print("\n=== Trace Analysis Report ===\n")
 
     let traceAnalysis = TraceAnalysisService(databaseManager: app.databaseManager)
 
+    if traceAnalysis.isLangfuseEnabled {
+        print("Langfuse: enabled")
+    }
+
     do {
         let report = try traceAnalysis.runFullAnalysis()
         print(TraceAnalysisService.formatReport(report))
+
+        if exportToLangfuse {
+            print("\nExporting traces to Langfuse...")
+            let result = try await traceAnalysis.exportToLangfuse()
+            print("Exported \(result.traces) traces and \(result.observations) observations to Langfuse.")
+        }
     } catch {
         print("Error running trace analysis: \(error.localizedDescription)")
+    }
+}
+
+func exportTracesToLangfuse(app: WritersApp) async {
+    print("\n=== Export Traces to Langfuse ===\n")
+
+    let traceAnalysis = TraceAnalysisService(databaseManager: app.databaseManager)
+
+    guard traceAnalysis.isLangfuseEnabled else {
+        print("Langfuse is not configured.")
+        print("Set the following environment variables:")
+        print("  TRACE_TO_LANGFUSE=true")
+        print("  LANGFUSE_PUBLIC_KEY=pk-lf-...")
+        print("  LANGFUSE_SECRET_KEY=sk-lf-...")
+        print("  LANGFUSE_HOST=https://cloud.langfuse.com")
+        return
+    }
+
+    do {
+        let result = try await traceAnalysis.exportToLangfuse()
+        print("Exported \(result.traces) traces and \(result.observations) observations to Langfuse.")
+    } catch {
+        print("Error exporting to Langfuse: \(error.localizedDescription)")
     }
 }
 

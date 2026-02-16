@@ -2,17 +2,24 @@
 #
 # analyze-traces.sh - Run trace analysis on the WritersApp database
 #
-# This script builds the project (if needed) and runs the CLI with the
-# --analyze-traces flag to produce a productivity report based on
-# trace and observation data.
-#
 # Usage:
-#   ./scripts/analyze-traces.sh
+#   ./scripts/analyze-traces.sh                    # Local analysis only
+#   ./scripts/analyze-traces.sh --export-langfuse   # Analyze + export to Langfuse
+#
+# For Langfuse Cloud or self-hosted with the Python SDK:
+#   python3 scripts/analyze-traces-sdk.py
 #
 # The analysis includes:
 #   - Productivity by session length (changes per turn, bucketed by session size)
 #   - Tool usage breakdown (Edit, Write, Read, etc.)
+#   - Read-before-edit compliance
 #   - Top sessions ranked by turn count
+#
+# Langfuse env vars (optional, for --export-langfuse):
+#   TRACE_TO_LANGFUSE=true
+#   LANGFUSE_PUBLIC_KEY=pk-lf-...
+#   LANGFUSE_SECRET_KEY=sk-lf-...
+#   LANGFUSE_HOST=https://cloud.langfuse.com
 #
 # Equivalent SQL (ClickHouse syntax, adapted to SQLite in the Swift service):
 #
@@ -54,4 +61,5 @@ echo ""
 echo "Running trace analysis..."
 echo ""
 
-swift run WritersAppCLI --analyze-traces
+# Pass through any flags (e.g. --export-langfuse)
+swift run WritersAppCLI --analyze-traces "$@"
