@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 
+// Strip leading @ from bot handles for flexible input
+function normalizeHandle(handle: string): string {
+  return handle.startsWith("@") ? handle.slice(1) : handle;
+}
+
 // GET /api/message?from=crab-mem&to=mcfly&limit=50
 export async function GET(request: NextRequest) {
   const sql = getDb();
   const { searchParams } = request.nextUrl;
 
-  const from = searchParams.get("from");
-  const to = searchParams.get("to");
+  const from = searchParams.get("from") ? normalizeHandle(searchParams.get("from")!) : null;
+  const to = searchParams.get("to") ? normalizeHandle(searchParams.get("to")!) : null;
   const limit = Math.min(parseInt(searchParams.get("limit") ?? "50", 10), 200);
 
   if (from && to) {
@@ -55,7 +60,9 @@ export async function GET(request: NextRequest) {
 // POST /api/message
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { from, to, content, type = "message" } = body;
+  const { content, type = "message" } = body;
+  const from = body.from ? normalizeHandle(body.from) : undefined;
+  const to = body.to ? normalizeHandle(body.to) : undefined;
 
   if (!from || !to || !content) {
     return NextResponse.json(
