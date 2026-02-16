@@ -23,6 +23,7 @@ public class TraceAnalysisService {
         let bucketMetrics = try getProductivityBySessionLength()
         let toolUsage = try getToolUsageBreakdown()
         let sessionMetrics = try getSessionMetrics()
+        let readBeforeEdit = try getReadBeforeEditMetrics()
 
         return TraceAnalysisReport(
             totalTraces: totals.traces,
@@ -30,7 +31,8 @@ public class TraceAnalysisService {
             totalSessions: totals.sessions,
             productivityBySessionLength: bucketMetrics,
             toolUsageBreakdown: toolUsage,
-            sessionMetrics: sessionMetrics
+            sessionMetrics: sessionMetrics,
+            readBeforeEdit: readBeforeEdit
         )
     }
 
@@ -175,6 +177,57 @@ public class TraceAnalysisService {
         }.sorted { $0.turns > $1.turns }
     }
 
+    // MARK: - Read Before Edit Compliance
+
+    /// Checks how often traces that contain an Edit also contain a Read.
+    ///
+    /// ClickHouse original:
+    /// ```sql
+    /// SELECT
+    ///     countIf(has_edit) as traces_with_edit,
+    ///     countIf(has_edit AND has_read) as also_read_first,
+    ///     round(countIf(has_edit AND has_read) * 100.0
+    ///         / greatest(countIf(has_edit), 1), 1) as pct
+    /// FROM (
+    ///     SELECT trace_id,
+    ///         has(groupArray(name), 'Tool: Read') as has_read,
+    ///         has(groupArray(name), 'Tool: Edit') as has_edit
+    ///     FROM observations
+    ///     WHERE name LIKE 'Tool:%'
+    ///     GROUP BY trace_id
+    /// )
+    /// ```
+    public func getReadBeforeEditMetrics() throws -> ReadBeforeEditMetrics {
+        let traces = try databaseManager.getTraces()
+
+        var tracesWithEdit = 0
+        var alsoReadFirst = 0
+
+        for trace in traces {
+            let observations = try databaseManager.getObservations(traceId: trace.id)
+            let toolObs = observations.filter { $0.name.hasPrefix("Tool:") }
+
+            let hasEdit = toolObs.contains { $0.name == "Tool: Edit" }
+            guard hasEdit else { continue }
+
+            tracesWithEdit += 1
+            let hasRead = toolObs.contains { $0.name == "Tool: Read" }
+            if hasRead {
+                alsoReadFirst += 1
+            }
+        }
+
+        let pct = tracesWithEdit > 0
+            ? (Double(alsoReadFirst) * 1000.0 / Double(tracesWithEdit)).rounded() / 10.0
+            : 0.0
+
+        return ReadBeforeEditMetrics(
+            tracesWithEdit: tracesWithEdit,
+            alsoReadFirst: alsoReadFirst,
+            percentage: pct
+        )
+    }
+
     // MARK: - Totals
 
     private func getTotals() throws -> (traces: Int, observations: Int, sessions: Int) {
@@ -238,6 +291,14 @@ public class TraceAnalysisService {
                 lines.append(String(format: "  %-25s  %8d  %7.1f%%", tool.toolName, tool.count, tool.percentage))
             }
         }
+        lines.append("")
+
+        // Read before edit compliance
+        lines.append("--- Read Before Edit Compliance ---")
+        let rbe = report.readBeforeEdit
+        lines.append("  Traces with Edit:    \(rbe.tracesWithEdit)")
+        lines.append("  Also Read first:     \(rbe.alsoReadFirst)")
+        lines.append("  Compliance:          \(String(format: "%.1f", rbe.percentage))%")
         lines.append("")
 
         // Top sessions

@@ -113,6 +113,19 @@ public struct ToolUsageFrequency: Codable {
     }
 }
 
+/// Read-before-edit compliance metrics
+public struct ReadBeforeEditMetrics: Codable {
+    public let tracesWithEdit: Int
+    public let alsoReadFirst: Int
+    public let percentage: Double
+
+    public init(tracesWithEdit: Int, alsoReadFirst: Int, percentage: Double) {
+        self.tracesWithEdit = tracesWithEdit
+        self.alsoReadFirst = alsoReadFirst
+        self.percentage = percentage
+    }
+}
+
 /// Comprehensive trace analysis report
 public struct TraceAnalysisReport: Codable {
     public let generatedAt: Date
@@ -122,6 +135,7 @@ public struct TraceAnalysisReport: Codable {
     public let productivityBySessionLength: [SessionBucketMetrics]
     public let toolUsageBreakdown: [ToolUsageFrequency]
     public let sessionMetrics: [SessionMetrics]
+    public let readBeforeEdit: ReadBeforeEditMetrics
 
     public init(
         generatedAt: Date = Date(),
@@ -130,7 +144,8 @@ public struct TraceAnalysisReport: Codable {
         totalSessions: Int,
         productivityBySessionLength: [SessionBucketMetrics],
         toolUsageBreakdown: [ToolUsageFrequency],
-        sessionMetrics: [SessionMetrics]
+        sessionMetrics: [SessionMetrics],
+        readBeforeEdit: ReadBeforeEditMetrics
     ) {
         self.generatedAt = generatedAt
         self.totalTraces = totalTraces
@@ -139,5 +154,6 @@ public struct TraceAnalysisReport: Codable {
         self.productivityBySessionLength = productivityBySessionLength
         self.toolUsageBreakdown = toolUsageBreakdown
         self.sessionMetrics = sessionMetrics
+        self.readBeforeEdit = readBeforeEdit
     }
 }
