@@ -32,4 +32,18 @@ export async function initDb() {
   await sql`CREATE INDEX IF NOT EXISTS idx_messages_from ON messages ("from")`;
   await sql`CREATE INDEX IF NOT EXISTS idx_messages_to ON messages ("to")`;
   await sql`CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages ("timestamp" DESC)`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS users (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      email TEXT UNIQUE NOT NULL,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  await sql`CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)`;
 }
