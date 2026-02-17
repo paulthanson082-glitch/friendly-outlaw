@@ -285,6 +285,164 @@ public class AIService {
         return text
     }
 
+    // MARK: - Tool Loop
+
+    /// Get AI assistance with tool support, implementing the client SDK tool loop pattern.
+    ///
+    /// This method sends the request to the Claude API with tool definitions. If Claude
+    /// responds with `stop_reason: "tool_use"`, the tools are executed via the provided
+    /// `toolExecutor`, and results are sent back. This loop continues until Claude
+    /// produces a final text response (`stop_reason: "end_turn"`).
+    public func getAssistanceWithTools(
+        text: String,
+        type: AIAssistanceType,
+        tools: [ToolDefinition],
+        toolExecutor: AIToolExecutor,
+        context: AIContext? = nil,
+        maxIterations: Int = 10
+    ) async throws -> AIResponse {
+        let prompt = type.prompt(for: text, context: context)
+        let generatedContent = try await sendRequestWithToolLoop(
+            prompt: prompt,
+            tools: tools,
+            toolExecutor: toolExecutor,
+            maxIterations: maxIterations
+        )
+
+        return AIResponse(
+            requestType: type,
+            originalText: text,
+            generatedContent: generatedContent,
+            model: configuration.model
+        )
+    }
+
+    /// Core tool loop implementation.
+    ///
+    /// Mirrors the client SDK pattern:
+    /// ```
+    /// response = client.messages.create(...)
+    /// while response.stop_reason == "tool_use":
+    ///     result = your_tool_executor(response.tool_use)
+    ///     response = client.messages.create(tool_result=result, **params)
+    /// ```
+    private func sendRequestWithToolLoop(
+        prompt: String,
+        tools: [ToolDefinition],
+        toolExecutor: AIToolExecutor,
+        maxIterations: Int
+    ) async throws -> String {
+        guard let url = URL(string: apiURL) else {
+            throw AIServiceError.invalidURL
+        }
+
+        var messages: [[String: Any]] = [
+            ["role": "user", "content": prompt]
+        ]
+
+        let toolDefs = tools.map { $0.toDict() }
+
+        for _ in 0..<maxIterations {
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue(configuration.apiKey, forHTTPHeaderField: "x-api-key")
+            request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+            request.setValue("application/json", forHTTPHeaderField: "content-type")
+
+            var requestBody: [String: Any] = [
+                "model": configuration.model.rawValue,
+                "max_tokens": configuration.maxTokens,
+                "temperature": configuration.temperature,
+                "messages": messages
+            ]
+
+            if !toolDefs.isEmpty {
+                requestBody["tools"] = toolDefs
+            }
+
+            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw AIServiceError.invalidResponse
+            }
+
+            guard httpResponse.statusCode == 200 else {
+                let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+                throw AIServiceError.apiError(statusCode: httpResponse.statusCode, message: errorMessage)
+            }
+
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let stopReason = json["stop_reason"] as? String,
+                  let content = json["content"] as? [[String: Any]] else {
+                throw AIServiceError.invalidResponseFormat
+            }
+
+            // If the model finished with a text response, extract and return it
+            if stopReason == "end_turn" {
+                let textParts = content.compactMap { block -> String? in
+                    guard block["type"] as? String == "text" else { return nil }
+                    return block["text"] as? String
+                }
+                return textParts.joined()
+            }
+
+            // If the model wants to use tools, execute them and continue the loop
+            if stopReason == "tool_use" {
+                // Add the assistant's response (with tool_use blocks) to the conversation
+                messages.append([
+                    "role": "assistant",
+                    "content": content
+                ])
+
+                // Extract and execute each tool use block
+                let toolUseBlocks = content.compactMap { ToolUseBlock(from: $0) }
+
+                var toolResults: [[String: Any]] = []
+                for toolUse in toolUseBlocks {
+                    do {
+                        let result = try await toolExecutor.executeTool(
+                            name: toolUse.name,
+                            input: toolUse.input
+                        )
+                        toolResults.append(ToolResult(
+                            toolUseId: toolUse.id,
+                            content: result
+                        ).toDict())
+                    } catch {
+                        toolResults.append(ToolResult(
+                            toolUseId: toolUse.id,
+                            content: "Error: \(error.localizedDescription)",
+                            isError: true
+                        ).toDict())
+                    }
+                }
+
+                // Send tool results back as a user message
+                messages.append([
+                    "role": "user",
+                    "content": toolResults
+                ])
+
+                continue
+            }
+
+            // Unknown stop reason — try to extract text if available
+            let textParts = content.compactMap { block -> String? in
+                guard block["type"] as? String == "text" else { return nil }
+                return block["text"] as? String
+            }
+            if !textParts.isEmpty {
+                return textParts.joined()
+            }
+
+            throw AIServiceError.invalidResponseFormat
+        }
+
+        throw AIServiceError.toolLoopExhausted(iterations: maxIterations)
+    }
+
     // MARK: - Batch Operations
 
     /// Process multiple requests in batch
@@ -396,6 +554,8 @@ public enum AIServiceError: LocalizedError {
     case invalidResponseFormat
     case apiError(statusCode: Int, message: String)
     case networkError(Error)
+    case toolLoopExhausted(iterations: Int)
+    case toolExecutionFailed(toolName: String, reason: String)
 
     public var errorDescription: String? {
         switch self {
@@ -409,6 +569,10 @@ public enum AIServiceError: LocalizedError {
             return "API error (status \(statusCode)): \(message)"
         case .networkError(let error):
             return "Network error: \(error.localizedDescription)"
+        case .toolLoopExhausted(let iterations):
+            return "Tool loop exceeded maximum iterations (\(iterations))"
+        case .toolExecutionFailed(let toolName, let reason):
+            return "Tool '\(toolName)' execution failed: \(reason)"
         }
     }
 }
