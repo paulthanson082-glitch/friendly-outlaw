@@ -419,9 +419,16 @@ swift run WritersAppCLI --open <document-uuid>
 ./run.sh --run                    # Free write (no time limit)
 swift run WritersAppCLI --run pomodoro
 
+# Open document and start focus session (NEW!)
+./run.sh --open "My Novel" --run pomodoro      # Open and start 25-min session
+./run.sh --run sprint --open "Chapter 1"       # Open and start 15-min sprint
+swift run WritersAppCLI --open "My Story" --run deepwork
+
 # Combine with release mode
 ./run.sh --release --open "My Story"
 ```
+
+> **📚 See [RUN_OPEN_COMMAND.md](RUN_OPEN_COMMAND.md)** for complete documentation on the combined `--open --run` command feature, including session types, document matching, and workflow examples.
 
 These arguments allow for quick operations without entering the interactive menu system, making it easier to integrate with scripts and workflows.
 
