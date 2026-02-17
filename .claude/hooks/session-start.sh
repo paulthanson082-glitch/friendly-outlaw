@@ -15,15 +15,20 @@ fi
 # Install Swift via swiftly if not already installed
 if ! command -v swift &>/dev/null; then
   apt-get update -qq
-  apt-get install -y -qq curl gnupg
+  apt-get install -y -qq curl
 
-  curl -L https://swiftlang.github.io/swiftly/swiftly-install.sh | bash -s -- -y
-  . "${HOME}/.local/share/swiftly/env.sh"
-  swiftly install latest
+  ARCH="$(uname -m)"
+  cd /tmp
+  curl -fsSLO "https://download.swift.org/swiftly/linux/swiftly-${ARCH}.tar.gz"
+  tar zxf "swiftly-${ARCH}.tar.gz"
+  ./swiftly init --quiet-shell-followup -y
+  . "${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh"
+  hash -r
+  rm -f "swiftly-${ARCH}.tar.gz" swiftly
 
   # Persist PATH for the session
   if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
-    echo "source ${HOME}/.local/share/swiftly/env.sh" >> "$CLAUDE_ENV_FILE"
+    echo ". \"${SWIFTLY_HOME_DIR:-$HOME/.local/share/swiftly}/env.sh\"" >> "$CLAUDE_ENV_FILE"
   fi
 fi
 
