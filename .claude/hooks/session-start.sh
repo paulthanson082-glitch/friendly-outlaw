@@ -6,6 +6,9 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0
 fi
 
+# Run asynchronously so the session starts immediately
+echo '{"async": true, "asyncTimeout": 300000}'
+
 # Install system dependencies (libsqlite3-dev needed for CSQLite module)
 if ! dpkg -s libsqlite3-dev &>/dev/null || ! dpkg -s pkg-config &>/dev/null; then
   apt-get update -qq
