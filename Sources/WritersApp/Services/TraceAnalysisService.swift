@@ -249,7 +249,7 @@ public class TraceAnalysisService {
             lines.append(String(format: "  %-36s  %6s  %8s  %6s  %12s", "Session ID", "Turns", "Changes", "Reads", "Changes/Turn"))
             lines.append("  " + "-" * 75)
             for s in top {
-                lines.append(String(format: "  %-36s  %6d  %8d  %6d  %12.2f", s.sessionId.prefix(36), s.turns, s.changes, s.reads, s.changesPerTurn))
+                lines.append(String(format: "  %-36s  %6d  %8d  %6d  %12.2f", String(s.sessionId.prefix(36)), s.turns, s.changes, s.reads, s.changesPerTurn))
             }
         }
         lines.append("")
