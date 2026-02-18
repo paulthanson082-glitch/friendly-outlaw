@@ -33,6 +33,8 @@ show_help() {
     echo "  ./run.sh --release --open <document-id>     # Open document in release mode"
     echo "  ./run.sh --run pomodoro                     # Start a 25-minute Pomodoro session"
     echo "  ./run.sh --run sprint                       # Start a 15-minute writing sprint"
+    echo "  ./run.sh --open \"My Novel\" --run pomodoro   # Open document and start 25-min session"
+    echo "  ./run.sh --run deepwork --open \"Chapter 1\"  # Open document and start 90-min session"
     echo "  ANTHROPIC_API_KEY=sk-... ./run.sh          # Run with AI features"
 }
 
