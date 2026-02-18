@@ -182,6 +182,18 @@ struct WritersAppCLI {
             print("50. Get Encouragement")
             print("51. Toggle Encouragement")
             print("52. View Encouragement History")
+            
+            print("\nIssue Management:")
+            print("60. Create Issue")
+            print("61. View Issues for Document")
+            print("62. View All Issues")
+            print("63. View Issues by Status")
+            print("64. View Issues by Priority")
+            print("65. Search Issues")
+            print("66. Update Issue")
+            print("67. Update Issue Status")
+            print("68. Delete Issue")
+            print("69. View Issue Statistics")
 
             print("\n0. Exit")
             print()
@@ -263,6 +275,26 @@ struct WritersAppCLI {
                 toggleEncouragement(app: app)
             case 52:
                 viewEncouragementHistory(app: app)
+            case 60:
+                createIssue(app: app)
+            case 61:
+                viewIssuesForDocument(app: app)
+            case 62:
+                viewAllIssues(app: app)
+            case 63:
+                viewIssuesByStatus(app: app)
+            case 64:
+                viewIssuesByPriority(app: app)
+            case 65:
+                searchIssues(app: app)
+            case 66:
+                updateIssue(app: app)
+            case 67:
+                updateIssueStatus(app: app)
+            case 68:
+                deleteIssue(app: app)
+            case 69:
+                viewIssueStatistics(app: app)
             case 0:
                 await app.shutdownPlugins()
                 running = false
@@ -2286,6 +2318,372 @@ func viewEncouragementHistory(app: WritersApp) {
             if let duration = context["duration_minutes"] {
                 print("   Session duration: \(duration) minutes")
             }
+        }
+        print()
+    }
+}
+
+// MARK: - Issue Management
+
+func createIssue(app: WritersApp) {
+    print("\n=== Create Issue ===\n")
+    
+    // Select document
+    let documents = app.documentManager.getAllDocuments()
+    if documents.isEmpty {
+        print("No documents available. Create a document first.")
+        return
+    }
+    
+    print("Select a document:")
+    for (index, doc) in documents.enumerated() {
+        print("\(index + 1). \(doc.title)")
+    }
+    print("\nEnter document number: ", terminator: "")
+    
+    guard let docChoice = readLine(), let docIndex = Int(docChoice),
+          docIndex > 0, docIndex <= documents.count else {
+        print("Invalid selection.")
+        return
+    }
+    
+    let document = documents[docIndex - 1]
+    
+    // Get issue title
+    print("Enter issue title: ", terminator: "")
+    guard let title = readLine(), !title.isEmpty else {
+        print("Title cannot be empty.")
+        return
+    }
+    
+    // Get description
+    print("Enter issue description (optional): ", terminator: "")
+    let description = readLine() ?? ""
+    
+    // Get priority
+    print("\nSelect priority:")
+    print("1. Low")
+    print("2. Medium (default)")
+    print("3. High")
+    print("4. Critical")
+    print("Enter priority (1-4, default 2): ", terminator: "")
+    
+    let priorityInput = readLine() ?? "2"
+    let priority: IssuePriority
+    switch priorityInput {
+    case "1": priority = .low
+    case "3": priority = .high
+    case "4": priority = .critical
+    default: priority = .medium
+    }
+    
+    let issue = app.createIssue(
+        documentId: document.id,
+        title: title,
+        description: description,
+        priority: priority
+    )
+    
+    print("\n✓ Issue created successfully!")
+    print("Issue ID: \(issue.id)")
+    print("Document: \(document.title)")
+    print("Priority: \(priority.displayName)")
+}
+
+func viewIssuesForDocument(app: WritersApp) {
+    print("\n=== View Issues for Document ===\n")
+    
+    let documents = app.documentManager.getAllDocuments()
+    if documents.isEmpty {
+        print("No documents available.")
+        return
+    }
+    
+    print("Select a document:")
+    for (index, doc) in documents.enumerated() {
+        print("\(index + 1). \(doc.title)")
+    }
+    print("\nEnter document number: ", terminator: "")
+    
+    guard let docChoice = readLine(), let docIndex = Int(docChoice),
+          docIndex > 0, docIndex <= documents.count else {
+        print("Invalid selection.")
+        return
+    }
+    
+    let document = documents[docIndex - 1]
+    let issues = app.getIssues(forDocument: document.id)
+    
+    if issues.isEmpty {
+        print("\nNo issues found for '\(document.title)'")
+        return
+    }
+    
+    print("\n=== Issues for '\(document.title)' ===\n")
+    displayIssues(issues)
+}
+
+func viewAllIssues(app: WritersApp) {
+    print("\n=== All Issues ===\n")
+    
+    let issues = app.issueManager.getAllIssues()
+    
+    if issues.isEmpty {
+        print("No issues found.")
+        return
+    }
+    
+    displayIssues(issues)
+}
+
+func viewIssuesByStatus(app: WritersApp) {
+    print("\n=== View Issues by Status ===\n")
+    
+    print("Select status:")
+    print("1. Open")
+    print("2. In Progress")
+    print("3. Resolved")
+    print("4. Closed")
+    print("\nEnter status (1-4): ", terminator: "")
+    
+    guard let choice = readLine(), let statusIndex = Int(choice),
+          statusIndex >= 1, statusIndex <= 4 else {
+        print("Invalid selection.")
+        return
+    }
+    
+    let status: IssueStatus
+    switch statusIndex {
+    case 1: status = .open
+    case 2: status = .inProgress
+    case 3: status = .resolved
+    case 4: status = .closed
+    default: return
+    }
+    
+    let issues = app.getIssues(withStatus: status)
+    
+    if issues.isEmpty {
+        print("\nNo issues with status '\(status.displayName)'")
+        return
+    }
+    
+    print("\n=== Issues with Status: \(status.displayName) ===\n")
+    displayIssues(issues)
+}
+
+func viewIssuesByPriority(app: WritersApp) {
+    print("\n=== View Issues by Priority ===\n")
+    
+    print("Select priority:")
+    print("1. Low")
+    print("2. Medium")
+    print("3. High")
+    print("4. Critical")
+    print("\nEnter priority (1-4): ", terminator: "")
+    
+    guard let choice = readLine(), let priorityIndex = Int(choice),
+          priorityIndex >= 1, priorityIndex <= 4 else {
+        print("Invalid selection.")
+        return
+    }
+    
+    let priority: IssuePriority
+    switch priorityIndex {
+    case 1: priority = .low
+    case 2: priority = .medium
+    case 3: priority = .high
+    case 4: priority = .critical
+    default: return
+    }
+    
+    let issues = app.getIssues(withPriority: priority)
+    
+    if issues.isEmpty {
+        print("\nNo issues with priority '\(priority.displayName)'")
+        return
+    }
+    
+    print("\n=== Issues with Priority: \(priority.displayName) ===\n")
+    displayIssues(issues)
+}
+
+func searchIssues(app: WritersApp) {
+    print("\n=== Search Issues ===\n")
+    print("Enter search query: ", terminator: "")
+    
+    guard let query = readLine(), !query.isEmpty else {
+        print("Search query cannot be empty.")
+        return
+    }
+    
+    let issues = app.searchIssues(query: query)
+    
+    if issues.isEmpty {
+        print("\nNo issues found matching '\(query)'")
+        return
+    }
+    
+    print("\n=== Search Results for '\(query)' ===\n")
+    displayIssues(issues)
+}
+
+func updateIssue(app: WritersApp) {
+    print("\n=== Update Issue ===\n")
+    
+    let issues = app.issueManager.getAllIssues()
+    if issues.isEmpty {
+        print("No issues available.")
+        return
+    }
+    
+    print("Select an issue to update:")
+    for (index, issue) in issues.enumerated() {
+        print("\(index + 1). \(issue.title) [\(issue.status.displayName), \(issue.priority.displayName)]")
+    }
+    print("\nEnter issue number: ", terminator: "")
+    
+    guard let choice = readLine(), let issueIndex = Int(choice),
+          issueIndex > 0, issueIndex <= issues.count else {
+        print("Invalid selection.")
+        return
+    }
+    
+    var issue = issues[issueIndex - 1]
+    
+    print("\nCurrent title: \(issue.title)")
+    print("Enter new title (or press Enter to keep): ", terminator: "")
+    if let newTitle = readLine(), !newTitle.isEmpty {
+        issue.title = newTitle
+    }
+    
+    print("\nCurrent description: \(issue.description)")
+    print("Enter new description (or press Enter to keep): ", terminator: "")
+    if let newDescription = readLine(), !newDescription.isEmpty {
+        issue.description = newDescription
+    }
+    
+    app.updateIssue(issue)
+    print("\n✓ Issue updated successfully!")
+}
+
+func updateIssueStatus(app: WritersApp) {
+    print("\n=== Update Issue Status ===\n")
+    
+    let issues = app.issueManager.getAllIssues()
+    if issues.isEmpty {
+        print("No issues available.")
+        return
+    }
+    
+    print("Select an issue:")
+    for (index, issue) in issues.enumerated() {
+        print("\(index + 1). \(issue.title) [Current: \(issue.status.displayName)]")
+    }
+    print("\nEnter issue number: ", terminator: "")
+    
+    guard let choice = readLine(), let issueIndex = Int(choice),
+          issueIndex > 0, issueIndex <= issues.count else {
+        print("Invalid selection.")
+        return
+    }
+    
+    let issue = issues[issueIndex - 1]
+    
+    print("\nSelect new status:")
+    print("1. Open")
+    print("2. In Progress")
+    print("3. Resolved")
+    print("4. Closed")
+    print("\nEnter status (1-4): ", terminator: "")
+    
+    guard let statusChoice = readLine(), let statusIndex = Int(statusChoice),
+          statusIndex >= 1, statusIndex <= 4 else {
+        print("Invalid selection.")
+        return
+    }
+    
+    let status: IssueStatus
+    switch statusIndex {
+    case 1: status = .open
+    case 2: status = .inProgress
+    case 3: status = .resolved
+    case 4: status = .closed
+    default: return
+    }
+    
+    app.updateIssueStatus(id: issue.id, status: status)
+    print("\n✓ Issue status updated to '\(status.displayName)'!")
+}
+
+func deleteIssue(app: WritersApp) {
+    print("\n=== Delete Issue ===\n")
+    
+    let issues = app.issueManager.getAllIssues()
+    if issues.isEmpty {
+        print("No issues available.")
+        return
+    }
+    
+    print("Select an issue to delete:")
+    for (index, issue) in issues.enumerated() {
+        print("\(index + 1). \(issue.title) [\(issue.status.displayName)]")
+    }
+    print("\nEnter issue number: ", terminator: "")
+    
+    guard let choice = readLine(), let issueIndex = Int(choice),
+          issueIndex > 0, issueIndex <= issues.count else {
+        print("Invalid selection.")
+        return
+    }
+    
+    let issue = issues[issueIndex - 1]
+    
+    print("\nAre you sure you want to delete '\(issue.title)'? (yes/no): ", terminator: "")
+    guard let confirm = readLine()?.lowercased(), confirm == "yes" || confirm == "y" else {
+        print("Deletion cancelled.")
+        return
+    }
+    
+    app.deleteIssue(id: issue.id)
+    print("\n✓ Issue deleted successfully!")
+}
+
+func viewIssueStatistics(app: WritersApp) {
+    print("\n=== Issue Statistics ===\n")
+    
+    let (byStatus, byPriority) = app.getIssueStatistics()
+    
+    print("Issues by Status:")
+    for status in IssueStatus.allCases {
+        let count = byStatus[status] ?? 0
+        print("  \(status.displayName): \(count)")
+    }
+    
+    print("\nIssues by Priority:")
+    for priority in IssuePriority.allCases {
+        let count = byPriority[priority] ?? 0
+        print("  \(priority.displayName): \(count)")
+    }
+    
+    let totalIssues = byStatus.values.reduce(0, +)
+    print("\nTotal Issues: \(totalIssues)")
+}
+
+func displayIssues(_ issues: [Issue]) {
+    let formatter = DateFormatter()
+    formatter.dateStyle = .medium
+    formatter.timeStyle = .short
+    
+    for (index, issue) in issues.enumerated() {
+        print("\(index + 1). \(issue.title)")
+        print("   Status: \(issue.status.displayName) | Priority: \(issue.priority.displayName)")
+        if !issue.description.isEmpty {
+            print("   Description: \(issue.description)")
+        }
+        print("   Created: \(formatter.string(from: issue.metadata.created))")
+        if let resolvedAt = issue.metadata.resolvedAt {
+            print("   Resolved: \(formatter.string(from: resolvedAt))")
         }
         print()
     }
