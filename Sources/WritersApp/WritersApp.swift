@@ -591,6 +591,39 @@ public class WritersApp {
         return try await ai.getWritingInsights(document: document)
     }
 
+    /// Get AI assistance with tool support (implements the tool loop pattern).
+    ///
+    /// This enables Claude to use built-in writing tools (word count, document search,
+    /// template listing, reading time) during its response generation. The tool loop
+    /// continues until Claude produces a final text response.
+    public func getAIAssistanceWithTools(
+        documentId: UUID,
+        type: AIAssistanceType,
+        context: AIContext? = nil,
+        maxIterations: Int = 10
+    ) async throws -> AIResponse {
+        guard let ai = aiService else {
+            throw AIError.aiNotEnabled
+        }
+        guard let document = documentManager.getDocument(id: documentId) else {
+            throw AIError.documentNotFound
+        }
+
+        let toolExecutor = WritingToolExecutor(
+            documentManager: documentManager,
+            templateManager: templateManager
+        )
+
+        return try await ai.getAssistanceWithTools(
+            text: document.content,
+            type: type,
+            tools: WritingToolExecutor.tools,
+            toolExecutor: toolExecutor,
+            context: context,
+            maxIterations: maxIterations
+        )
+    }
+
     /// Brainstorm ideas for a topic
     public func brainstormIdeas(
         topic: String,

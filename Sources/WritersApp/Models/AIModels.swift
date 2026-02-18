@@ -337,6 +337,80 @@ public struct AIContext {
     }
 }
 
+// MARK: - Tool Definitions
+
+/// Definition of a tool that the AI can use during the tool loop
+public struct ToolDefinition {
+    public let name: String
+    public let description: String
+    public let inputSchema: [String: Any]
+
+    public init(name: String, description: String, inputSchema: [String: Any]) {
+        self.name = name
+        self.description = description
+        self.inputSchema = inputSchema
+    }
+
+    /// Convert to dictionary format for the Claude API request body
+    public func toDict() -> [String: Any] {
+        return [
+            "name": name,
+            "description": description,
+            "input_schema": inputSchema
+        ]
+    }
+}
+
+/// A tool use request parsed from an AI response content block
+public struct ToolUseBlock {
+    public let id: String
+    public let name: String
+    public let input: [String: Any]
+
+    public init?(from dict: [String: Any]) {
+        guard let type = dict["type"] as? String, type == "tool_use",
+              let id = dict["id"] as? String,
+              let name = dict["name"] as? String else {
+            return nil
+        }
+        self.id = id
+        self.name = name
+        self.input = dict["input"] as? [String: Any] ?? [:]
+    }
+}
+
+/// Result of executing a tool, sent back to the API
+public struct ToolResult {
+    public let toolUseId: String
+    public let content: String
+    public let isError: Bool
+
+    public init(toolUseId: String, content: String, isError: Bool = false) {
+        self.toolUseId = toolUseId
+        self.content = content
+        self.isError = isError
+    }
+
+    /// Convert to dictionary format for the Claude API request body
+    public func toDict() -> [String: Any] {
+        var dict: [String: Any] = [
+            "type": "tool_result",
+            "tool_use_id": toolUseId,
+            "content": content
+        ]
+        if isError {
+            dict["is_error"] = true
+        }
+        return dict
+    }
+}
+
+/// Protocol for executing tools in the tool loop
+public protocol AIToolExecutor {
+    /// Execute a tool by name with the given input parameters
+    func executeTool(name: String, input: [String: Any]) async throws -> String
+}
+
 // MARK: - AI Response
 
 /// Response from AI assistance
