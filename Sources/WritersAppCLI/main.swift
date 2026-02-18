@@ -1871,21 +1871,24 @@ func runMenuOption(app: WritersApp, optionString: String) async {
         // This is expected in some environments, so we continue silently
     }
     
+    var shouldExecuteOption = true
+    
     // Check prerequisites for AI-only options (10-16)
     if (10...16).contains(option) && !app.isAIEnabled {
         print("Error: AI features are not enabled. Set ANTHROPIC_API_KEY environment variable.")
-        return
+        shouldExecuteOption = false
     }
     
     // Check prerequisites for memory plugin options (20-25)
     if (20...25).contains(option) && !app.isMemoryPluginEnabled {
         print("Error: Memory plugin is not enabled.")
-        return
+        shouldExecuteOption = false
     }
     
-    switch option {
-    case 1:
-        browseTemplates(app: app)
+    if shouldExecuteOption {
+        switch option {
+        case 1:
+            browseTemplates(app: app)
     case 2:
         createDocumentFromTemplate(app: app)
     case 3:
