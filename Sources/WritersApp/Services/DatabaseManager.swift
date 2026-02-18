@@ -148,11 +148,29 @@ public class DatabaseManager {
         );
         """
 
+        // Create Issues table
+        let createIssuesTable = """
+        CREATE TABLE IF NOT EXISTS Issues (
+            id TEXT PRIMARY KEY,
+            document_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            status TEXT NOT NULL,
+            priority TEXT NOT NULL,
+            created REAL NOT NULL,
+            modified REAL NOT NULL,
+            resolved_at REAL,
+            tags TEXT,
+            notes TEXT
+        );
+        """
+
         try execute(createAISuggestionsTable)
         try execute(createUserSessionsTable)
         try execute(createAIConfigurationsTable)
         try execute(createTracesTable)
         try execute(createObservationsTable)
+        try execute(createIssuesTable)
 
     }
     
@@ -169,7 +187,11 @@ public class DatabaseManager {
             "CREATE INDEX IF NOT EXISTS idx_traces_session ON Traces(session_id);",
             "CREATE INDEX IF NOT EXISTS idx_traces_start ON Traces(start_time);",
             "CREATE INDEX IF NOT EXISTS idx_observations_trace ON Observations(trace_id);",
-            "CREATE INDEX IF NOT EXISTS idx_observations_name ON Observations(name);"
+            "CREATE INDEX IF NOT EXISTS idx_observations_name ON Observations(name);",
+            "CREATE INDEX IF NOT EXISTS idx_issues_document ON Issues(document_id);",
+            "CREATE INDEX IF NOT EXISTS idx_issues_status ON Issues(status);",
+            "CREATE INDEX IF NOT EXISTS idx_issues_priority ON Issues(priority);",
+            "CREATE INDEX IF NOT EXISTS idx_issues_created ON Issues(created);"
         ]
         
         for index in indexes {
@@ -1143,5 +1165,290 @@ public class DatabaseManager {
         }
 
         return observations
+    }
+    
+    // MARK: - Issue Operations
+    
+    /// Inserts a new issue
+    public func insertIssue(_ issue: Issue) throws {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+        
+        let sql = """
+        INSERT INTO Issues (id, document_id, title, description, status, priority, created, modified, resolved_at, tags, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """
+        
+        var statement: OpaquePointer?
+        defer {
+            if statement != nil {
+                sqlite3_finalize(statement)
+            }
+        }
+        
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+        
+        // Encode tags as JSON
+        let tagsData = try JSONEncoder().encode(issue.metadata.tags)
+        let tagsString = String(data: tagsData, encoding: .utf8) ?? "[]"
+        
+        sqlite3_bind_text(statement, 1, issue.id.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 2, issue.documentId.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 3, issue.title, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 4, issue.description, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 5, issue.status.rawValue, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 6, issue.priority.rawValue, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_double(statement, 7, issue.metadata.created.timeIntervalSince1970)
+        sqlite3_bind_double(statement, 8, issue.metadata.modified.timeIntervalSince1970)
+        
+        if let resolvedAt = issue.metadata.resolvedAt {
+            sqlite3_bind_double(statement, 9, resolvedAt.timeIntervalSince1970)
+        } else {
+            sqlite3_bind_null(statement, 9)
+        }
+        
+        sqlite3_bind_text(statement, 10, tagsString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 11, issue.metadata.notes, -1, SQLITE_TRANSIENT)
+        
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Insert failed: \(errorMessage)")
+        }
+    }
+    
+    /// Updates an existing issue
+    public func updateIssue(_ issue: Issue) throws {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+        
+        let sql = """
+        UPDATE Issues SET
+            title = ?, description = ?, status = ?, priority = ?,
+            modified = ?, resolved_at = ?, tags = ?, notes = ?
+        WHERE id = ?;
+        """
+        
+        var statement: OpaquePointer?
+        defer {
+            if statement != nil {
+                sqlite3_finalize(statement)
+            }
+        }
+        
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+        
+        // Encode tags as JSON
+        let tagsData = try JSONEncoder().encode(issue.metadata.tags)
+        let tagsString = String(data: tagsData, encoding: .utf8) ?? "[]"
+        
+        sqlite3_bind_text(statement, 1, issue.title, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 2, issue.description, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 3, issue.status.rawValue, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 4, issue.priority.rawValue, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_double(statement, 5, issue.metadata.modified.timeIntervalSince1970)
+        
+        if let resolvedAt = issue.metadata.resolvedAt {
+            sqlite3_bind_double(statement, 6, resolvedAt.timeIntervalSince1970)
+        } else {
+            sqlite3_bind_null(statement, 6)
+        }
+        
+        sqlite3_bind_text(statement, 7, tagsString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 8, issue.metadata.notes, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 9, issue.id.uuidString, -1, SQLITE_TRANSIENT)
+        
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Update failed: \(errorMessage)")
+        }
+    }
+    
+    /// Retrieves issues for a document with pagination
+    public func getIssues(forDocument documentId: UUID, limit: Int = 50, offset: Int = 0) throws -> [Issue] {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+        
+        let sql = """
+        SELECT id, document_id, title, description, status, priority, created, modified, resolved_at, tags, notes
+        FROM Issues
+        WHERE document_id = ?
+        ORDER BY created DESC
+        LIMIT ? OFFSET ?;
+        """
+        
+        var statement: OpaquePointer?
+        defer {
+            if statement != nil {
+                sqlite3_finalize(statement)
+            }
+        }
+        
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+        
+        sqlite3_bind_text(statement, 1, documentId.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_int(statement, 2, Int32(limit))
+        sqlite3_bind_int(statement, 3, Int32(offset))
+        
+        return try parseIssues(from: statement)
+    }
+    
+    /// Retrieves issues by status with pagination
+    public func getIssues(withStatus status: IssueStatus, limit: Int = 50, offset: Int = 0) throws -> [Issue] {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+        
+        let sql = """
+        SELECT id, document_id, title, description, status, priority, created, modified, resolved_at, tags, notes
+        FROM Issues
+        WHERE status = ?
+        ORDER BY created DESC
+        LIMIT ? OFFSET ?;
+        """
+        
+        var statement: OpaquePointer?
+        defer {
+            if statement != nil {
+                sqlite3_finalize(statement)
+            }
+        }
+        
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+        
+        sqlite3_bind_text(statement, 1, status.rawValue, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_int(statement, 2, Int32(limit))
+        sqlite3_bind_int(statement, 3, Int32(offset))
+        
+        return try parseIssues(from: statement)
+    }
+    
+    /// Retrieves all issues with pagination
+    public func getAllIssues(limit: Int = 50, offset: Int = 0) throws -> [Issue] {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+        
+        let sql = """
+        SELECT id, document_id, title, description, status, priority, created, modified, resolved_at, tags, notes
+        FROM Issues
+        ORDER BY created DESC
+        LIMIT ? OFFSET ?;
+        """
+        
+        var statement: OpaquePointer?
+        defer {
+            if statement != nil {
+                sqlite3_finalize(statement)
+            }
+        }
+        
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+        
+        sqlite3_bind_int(statement, 1, Int32(limit))
+        sqlite3_bind_int(statement, 2, Int32(offset))
+        
+        return try parseIssues(from: statement)
+    }
+    
+    /// Deletes an issue
+    public func deleteIssue(id: UUID) throws {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+        
+        let sql = "DELETE FROM Issues WHERE id = ?;"
+        
+        var statement: OpaquePointer?
+        defer {
+            if statement != nil {
+                sqlite3_finalize(statement)
+            }
+        }
+        
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+        
+        sqlite3_bind_text(statement, 1, id.uuidString, -1, SQLITE_TRANSIENT)
+        
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Delete failed: \(errorMessage)")
+        }
+    }
+    
+    /// Helper method to parse issues from a statement
+    private func parseIssues(from statement: OpaquePointer?) throws -> [Issue] {
+        var issues: [Issue] = []
+        
+        while sqlite3_step(statement) == SQLITE_ROW {
+            guard let id = UUID(uuidString: String(cString: sqlite3_column_text(statement, 0))),
+                  let documentId = UUID(uuidString: String(cString: sqlite3_column_text(statement, 1))) else {
+                continue
+            }
+            
+            let title = String(cString: sqlite3_column_text(statement, 2))
+            let description = String(cString: sqlite3_column_text(statement, 3))
+            let statusString = String(cString: sqlite3_column_text(statement, 4))
+            let priorityString = String(cString: sqlite3_column_text(statement, 5))
+            
+            guard let status = IssueStatus(rawValue: statusString),
+                  let priority = IssuePriority(rawValue: priorityString) else {
+                continue
+            }
+            
+            let created = Date(timeIntervalSince1970: sqlite3_column_double(statement, 6))
+            let modified = Date(timeIntervalSince1970: sqlite3_column_double(statement, 7))
+            
+            let resolvedAt = sqlite3_column_type(statement, 8) != SQLITE_NULL ?
+                Date(timeIntervalSince1970: sqlite3_column_double(statement, 8)) : nil
+            
+            // Decode tags from JSON
+            let tagsString = String(cString: sqlite3_column_text(statement, 9))
+            let tags = (try? JSONDecoder().decode([String].self, from: Data(tagsString.utf8))) ?? []
+            
+            let notes = String(cString: sqlite3_column_text(statement, 10))
+            
+            let metadata = IssueMetadata(
+                created: created,
+                modified: modified,
+                resolvedAt: resolvedAt,
+                tags: tags,
+                notes: notes
+            )
+            
+            let issue = Issue(
+                id: id,
+                documentId: documentId,
+                title: title,
+                description: description,
+                status: status,
+                priority: priority,
+                metadata: metadata
+            )
+            
+            issues.append(issue)
+        }
+        
+        return issues
     }
 }
