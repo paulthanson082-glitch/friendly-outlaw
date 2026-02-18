@@ -4,6 +4,7 @@ import Foundation
 public class WritersApp {
     public let templateManager: TemplateManager
     public let documentManager: DocumentManager
+    public let issueManager: IssueManager
     public let databaseManager: DatabaseManager
     public let pluginManager: PluginManager
     public let encouragementService: EncouragementService
@@ -15,6 +16,7 @@ public class WritersApp {
     public init() {
         self.templateManager = TemplateManager()
         self.documentManager = DocumentManager()
+        self.issueManager = IssueManager()
         self.databaseManager = DatabaseManager()
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
@@ -25,6 +27,7 @@ public class WritersApp {
     public init(aiConfiguration: AIConfiguration) {
         self.templateManager = TemplateManager()
         self.documentManager = DocumentManager()
+        self.issueManager = IssueManager()
         self.databaseManager = DatabaseManager()
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
@@ -36,6 +39,7 @@ public class WritersApp {
     public init(databasePath: String? = nil) {
         self.templateManager = TemplateManager()
         self.documentManager = DocumentManager()
+        self.issueManager = IssueManager()
         self.databaseManager = DatabaseManager(databasePath: databasePath)
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
@@ -345,6 +349,98 @@ public class WritersApp {
             session.aiInteractions = aiInteractions
             try? databaseManager.updateUserSession(session)
         }
+    }
+
+    // MARK: - Issue Management
+    
+    /// Creates a new issue for a document
+    public func createIssue(
+        documentId: UUID,
+        title: String,
+        description: String = "",
+        status: IssueStatus = .open,
+        priority: IssuePriority = .medium
+    ) -> Issue {
+        let issue = Issue(
+            documentId: documentId,
+            title: title,
+            description: description,
+            status: status,
+            priority: priority
+        )
+        issueManager.createIssue(issue)
+        try? databaseManager.insertIssue(issue)
+        return issue
+    }
+    
+    /// Retrieves an issue by ID
+    public func getIssue(id: UUID) -> Issue? {
+        return issueManager.getIssue(id: id)
+    }
+    
+    /// Retrieves all issues for a document
+    public func getIssues(forDocument documentId: UUID) -> [Issue] {
+        return issueManager.getIssues(forDocument: documentId)
+    }
+    
+    /// Retrieves issues by status
+    public func getIssues(withStatus status: IssueStatus) -> [Issue] {
+        return issueManager.getIssues(withStatus: status)
+    }
+    
+    /// Retrieves issues by priority
+    public func getIssues(withPriority priority: IssuePriority) -> [Issue] {
+        return issueManager.getIssues(withPriority: priority)
+    }
+    
+    /// Searches issues by title or description
+    public func searchIssues(query: String) -> [Issue] {
+        return issueManager.searchIssues(query: query)
+    }
+    
+    /// Updates an existing issue
+    public func updateIssue(_ issue: Issue) {
+        issueManager.updateIssue(issue)
+        try? databaseManager.updateIssue(issue)
+    }
+    
+    /// Deletes an issue
+    public func deleteIssue(id: UUID) {
+        issueManager.deleteIssue(id: id)
+        try? databaseManager.deleteIssue(id: id)
+    }
+    
+    /// Updates the status of an issue
+    public func updateIssueStatus(id: UUID, status: IssueStatus) {
+        issueManager.updateIssueStatus(id: id, status: status)
+        if let issue = issueManager.getIssue(id: id) {
+            try? databaseManager.updateIssue(issue)
+        }
+    }
+    
+    /// Updates the priority of an issue
+    public func updateIssuePriority(id: UUID, priority: IssuePriority) {
+        issueManager.updateIssuePriority(id: id, priority: priority)
+        if let issue = issueManager.getIssue(id: id) {
+            try? databaseManager.updateIssue(issue)
+        }
+    }
+    
+    /// Gets issue statistics
+    public func getIssueStatistics() -> (byStatus: [IssueStatus: Int], byPriority: [IssuePriority: Int]) {
+        let byStatus = issueManager.getIssueCountByStatus()
+        let byPriority = issueManager.getIssueCountByPriority()
+        return (byStatus, byPriority)
+    }
+    
+    /// Gets open issues for a document
+    public func getOpenIssues(forDocument documentId: UUID) -> [Issue] {
+        return issueManager.getOpenIssues(forDocument: documentId)
+    }
+    
+    /// Gets critical issues across all documents
+    public func getCriticalIssues() -> [Issue] {
+        return issueManager.getCriticalIssues()
     }
 
     // MARK: - AI-Powered Features
