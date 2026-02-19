@@ -37,6 +37,7 @@ public class ClaudeMemoryPlugin: Plugin {
         // Load existing memories
         loadMemories()
         loadIndex()
+        rebuildIndexIfNeeded()
 
         isInitialized = true
     }
@@ -489,6 +490,22 @@ public class ClaudeMemoryPlugin: Plugin {
 
     // MARK: - Persistence
 
+    /// Rebuilds the in-memory index from loaded memories if any entries are missing,
+    /// ensuring the index stays in sync with actual memory data after startup.
+    private func rebuildIndexIfNeeded() {
+        let needsRebuild = memories.values.contains { entry in
+            memoryIndex.keysByCategory[entry.category]?.contains(entry.key) != true
+        }
+
+        guard needsRebuild else { return }
+
+        memoryIndex = MemoryIndex()
+        for entry in memories.values {
+            memoryIndex.add(entry: entry)
+        }
+        saveIndex()
+    }
+
     private func loadMemories() {
         let fileManager = FileManager.default
         guard let files = try? fileManager.contentsOfDirectory(atPath: storagePath) else { return }
@@ -503,7 +520,7 @@ public class ClaudeMemoryPlugin: Plugin {
     }
 
     private func saveMemory(_ entry: MemoryEntry) {
-        let filename = entry.key.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? entry.key
+        let filename = entry.key.sanitizedForFilename
         let path = storagePath + "/\(filename).json"
 
         if let data = try? encoder.encode(entry) {
@@ -512,7 +529,7 @@ public class ClaudeMemoryPlugin: Plugin {
     }
 
     private func deleteMemoryFile(key: String) {
-        let filename = key.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? key
+        let filename = key.sanitizedForFilename
         let path = storagePath + "/\(filename).json"
         try? FileManager.default.removeItem(atPath: path)
     }

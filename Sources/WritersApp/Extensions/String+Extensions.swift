@@ -39,4 +39,14 @@ extension String {
             return String(self[range])
         }
     }
+
+    /// Sanitizes a string for use as a filename by replacing characters outside [a-zA-Z0-9._-]
+    /// with underscores and stripping trailing non-alphanumeric characters.
+    /// Returns "unknown" if the result is empty.
+    var sanitizedForFilename: String {
+        let sanitized = self
+            .replacingOccurrences(of: "[^a-zA-Z0-9._-]", with: "_", options: .regularExpression)
+            .replacingOccurrences(of: "[^a-zA-Z0-9]+$", with: "", options: .regularExpression)
+        return sanitized.isEmpty ? "unknown" : sanitized
+    }
 }
