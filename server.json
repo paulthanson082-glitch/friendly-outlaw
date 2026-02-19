@@ -1,0 +1,83 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.paulthanson082-glitch/friendly-outlaw",
+  "description": "A comprehensive Swift-based MCP server for writers featuring template management, document creation, AI-powered writing assistance, and productivity tools",
+  "title": "Friendly Outlaw - Writers App",
+  "websiteUrl": "https://github.com/paulthanson082-glitch/friendly-outlaw",
+  "repository": {
+    "url": "https://github.com/paulthanson082-glitch/friendly-outlaw",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "swift",
+      "transport": { "type": "stdio" },
+      "command": "swift",
+      "args": ["run", "WritersAppCLI"],
+      "environmentVariables": [
+        {
+          "name": "ANTHROPIC_API_KEY",
+          "description": "Anthropic API key for AI-powered writing assistance features (optional)",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ],
+  "capabilities": {
+    "tools": [
+      {
+        "name": "create_document",
+        "description": "Create a new document from a template or blank"
+      },
+      {
+        "name": "list_templates",
+        "description": "List all available writing templates"
+      },
+      {
+        "name": "continue_writing",
+        "description": "AI-powered continuation of existing text"
+      },
+      {
+        "name": "improve_text",
+        "description": "Enhance clarity, flow, and impact of text"
+      },
+      {
+        "name": "grammar_check",
+        "description": "Check grammar and spelling"
+      },
+      {
+        "name": "generate_titles",
+        "description": "Generate compelling title options"
+      },
+      {
+        "name": "brainstorm_ideas",
+        "description": "Creative idea generation for any topic"
+      },
+      {
+        "name": "develop_character",
+        "description": "Deep character creation assistance"
+      },
+      {
+        "name": "generate_outline",
+        "description": "Create structured outlines from concepts"
+      },
+      {
+        "name": "analyze_document",
+        "description": "Comprehensive document analysis and feedback"
+      }
+    ],
+    "resources": true,
+    "prompts": true
+  },
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "tool": "manual",
+      "version": "0.1.0",
+      "build_info": {
+        "timestamp": "2026-02-19T13:28:00Z"
+      }
+    }
+  }
+}
