@@ -627,6 +627,23 @@ export PKG_CONFIG_PATH="/opt/homebrew/opt/sqlite/lib/pkgconfig"
 
 For detailed setup verification steps and system requirements, see [SETUP_VERIFICATION.md](SETUP_VERIFICATION.md).
 
+## Quick Setup
+
+After cloning the repository:
+
+```bash
+# Install Node.js dependencies (for Next.js web interface)
+npm install
+
+# Verify Swift CLI works
+./run.sh --help
+
+# Run Next.js dev server
+npm run dev
+```
+
+**Note:** The `node_modules` directory is gitignored, so you must run `npm install` after cloning.
+
 ## Getting an API Key
 
 To use AI features, you'll need an Anthropic API key:
