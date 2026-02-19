@@ -109,10 +109,25 @@ public class FocusSessionManager {
             return nil
         }
 
-        // Start a break session (represented as a special state)
-        var breakSession = completedSession
+        // Update the completed pomodoro session with the incremented pomodoro count
+        var updatedCompletedSession = completedSession
+        updatedCompletedSession.completedPomodoros += 1
+        sessions[updatedCompletedSession.id] = updatedCompletedSession
+        if let historyIndex = sessionHistory.lastIndex(where: { $0.id == updatedCompletedSession.id }) {
+            sessionHistory[historyIndex] = updatedCompletedSession
+        }
+
+        // Start a separate break session with a new id, carrying forward the pomodoro count
+        guard var breakSession = startSession(
+            type: .pomodoro,
+            documentId: updatedCompletedSession.documentId,
+            currentWordCount: updatedCompletedSession.wordsAtEnd ?? updatedCompletedSession.wordsAtStart
+        ) else {
+            return nil
+        }
+
         breakSession.state = .onBreak
-        breakSession.completedPomodoros += 1
+        breakSession.completedPomodoros = updatedCompletedSession.completedPomodoros
         sessions[breakSession.id] = breakSession
         currentSession = breakSession
         return breakSession
