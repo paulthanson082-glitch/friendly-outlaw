@@ -83,9 +83,16 @@ public class IssueManager {
         
         if status == .resolved && issue.metadata.resolvedAt == nil {
             issue.metadata.resolvedAt = Date()
+        } else if status == .open {
+            issue.metadata.resolvedAt = nil
         }
         
         issues[id] = issue
+    }
+    
+    /// Reopens a resolved or closed issue, clearing its resolved date
+    public func reopenIssue(id: UUID) {
+        updateIssueStatus(id: id, status: .open)
     }
     
     /// Updates the priority of an issue

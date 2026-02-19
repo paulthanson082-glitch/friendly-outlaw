@@ -403,4 +403,49 @@ final class WritersAppTests: XCTestCase {
         XCTAssertTrue(execFailed.localizedDescription.contains("test_tool"))
         XCTAssertTrue(execFailed.localizedDescription.contains("something broke"))
     }
+
+    // MARK: - Reopen Issue Tests
+
+    func testReopenIssueClears_resolvedAt() {
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+        let issue = app.createIssue(documentId: doc.id, title: "Test Issue")
+
+        // Resolve the issue
+        app.updateIssueStatus(id: issue.id, status: .resolved)
+        let resolved = app.getIssue(id: issue.id)
+        XCTAssertEqual(resolved?.status, .resolved)
+        XCTAssertNotNil(resolved?.metadata.resolvedAt, "resolvedAt should be set when resolved")
+
+        // Reopen the issue
+        app.reopenIssue(id: issue.id)
+        let reopened = app.getIssue(id: issue.id)
+        XCTAssertEqual(reopened?.status, .open)
+        XCTAssertNil(reopened?.metadata.resolvedAt, "resolvedAt should be cleared when reopened")
+    }
+
+    func testReopenClosedIssue() {
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+        let issue = app.createIssue(documentId: doc.id, title: "Closed Issue")
+
+        app.updateIssueStatus(id: issue.id, status: .closed)
+        let closed = app.getIssue(id: issue.id)
+        XCTAssertEqual(closed?.status, .closed)
+
+        app.reopenIssue(id: issue.id)
+        let reopened = app.getIssue(id: issue.id)
+        XCTAssertEqual(reopened?.status, .open)
+    }
+
+    func testUpdateIssueStatusToOpenClears_resolvedAt() {
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+        let issue = app.createIssue(documentId: doc.id, title: "Another Issue")
+
+        app.updateIssueStatus(id: issue.id, status: .resolved)
+        XCTAssertNotNil(app.getIssue(id: issue.id)?.metadata.resolvedAt)
+
+        app.updateIssueStatus(id: issue.id, status: .open)
+        let reopened = app.getIssue(id: issue.id)
+        XCTAssertEqual(reopened?.status, .open)
+        XCTAssertNil(reopened?.metadata.resolvedAt, "resolvedAt should be nil after status set to open")
+    }
 }

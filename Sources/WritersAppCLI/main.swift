@@ -194,6 +194,7 @@ struct WritersAppCLI {
             print("67. Update Issue Status")
             print("68. Delete Issue")
             print("69. View Issue Statistics")
+            print("70. Reopen Issue")
 
             print("\n0. Exit")
             print()
@@ -295,6 +296,8 @@ struct WritersAppCLI {
                 deleteIssue(app: app)
             case 69:
                 viewIssueStatistics(app: app)
+            case 70:
+                reopenIssue(app: app)
             case 0:
                 await app.shutdownPlugins()
                 running = false
@@ -2673,6 +2676,38 @@ func viewIssueStatistics(app: WritersApp) {
     
     let totalIssues = byStatus.values.reduce(0, +)
     print("\nTotal Issues: \(totalIssues)")
+}
+
+func reopenIssue(app: WritersApp) {
+    print("\n=== Reopen Issue ===\n")
+    
+    let issues = app.issueManager.getAllIssues().filter { $0.status == .resolved || $0.status == .closed }
+    
+    if issues.isEmpty {
+        print("No resolved or closed issues to reopen.")
+        return
+    }
+    
+    displayIssues(issues)
+    
+    print("Enter issue number to reopen (0 to cancel): ", terminator: "")
+    guard let input = readLine(), let choice = Int(input) else {
+        print("Invalid input.")
+        return
+    }
+    
+    if choice == 0 {
+        return
+    }
+    
+    guard choice > 0 && choice <= issues.count else {
+        print("Invalid issue number.")
+        return
+    }
+    
+    let issue = issues[choice - 1]
+    app.reopenIssue(id: issue.id)
+    print("\n✓ Issue '\(issue.title)' has been reopened.")
 }
 
 func displayIssues(_ issues: [Issue]) {
