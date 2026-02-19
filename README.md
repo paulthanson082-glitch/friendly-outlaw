@@ -786,6 +786,44 @@ To use AI features, you'll need an Anthropic API key:
 
 AI features are completely optional - the app works fully without them.
 
+## MCP Registry
+
+This project is available in the Model Context Protocol (MCP) Registry. The `server.json` file in the root directory contains the registry metadata for submitting this application as an MCP server.
+
+### Running as an MCP Server
+
+To use this app as an MCP server with MCP-compatible clients:
+
+```json
+{
+  "mcpServers": {
+    "friendly-outlaw": {
+      "command": "swift",
+      "args": ["run", "WritersAppCLI"],
+      "env": {
+        "ANTHROPIC_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+Add this configuration to your MCP client's configuration file (e.g., Claude Desktop, Cursor, or other MCP-compatible applications).
+
+### Available MCP Tools
+
+When running as an MCP server, the following tools are available:
+- `create_document` - Create documents from templates
+- `list_templates` - Browse available writing templates
+- `continue_writing` - AI-powered text continuation
+- `improve_text` - Enhance text quality and clarity
+- `grammar_check` - Grammar and spelling corrections
+- `generate_titles` - Generate title suggestions
+- `brainstorm_ideas` - Creative idea generation
+- `develop_character` - Character development assistance
+- `generate_outline` - Create structured outlines
+- `analyze_document` - Comprehensive document analysis
+
 ## Additional Resources
 
 - [SETUP_VERIFICATION.md](SETUP_VERIFICATION.md) - Detailed setup verification and system requirements
@@ -813,3 +851,6 @@ Contributions welcome! Areas for enhancement:
 - Style consistency checking
 - Advanced writing analytics
 - Voice and style profile learning
+- Additional MCP server integrations
+- Enhanced plugin system capabilities
+- MCP tool implementations
