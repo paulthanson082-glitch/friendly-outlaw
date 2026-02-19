@@ -291,7 +291,7 @@ final class WritersAppTests: XCTestCase {
         )
         XCTAssertTrue(result.contains("Test Story"))
         XCTAssertTrue(result.contains("Story content here"))
-        XCTAssertTrue(result.contains("shortStory"))
+        XCTAssertTrue(result.contains("Short Story"))
     }
 
     func testWritingToolExecutorGetDocumentNotFound() async throws {
