@@ -125,6 +125,29 @@ A positive, motivational feedback system that celebrates your writing achievemen
 
 The encouragement system is enabled by default and can be toggled on/off through the CLI menu (option 51). Get instant positive feedback as you write!
 
+### 🔌 Plugin System & MCP Integration (NEW!)
+Extensible plugin architecture with Model Context Protocol (MCP) support:
+- **MCP Client Support**: Connect to MCP servers for extended functionality
+  - Stdio, HTTP, and WebSocket transport support
+  - Tool, resource, and prompt management
+  - JSON-RPC 2.0 protocol implementation
+- **Claude Memory Plugin**: Built-in persistent memory storage for AI interactions
+  - Store and retrieve context across writing sessions
+  - Category-based organization and tagging
+  - Full-text search and importance ranking
+  - Automatic memory persistence to disk
+- **Plugin Capabilities**:
+  - Memory: Store and retrieve persistent context
+  - Tools: Provide additional writing tools
+  - Resources: Access external files and data
+  - Prompts: Template prompt management
+  - Sampling: Request LLM completions
+  - Custom Actions: Plugin-specific functionality
+- **Dynamic Plugin Loading**: Install and configure MCP servers at runtime
+- **Multi-Server Support**: Connect to multiple MCP servers simultaneously
+
+See the plugin system in action through the CLI menu options or integrate MCP servers via `PluginManager` API.
+
 ## Development Environment
 
 ### VS Code Setup for iPad and MacBook Pro
@@ -364,6 +387,83 @@ if let ai = app.aiService {
 }
 ```
 
+#### With Plugin System
+
+```swift
+import WritersApp
+
+let app = WritersApp()
+
+// Enable Claude Memory Plugin
+try await app.enableMemoryPlugin()
+
+// Store a memory
+try await app.storeMemory(
+    key: "character_backstory",
+    value: "The protagonist grew up in a small coastal town...",
+    category: "characters",
+    tags: ["protagonist", "backstory"],
+    importance: 0.9
+)
+
+// Retrieve a memory
+if let memory = try await app.retrieveMemory(key: "character_backstory") {
+    print("Retrieved: \(memory)")
+}
+
+// Search memories
+let results = try await app.searchMemories(
+    query: "protagonist",
+    category: "characters",
+    limit: 10
+)
+
+// List all memories
+let allMemories = try await app.listMemories(category: "characters", limit: 100)
+
+// Get memory statistics
+let stats = try await app.getMemoryStats()
+print("Total memories: \(stats["totalCount"] ?? 0)")
+
+// Access plugin manager directly
+let plugins = app.getPlugins()
+let enabledPlugins = app.getEnabledPlugins()
+
+// Connect to an MCP server
+let mcpConfig = PluginConfiguration(
+    manifest: PluginManifest(
+        id: "custom-mcp-server",
+        name: "Custom MCP Server",
+        version: "1.0.0",
+        description: "Custom MCP server integration",
+        capabilities: [.tools, .resources],
+        mcpServer: MCPServerConfig(
+            transport: "stdio",
+            command: "/path/to/mcp-server",
+            args: ["--port", "3000"],
+            env: ["API_KEY": "your-key"]
+        )
+    )
+)
+
+let pluginManager = PluginManager.shared
+try await pluginManager.connectMCPServer(config: mcpConfig)
+
+// List available MCP tools
+if let tools = try await pluginManager.listMCPTools(pluginId: "custom-mcp-server") {
+    for tool in tools {
+        print("Tool: \(tool.name) - \(tool.description)")
+    }
+}
+
+// Call an MCP tool
+let result = try await pluginManager.callMCPTool(
+    pluginId: "custom-mcp-server",
+    toolName: "search",
+    arguments: ["query": "Swift programming"]
+)
+```
+
 ### As a CLI Tool
 
 #### Quick Start
@@ -583,6 +683,36 @@ Professional business correspondence format with proper addressing and structure
 - `analyzeDocument(document:)` - Analyze document comprehensively
 - `getWritingInsights(document:)` - Get writing insights
 
+### PluginManager
+- `register(plugin:)` - Register a new plugin
+- `unregister(pluginId:)` - Unregister a plugin
+- `getPlugin(id:)` - Get a registered plugin by ID
+- `getAllPlugins()` - Get all registered plugins
+- `getEnabledPlugins()` - Get only enabled plugins
+- `getPlugins(with:)` - Get plugins with specific capability
+- `initializeAll()` - Initialize all enabled plugins
+- `shutdownAll()` - Shutdown all plugins
+- `connectMCPServer(config:)` - Connect to an MCP server
+- `disconnectMCPServer(pluginId:)` - Disconnect from an MCP server
+- `listMCPTools(pluginId:)` - List tools from an MCP server
+- `callMCPTool(pluginId:toolName:arguments:)` - Call an MCP tool
+- `listMCPResources(pluginId:)` - List resources from an MCP server
+- `readMCPResource(pluginId:uri:)` - Read an MCP resource
+- `installClaudeMemoryPlugin()` - Install the built-in Claude Memory plugin
+
+### WritersApp Plugin Methods
+- `enableMemoryPlugin()` - Enable the Claude Memory plugin
+- `isMemoryPluginEnabled` - Check if memory plugin is enabled
+- `storeMemory(key:value:category:tags:importance:)` - Store a memory
+- `retrieveMemory(key:)` - Retrieve a memory by key
+- `searchMemories(query:category:limit:)` - Search memories
+- `listMemories(category:limit:sortBy:)` - List all memories
+- `clearMemory(key:category:)` - Clear specific or all memories
+- `getMemoryStats()` - Get memory plugin statistics
+- `getPlugins()` - Get all registered plugins
+- `getEnabledPlugins()` - Get enabled plugins
+- `shutdownPlugins()` - Shutdown all plugins
+
 ## Testing
 
 Run the test suite:
@@ -656,6 +786,44 @@ To use AI features, you'll need an Anthropic API key:
 
 AI features are completely optional - the app works fully without them.
 
+## MCP Registry
+
+This project is available in the Model Context Protocol (MCP) Registry. The `server.json` file in the root directory contains the registry metadata for submitting this application as an MCP server.
+
+### Running as an MCP Server
+
+To use this app as an MCP server with MCP-compatible clients:
+
+```json
+{
+  "mcpServers": {
+    "friendly-outlaw": {
+      "command": "swift",
+      "args": ["run", "WritersAppCLI"],
+      "env": {
+        "ANTHROPIC_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+Add this configuration to your MCP client's configuration file (e.g., Claude Desktop, Cursor, or other MCP-compatible applications).
+
+### Available MCP Tools
+
+When running as an MCP server, the following tools are available:
+- `create_document` - Create documents from templates
+- `list_templates` - Browse available writing templates
+- `continue_writing` - AI-powered text continuation
+- `improve_text` - Enhance text quality and clarity
+- `grammar_check` - Grammar and spelling corrections
+- `generate_titles` - Generate title suggestions
+- `brainstorm_ideas` - Creative idea generation
+- `develop_character` - Character development assistance
+- `generate_outline` - Create structured outlines
+- `analyze_document` - Comprehensive document analysis
+
 ## Additional Resources
 
 - [SETUP_VERIFICATION.md](SETUP_VERIFICATION.md) - Detailed setup verification and system requirements
@@ -683,3 +851,6 @@ Contributions welcome! Areas for enhancement:
 - Style consistency checking
 - Advanced writing analytics
 - Voice and style profile learning
+- Additional MCP server integrations
+- Enhanced plugin system capabilities
+- MCP tool implementations
