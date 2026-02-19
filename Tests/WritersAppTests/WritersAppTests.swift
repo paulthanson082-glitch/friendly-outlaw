@@ -392,6 +392,46 @@ final class WritersAppTests: XCTestCase {
         XCTAssertTrue(toolNames.contains("list_templates"))
     }
 
+    // MARK: - Trace Recording Tests
+
+    func testTraceRecordingRoundTrip() throws {
+        // Use an in-memory SQLite database so this test is self-contained
+        let traceApp = WritersApp(databasePath: ":memory:")
+
+        // Record a trace representing one AI-assistance turn
+        let trace = traceApp.recordTrace(sessionId: "test-session-001", name: "AI Assistance: continueWriting")
+        XCTAssertFalse(trace.sessionId.isEmpty)
+        XCTAssertNil(trace.endTime, "Trace should not have an end time yet")
+
+        // Simulate two tool observations within that trace
+        let obs1 = Observation(traceId: trace.id, name: "Tool: get_word_count",
+                               startTime: Date(), endTime: Date(), input: "{\"text\":\"hello world\"}", output: "2 words")
+        let obs2 = Observation(traceId: trace.id, name: "Tool: search_documents",
+                               startTime: Date(), endTime: Date(), input: "{\"query\":\"novel\"}", output: "- My Novel (100 words)")
+
+        try traceApp.databaseManager.insertObservation(obs1)
+        try traceApp.databaseManager.insertObservation(obs2)
+
+        // End the trace
+        traceApp.endTrace(trace)
+
+        // Verify the trace and observations are retrievable
+        let storedTraces = try traceApp.databaseManager.getTraces(sessionId: "test-session-001")
+        XCTAssertEqual(storedTraces.count, 1, "Should have one stored trace")
+        XCTAssertNotNil(storedTraces.first?.endTime, "Trace end time should be set after endTrace")
+
+        let storedObs = try traceApp.databaseManager.getObservations(traceId: trace.id)
+        XCTAssertEqual(storedObs.count, 2, "Should have two observations")
+
+        // Verify the analysis service can produce a report from the recorded data
+        let service = TraceAnalysisService(databaseManager: traceApp.databaseManager)
+        let report = try service.runFullAnalysis()
+        XCTAssertEqual(report.totalTraces, 1)
+        XCTAssertEqual(report.totalObservations, 2)
+        XCTAssertEqual(report.totalSessions, 1)
+        XCTAssertEqual(report.toolUsageBreakdown.count, 2, "Should see both tool names in breakdown")
+    }
+
     func testToolLoopErrorDescriptions() {
         let exhausted = AIServiceError.toolLoopExhausted(iterations: 10)
         XCTAssertTrue(exhausted.localizedDescription.contains("10"))

@@ -604,6 +604,9 @@ public class WritersApp {
     /// This enables Claude to use built-in writing tools (word count, document search,
     /// template listing, reading time) during its response generation. The tool loop
     /// continues until Claude produces a final text response.
+    ///
+    /// Each call records a `Trace` in the database with an `Observation` per tool call,
+    /// enabling productivity analysis via `TraceAnalysisService`.
     public func getAIAssistanceWithTools(
         documentId: UUID,
         type: AIAssistanceType,
@@ -617,19 +620,34 @@ public class WritersApp {
             throw AIError.documentNotFound
         }
 
-        let toolExecutor = WritingToolExecutor(
+        // --- Tracer bullet: record this turn as a Trace ---
+        let sessionId = currentSessionId?.uuidString ?? UUID().uuidString
+        var trace = Trace(sessionId: sessionId, name: "AI Assistance: \(type)")
+        try? databaseManager.insertTrace(trace)
+
+        let innerExecutor = WritingToolExecutor(
             documentManager: documentManager,
             templateManager: templateManager
         )
+        let tracingExecutor = TracingToolExecutor(
+            inner: innerExecutor,
+            traceId: trace.id,
+            databaseManager: databaseManager
+        )
 
-        return try await ai.getAssistanceWithTools(
+        let response = try await ai.getAssistanceWithTools(
             text: document.content,
             type: type,
             tools: WritingToolExecutor.tools,
-            toolExecutor: toolExecutor,
+            toolExecutor: tracingExecutor,
             context: context,
             maxIterations: maxIterations
         )
+
+        trace.endTime = Date()
+        try? databaseManager.updateTrace(trace)
+
+        return response
     }
 
     /// Brainstorm ideas for a topic
@@ -717,6 +735,26 @@ public class WritersApp {
         )
     }
     
+    // MARK: - Trace Recording
+
+    /// Records a new trace (a single AI-interaction turn) and returns it.
+    ///
+    /// Use `endTrace(_:)` once the operation that the trace covers is complete.
+    @discardableResult
+    public func recordTrace(sessionId: String? = nil, name: String) -> Trace {
+        let sid = sessionId ?? currentSessionId?.uuidString ?? UUID().uuidString
+        let trace = Trace(sessionId: sid, name: name)
+        try? databaseManager.insertTrace(trace)
+        return trace
+    }
+
+    /// Sets the end time on a trace and persists the update.
+    public func endTrace(_ trace: Trace) {
+        var completed = trace
+        completed.endTime = Date()
+        try? databaseManager.updateTrace(completed)
+    }
+
     // MARK: - Encouragement Features
     
     /// Get encouragement for a document update
@@ -783,6 +821,56 @@ public struct AppStatistics {
         self.averageWordCount = averageWordCount
         self.totalTemplates = totalTemplates
         self.documentsByCategory = documentsByCategory
+    }
+}
+
+// MARK: - TracingToolExecutor
+
+/// Wraps an `AIToolExecutor` to record an `Observation` for every tool call.
+///
+/// This is the tracer-bullet recording layer: each tool invocation during an AI
+/// assistance session is persisted to the database so `TraceAnalysisService` can
+/// surface productivity metrics.
+private class TracingToolExecutor: AIToolExecutor {
+    private let inner: WritingToolExecutor
+    private let traceId: UUID
+    private let databaseManager: DatabaseManager
+
+    init(inner: WritingToolExecutor, traceId: UUID, databaseManager: DatabaseManager) {
+        self.inner = inner
+        self.traceId = traceId
+        self.databaseManager = databaseManager
+    }
+
+    func executeTool(name: String, input: [String: Any]) async throws -> String {
+        let startTime = Date()
+        let inputString = (try? JSONSerialization.data(withJSONObject: input, options: []))
+            .flatMap { String(data: $0, encoding: .utf8) }
+
+        do {
+            let result = try await inner.executeTool(name: name, input: input)
+            let observation = Observation(
+                traceId: traceId,
+                name: "Tool: \(name)",
+                startTime: startTime,
+                endTime: Date(),
+                input: inputString,
+                output: result
+            )
+            try? databaseManager.insertObservation(observation)
+            return result
+        } catch {
+            let observation = Observation(
+                traceId: traceId,
+                name: "Tool: \(name)",
+                startTime: startTime,
+                endTime: Date(),
+                input: inputString,
+                statusMessage: error.localizedDescription
+            )
+            try? databaseManager.insertObservation(observation)
+            throw error
+        }
     }
 }
 

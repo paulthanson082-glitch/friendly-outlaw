@@ -1027,6 +1027,42 @@ public class DatabaseManager {
         }
     }
 
+    /// Updates an existing trace (e.g., to set its end time)
+    public func updateTrace(_ trace: Trace) throws {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+
+        let sql = "UPDATE Traces SET end_time = ?, metadata = ? WHERE id = ?;"
+
+        var statement: OpaquePointer?
+        defer { if statement != nil { sqlite3_finalize(statement) } }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+
+        if let endTime = trace.endTime {
+            sqlite3_bind_double(statement, 1, endTime.timeIntervalSince1970)
+        } else {
+            sqlite3_bind_null(statement, 1)
+        }
+
+        if let metadata = trace.metadata {
+            sqlite3_bind_text(statement, 2, metadata, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(statement, 2)
+        }
+
+        sqlite3_bind_text(statement, 3, trace.id.uuidString, -1, SQLITE_TRANSIENT)
+
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Update failed: \(errorMessage)")
+        }
+    }
+
     /// Retrieves all traces, optionally filtered by session ID
     public func getTraces(sessionId: String? = nil) throws -> [Trace] {
         guard isInitialized, let db = db else {
