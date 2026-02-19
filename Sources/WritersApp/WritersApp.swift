@@ -418,6 +418,14 @@ public class WritersApp {
         }
     }
     
+    /// Reopens a resolved or closed issue, clearing its resolved date
+    public func reopenIssue(id: UUID) {
+        issueManager.reopenIssue(id: id)
+        if let issue = issueManager.getIssue(id: id) {
+            try? databaseManager.updateIssue(issue)
+        }
+    }
+    
     /// Updates the priority of an issue
     public func updateIssuePriority(id: UUID, priority: IssuePriority) {
         issueManager.updateIssuePriority(id: id, priority: priority)
