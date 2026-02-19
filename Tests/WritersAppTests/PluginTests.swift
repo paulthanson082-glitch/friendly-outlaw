@@ -398,6 +398,69 @@ final class PluginTests: XCTestCase {
         XCTAssertTrue(result.success)
         XCTAssertNil(result.data)
     }
+
+    func testMemoryKeyWithSpecialCharacters() async throws {
+        // Store a memory whose key contains spaces and special characters.
+        // This exercises the sanitizedForFilename path in saveMemory / deleteMemoryFile.
+        let storeAction = PluginAction(type: .storeMemory, parameters: [
+            "key": "YC Stuff",
+            "value": "startup memories",
+            "category": "projects"
+        ])
+        let storeResult = try await memoryPlugin.execute(action: storeAction)
+        XCTAssertTrue(storeResult.success)
+
+        // Retrieve using the original (unsanitized) key
+        let retrieveAction = PluginAction(type: .retrieveMemory, parameters: ["key": "YC Stuff"])
+        let retrieveResult = try await memoryPlugin.execute(action: retrieveAction)
+        XCTAssertTrue(retrieveResult.success)
+        XCTAssertEqual(retrieveResult.data as? String, "startup memories")
+
+        // Delete using the original key — the file must be found for deletion to succeed
+        let clearAction = PluginAction(type: .clearMemory, parameters: ["key": "YC Stuff"])
+        let clearResult = try await memoryPlugin.execute(action: clearAction)
+        XCTAssertTrue(clearResult.success)
+
+        // Verify it is gone
+        let checkAction = PluginAction(type: .retrieveMemory, parameters: ["key": "YC Stuff"])
+        let checkResult = try await memoryPlugin.execute(action: checkAction)
+        XCTAssertNil(checkResult.data)
+    }
+
+    func testIndexRebuildAfterCorruption() async throws {
+        // Store some memories so they are persisted to disk
+        for i in 1...3 {
+            _ = try await memoryPlugin.execute(action: PluginAction(type: .storeMemory, parameters: [
+                "key": "rebuild-test-\(i)",
+                "value": "value-\(i)",
+                "category": "rebuild-category"
+            ]))
+        }
+        try await memoryPlugin.shutdown()
+
+        // Simulate index file corruption by deleting it
+        let indexPath = testStoragePath + "/memory/index.json"
+        try? FileManager.default.removeItem(atPath: indexPath)
+
+        // Re-initialize — rebuildIndexIfNeeded() should reconstruct the index from loaded memories
+        let newPlugin = ClaudeMemoryPlugin(storagePath: testStoragePath + "/memory")
+        try await newPlugin.initialize()
+
+        // All three memories should still be retrievable
+        let listAction = PluginAction(type: .listMemories, parameters: ["limit": 10])
+        let listResult = try await newPlugin.execute(action: listAction)
+        XCTAssertTrue(listResult.success)
+        if let memories = listResult.data as? [[String: Any]] {
+            XCTAssertEqual(memories.count, 3)
+        } else {
+            XCTFail("Memories should be accessible after index rebuild")
+        }
+
+        try await newPlugin.shutdown()
+
+        // The index file should have been recreated by the rebuild
+        XCTAssertTrue(FileManager.default.fileExists(atPath: indexPath))
+    }
 }
 
 // MARK: - Plugin Protocol Tests
