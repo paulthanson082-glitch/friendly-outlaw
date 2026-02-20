@@ -1,0 +1,90 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "en-US"
+tone_instructions: ""
+early_access: false
+enable_free_tier: true
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_placeholder: "@coderabbitai summary"
+  high_level_summary_in_walkthrough: false
+  auto_title_placeholder: "@coderabbitai"
+  review_status: true
+  commit_status: true
+  fail_commit_status: false
+  collapse_walkthrough: true
+  changed_files_summary: true
+  sequence_diagrams: true
+  estimate_code_review_effort: true
+  assess_linked_issues: true
+  related_issues: true
+  related_prs: true
+  suggested_labels: true
+  auto_apply_labels: false
+  suggested_reviewers: true
+  auto_assign_reviewers: false
+  poem: true
+  path_filters:
+    - "!**/.build/**"
+    - "!**/*.resolved"
+  path_instructions:
+    - path: "**/*.swift"
+      instructions: |
+        Review Swift code for:
+        - Proper use of Swift concurrency (async/await, actors)
+        - Memory management and retain cycles
+        - Codable conformance correctness
+        - Swift naming conventions and style
+        - Error handling with typed errors
+    - path: "Sources/WritersApp/Services/**"
+      instructions: |
+        These are core service files. Pay extra attention to:
+        - Thread safety for class-based services
+        - Proper async/await patterns in AIService
+        - Manager pattern consistency
+    - path: "Tests/**"
+      instructions: |
+        Ensure test coverage is meaningful and tests are:
+        - Independent and deterministic
+        - Following XCTest conventions
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    base_branches: []
+  finishing_touches:
+    docstrings:
+      enabled: true
+    unit_tests:
+      enabled: true
+  tools:
+    swiftlint:
+      enabled: true
+    shellcheck:
+      enabled: true
+    markdownlint:
+      enabled: true
+    gitleaks:
+      enabled: true
+    actionlint:
+      enabled: true
+chat:
+  auto_reply: true
+knowledge_base:
+  web_search:
+    enabled: true
+  code_guidelines:
+    enabled: true
+  learnings:
+    scope: "auto"
+  issues:
+    scope: "auto"
+  pull_requests:
+    scope: "auto"
+code_generation:
+  docstrings:
+    language: "en-US"
+    path_instructions:
+      - path: "**/*.swift"
+        instructions: "Generate Swift-style documentation comments using /// for public API members."
