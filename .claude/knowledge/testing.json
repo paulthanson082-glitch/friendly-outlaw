@@ -1,0 +1,36 @@
+{
+  "category": "testing",
+  "description": "Testing standards for the friendly-outlaw project",
+  "rules": [
+    {
+      "id": "test-001",
+      "title": "Test runner",
+      "severity": "required",
+      "rule": "Run 'swift test' from the project root after any source change. All 11 existing tests must pass before committing. Never commit with a failing test."
+    },
+    {
+      "id": "test-002",
+      "title": "Test coverage areas",
+      "severity": "guidance",
+      "rule": "Tests live in Tests/WritersAppTests/WritersAppTests.swift. The existing suite covers: template loading and search, document creation (from template and blank), word count calculation, DocumentManager CRUD, export formats (.markdown, .plainText, .html), statistics generation, and placeholder substitution."
+    },
+    {
+      "id": "test-003",
+      "title": "New feature tests",
+      "severity": "required",
+      "rule": "Every new public method on WritersApp, TemplateManager, or DocumentManager must have at least one test case. New template additions must not break the existing template count assertion if one exists."
+    },
+    {
+      "id": "test-004",
+      "title": "AI feature tests",
+      "severity": "guidance",
+      "rule": "AI service methods (async throws) should not be tested with live API calls in the test suite. Test the surrounding logic (prompt construction, error handling paths) with mocks or by testing the non-AI layers."
+    },
+    {
+      "id": "test-005",
+      "title": "Test naming",
+      "severity": "guidance",
+      "rule": "Test method names must start with 'test' and clearly describe what is being tested, e.g., testDocumentWordCountIsAccurate, testPlaceholderSubstitutionReplacesAllKeys."
+    }
+  ]
+}
