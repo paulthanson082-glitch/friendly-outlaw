@@ -1,0 +1,81 @@
+{
+  "category": "architecture",
+  "description": "Architecture patterns and structural rules for the friendly-outlaw project",
+  "rules": [
+    {
+      "id": "arch-001",
+      "title": "Manager pattern",
+      "severity": "required",
+      "rule": "Template lifecycle goes through TemplateManager. Document CRUD, search, and statistics go through DocumentManager. Do not bypass these managers with direct data manipulation."
+    },
+    {
+      "id": "arch-002",
+      "title": "Service pattern",
+      "severity": "required",
+      "rule": "All Anthropic API communication is encapsulated in AIService. The WritersApp class exposes a subset of AIService methods as the public API. Do not call the Anthropic API from outside AIService."
+    },
+    {
+      "id": "arch-003",
+      "title": "AI feature gating",
+      "severity": "required",
+      "rule": "AI features are optional. The app must degrade gracefully when no API key is present. Always check that AI is enabled (via enableAI()) before calling AI operations. The CLI auto-detects ANTHROPIC_API_KEY."
+    },
+    {
+      "id": "arch-004",
+      "title": "Adding a new AI feature",
+      "severity": "guidance",
+      "steps": [
+        "Add method to Sources/WritersApp/Services/AIService.swift",
+        "Create a system prompt and user prompt inside that method",
+        "Add the assistance type to AIAssistanceType enum in AIModels.swift",
+        "Expose the method via WritersApp.swift if it should be part of the public API",
+        "Add a CLI option in Sources/WritersAppCLI/main.swift if applicable"
+      ]
+    },
+    {
+      "id": "arch-005",
+      "title": "Adding a new template",
+      "severity": "guidance",
+      "steps": [
+        "Edit Sources/WritersApp/Services/TemplateManager.swift",
+        "Add to the loadDefaultTemplates() method",
+        "Define placeholders using the Placeholder struct",
+        "Verify every {{key}} in content has a matching Placeholder entry and vice versa",
+        "Update tests if the template count assertion exists"
+      ]
+    },
+    {
+      "id": "arch-006",
+      "title": "Adding a new export format",
+      "severity": "guidance",
+      "steps": [
+        "Add a case to the export format enum",
+        "Implement the conversion inside exportDocument()",
+        "Add a test case for the new format"
+      ]
+    },
+    {
+      "id": "arch-007",
+      "title": "Modifying models",
+      "severity": "guidance",
+      "steps": [
+        "Update the struct in Sources/WritersApp/Models/",
+        "Ensure Codable conformance is maintained",
+        "Update the related manager methods",
+        "Update tests to cover the change"
+      ]
+    },
+    {
+      "id": "arch-008",
+      "title": "Entry points",
+      "severity": "required",
+      "rule": "WritersApp.swift is the main library entry point and public API surface. main.swift is the CLI entry point. Changes to the public API in WritersApp.swift may break external consumers — prefer additive changes."
+    },
+    {
+      "id": "arch-009",
+      "title": "Date serialisation",
+      "severity": "required",
+      "rule": "All dates must use ISO 8601 format for JSON serialisation."
+    }
+  ]
+}

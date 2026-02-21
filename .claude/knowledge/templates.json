@@ -1,0 +1,42 @@
+{
+  "category": "templates",
+  "description": "Standards for writing templates in the friendly-outlaw app",
+  "rules": [
+    {
+      "id": "tmpl-001",
+      "title": "Placeholder format",
+      "severity": "required",
+      "rule": "Placeholder keys must use {{snake_case}} format — lowercase letters and underscores only. Every {{key}} referenced in content must have a matching Placeholder struct entry, and every Placeholder entry must be referenced in content."
+    },
+    {
+      "id": "tmpl-002",
+      "title": "Placeholder count",
+      "severity": "guidance",
+      "rule": "Good templates have 3–8 placeholders. Fewer than 3 is too rigid; more than 8 is overwhelming for writers."
+    },
+    {
+      "id": "tmpl-003",
+      "title": "Placeholder descriptions",
+      "severity": "required",
+      "rule": "Each Placeholder must have a clear, writer-friendly 'description' field explaining what to write there. Use a realistic 'defaultValue' where it helps (e.g., 'My Story Title'), or an empty string for open-ended fields."
+    },
+    {
+      "id": "tmpl-004",
+      "title": "Category assignment",
+      "severity": "required",
+      "rule": "Assign the most specific TemplateCategory that fits: novel, shortStory, screenplay, blogPost, article, essay, poetry, businessLetter, proposal, resume, other. Do not use 'other' if a more specific category applies."
+    },
+    {
+      "id": "tmpl-005",
+      "title": "Template structure",
+      "severity": "guidance",
+      "rule": "Templates should include genre-appropriate headings and structure. A novel chapter template should have scene-setting sections; a blog post template should have an intro, body sections, and a conclusion."
+    },
+    {
+      "id": "tmpl-006",
+      "title": "New template categories",
+      "severity": "required",
+      "rule": "If a new TemplateCategory value is needed, add it to the TemplateCategory enum in Sources/WritersApp/Models/Template.swift before using it in a template definition."
+    }
+  ]
+}

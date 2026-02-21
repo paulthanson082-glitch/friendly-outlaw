@@ -1,0 +1,66 @@
+{
+  "category": "swift",
+  "description": "Swift coding standards for the friendly-outlaw project",
+  "rules": [
+    {
+      "id": "swift-001",
+      "title": "Naming conventions",
+      "severity": "required",
+      "rule": "Methods use verb names (createDocument, improveText). Properties use descriptive nouns (wordCount, readingTime). Types use UpperCamelCase. Variables/properties use lowerCamelCase."
+    },
+    {
+      "id": "swift-002",
+      "title": "Code organisation",
+      "severity": "required",
+      "rule": "Use '// MARK: - Section Name' to divide files into sections. Public interface at the top, private implementation below."
+    },
+    {
+      "id": "swift-003",
+      "title": "Optionals",
+      "severity": "required",
+      "rule": "Never force-unwrap (!) optionals from dictionary lookups, first(where:), or external input. Use 'if let' or 'guard let'. Force-unwrap is only acceptable for values that are truly programmer errors if nil (e.g., Bundle resources)."
+    },
+    {
+      "id": "swift-004",
+      "title": "Async/await",
+      "severity": "required",
+      "rule": "All AI service methods must be 'async throws'. Always propagate errors with typed error types (AIError, AIServiceError). Never swallow errors silently."
+    },
+    {
+      "id": "swift-005",
+      "title": "Codable conformance",
+      "severity": "required",
+      "rule": "All model structs (Document, Template, AIConfiguration) must maintain Codable conformance. When adding stored properties, update CodingKeys if a custom implementation exists."
+    },
+    {
+      "id": "swift-006",
+      "title": "Data types",
+      "severity": "required",
+      "rule": "Use structs for data (Document, Template, AIConfiguration). Use classes for services (WritersApp, TemplateManager, DocumentManager, AIService). Use enums for domain types (TemplateCategory, AIModel, WritingTone, AIAssistanceType)."
+    },
+    {
+      "id": "swift-007",
+      "title": "Identifiable conformance",
+      "severity": "required",
+      "rule": "All entities must have a UUID 'id' property and conform to Identifiable."
+    },
+    {
+      "id": "swift-008",
+      "title": "Linux compatibility",
+      "severity": "required",
+      "rule": "Use '#if canImport(FoundationNetworking)' guard when importing FoundationNetworking for URLSession on Linux. The project runs on both macOS and Linux CI."
+    },
+    {
+      "id": "swift-009",
+      "title": "Closures and retain cycles",
+      "severity": "warning",
+      "rule": "Use [weak self] in closures that capture self when self outlives the closure's scope. Avoid unnecessary 'self.' references inside closures where capture is not needed."
+    },
+    {
+      "id": "swift-010",
+      "title": "No external dependencies",
+      "severity": "required",
+      "rule": "The project has zero external dependencies — only the Swift standard library and Foundation. Do not add packages to Package.swift without explicit discussion."
+    }
+  ]
+}

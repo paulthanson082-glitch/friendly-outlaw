@@ -1,0 +1,31 @@
+{
+  "description": "Knowledge base index for the friendly-outlaw project. Each file contains structured standards that agents should consult before making changes.",
+  "categories": [
+    {
+      "id": "swift",
+      "file": "swift.json",
+      "description": "Swift language coding standards — naming, optionals, async/await, Codable, dependencies"
+    },
+    {
+      "id": "architecture",
+      "file": "architecture.json",
+      "description": "Architecture patterns — manager/service layers, AI feature gating, how to add features"
+    },
+    {
+      "id": "security",
+      "file": "security.json",
+      "description": "Security rules — no hardcoded secrets, input sanitisation, network call policy"
+    },
+    {
+      "id": "templates",
+      "file": "templates.json",
+      "description": "Writing template standards — placeholder format, count, descriptions, category assignment"
+    },
+    {
+      "id": "testing",
+      "file": "testing.json",
+      "description": "Testing standards — what to test, naming, AI method testing approach"
+    }
+  ],
+  "usage": "Before making a code change, read the relevant category files. For Swift changes: swift.json + architecture.json. For new templates: templates.json. For AI features: architecture.json + security.json. For any change: testing.json."
+}

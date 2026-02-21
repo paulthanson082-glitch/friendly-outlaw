@@ -161,6 +161,36 @@ Run with: `swift test`
 |----------|---------|
 | `ANTHROPIC_API_KEY` | Claude API key for AI features |
 
+## Knowledge System
+
+Project standards live in `.claude/knowledge/` as structured JSON files. Before making any code change, consult the relevant files or use the **knowledge-advisor** subagent to retrieve applicable rules automatically.
+
+### Knowledge Base Files
+
+| File | Covers |
+|------|--------|
+| `index.json` | Category index and usage guide |
+| `swift.json` | Naming, optionals, async/await, Codable, no-external-deps |
+| `architecture.json` | Manager/service layers, how to add features, entry points |
+| `security.json` | No hardcoded secrets, input sanitisation, network policy |
+| `templates.json` | Placeholder format, count, descriptions, categories |
+| `testing.json` | What to test, naming conventions, AI method approach |
+
+### Using the Knowledge Advisor Agent
+
+The **knowledge-advisor** subagent reads the relevant files and returns a focused rule list plus a pre-commit checklist for your specific task. Invoke it before writing code:
+
+> "I am about to add a new async method to AIService for generating chapter outlines. What standards apply?"
+
+The agent selects the right categories (swift + architecture + security + testing for an AI feature), reads the JSON files, and returns only the rules that matter for that task.
+
+### Quick Reference — Which Files to Read
+
+- **Any Swift change**: `swift.json` + `architecture.json` + `testing.json`
+- **New AI feature**: all of the above + `security.json`
+- **New template**: `templates.json` + `testing.json`
+- **Security-sensitive change**: `security.json`
+
 ## Common Tasks for AI Assistants
 
 ### Adding a New Template

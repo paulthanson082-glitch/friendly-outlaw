@@ -1,0 +1,48 @@
+{
+  "category": "security",
+  "description": "Security rules for the friendly-outlaw project",
+  "rules": [
+    {
+      "id": "sec-001",
+      "title": "No hardcoded secrets",
+      "severity": "critical",
+      "rule": "Never hardcode API keys, tokens, or secrets in source files. The Anthropic API key must come from the ANTHROPIC_API_KEY environment variable or be passed by the caller at runtime. Any file containing a real key must not be committed."
+    },
+    {
+      "id": "sec-002",
+      "title": "API key handling",
+      "severity": "critical",
+      "rule": "API keys must not appear in log output, error messages, or string interpolation. When constructing AIConfiguration, accept the key as a parameter — never read process environment directly inside a library method."
+    },
+    {
+      "id": "sec-003",
+      "title": "User input sanitisation",
+      "severity": "required",
+      "rule": "Do not pass raw user input directly as prompt content without validation. Validate that placeholder values are non-empty strings where required. Limit input lengths before sending to the API."
+    },
+    {
+      "id": "sec-004",
+      "title": "No shell injection",
+      "severity": "critical",
+      "rule": "Never construct shell commands by concatenating user-supplied strings. Any use of Process() or shell invocation must use fixed argument arrays, not interpolated strings."
+    },
+    {
+      "id": "sec-005",
+      "title": "Network calls only from AIService",
+      "severity": "required",
+      "rule": "All outbound network requests must go through AIService. Do not add URLSession calls elsewhere. This ensures a single audit point for network activity."
+    },
+    {
+      "id": "sec-006",
+      "title": "Anthropic API version header",
+      "severity": "required",
+      "rule": "Every request to the Anthropic API must include the 'anthropic-version: 2023-06-01' header. Do not omit it or use a different value without testing."
+    },
+    {
+      "id": "sec-007",
+      "title": "Error messages",
+      "severity": "warning",
+      "rule": "Error messages shown to the user must not expose internal implementation details, file paths, or stack traces. Use typed errors (AIError, AIServiceError) with user-facing messages."
+    }
+  ]
+}
