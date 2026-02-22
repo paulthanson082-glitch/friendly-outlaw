@@ -165,12 +165,53 @@ public class DatabaseManager {
         );
         """
 
+        // Create version control tables
+        let createVCBranchesTable = """
+        CREATE TABLE IF NOT EXISTS vc_branches (
+            id TEXT PRIMARY KEY,
+            name TEXT UNIQUE NOT NULL,
+            head_commit_id TEXT,
+            created_at REAL NOT NULL,
+            is_active INTEGER DEFAULT 0
+        );
+        """
+
+        let createVCCommitsTable = """
+        CREATE TABLE IF NOT EXISTS vc_commits (
+            id TEXT PRIMARY KEY,
+            branch_id TEXT NOT NULL,
+            message TEXT NOT NULL,
+            author_id TEXT,
+            timestamp REAL NOT NULL,
+            parent_commit_id TEXT,
+            second_parent_commit_id TEXT,
+            FOREIGN KEY (branch_id) REFERENCES vc_branches(id)
+        );
+        """
+
+        let createVCSnapshotsTable = """
+        CREATE TABLE IF NOT EXISTS vc_document_snapshots (
+            id TEXT PRIMARY KEY,
+            commit_id TEXT NOT NULL,
+            document_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            category TEXT NOT NULL,
+            word_count INTEGER DEFAULT 0,
+            captured_at REAL NOT NULL,
+            FOREIGN KEY (commit_id) REFERENCES vc_commits(id)
+        );
+        """
+
         try execute(createAISuggestionsTable)
         try execute(createUserSessionsTable)
         try execute(createAIConfigurationsTable)
         try execute(createTracesTable)
         try execute(createObservationsTable)
         try execute(createIssuesTable)
+        try execute(createVCBranchesTable)
+        try execute(createVCCommitsTable)
+        try execute(createVCSnapshotsTable)
 
     }
     
@@ -191,7 +232,13 @@ public class DatabaseManager {
             "CREATE INDEX IF NOT EXISTS idx_issues_document ON Issues(document_id);",
             "CREATE INDEX IF NOT EXISTS idx_issues_status ON Issues(status);",
             "CREATE INDEX IF NOT EXISTS idx_issues_priority ON Issues(priority);",
-            "CREATE INDEX IF NOT EXISTS idx_issues_created ON Issues(created);"
+            "CREATE INDEX IF NOT EXISTS idx_issues_created ON Issues(created);",
+            "CREATE INDEX IF NOT EXISTS idx_vc_branches_name ON vc_branches(name);",
+            "CREATE INDEX IF NOT EXISTS idx_vc_commits_branch ON vc_commits(branch_id);",
+            "CREATE INDEX IF NOT EXISTS idx_vc_commits_timestamp ON vc_commits(timestamp);",
+            "CREATE INDEX IF NOT EXISTS idx_vc_snapshots_commit ON vc_document_snapshots(commit_id);",
+            "CREATE INDEX IF NOT EXISTS idx_vc_snapshots_document ON vc_document_snapshots(document_id);",
+            "CREATE INDEX IF NOT EXISTS idx_vc_snapshots_captured ON vc_document_snapshots(captured_at);"
         ]
         
         for index in indexes {
@@ -1448,7 +1495,327 @@ public class DatabaseManager {
             
             issues.append(issue)
         }
-        
+
         return issues
     }
+
+    // MARK: - Version Control: Branch Operations
+
+    /// Inserts a new branch record
+    public func insertVCBranch(_ branch: VCBranch) throws {
+        guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
+        let sql = """
+        INSERT INTO vc_branches (id, name, head_commit_id, created_at, is_active)
+        VALUES (?, ?, ?, ?, ?);
+        """
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        sqlite3_bind_text(stmt, 1, branch.id.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 2, branch.name, -1, SQLITE_TRANSIENT)
+        if let hc = branch.headCommitId {
+            sqlite3_bind_text(stmt, 3, hc.uuidString, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(stmt, 3)
+        }
+        sqlite3_bind_double(stmt, 4, branch.createdAt.timeIntervalSince1970)
+        sqlite3_bind_int(stmt, 5, branch.isActive ? 1 : 0)
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+    }
+
+    /// Updates the head commit and active flag for a branch
+    public func updateVCBranch(_ branch: VCBranch) throws {
+        guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
+        let sql = "UPDATE vc_branches SET head_commit_id = ?, is_active = ? WHERE id = ?;"
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        if let hc = branch.headCommitId {
+            sqlite3_bind_text(stmt, 1, hc.uuidString, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(stmt, 1)
+        }
+        sqlite3_bind_int(stmt, 2, branch.isActive ? 1 : 0)
+        sqlite3_bind_text(stmt, 3, branch.id.uuidString, -1, SQLITE_TRANSIENT)
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+    }
+
+    /// Atomically sets all branches inactive then marks one as active.
+    /// The two-statement update is wrapped in a transaction so a crash between
+    /// statements cannot leave every branch inactive.
+    public func setActiveBranch(id: UUID) throws {
+        guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
+        try execute("BEGIN;")
+        do {
+            try execute("UPDATE vc_branches SET is_active = 0;")
+            let sql = "UPDATE vc_branches SET is_active = 1 WHERE id = ?;"
+            var stmt: OpaquePointer?
+            defer { sqlite3_finalize(stmt) }
+            guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+                throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
+            }
+            sqlite3_bind_text(stmt, 1, id.uuidString, -1, SQLITE_TRANSIENT)
+            guard sqlite3_step(stmt) == SQLITE_DONE else {
+                throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
+            }
+            try execute("COMMIT;")
+        } catch {
+            try? execute("ROLLBACK;")
+            throw error
+        }
+    }
+
+    /// Returns all branches ordered by creation date
+    public func getAllVCBranches() throws -> [VCBranch] {
+        guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
+        let sql = """
+        SELECT id, name, head_commit_id, created_at, is_active
+        FROM vc_branches ORDER BY created_at ASC;
+        """
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        var branches: [VCBranch] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let idText = sqlite3_column_text(stmt, 0),
+                  let nameText = sqlite3_column_text(stmt, 1),
+                  let id = UUID(uuidString: String(cString: idText)) else { continue }
+            let headId: UUID?
+            if let hcText = sqlite3_column_text(stmt, 2) {
+                headId = UUID(uuidString: String(cString: hcText))
+            } else {
+                headId = nil
+            }
+            let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 3))
+            let isActive = sqlite3_column_int(stmt, 4) != 0
+            branches.append(VCBranch(id: id, name: String(cString: nameText),
+                                     headCommitId: headId, createdAt: createdAt, isActive: isActive))
+        }
+        return branches
+    }
+
+    /// Returns the branch with the given name, or nil
+    public func getVCBranch(name: String) throws -> VCBranch? {
+        guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
+        let sql = """
+        SELECT id, name, head_commit_id, created_at, is_active
+        FROM vc_branches WHERE name = ?;
+        """
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        sqlite3_bind_text(stmt, 1, name, -1, SQLITE_TRANSIENT)
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+        guard let idText = sqlite3_column_text(stmt, 0),
+              let nameText = sqlite3_column_text(stmt, 1),
+              let id = UUID(uuidString: String(cString: idText)) else { return nil }
+        let headId: UUID?
+        if let hcText = sqlite3_column_text(stmt, 2) {
+            headId = UUID(uuidString: String(cString: hcText))
+        } else {
+            headId = nil
+        }
+        let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 3))
+        let isActive = sqlite3_column_int(stmt, 4) != 0
+        return VCBranch(id: id, name: String(cString: nameText),
+                        headCommitId: headId, createdAt: createdAt, isActive: isActive)
+    }
+
+    // MARK: - Version Control: Commit Operations
+
+    /// Inserts a new commit record
+    public func insertVCCommit(_ commit: VCCommit) throws {
+        guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
+        let sql = """
+        INSERT INTO vc_commits
+            (id, branch_id, message, author_id, timestamp, parent_commit_id, second_parent_commit_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?);
+        """
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        sqlite3_bind_text(stmt, 1, commit.id.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 2, commit.branchId.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 3, commit.message, -1, SQLITE_TRANSIENT)
+        if let author = commit.authorId {
+            sqlite3_bind_text(stmt, 4, author, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(stmt, 4)
+        }
+        sqlite3_bind_double(stmt, 5, commit.timestamp.timeIntervalSince1970)
+        if let parent = commit.parentCommitId {
+            sqlite3_bind_text(stmt, 6, parent.uuidString, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(stmt, 6)
+        }
+        if let second = commit.secondParentCommitId {
+            sqlite3_bind_text(stmt, 7, second.uuidString, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(stmt, 7)
+        }
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+    }
+
+    /// Returns all commits on a branch ordered from oldest to newest
+    public func getVCCommits(branchId: UUID) throws -> [VCCommit] {
+        guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
+        let sql = """
+        SELECT id, branch_id, message, author_id, timestamp,
+               parent_commit_id, second_parent_commit_id
+        FROM vc_commits WHERE branch_id = ? ORDER BY timestamp ASC;
+        """
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        sqlite3_bind_text(stmt, 1, branchId.uuidString, -1, SQLITE_TRANSIENT)
+        var commits: [VCCommit] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let idText = sqlite3_column_text(stmt, 0),
+                  let branchText = sqlite3_column_text(stmt, 1),
+                  let msgText = sqlite3_column_text(stmt, 2),
+                  let id = UUID(uuidString: String(cString: idText)),
+                  let bId = UUID(uuidString: String(cString: branchText)) else { continue }
+            let author: String? = sqlite3_column_text(stmt, 3).map { String(cString: $0) }
+            let ts = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 4))
+            let parent: UUID? = sqlite3_column_text(stmt, 5)
+                .flatMap { UUID(uuidString: String(cString: $0)) }
+            let secondParent: UUID? = sqlite3_column_text(stmt, 6)
+                .flatMap { UUID(uuidString: String(cString: $0)) }
+            commits.append(VCCommit(id: id, branchId: bId,
+                                    message: String(cString: msgText),
+                                    authorId: author, timestamp: ts,
+                                    parentCommitId: parent,
+                                    secondParentCommitId: secondParent))
+        }
+        return commits
+    }
+
+    // MARK: - Version Control: Snapshot Operations
+
+    /// Inserts a document snapshot for a commit
+    public func insertVCSnapshot(_ snapshot: VCDocumentSnapshot) throws {
+        guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
+        let sql = """
+        INSERT INTO vc_document_snapshots
+            (id, commit_id, document_id, title, content, category, word_count, captured_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+        """
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        sqlite3_bind_text(stmt, 1, snapshot.id.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 2, snapshot.commitId.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 3, snapshot.documentId.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 4, snapshot.title, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 5, snapshot.content, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(stmt, 6, snapshot.category, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_int64(stmt, 7, Int64(snapshot.wordCount))
+        sqlite3_bind_double(stmt, 8, snapshot.capturedAt.timeIntervalSince1970)
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+    }
+
+    /// Returns all snapshots belonging to a commit
+    public func getVCSnapshots(commitId: UUID) throws -> [VCDocumentSnapshot] {
+        guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
+        let sql = """
+        SELECT id, commit_id, document_id, title, content, category, word_count, captured_at
+        FROM vc_document_snapshots WHERE commit_id = ?;
+        """
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        sqlite3_bind_text(stmt, 1, commitId.uuidString, -1, SQLITE_TRANSIENT)
+        return try collectSnapshots(stmt: stmt)
+    }
+
+    /// Returns all snapshots for a document across all commits, ordered by capture time
+    public func getVCSnapshotsForDocument(documentId: UUID) throws -> [VCDocumentSnapshot] {
+        guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
+        let sql = """
+        SELECT id, commit_id, document_id, title, content, category, word_count, captured_at
+        FROM vc_document_snapshots WHERE document_id = ? ORDER BY captured_at ASC;
+        """
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        sqlite3_bind_text(stmt, 1, documentId.uuidString, -1, SQLITE_TRANSIENT)
+        return try collectSnapshots(stmt: stmt)
+    }
+
+    /// Returns the most recent snapshot for each document captured at or before the given date.
+    /// Analogous to Dolt's `SELECT * FROM table AS OF 'date'`.
+    public func getVCSnapshotsAsOf(date: Date) throws -> [VCDocumentSnapshot] {
+        guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
+        let sql = """
+        SELECT s.id, s.commit_id, s.document_id, s.title, s.content,
+               s.category, s.word_count, s.captured_at
+        FROM vc_document_snapshots s
+        INNER JOIN (
+            SELECT document_id, MAX(captured_at) AS latest
+            FROM vc_document_snapshots
+            WHERE captured_at <= ?
+            GROUP BY document_id
+        ) latest ON s.document_id = latest.document_id AND s.captured_at = latest.latest;
+        """
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        sqlite3_bind_double(stmt, 1, date.timeIntervalSince1970)
+        return try collectSnapshots(stmt: stmt)
+    }
+
+    // MARK: - Version Control: Private Helpers
+
+    private func collectSnapshots(stmt: OpaquePointer?) throws -> [VCDocumentSnapshot] {
+        var snapshots: [VCDocumentSnapshot] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let idText = sqlite3_column_text(stmt, 0),
+                  let commitText = sqlite3_column_text(stmt, 1),
+                  let docText = sqlite3_column_text(stmt, 2),
+                  let titleText = sqlite3_column_text(stmt, 3),
+                  let contentText = sqlite3_column_text(stmt, 4),
+                  let categoryText = sqlite3_column_text(stmt, 5),
+                  let id = UUID(uuidString: String(cString: idText)),
+                  let commitId = UUID(uuidString: String(cString: commitText)),
+                  let documentId = UUID(uuidString: String(cString: docText)) else { continue }
+            let wordCount = Int(sqlite3_column_int64(stmt, 6))
+            let capturedAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 7))
+            snapshots.append(VCDocumentSnapshot(
+                id: id, commitId: commitId, documentId: documentId,
+                title: String(cString: titleText),
+                content: String(cString: contentText),
+                category: String(cString: categoryText),
+                wordCount: wordCount, capturedAt: capturedAt))
+        }
+        return snapshots
+    }
+
 }
