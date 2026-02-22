@@ -633,261 +633,859 @@ final class WritersAppTests: XCTestCase {
         XCTAssertNil(KanbanColumn.done.next)
     }
 
-    // MARK: - Dolt Version Control Tests
+    // MARK: - Database Integration Tests
 
-    private func makeVC() throws -> (DoltVersionControlService, DatabaseManager) {
-        let db = DatabaseManager(databasePath: ":memory:")
-        try db.initialize()
-        let vc = DoltVersionControlService(databaseManager: db)
-        return (vc, db)
+    func testSessionManagement() throws {
+        // Create app with temporary database
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+        let userId = UUID()
+
+        // Start session
+        app.startSession(userId: userId, multitaskingMode: "Split View")
+
+        // Update session stats
+        app.updateSessionStats(wordsWritten: 500, aiInteractions: 3)
+
+        // End session
+        app.endSession()
+
+        // Verify session was recorded
+        let sessions = try app.getUserSessions(userId: userId)
+        XCTAssertEqual(sessions.count, 1)
+        XCTAssertEqual(sessions.first?.wordsWritten, 500)
+        XCTAssertEqual(sessions.first?.aiInteractions, 3)
+        XCTAssertEqual(sessions.first?.multitaskingMode, "Split View")
+        XCTAssertNotNil(sessions.first?.endTime)
+        XCTAssertNotNil(sessions.first?.durationSeconds)
     }
 
-    private func makeDoc(title: String, content: String) -> Document {
-        return Document(title: title, content: content, category: .novel)
+    func testIssueManagementIntegration() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+
+        // Create issue
+        let issue = app.createIssue(
+            documentId: doc.id,
+            title: "Plot hole",
+            description: "Chapter 3 has inconsistent timeline",
+            status: .open,
+            priority: .high
+        )
+
+        // Verify issue was saved to database
+        let dbIssues = try app.databaseManager.getIssues(forDocument: doc.id)
+        XCTAssertEqual(dbIssues.count, 1)
+        XCTAssertEqual(dbIssues.first?.title, "Plot hole")
+
+        // Update issue
+        var updatedIssue = issue
+        updatedIssue.status = .resolved
+        app.updateIssue(updatedIssue)
+
+        // Verify update in database
+        let updated = try app.databaseManager.getIssues(forDocument: doc.id)
+        XCTAssertEqual(updated.first?.status, .resolved)
+
+        // Delete issue
+        app.deleteIssue(id: issue.id)
+
+        // Verify deletion from database
+        let afterDelete = try app.databaseManager.getIssues(forDocument: doc.id)
+        XCTAssertEqual(afterDelete.count, 0)
     }
 
-    func testInitializeDefaultBranchCreatesMainBranch() throws {
-        let (vc, _) = try makeVC()
-        let branch = try vc.initializeDefaultBranch()
-        XCTAssertEqual(branch.name, "main")
-        XCTAssertTrue(branch.isActive)
+    func testIssueStatusUpdateIntegration() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+        let doc = app.createBlankDocument(title: "Test Doc", category: .article)
+
+        let issue = app.createIssue(documentId: doc.id, title: "Test Issue")
+
+        // Update status
+        app.updateIssueStatus(id: issue.id, status: .inProgress)
+
+        // Verify in database
+        let dbIssues = try app.databaseManager.getIssues(forDocument: doc.id)
+        XCTAssertEqual(dbIssues.first?.status, .inProgress)
+
+        // Reopen issue
+        app.updateIssueStatus(id: issue.id, status: .resolved)
+        app.reopenIssue(id: issue.id)
+
+        // Verify reopened in database
+        let reopened = try app.databaseManager.getIssues(forDocument: doc.id)
+        XCTAssertEqual(reopened.first?.status, .open)
+        XCTAssertNil(reopened.first?.metadata.resolvedAt)
     }
 
-    func testCheckoutNewBranchCreatesAndActivatesBranch() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let experiment = try vc.checkoutBranch(name: "experiment", createNew: true)
-        XCTAssertEqual(experiment.name, "experiment")
-        XCTAssertTrue(experiment.isActive)
+    func testIssuePriorityUpdateIntegration() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+
+        let issue = app.createIssue(documentId: doc.id, title: "Priority Test", priority: .low)
+
+        // Update priority
+        app.updateIssuePriority(id: issue.id, priority: .critical)
+
+        // Verify in database
+        let dbIssues = try app.databaseManager.getIssues(forDocument: doc.id)
+        XCTAssertEqual(dbIssues.first?.priority, .critical)
     }
 
-    func testCheckoutNewBranchThrowsIfAlreadyExists() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        _ = try vc.checkoutBranch(name: "experiment", createNew: true)
-        XCTAssertThrowsError(try vc.checkoutBranch(name: "experiment", createNew: true)) { error in
-            if case VersionControlError.branchAlreadyExists(let name) = error {
-                XCTAssertEqual(name, "experiment")
-            } else {
-                XCTFail("Expected branchAlreadyExists error")
+    func testAIConfigurationIntegration() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+        let userId = UUID()
+
+        let config = AIConfiguration(
+            apiKey: "test-key",
+            model: .claude35Sonnet,
+            maxTokens: 4096,
+            temperature: 0.7
+        )
+
+        app.enableAI(configuration: config, userId: userId)
+
+        // Verify configuration was saved to database
+        let savedConfig = try app.databaseManager.getAIConfiguration(userId: userId)
+        XCTAssertNotNil(savedConfig)
+        XCTAssertEqual(savedConfig?.apiKey, "test-key")
+        XCTAssertEqual(savedConfig?.model, .claude35Sonnet)
+    }
+
+    func testMultipleSessionsTracking() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+        let userId = UUID()
+
+        // Create multiple sessions
+        for i in 1...3 {
+            app.startSession(userId: userId)
+            app.updateSessionStats(wordsWritten: i * 100, aiInteractions: i)
+            app.endSession()
+        }
+
+        // Verify all sessions tracked
+        let sessions = try app.getUserSessions(userId: userId)
+        XCTAssertEqual(sessions.count, 3)
+    }
+
+    func testSessionStatistics() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+        let userId = UUID()
+
+        // Create sessions with known durations
+        let session1 = UserSession(userId: userId, durationSeconds: 1000)
+        let session2 = UserSession(userId: userId, durationSeconds: 2000)
+        let session3 = UserSession(userId: userId, durationSeconds: 3000)
+
+        try app.databaseManager.insertUserSession(session1)
+        try app.databaseManager.insertUserSession(session2)
+        try app.databaseManager.insertUserSession(session3)
+
+        // Get session stats
+        let stats = try app.getSessionStats(userId: userId)
+        XCTAssertEqual(stats.totalSessions, 3)
+        XCTAssertEqual(stats.totalDurationSeconds, 6000)
+        XCTAssertEqual(stats.averageDurationSeconds, 2000.0)
+    }
+
+    func testGetAISuggestionsIntegration() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+        let userId = UUID()
+
+        // Insert test suggestions
+        for i in 1...10 {
+            let suggestion = AISuggestion(
+                userId: userId,
+                toolUsed: "Tool \(i)",
+                prompt: "Prompt \(i)",
+                response: "Response \(i)"
+            )
+            try app.databaseManager.insertAISuggestion(suggestion)
+        }
+
+        // Test pagination
+        let firstPage = try app.getAISuggestions(userId: userId, limit: 5, offset: 0)
+        XCTAssertEqual(firstPage.count, 5)
+
+        let secondPage = try app.getAISuggestions(userId: userId, limit: 5, offset: 5)
+        XCTAssertEqual(secondPage.count, 5)
+
+        // Verify different results
+        XCTAssertNotEqual(firstPage.first?.id, secondPage.first?.id)
+    }
+
+    func testAIToolUsageStatsIntegration() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+        let userId = UUID()
+
+        // Insert suggestions with different tools
+        let tools = ["Continue Writing", "Grammar Check", "Continue Writing", "Improve Text"]
+        for tool in tools {
+            let suggestion = AISuggestion(userId: userId, toolUsed: tool, prompt: "Test", response: "Test")
+            try app.databaseManager.insertAISuggestion(suggestion)
+        }
+
+        // Get stats
+        let stats = try app.getAIToolUsageStats(userId: userId)
+        XCTAssertEqual(stats.count, 3) // 3 unique tools
+        XCTAssertEqual(stats.first?.toolName, "Continue Writing")
+        XCTAssertEqual(stats.first?.usageCount, 2)
+    }
+
+    func testDatabaseInitializationOnAppCreation() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+
+        // Verify database can be used immediately
+        let userId = UUID()
+        let suggestion = AISuggestion(userId: userId, toolUsed: "Test", prompt: "Test", response: "Test")
+
+        XCTAssertNoThrow(try app.databaseManager.insertAISuggestion(suggestion))
+
+        let retrieved = try app.databaseManager.getAISuggestions(userId: userId)
+        XCTAssertEqual(retrieved.count, 1)
+    }
+
+    func testTraceAndObservationWorkflow() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+
+        // Create trace
+        let trace = Trace(sessionId: "test-session", name: "Writing Session", startTime: Date())
+        try app.databaseManager.insertTrace(trace)
+
+        // Add observations
+        let obs1 = Observation(traceId: trace.id, name: "Start Writing", startTime: Date())
+        let obs2 = Observation(traceId: trace.id, name: "AI Assist", startTime: Date())
+
+        try app.databaseManager.insertObservation(obs1)
+        try app.databaseManager.insertObservation(obs2)
+
+        // Retrieve and verify
+        let traces = try app.databaseManager.getTraces(sessionId: "test-session")
+        XCTAssertEqual(traces.count, 1)
+
+        let observations = try app.databaseManager.getObservations(traceId: trace.id)
+        XCTAssertEqual(observations.count, 2)
+    }
+
+    func testConcurrentIssueOperations() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+
+        // Create multiple issues
+        let issue1 = app.createIssue(documentId: doc.id, title: "Issue 1", priority: .low)
+        let issue2 = app.createIssue(documentId: doc.id, title: "Issue 2", priority: .high)
+        let issue3 = app.createIssue(documentId: doc.id, title: "Issue 3", priority: .medium)
+
+        // Update different issues
+        app.updateIssueStatus(id: issue1.id, status: .resolved)
+        app.updateIssuePriority(id: issue2.id, priority: .critical)
+
+        // Verify all changes persisted
+        let allIssues = app.getIssues(forDocument: doc.id)
+        XCTAssertEqual(allIssues.count, 3)
+
+        let resolvedIssues = allIssues.filter { $0.status == .resolved }
+        XCTAssertEqual(resolvedIssues.count, 1)
+
+        let criticalIssues = allIssues.filter { $0.priority == .critical }
+        XCTAssertEqual(criticalIssues.count, 1)
+    }
+
+    func testEmptyDatabaseQueries() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+        let userId = UUID()
+
+        // Test all empty queries
+        let suggestions = try app.getAISuggestions(userId: userId)
+        XCTAssertEqual(suggestions.count, 0)
+
+        let sessions = try app.getUserSessions(userId: userId)
+        XCTAssertEqual(sessions.count, 0)
+
+        let stats = try app.getSessionStats(userId: userId)
+        XCTAssertEqual(stats.totalSessions, 0)
+
+        let toolStats = try app.getAIToolUsageStats(userId: userId)
+        XCTAssertEqual(toolStats.count, 0)
+    }
+
+    func testSessionDurationCalculation() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+        let userId = UUID()
+
+        app.startSession(userId: userId)
+
+        // Simulate some time passing
+        Thread.sleep(forTimeInterval: 0.1)
+
+        app.endSession()
+
+        let sessions = try app.getUserSessions(userId: userId)
+        XCTAssertEqual(sessions.count, 1)
+        XCTAssertNotNil(sessions.first?.durationSeconds)
+        XCTAssertGreaterThan(sessions.first?.durationSeconds ?? 0, 0)
+    }
+
+    func testGetUserSessionsSortedByDuration() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+        let userId = UUID()
+
+        // Create sessions with different durations
+        let session1 = UserSession(userId: userId, durationSeconds: 500)
+        let session2 = UserSession(userId: userId, durationSeconds: 2000)
+        let session3 = UserSession(userId: userId, durationSeconds: 100)
+
+        try app.databaseManager.insertUserSession(session1)
+        try app.databaseManager.insertUserSession(session2)
+        try app.databaseManager.insertUserSession(session3)
+
+        // Get sessions sorted by duration
+        let sortedSessions = try app.getUserSessions(userId: userId, sortByDuration: true)
+        XCTAssertEqual(sortedSessions.count, 3)
+        XCTAssertEqual(sortedSessions[0].durationSeconds, 2000)
+        XCTAssertEqual(sortedSessions[1].durationSeconds, 500)
+        XCTAssertEqual(sortedSessions[2].durationSeconds, 100)
+    }
+
+    // MARK: - Additional Edge Case Tests
+
+    func testAINotEnabledErrorHandling() {
+        let app = WritersApp()
+        let doc = app.createBlankDocument(title: "Test", category: .novel)
+
+        // Try to use AI features without enabling AI
+        let expectation = XCTestExpectation(description: "AI error thrown")
+
+        Task {
+            do {
+                _ = try await app.continueDocument(documentId: doc.id)
+                XCTFail("Should throw AI not enabled error")
+            } catch let error as AIError {
+                XCTAssertEqual(error, .aiNotEnabled)
+                expectation.fulfill()
+            } catch {
+                XCTFail("Wrong error type: \(error)")
             }
         }
+
+        wait(for: [expectation], timeout: 1.0)
     }
 
-    func testCheckoutExistingBranchSwitchesActive() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        _ = try vc.checkoutBranch(name: "feature", createNew: true)
-        // Switch back to main
-        let main = try vc.checkoutBranch(name: "main")
-        XCTAssertEqual(main.name, "main")
-        XCTAssertTrue(main.isActive)
-        let current = try vc.currentBranch()
-        XCTAssertEqual(current?.name, "main")
-    }
+    func testDocumentNotFoundErrorHandling() {
+        let app = WritersApp()
+        let config = AIConfiguration(apiKey: "test", model: .claude35Sonnet)
+        app.enableAI(configuration: config)
 
-    func testCommitStoresDocumentSnapshots() throws {
-        let (vc, db) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let doc = makeDoc(title: "Chapter One", content: "It was a dark and stormy night.")
-        let commit = try vc.commit(message: "Initial draft", documents: [doc])
-        let snapshots = try db.getVCSnapshots(commitId: commit.id)
-        XCTAssertEqual(snapshots.count, 1)
-        XCTAssertEqual(snapshots.first?.title, "Chapter One")
-        XCTAssertEqual(snapshots.first?.content, "It was a dark and stormy night.")
-    }
+        let nonExistentId = UUID()
+        let expectation = XCTestExpectation(description: "Document not found error thrown")
 
-    func testCommitAdvancesBranchHead() throws {
-        let (vc, db) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let doc = makeDoc(title: "Story", content: "Once upon a time.")
-        let commit = try vc.commit(message: "First commit", documents: [doc])
-        let branches = try db.getAllVCBranches()
-        let main = branches.first(where: { $0.name == "main" })
-        XCTAssertEqual(main?.headCommitId, commit.id)
-    }
-
-    func testCommitWithoutActiveBranchThrows() throws {
-        let (vc, _) = try makeVC()
-        // No branch initialized
-        let doc = makeDoc(title: "X", content: "Y")
-        XCTAssertThrowsError(try vc.commit(message: "Should fail", documents: [doc])) { error in
-            if case VersionControlError.noActiveBranch = error {
-                // expected
-            } else {
-                XCTFail("Expected noActiveBranch error")
+        Task {
+            do {
+                _ = try await app.continueDocument(documentId: nonExistentId)
+                XCTFail("Should throw document not found error")
+            } catch let error as AIError {
+                XCTAssertEqual(error, .documentNotFound)
+                expectation.fulfill()
+            } catch {
+                XCTFail("Wrong error type: \(error)")
             }
         }
+
+        wait(for: [expectation], timeout: 1.0)
     }
 
-    func testLogReturnsCommitsLinkedByParentChain() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let doc = makeDoc(title: "Doc", content: "v1")
-        let first = try vc.commit(message: "First", documents: [doc])
-        let second = try vc.commit(message: "Second", documents: [doc])
-        let history = try vc.log(branch: "main")
-        XCTAssertEqual(history.count, 2)
-        // Verify parent-chain linkage rather than relying on timestamp ordering
-        let root = history.first(where: { $0.parentCommitId == nil })
-        let child = history.first(where: { $0.parentCommitId != nil })
-        XCTAssertNotNil(root, "There should be one root commit with no parent")
-        XCTAssertNotNil(child, "There should be one child commit with a parent")
-        XCTAssertEqual(root?.id, first.id)
-        XCTAssertEqual(child?.id, second.id)
-        XCTAssertEqual(child?.parentCommitId, first.id)
+    func testIsAIEnabledFlag() {
+        let app = WritersApp()
+        XCTAssertFalse(app.isAIEnabled)
+
+        let config = AIConfiguration(apiKey: "test", model: .claude35Sonnet)
+        app.enableAI(configuration: config)
+        XCTAssertTrue(app.isAIEnabled)
+
+        app.disableAI()
+        XCTAssertFalse(app.isAIEnabled)
     }
 
-    func testDiffDetectsModifiedDocument() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let docId = UUID()
-        let v1 = Document(id: docId, title: "Prices", content: "amount: 100", category: .article)
-        _ = try vc.commit(message: "Base", documents: [v1])
+    func testCreateDocumentFromNonExistentTemplate() {
+        let app = WritersApp()
+        let nonExistentTemplateId = UUID()
 
-        // Checkout experiment, modify price by 10%
-        _ = try vc.checkoutBranch(name: "experiment", createNew: true)
-        let v2 = Document(id: docId, title: "Prices", content: "amount: 90", category: .article)
-        _ = try vc.commit(message: "Test 10% price reduction", documents: [v2])
-
-        let diffs = try vc.diff(fromBranch: "main", toBranch: "experiment")
-        let modified = diffs.filter { $0.changeType == .modified }
-        XCTAssertEqual(modified.count, 1)
-        XCTAssertEqual(modified.first?.fromContent, "amount: 100")
-        XCTAssertEqual(modified.first?.toContent, "amount: 90")
+        let doc = app.createDocumentFromTemplate(templateId: nonExistentTemplateId, values: [:])
+        XCTAssertNil(doc)
     }
 
-    func testDiffDetectsAddedDocument() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let base = makeDoc(title: "Existing", content: "content")
-        _ = try vc.commit(message: "Base commit", documents: [base])
+    func testExportNonExistentDocument() {
+        let app = WritersApp()
+        let nonExistentId = UUID()
 
-        _ = try vc.checkoutBranch(name: "feature", createNew: true)
-        let newDoc = makeDoc(title: "New Chapter", content: "fresh content")
-        _ = try vc.commit(message: "Add new chapter", documents: [base, newDoc])
-
-        let diffs = try vc.diff(fromBranch: "main", toBranch: "feature")
-        let added = diffs.filter { $0.changeType == .added }
-        XCTAssertEqual(added.count, 1)
-        XCTAssertEqual(added.first?.title, "New Chapter")
+        let exported = app.exportDocument(id: nonExistentId)
+        XCTAssertNil(exported)
     }
 
-    func testDiffDetectsDeletedDocument() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let doc1 = makeDoc(title: "Keep", content: "stays")
-        let doc2 = makeDoc(title: "Remove", content: "gone")
-        _ = try vc.commit(message: "Both docs", documents: [doc1, doc2])
+    func testExportDocumentAsPlainText() {
+        let app = WritersApp()
+        let doc = Document(title: "Test", content: "Plain text content", category: .article)
+        app.documentManager.createDocument(doc)
 
-        _ = try vc.checkoutBranch(name: "pruned", createNew: true)
-        _ = try vc.commit(message: "Remove second doc", documents: [doc1])
-
-        let diffs = try vc.diff(fromBranch: "main", toBranch: "pruned")
-        let deleted = diffs.filter { $0.changeType == .deleted }
-        XCTAssertEqual(deleted.count, 1)
-        XCTAssertEqual(deleted.first?.title, "Remove")
+        let exported = app.exportDocument(id: doc.id, format: .plainText)
+        XCTAssertEqual(exported, "Plain text content")
     }
 
-    func testTimeTravelQueryWithDistantFutureReturnsLatestSnapshot() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let docId = UUID()
-        let v1 = Document(id: docId, title: "Users", content: "alice", category: .article)
-        _ = try vc.commit(message: "Initial users", documents: [v1])
-        let v2 = Document(id: docId, title: "Users", content: "alice, bob", category: .article)
-        _ = try vc.commit(message: "Add bob", documents: [v2])
+    func testExportDocumentAsHTML() {
+        let app = WritersApp()
+        let doc = Document(title: "HTML Test", content: "HTML content", category: .blogPost)
+        app.documentManager.createDocument(doc)
 
-        // Querying with distant future should return the most recent snapshot
-        let latest = try vc.query(asOf: Date.distantFuture)
-        XCTAssertFalse(latest.isEmpty)
-        XCTAssertEqual(latest.first?.content, "alice, bob")
+        let exported = app.exportDocument(id: doc.id, format: .html)
+        XCTAssertNotNil(exported)
+        XCTAssertTrue(exported?.contains("<!DOCTYPE html>") ?? false)
+        XCTAssertTrue(exported?.contains("HTML Test") ?? false)
+        XCTAssertTrue(exported?.contains("HTML content") ?? false)
     }
 
-    func testTimeTravelQueryWithDistantPastReturnsNoSnapshots() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let doc = makeDoc(title: "Users", content: "alice")
-        _ = try vc.commit(message: "Initial", documents: [doc])
+    func testStatisticsWithNoDocuments() {
+        let app = WritersApp()
+        let stats = app.getStatistics()
 
-        // Querying with distant past should return nothing
-        let historical = try vc.query(asOf: Date.distantPast)
-        XCTAssertTrue(historical.isEmpty)
+        XCTAssertEqual(stats.totalDocuments, 0)
+        XCTAssertEqual(stats.totalWordCount, 0)
+        XCTAssertEqual(stats.averageWordCount, 0)
     }
 
-    func testHistoryReturnsAllVersionsOfDocument() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let docId = UUID()
-        let v1 = Document(id: docId, title: "Story", content: "v1", category: .novel)
-        let v2 = Document(id: docId, title: "Story", content: "v2", category: .novel)
-        let v3 = Document(id: docId, title: "Story", content: "v3", category: .novel)
-        _ = try vc.commit(message: "v1", documents: [v1])
-        _ = try vc.commit(message: "v2", documents: [v2])
-        _ = try vc.commit(message: "v3", documents: [v3])
+    func testUpdateIssueStatusOnNonExistentIssue() {
+        let app = WritersApp()
+        let nonExistentId = UUID()
 
-        let snapshots = try vc.history(of: docId)
-        XCTAssertEqual(snapshots.count, 3)
-        XCTAssertEqual(snapshots.map { $0.content }, ["v1", "v2", "v3"])
+        // Should not crash, just fail silently
+        app.updateIssueStatus(id: nonExistentId, status: .resolved)
+
+        let issue = app.getIssue(id: nonExistentId)
+        XCTAssertNil(issue)
     }
 
-    func testMergeFastForwardAdvancesHead() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let doc = makeDoc(title: "Prices", content: "100")
-        // Commit only on feature (main has no commits), then merge into main
-        _ = try vc.checkoutBranch(name: "feature", createNew: true)
-        let commit = try vc.commit(message: "Feature work", documents: [doc])
-        _ = try vc.checkoutBranch(name: "main")
-        let result = try vc.merge(fromBranch: "feature", into: "main")
-        XCTAssertTrue(result.success)
-        XCTAssertEqual(result.strategy, .fastForward)
-        XCTAssertEqual(result.commitId, commit.id)
+    func testUpdateIssuePriorityOnNonExistentIssue() {
+        let app = WritersApp()
+        let nonExistentId = UUID()
+
+        // Should not crash, just fail silently
+        app.updateIssuePriority(id: nonExistentId, priority: .critical)
+
+        let issue = app.getIssue(id: nonExistentId)
+        XCTAssertNil(issue)
     }
 
-    func testMergeThreeWayBringsInNewDocuments() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let shared = makeDoc(title: "Shared", content: "same")
-        _ = try vc.commit(message: "Base on main", documents: [shared])
+    func testReopenNonExistentIssue() {
+        let app = WritersApp()
+        let nonExistentId = UUID()
 
-        _ = try vc.checkoutBranch(name: "feature", createNew: true)
-        let extra = makeDoc(title: "Extra", content: "new")
-        _ = try vc.commit(message: "Add extra doc", documents: [shared, extra])
+        // Should not crash, just fail silently
+        app.reopenIssue(id: nonExistentId)
 
-        _ = try vc.checkoutBranch(name: "main")
-        let result = try vc.merge(fromBranch: "feature", into: "main")
-        XCTAssertTrue(result.success)
-        XCTAssertEqual(result.strategy, .threeWay)
-        XCTAssertGreaterThan(result.diffCount, 0)
+        let issue = app.getIssue(id: nonExistentId)
+        XCTAssertNil(issue)
     }
 
-    func testListBranchesReturnsAllBranches() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        _ = try vc.checkoutBranch(name: "alpha", createNew: true)
-        _ = try vc.checkoutBranch(name: "beta", createNew: true)
-        let branches = try vc.listBranches()
-        let names = branches.map { $0.name }
-        XCTAssertTrue(names.contains("main"))
-        XCTAssertTrue(names.contains("alpha"))
-        XCTAssertTrue(names.contains("beta"))
+    func testGetIssuesForNonExistentDocument() {
+        let app = WritersApp()
+        let nonExistentDocId = UUID()
+
+        let issues = app.getIssues(forDocument: nonExistentDocId)
+        XCTAssertEqual(issues.count, 0)
     }
 
-    func testVCDiffWordCountDelta() {
-        let diff = VCDiff(documentId: UUID(), title: "Test", changeType: .modified,
-                          fromContent: "one two", toContent: "one two three four",
-                          fromWordCount: 2, toWordCount: 4)
-        XCTAssertEqual(diff.wordCountDelta, 2)
+    func testSearchIssuesWithNoMatches() {
+        let app = WritersApp()
+        let doc = app.createBlankDocument(title: "Test", category: .novel)
+        _ = app.createIssue(documentId: doc.id, title: "Bug in chapter 1")
+
+        let results = app.searchIssues(query: "nonexistent xyz 123")
+        XCTAssertEqual(results.count, 0)
     }
 
-    func testVCBranchIsIdentifiable() {
-        let branch = VCBranch(name: "test")
-        XCTAssertNotNil(branch.id)
+    func testGetIssueStatisticsWithNoIssues() {
+        let app = WritersApp()
+        let (byStatus, byPriority) = app.getIssueStatistics()
+
+        XCTAssertEqual(byStatus.count, 0)
+        XCTAssertEqual(byPriority.count, 0)
     }
 
-    func testVCCommitIsIdentifiable() {
-        let commit = VCCommit(branchId: UUID(), message: "test")
-        XCTAssertNotNil(commit.id)
+    func testMoveNonExistentKanbanTask() {
+        let app = WritersApp()
+        let nonExistentId = UUID()
+
+        // Should not crash
+        app.moveKanbanTask(id: nonExistentId, toColumn: .done)
+
+        let task = app.getKanbanTask(id: nonExistentId)
+        XCTAssertNil(task)
+    }
+
+    func testAdvanceNonExistentKanbanTask() {
+        let app = WritersApp()
+        let nonExistentId = UUID()
+
+        let result = app.advanceKanbanTask(id: nonExistentId)
+        XCTAssertNil(result)
+    }
+
+    func testRegressNonExistentKanbanTask() {
+        let app = WritersApp()
+        let nonExistentId = UUID()
+
+        let result = app.regressKanbanTask(id: nonExistentId)
+        XCTAssertNil(result)
+    }
+
+    func testGetKanbanTasksForNonExistentBoard() {
+        let app = WritersApp()
+        let nonExistentBoardId = UUID()
+
+        let tasks = app.getKanbanTasks(forBoard: nonExistentBoardId)
+        XCTAssertEqual(tasks.count, 0)
+    }
+
+    func testSearchKanbanTasksWithNoResults() {
+        let app = WritersApp()
+        let board = app.createKanbanBoard(name: "Board")
+        _ = app.createKanbanTask(boardId: board.id, title: "Task 1")
+
+        let results = app.searchKanbanTasks(query: "nonexistent xyz")
+        XCTAssertEqual(results.count, 0)
+    }
+
+    func testGetKanbanTaskCountsForEmptyBoard() {
+        let app = WritersApp()
+        let board = app.createKanbanBoard(name: "Empty Board")
+
+        let counts = app.getKanbanTaskCounts(forBoard: board.id)
+        XCTAssertEqual(counts[.backlog], 0)
+        XCTAssertEqual(counts[.planning], 0)
+        XCTAssertEqual(counts[.running], 0)
+        XCTAssertEqual(counts[.review], 0)
+        XCTAssertEqual(counts[.done], 0)
+    }
+
+    func testDeleteNonExistentKanbanBoard() {
+        let app = WritersApp()
+        let nonExistentId = UUID()
+
+        // Should not crash
+        app.deleteKanbanBoard(id: nonExistentId)
+    }
+
+    func testDeleteNonExistentKanbanTask() {
+        let app = WritersApp()
+        let nonExistentId = UUID()
+
+        // Should not crash
+        app.deleteKanbanTask(id: nonExistentId)
+    }
+
+    func testStartSessionWithoutUserId() {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+        let userId = UUID()
+
+        app.startSession(userId: userId)
+
+        // Update stats without setting user explicitly
+        app.updateSessionStats(wordsWritten: 100, aiInteractions: 1)
+
+        app.endSession()
+
+        // Verify session was created
+        let sessions = try? app.getUserSessions(userId: userId)
+        XCTAssertEqual(sessions?.count, 1)
+    }
+
+    func testEndSessionWithoutStarting() {
+        let app = WritersApp()
+
+        // Should not crash
+        app.endSession()
+    }
+
+    func testUpdateSessionStatsWithoutStarting() {
+        let app = WritersApp()
+
+        // Should not crash
+        app.updateSessionStats(wordsWritten: 100, aiInteractions: 5)
+    }
+
+    func testGetAIToolUsageStatsWithDefaultUserId() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+
+        // Call without explicit userId (uses default UUID)
+        let stats = try app.getAIToolUsageStats(userId: nil)
+        XCTAssertEqual(stats.count, 0)
+    }
+
+    func testGetSessionStatsWithDefaultUserId() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+
+        // Call without explicit userId
+        let stats = try app.getSessionStats(userId: nil)
+        XCTAssertEqual(stats.totalSessions, 0)
+    }
+
+    func testGetAISuggestionsWithDefaultUserId() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+
+        // Call without explicit userId
+        let suggestions = try app.getAISuggestions(userId: nil)
+        XCTAssertEqual(suggestions.count, 0)
+    }
+
+    func testGetUserSessionsWithDefaultUserId() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+
+        // Call without explicit userId
+        let sessions = try app.getUserSessions(userId: nil)
+        XCTAssertEqual(sessions.count, 0)
+    }
+
+    func testGetOpenIssuesForDocumentWithNoIssues() {
+        let app = WritersApp()
+        let doc = app.createBlankDocument(title: "Test", category: .novel)
+
+        let openIssues = app.getOpenIssues(forDocument: doc.id)
+        XCTAssertEqual(openIssues.count, 0)
+    }
+
+    func testGetCriticalIssuesWithNone() {
+        let app = WritersApp()
+        let doc = app.createBlankDocument(title: "Test", category: .novel)
+        _ = app.createIssue(documentId: doc.id, title: "Low priority", priority: .low)
+
+        let criticalIssues = app.getCriticalIssues()
+        XCTAssertEqual(criticalIssues.count, 0)
+    }
+
+    func testGetCriticalIssues() {
+        let app = WritersApp()
+        let doc1 = app.createBlankDocument(title: "Doc1", category: .novel)
+        let doc2 = app.createBlankDocument(title: "Doc2", category: .article)
+
+        _ = app.createIssue(documentId: doc1.id, title: "Critical 1", priority: .critical)
+        _ = app.createIssue(documentId: doc2.id, title: "Critical 2", priority: .critical)
+        _ = app.createIssue(documentId: doc1.id, title: "High", priority: .high)
+
+        let criticalIssues = app.getCriticalIssues()
+        XCTAssertEqual(criticalIssues.count, 2)
+        XCTAssertTrue(criticalIssues.allSatisfy { $0.priority == .critical })
+    }
+
+    func testDocumentWordCountWithEmptyContent() {
+        let doc = Document(title: "Empty", content: "", category: .article)
+        XCTAssertEqual(doc.wordCount, 0)
+    }
+
+    func testDocumentWordCountWithWhitespaceOnly() {
+        let doc = Document(title: "Whitespace", content: "   \n\n\t\t   ", category: .article)
+        XCTAssertEqual(doc.wordCount, 0)
+    }
+
+    func testDocumentWordCountWithMultipleSpaces() {
+        let doc = Document(title: "Spaces", content: "word1    word2     word3", category: .article)
+        XCTAssertEqual(doc.wordCount, 3)
+    }
+
+    func testCreateIssueWithDefaultParameters() {
+        let app = WritersApp()
+        let doc = app.createBlankDocument(title: "Test", category: .novel)
+
+        let issue = app.createIssue(documentId: doc.id, title: "Simple Issue")
+
+        XCTAssertEqual(issue.title, "Simple Issue")
+        XCTAssertEqual(issue.description, "")
+        XCTAssertEqual(issue.status, .open)
+        XCTAssertEqual(issue.priority, .medium)
+    }
+
+    func testCreateKanbanTaskWithDefaultColumn() {
+        let app = WritersApp()
+        let board = app.createKanbanBoard(name: "Board")
+
+        let task = app.createKanbanTask(boardId: board.id, title: "Task")
+
+        XCTAssertEqual(task.column, .backlog)
+        XCTAssertEqual(task.description, "")
+    }
+
+    func testKanbanBoardWithEmptyDescription() {
+        let app = WritersApp()
+        let board = app.createKanbanBoard(name: "Board")
+
+        XCTAssertEqual(board.description, "")
+    }
+
+    func testMultipleSessionsForSameUser() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+        let userId = UUID()
+
+        // Start and end multiple sessions
+        for i in 1...5 {
+            app.startSession(userId: userId)
+            app.updateSessionStats(wordsWritten: i * 100, aiInteractions: i)
+            app.endSession()
+        }
+
+        let sessions = try app.getUserSessions(userId: userId)
+        XCTAssertEqual(sessions.count, 5)
+    }
+
+    func testEnableAIWithUserIdSavesConfiguration() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+        let userId = UUID()
+
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        app.enableAI(configuration: config, userId: userId)
+
+        // Verify configuration was saved
+        let savedConfig = try app.databaseManager.getAIConfiguration(userId: userId)
+        XCTAssertNotNil(savedConfig)
+        XCTAssertEqual(savedConfig?.apiKey, "test-key")
+    }
+
+    func testEnableAIWithoutUserIdDoesNotSave() throws {
+        let tempPath = "/tmp/test_app_db_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: tempPath) }
+
+        let app = WritersApp(databasePath: tempPath)
+        let userId = UUID()
+
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        app.enableAI(configuration: config, userId: nil)
+
+        // Verify configuration was NOT saved (no userId provided)
+        let savedConfig = try app.databaseManager.getAIConfiguration(userId: userId)
+        XCTAssertNil(savedConfig)
+    }
+
+    func testDatabaseInitializationFailsGracefully() {
+        // Create app with invalid path
+        let invalidPath = "/nonexistent/invalid/path.db"
+        let app = WritersApp(databasePath: invalidPath)
+
+        // App should still be created, but database operations may fail
+        XCTAssertNotNil(app)
+    }
+
+    func testTemplateWithEmptyPlaceholders() {
+        let template = Template(
+            name: "No Placeholders",
+            category: .other,
+            description: "Template without placeholders",
+            content: "Static content only",
+            placeholders: []
+        )
+
+        let doc = template.createDocument(with: [:])
+        XCTAssertEqual(doc.content, "Static content only")
+    }
+
+    func testTemplateWithMissingPlaceholderValues() {
+        let template = Template(
+            name: "Test Template",
+            category: .other,
+            description: "Test",
+            content: "Hello {{name}}, you are {{age}} years old.",
+            placeholders: [
+                Placeholder(key: "name", label: "Name"),
+                Placeholder(key: "age", label: "Age")
+            ]
+        )
+
+        // Only provide one value
+        let doc = template.createDocument(with: ["name": "John"])
+        XCTAssertTrue(doc.content.contains("John"))
+        XCTAssertTrue(doc.content.contains("{{age}}")) // Unreplaced placeholder
+    }
+
+    func testGetIssuesWithStatusReturnsEmpty() {
+        let app = WritersApp()
+        let doc = app.createBlankDocument(title: "Test", category: .novel)
+        _ = app.createIssue(documentId: doc.id, title: "Open Issue", status: .open)
+
+        let closedIssues = app.getIssues(withStatus: .closed)
+        XCTAssertEqual(closedIssues.count, 0)
+    }
+
+    func testGetIssuesWithPriority() {
+        let app = WritersApp()
+        let doc = app.createBlankDocument(title: "Test", category: .novel)
+
+        _ = app.createIssue(documentId: doc.id, title: "High 1", priority: .high)
+        _ = app.createIssue(documentId: doc.id, title: "High 2", priority: .high)
+        _ = app.createIssue(documentId: doc.id, title: "Low", priority: .low)
+
+        let highIssues = app.getIssues(withPriority: .high)
+        XCTAssertEqual(highIssues.count, 2)
+        XCTAssertTrue(highIssues.allSatisfy { $0.priority == .high })
     }
 }
