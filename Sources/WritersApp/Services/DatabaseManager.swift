@@ -207,6 +207,18 @@ public class DatabaseManager {
         );
         """
 
+        // Create Token_Usage table for tracking API token consumption
+        let createTokenUsageTable = """
+        CREATE TABLE IF NOT EXISTS Token_Usage (
+            id TEXT PRIMARY KEY,
+            timestamp REAL NOT NULL,
+            operation TEXT NOT NULL,
+            model TEXT NOT NULL,
+            input_tokens INTEGER NOT NULL DEFAULT 0,
+            output_tokens INTEGER NOT NULL DEFAULT 0
+        );
+        """
+
         try execute(createAISuggestionsTable)
         try execute(createUserSessionsTable)
         try execute(createAIConfigurationsTable)
@@ -216,6 +228,7 @@ public class DatabaseManager {
         try execute(createVCBranchesTable)
         try execute(createVCCommitsTable)
         try execute(createVCSnapshotsTable)
+        try execute(createTokenUsageTable)
 
     }
     
@@ -249,7 +262,10 @@ public class DatabaseManager {
             "CREATE INDEX IF NOT EXISTS idx_vc_commits_timestamp ON vc_commits(timestamp);",
             "CREATE INDEX IF NOT EXISTS idx_vc_snapshots_commit ON vc_document_snapshots(commit_id);",
             "CREATE INDEX IF NOT EXISTS idx_vc_snapshots_document ON vc_document_snapshots(document_id);",
-            "CREATE INDEX IF NOT EXISTS idx_vc_snapshots_captured ON vc_document_snapshots(captured_at);"
+            "CREATE INDEX IF NOT EXISTS idx_vc_snapshots_captured ON vc_document_snapshots(captured_at);",
+            "CREATE INDEX IF NOT EXISTS idx_token_usage_timestamp ON Token_Usage(timestamp);",
+            "CREATE INDEX IF NOT EXISTS idx_token_usage_model ON Token_Usage(model);",
+            "CREATE INDEX IF NOT EXISTS idx_token_usage_operation ON Token_Usage(operation);"
         ]
         
         for index in indexes {
@@ -1879,6 +1895,224 @@ public class DatabaseManager {
                 wordCount: wordCount, capturedAt: capturedAt))
         }
         return snapshots
+    }
+
+    // MARK: - Token Usage Operations
+
+    /// Inserts a token usage record into the database
+    public func insertTokenUsageRecord(_ record: TokenUsageRecord) throws {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+
+        let sql = """
+        INSERT INTO Token_Usage (id, timestamp, operation, model, input_tokens, output_tokens)
+        VALUES (?, ?, ?, ?, ?, ?);
+        """
+
+        var statement: OpaquePointer?
+        defer { if statement != nil { sqlite3_finalize(statement) } }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+
+        sqlite3_bind_text(statement, 1, record.id.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_double(statement, 2, record.timestamp.timeIntervalSince1970)
+        sqlite3_bind_text(statement, 3, record.operation, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 4, record.model, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_int(statement, 5, Int32(record.inputTokens))
+        sqlite3_bind_int(statement, 6, Int32(record.outputTokens))
+
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Insert failed: \(errorMessage)")
+        }
+    }
+
+    /// Returns aggregated total token usage across all records
+    public func getTotalTokenUsage() throws -> TokenUsageSummary {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+
+        let sql = """
+        SELECT SUM(input_tokens), SUM(output_tokens), COUNT(*), model
+        FROM Token_Usage
+        GROUP BY model;
+        """
+
+        var statement: OpaquePointer?
+        defer { if statement != nil { sqlite3_finalize(statement) } }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+
+        var totalInput = 0
+        var totalOutput = 0
+        var totalRequests = 0
+        var totalCost = 0.0
+
+        while sqlite3_step(statement) == SQLITE_ROW {
+            let inputTokens = Int(sqlite3_column_int(statement, 0))
+            let outputTokens = Int(sqlite3_column_int(statement, 1))
+            let count = Int(sqlite3_column_int(statement, 2))
+            let modelStr = sqlite3_column_text(statement, 3).map { String(cString: $0) } ?? ""
+            totalInput += inputTokens
+            totalOutput += outputTokens
+            totalRequests += count
+            if let aiModel = AIModel(rawValue: modelStr) {
+                totalCost += aiModel.estimatedCostUSD(inputTokens: inputTokens, outputTokens: outputTokens)
+            }
+        }
+
+        return TokenUsageSummary(
+            totalInputTokens: totalInput,
+            totalOutputTokens: totalOutput,
+            estimatedCostUSD: totalCost,
+            requestCount: totalRequests
+        )
+    }
+
+    /// Returns token usage grouped by day (most recent first), limited to the given number of days
+    public func getTokenUsageByDay(days: Int = 30) throws -> [DailyTokenUsage] {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+
+        let cutoff = Date().timeIntervalSince1970 - Double(days) * 86400
+
+        let sql = """
+        SELECT
+            strftime('%Y-%m-%d', datetime(timestamp, 'unixepoch')) as day,
+            SUM(input_tokens),
+            SUM(output_tokens),
+            COUNT(*),
+            GROUP_CONCAT(model)
+        FROM Token_Usage
+        WHERE timestamp >= ?
+        GROUP BY day
+        ORDER BY day DESC;
+        """
+
+        var statement: OpaquePointer?
+        defer { if statement != nil { sqlite3_finalize(statement) } }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+
+        sqlite3_bind_double(statement, 1, cutoff)
+
+        var results: [DailyTokenUsage] = []
+
+        while sqlite3_step(statement) == SQLITE_ROW {
+            let day = sqlite3_column_text(statement, 0).map { String(cString: $0) } ?? ""
+            let inputTokens = Int(sqlite3_column_int(statement, 1))
+            let outputTokens = Int(sqlite3_column_int(statement, 2))
+            let count = Int(sqlite3_column_int(statement, 3))
+            // Cost approximation: use average pricing since we don't have per-row model info
+            let cost = AIModel.claude35Sonnet.estimatedCostUSD(inputTokens: inputTokens, outputTokens: outputTokens)
+            results.append(DailyTokenUsage(
+                date: day,
+                inputTokens: inputTokens,
+                outputTokens: outputTokens,
+                estimatedCostUSD: cost,
+                requestCount: count
+            ))
+        }
+
+        return results
+    }
+
+    /// Returns token usage grouped by model, sorted by total tokens descending
+    public func getTokenUsageByModel() throws -> [ModelTokenUsage] {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+
+        let sql = """
+        SELECT model, SUM(input_tokens), SUM(output_tokens), COUNT(*)
+        FROM Token_Usage
+        GROUP BY model
+        ORDER BY SUM(input_tokens) + SUM(output_tokens) DESC;
+        """
+
+        var statement: OpaquePointer?
+        defer { if statement != nil { sqlite3_finalize(statement) } }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+
+        var results: [ModelTokenUsage] = []
+
+        while sqlite3_step(statement) == SQLITE_ROW {
+            let modelStr = sqlite3_column_text(statement, 0).map { String(cString: $0) } ?? ""
+            let inputTokens = Int(sqlite3_column_int(statement, 1))
+            let outputTokens = Int(sqlite3_column_int(statement, 2))
+            let count = Int(sqlite3_column_int(statement, 3))
+            var cost = 0.0
+            if let aiModel = AIModel(rawValue: modelStr) {
+                cost = aiModel.estimatedCostUSD(inputTokens: inputTokens, outputTokens: outputTokens)
+            }
+            results.append(ModelTokenUsage(
+                model: modelStr,
+                inputTokens: inputTokens,
+                outputTokens: outputTokens,
+                estimatedCostUSD: cost,
+                requestCount: count
+            ))
+        }
+
+        return results
+    }
+
+    /// Returns token usage grouped by operation, sorted by total tokens descending
+    public func getTokenUsageByOperation() throws -> [OperationTokenUsage] {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+
+        let sql = """
+        SELECT operation, SUM(input_tokens), SUM(output_tokens), COUNT(*)
+        FROM Token_Usage
+        GROUP BY operation
+        ORDER BY SUM(input_tokens) + SUM(output_tokens) DESC;
+        """
+
+        var statement: OpaquePointer?
+        defer { if statement != nil { sqlite3_finalize(statement) } }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+
+        var results: [OperationTokenUsage] = []
+
+        while sqlite3_step(statement) == SQLITE_ROW {
+            let operation = sqlite3_column_text(statement, 0).map { String(cString: $0) } ?? ""
+            let inputTokens = Int(sqlite3_column_int(statement, 1))
+            let outputTokens = Int(sqlite3_column_int(statement, 2))
+            let count = Int(sqlite3_column_int(statement, 3))
+            // Use average pricing for cost estimate
+            let cost = AIModel.claude35Sonnet.estimatedCostUSD(inputTokens: inputTokens, outputTokens: outputTokens)
+            results.append(OperationTokenUsage(
+                operation: operation,
+                inputTokens: inputTokens,
+                outputTokens: outputTokens,
+                estimatedCostUSD: cost,
+                requestCount: count
+            ))
+        }
+
+        return results
     }
 
 }

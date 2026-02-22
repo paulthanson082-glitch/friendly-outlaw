@@ -37,6 +37,46 @@ public enum AIModel: String {
         case .claude3Haiku: return "Claude 3 Haiku"
         }
     }
+
+    /// Cost per million input tokens (USD)
+    public var inputCostPerMillionTokens: Double {
+        switch self {
+        case .claude35Sonnet: return 3.0
+        case .claude3Opus: return 15.0
+        case .claude3Sonnet: return 3.0
+        case .claude3Haiku: return 0.25
+        }
+    }
+
+    /// Cost per million output tokens (USD)
+    public var outputCostPerMillionTokens: Double {
+        switch self {
+        case .claude35Sonnet: return 15.0
+        case .claude3Opus: return 75.0
+        case .claude3Sonnet: return 15.0
+        case .claude3Haiku: return 1.25
+        }
+    }
+
+    /// Estimated cost in USD for the given input and output token counts
+    public func estimatedCostUSD(inputTokens: Int, outputTokens: Int) -> Double {
+        return Double(inputTokens) / 1_000_000.0 * inputCostPerMillionTokens
+             + Double(outputTokens) / 1_000_000.0 * outputCostPerMillionTokens
+    }
+}
+
+// MARK: - Token Usage
+
+/// Token usage returned by the Anthropic API for a single request
+public struct TokenUsage {
+    public let inputTokens: Int
+    public let outputTokens: Int
+    public var totalTokens: Int { inputTokens + outputTokens }
+
+    public init(inputTokens: Int, outputTokens: Int) {
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+    }
 }
 
 // MARK: - AI Assistance Types
@@ -420,6 +460,7 @@ public struct AIResponse {
     public let generatedContent: String
     public let model: AIModel
     public let tokensUsed: Int?
+    public let tokenUsage: TokenUsage?
     public let timestamp: Date
 
     public init(
@@ -428,6 +469,7 @@ public struct AIResponse {
         generatedContent: String,
         model: AIModel,
         tokensUsed: Int? = nil,
+        tokenUsage: TokenUsage? = nil,
         timestamp: Date = Date()
     ) {
         self.requestType = requestType
@@ -435,6 +477,7 @@ public struct AIResponse {
         self.generatedContent = generatedContent
         self.model = model
         self.tokensUsed = tokensUsed
+        self.tokenUsage = tokenUsage
         self.timestamp = timestamp
     }
 }

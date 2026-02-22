@@ -8,6 +8,9 @@ public class AIService {
     private let configuration: AIConfiguration
     private let apiURL = "https://api.anthropic.com/v1/messages"
 
+    /// The AI model used by this service
+    public var model: AIModel { configuration.model }
+
     public init(configuration: AIConfiguration) {
         self.configuration = configuration
     }
@@ -21,13 +24,14 @@ public class AIService {
         context: AIContext? = nil
     ) async throws -> AIResponse {
         let prompt = type.prompt(for: text, context: context)
-        let generatedContent = try await sendRequest(prompt: prompt)
+        let (generatedContent, tokenUsage) = try await sendRequest(prompt: prompt)
 
         return AIResponse(
             requestType: type,
             originalText: text,
             generatedContent: generatedContent,
-            model: configuration.model
+            model: configuration.model,
+            tokenUsage: tokenUsage
         )
     }
 
@@ -239,7 +243,7 @@ public class AIService {
 
     // MARK: - API Communication
 
-    private func sendRequest(prompt: String) async throws -> String {
+    private func sendRequest(prompt: String) async throws -> (text: String, tokenUsage: TokenUsage?) {
         guard let url = URL(string: apiURL) else {
             throw AIServiceError.invalidURL
         }
@@ -282,7 +286,14 @@ public class AIService {
             throw AIServiceError.invalidResponseFormat
         }
 
-        return text
+        var tokenUsage: TokenUsage? = nil
+        if let usage = json["usage"] as? [String: Any],
+           let inputTokens = usage["input_tokens"] as? Int,
+           let outputTokens = usage["output_tokens"] as? Int {
+            tokenUsage = TokenUsage(inputTokens: inputTokens, outputTokens: outputTokens)
+        }
+
+        return (text, tokenUsage)
     }
 
     // MARK: - Tool Loop
@@ -302,7 +313,7 @@ public class AIService {
         maxIterations: Int = 10
     ) async throws -> AIResponse {
         let prompt = type.prompt(for: text, context: context)
-        let generatedContent = try await sendRequestWithToolLoop(
+        let (generatedContent, tokenUsage) = try await sendRequestWithToolLoop(
             prompt: prompt,
             tools: tools,
             toolExecutor: toolExecutor,
@@ -313,7 +324,8 @@ public class AIService {
             requestType: type,
             originalText: text,
             generatedContent: generatedContent,
-            model: configuration.model
+            model: configuration.model,
+            tokenUsage: tokenUsage
         )
     }
 
@@ -331,7 +343,7 @@ public class AIService {
         tools: [ToolDefinition],
         toolExecutor: AIToolExecutor,
         maxIterations: Int
-    ) async throws -> String {
+    ) async throws -> (text: String, tokenUsage: TokenUsage?) {
         guard let url = URL(string: apiURL) else {
             throw AIServiceError.invalidURL
         }
@@ -341,6 +353,8 @@ public class AIService {
         ]
 
         let toolDefs = tools.map { $0.toDict() }
+        var totalInputTokens = 0
+        var totalOutputTokens = 0
 
         for _ in 0..<maxIterations {
             var request = URLRequest(url: url)
@@ -379,13 +393,22 @@ public class AIService {
                 throw AIServiceError.invalidResponseFormat
             }
 
+            // Accumulate token usage across all loop iterations
+            if let usage = json["usage"] as? [String: Any] {
+                totalInputTokens += (usage["input_tokens"] as? Int) ?? 0
+                totalOutputTokens += (usage["output_tokens"] as? Int) ?? 0
+            }
+
             // If the model finished with a text response, extract and return it
             if stopReason == "end_turn" {
                 let textParts = content.compactMap { block -> String? in
                     guard block["type"] as? String == "text" else { return nil }
                     return block["text"] as? String
                 }
-                return textParts.joined()
+                let tokenUsage = (totalInputTokens > 0 || totalOutputTokens > 0)
+                    ? TokenUsage(inputTokens: totalInputTokens, outputTokens: totalOutputTokens)
+                    : nil
+                return (textParts.joined(), tokenUsage)
             }
 
             // If the model wants to use tools, execute them and continue the loop
@@ -434,7 +457,10 @@ public class AIService {
                 return block["text"] as? String
             }
             if !textParts.isEmpty {
-                return textParts.joined()
+                let tokenUsage = (totalInputTokens > 0 || totalOutputTokens > 0)
+                    ? TokenUsage(inputTokens: totalInputTokens, outputTokens: totalOutputTokens)
+                    : nil
+                return (textParts.joined(), tokenUsage)
             }
 
             throw AIServiceError.invalidResponseFormat
@@ -485,12 +511,13 @@ public class AIService {
         Provide the analysis in a structured format.
         """
 
-        let response = try await sendRequest(prompt: analysisPrompt)
+        let (response, tokenUsage) = try await sendRequest(prompt: analysisPrompt)
 
         return DocumentAnalysis(
             documentId: document.id,
             analysis: response,
-            timestamp: Date()
+            timestamp: Date(),
+            tokenUsage: tokenUsage
         )
     }
 
@@ -510,12 +537,13 @@ public class AIService {
         Provide specific metrics and observations.
         """
 
-        let response = try await sendRequest(prompt: insightsPrompt)
+        let (response, tokenUsage) = try await sendRequest(prompt: insightsPrompt)
 
         return WritingInsights(
             documentId: document.id,
             insights: response,
-            timestamp: Date()
+            timestamp: Date(),
+            tokenUsage: tokenUsage
         )
     }
 }
@@ -526,11 +554,13 @@ public struct DocumentAnalysis {
     public let documentId: UUID
     public let analysis: String
     public let timestamp: Date
+    public let tokenUsage: TokenUsage?
 
-    public init(documentId: UUID, analysis: String, timestamp: Date) {
+    public init(documentId: UUID, analysis: String, timestamp: Date, tokenUsage: TokenUsage? = nil) {
         self.documentId = documentId
         self.analysis = analysis
         self.timestamp = timestamp
+        self.tokenUsage = tokenUsage
     }
 }
 
@@ -538,11 +568,13 @@ public struct WritingInsights {
     public let documentId: UUID
     public let insights: String
     public let timestamp: Date
+    public let tokenUsage: TokenUsage?
 
-    public init(documentId: UUID, insights: String, timestamp: Date) {
+    public init(documentId: UUID, insights: String, timestamp: Date, tokenUsage: TokenUsage? = nil) {
         self.documentId = documentId
         self.insights = insights
         self.timestamp = timestamp
+        self.tokenUsage = tokenUsage
     }
 }
 

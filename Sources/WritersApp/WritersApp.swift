@@ -570,11 +570,36 @@ public class WritersApp {
             throw AIError.documentNotFound
         }
 
-        return try await ai.getAssistance(
+        let response = try await ai.getAssistance(
             text: document.content,
             type: type,
             context: context
         )
+        recordTokenUsage(from: response)
+        return response
+    }
+
+    /// Record token usage from an AIResponse to the database
+    private func recordTokenUsage(from response: AIResponse, operation: String? = nil) {
+        guard let tokenUsage = response.tokenUsage else { return }
+        let record = TokenUsageRecord(
+            operation: operation ?? response.requestType.displayName,
+            model: response.model.rawValue,
+            inputTokens: tokenUsage.inputTokens,
+            outputTokens: tokenUsage.outputTokens
+        )
+        try? databaseManager.insertTokenUsageRecord(record)
+    }
+
+    /// Record token usage directly from token counts to the database
+    private func recordTokenUsage(tokenUsage: TokenUsage, model: AIModel, operation: String) {
+        let record = TokenUsageRecord(
+            operation: operation,
+            model: model.rawValue,
+            inputTokens: tokenUsage.inputTokens,
+            outputTokens: tokenUsage.outputTokens
+        )
+        try? databaseManager.insertTokenUsageRecord(record)
     }
 
     /// Continue writing a document with AI
@@ -591,11 +616,14 @@ public class WritersApp {
             throw AIError.documentNotFound
         }
 
-        let continuation = try await ai.continueWriting(
+        let response = try await ai.getAssistance(
             text: document.content,
+            type: .continueWriting,
             context: context
         )
-        
+        let continuation = response.generatedContent
+        recordTokenUsage(from: response)
+
         // Log AI suggestion if user is set
         if let userId = currentUserId {
             let suggestion = AISuggestion(
@@ -631,11 +659,14 @@ public class WritersApp {
             throw AIError.documentNotFound
         }
 
-        let improved = try await ai.improveText(
+        let response = try await ai.getAssistance(
             text: document.content,
+            type: .improveText,
             context: context
         )
-        
+        let improved = response.generatedContent
+        recordTokenUsage(from: response)
+
         // Log AI suggestion if user is set
         if let userId = currentUserId {
             let suggestion = AISuggestion(
@@ -670,10 +701,19 @@ public class WritersApp {
             throw AIError.documentNotFound
         }
 
-        return try await ai.generateTitles(
-            content: document.content,
+        let response = try await ai.getAssistance(
+            text: document.content,
+            type: .titleGeneration,
             context: context
         )
+        recordTokenUsage(from: response)
+        return response.generatedContent
+            .components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .map { title in
+                title.replacingOccurrences(of: "^\\d+[.):]\\s*", with: "", options: .regularExpression)
+            }
     }
 
     /// Analyze a document comprehensively
@@ -686,7 +726,11 @@ public class WritersApp {
             throw AIError.documentNotFound
         }
 
-        return try await ai.analyzeDocument(document: document)
+        let analysis = try await ai.analyzeDocument(document: document)
+        if let tokenUsage = analysis.tokenUsage {
+            recordTokenUsage(tokenUsage: tokenUsage, model: ai.model, operation: "Analyze Document")
+        }
+        return analysis
     }
 
     /// Get writing insights for a document
@@ -699,7 +743,11 @@ public class WritersApp {
             throw AIError.documentNotFound
         }
 
-        return try await ai.getWritingInsights(document: document)
+        let insights = try await ai.getWritingInsights(document: document)
+        if let tokenUsage = insights.tokenUsage {
+            recordTokenUsage(tokenUsage: tokenUsage, model: ai.model, operation: "Writing Insights")
+        }
+        return insights
     }
 
     /// Get AI assistance with tool support (implements the tool loop pattern).
@@ -744,7 +792,9 @@ public class WritersApp {
             throw AIError.aiNotEnabled
         }
 
-        return try await ai.brainstormIdeas(topic: topic, context: context)
+        let response = try await ai.getAssistance(text: topic, type: .brainstormIdeas, context: context)
+        recordTokenUsage(from: response)
+        return response.generatedContent
     }
 
     /// Generate outline from concept
@@ -756,7 +806,9 @@ public class WritersApp {
             throw AIError.aiNotEnabled
         }
 
-        return try await ai.generateOutline(concept: concept, context: context)
+        let response = try await ai.getAssistance(text: concept, type: .generateOutline, context: context)
+        recordTokenUsage(from: response)
+        return response.generatedContent
     }
 
     /// Develop a character concept
@@ -768,14 +820,35 @@ public class WritersApp {
             throw AIError.aiNotEnabled
         }
 
-        return try await ai.developCharacter(
-            characterConcept: characterConcept,
-            context: context
-        )
+        let response = try await ai.getAssistance(text: characterConcept, type: .characterDevelopment, context: context)
+        recordTokenUsage(from: response)
+        return response.generatedContent
+    }
+
+    // MARK: - Token Usage Dashboard
+
+    /// Returns aggregated token usage totals across all AI operations
+    public func getTotalTokenUsage() throws -> TokenUsageSummary {
+        return try databaseManager.getTotalTokenUsage()
+    }
+
+    /// Returns daily token usage for the past N days (default 30), most recent first
+    public func getTokenUsageByDay(days: Int = 30) throws -> [DailyTokenUsage] {
+        return try databaseManager.getTokenUsageByDay(days: days)
+    }
+
+    /// Returns token usage grouped by model, sorted by total tokens descending
+    public func getTokenUsageByModel() throws -> [ModelTokenUsage] {
+        return try databaseManager.getTokenUsageByModel()
+    }
+
+    /// Returns token usage grouped by operation type, sorted by total tokens descending
+    public func getTokenUsageByOperation() throws -> [OperationTokenUsage] {
+        return try databaseManager.getTokenUsageByOperation()
     }
 
     // MARK: - Statistics
-    
+
     /// Gets AI tool usage statistics
     public func getAIToolUsageStats(userId: UUID? = nil) throws -> [AIToolUsageStats] {
         let uid = userId ?? currentUserId ?? UUID()

@@ -77,6 +77,110 @@ public struct AIToolUsageStats: Codable {
     }
 }
 
+// MARK: - Token Usage Records
+
+/// A record of token usage for a single AI API call, persisted to the database
+public struct TokenUsageRecord: Codable, Identifiable {
+    public let id: UUID
+    public let timestamp: Date
+    public let operation: String
+    public let model: String
+    public let inputTokens: Int
+    public let outputTokens: Int
+
+    public var totalTokens: Int { inputTokens + outputTokens }
+
+    public init(
+        id: UUID = UUID(),
+        timestamp: Date = Date(),
+        operation: String,
+        model: String,
+        inputTokens: Int,
+        outputTokens: Int
+    ) {
+        self.id = id
+        self.timestamp = timestamp
+        self.operation = operation
+        self.model = model
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+    }
+}
+
+/// Aggregated token usage totals
+public struct TokenUsageSummary: Codable {
+    public let totalInputTokens: Int
+    public let totalOutputTokens: Int
+    public let totalTokens: Int
+    public let estimatedCostUSD: Double
+    public let requestCount: Int
+
+    public init(totalInputTokens: Int, totalOutputTokens: Int, estimatedCostUSD: Double, requestCount: Int) {
+        self.totalInputTokens = totalInputTokens
+        self.totalOutputTokens = totalOutputTokens
+        self.totalTokens = totalInputTokens + totalOutputTokens
+        self.estimatedCostUSD = estimatedCostUSD
+        self.requestCount = requestCount
+    }
+}
+
+/// Daily token usage breakdown
+public struct DailyTokenUsage: Codable {
+    public let date: String
+    public let inputTokens: Int
+    public let outputTokens: Int
+    public let totalTokens: Int
+    public let estimatedCostUSD: Double
+    public let requestCount: Int
+
+    public init(date: String, inputTokens: Int, outputTokens: Int, estimatedCostUSD: Double, requestCount: Int) {
+        self.date = date
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.totalTokens = inputTokens + outputTokens
+        self.estimatedCostUSD = estimatedCostUSD
+        self.requestCount = requestCount
+    }
+}
+
+/// Per-model token usage breakdown
+public struct ModelTokenUsage: Codable {
+    public let model: String
+    public let inputTokens: Int
+    public let outputTokens: Int
+    public let totalTokens: Int
+    public let estimatedCostUSD: Double
+    public let requestCount: Int
+
+    public init(model: String, inputTokens: Int, outputTokens: Int, estimatedCostUSD: Double, requestCount: Int) {
+        self.model = model
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.totalTokens = inputTokens + outputTokens
+        self.estimatedCostUSD = estimatedCostUSD
+        self.requestCount = requestCount
+    }
+}
+
+/// Per-operation token usage breakdown
+public struct OperationTokenUsage: Codable {
+    public let operation: String
+    public let inputTokens: Int
+    public let outputTokens: Int
+    public let totalTokens: Int
+    public let estimatedCostUSD: Double
+    public let requestCount: Int
+
+    public init(operation: String, inputTokens: Int, outputTokens: Int, estimatedCostUSD: Double, requestCount: Int) {
+        self.operation = operation
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.totalTokens = inputTokens + outputTokens
+        self.estimatedCostUSD = estimatedCostUSD
+        self.requestCount = requestCount
+    }
+}
+
 /// Statistics for user sessions
 public struct SessionStats: Codable {
     public let totalSessions: Int

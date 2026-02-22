@@ -151,6 +151,7 @@ struct WritersAppCLI {
                 print("14. Brainstorm Ideas (AI)")
                 print("15. Develop Character (AI)")
                 print("16. Generate Outline (AI)")
+                print("17. Token Usage Dashboard (AI)")
             }
 
             if app.isMemoryPluginEnabled {
@@ -236,6 +237,8 @@ struct WritersAppCLI {
                 await developCharacterWithAI(app: app)
             case 16:
                 await generateOutlineWithAI(app: app)
+            case 17:
+                showTokenUsageDashboard(app: app)
             case 20:
                 await storeMemory(app: app)
             case 21:
@@ -1218,6 +1221,76 @@ func generateOutlineWithAI(app: WritersApp) async {
         print()
     } catch {
         print("\n✗ Error: \(error.localizedDescription)")
+    }
+}
+
+// MARK: - Token Usage Dashboard
+
+func showTokenUsageDashboard(app: WritersApp) {
+    print("\n╔══════════════════════════════════════════╗")
+    print("║         Token Usage Dashboard            ║")
+    print("╚══════════════════════════════════════════╝\n")
+
+    // Total summary
+    guard let summary = try? app.getTotalTokenUsage() else {
+        print("Error reading token usage data.")
+        return
+    }
+
+    if summary.requestCount == 0 {
+        print("No token usage recorded yet.")
+        print("Use AI features (options 10-16) to start tracking.\n")
+        return
+    }
+
+    print("── TOTALS ──────────────────────────────────")
+    print("  Requests:       \(summary.requestCount)")
+    print("  Input tokens:   \(summary.totalInputTokens)")
+    print("  Output tokens:  \(summary.totalOutputTokens)")
+    print("  Total tokens:   \(summary.totalTokens)")
+    print(String(format: "  Est. cost:      $%.4f USD", summary.estimatedCostUSD))
+    print()
+
+    // By operation
+    if let byOp = try? app.getTokenUsageByOperation(), !byOp.isEmpty {
+        print("── BY OPERATION ────────────────────────────")
+        let colWidth = max(byOp.map { $0.operation.count }.max() ?? 20, 9)
+        let opHeader = "Operation".padding(toLength: colWidth, withPad: " ", startingAt: 0)
+        print("  \(opHeader)     Input    Output     Total")
+        print("  " + String(repeating: "-", count: colWidth + 30))
+        for op in byOp {
+            let opPadded = op.operation.padding(toLength: colWidth, withPad: " ", startingAt: 0)
+            let row = "  \(opPadded)  \(String(format: "%8d", op.inputTokens))  \(String(format: "%8d", op.outputTokens))  \(String(format: "%8d", op.totalTokens))"
+            print(row)
+        }
+        print()
+    }
+
+    // By model
+    if let byModel = try? app.getTokenUsageByModel(), !byModel.isEmpty {
+        print("── BY MODEL ────────────────────────────────")
+        for m in byModel {
+            let modelName: String
+            if let aiModel = AIModel(rawValue: m.model) {
+                modelName = aiModel.displayName
+            } else {
+                modelName = m.model
+            }
+            print("  \(modelName)  \(m.totalTokens) tokens  (\(String(format: "$%.4f", m.estimatedCostUSD)))")
+        }
+        print()
+    }
+
+    // By day (last 7 days)
+    if let byDay = try? app.getTokenUsageByDay(days: 7), !byDay.isEmpty {
+        print("── LAST 7 DAYS ─────────────────────────────")
+        print("  Date             Input    Output  Reqs")
+        print("  " + String(repeating: "-", count: 38))
+        for day in byDay {
+            let datePadded = day.date.padding(toLength: 12, withPad: " ", startingAt: 0)
+            print("  \(datePadded)  \(String(format: "%8d", day.inputTokens))  \(String(format: "%8d", day.outputTokens))  \(String(format: "%4d", day.requestCount))")
+        }
+        print()
     }
 }
 
