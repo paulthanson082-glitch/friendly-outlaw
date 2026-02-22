@@ -76,7 +76,11 @@ public class DatabaseManager {
         
     }
     
-    // MARK: - Schema Creation
+    /// Ensures all required database tables for the application exist by creating them if missing.
+    /// 
+    /// Creates schema for AI suggestions, user sessions, AI configurations, traces, observations, issues,
+    /// and version control (branches, commits, document snapshots).
+    /// - Throws: `DatabaseError.queryFailed` if any CREATE TABLE statement fails.
     
     private func createTables() throws {
         
@@ -215,6 +219,13 @@ public class DatabaseManager {
 
     }
     
+    /// Creates the database indexes used to optimize common queries across tables.
+    /// 
+    /// Executes a predefined set of `CREATE INDEX IF NOT EXISTS` statements for
+    /// AI_Suggestions, User_Sessions, AI_Configurations, Traces, Observations,
+    /// Issues, and version control tables (vc_branches, vc_commits,
+    /// vc_document_snapshots).
+    /// - Throws: `DatabaseError.queryFailed` if executing any index statement fails.
     private func createIndexes() throws {
         
         // Index for frequently queried columns
@@ -1443,7 +1454,12 @@ public class DatabaseManager {
         }
     }
     
-    /// Helper method to parse issues from a statement
+    /// Parses rows from a prepared SQLite statement into an array of `Issue` values.
+    /// 
+    /// Decodes each result row into an `Issue`, interpreting numeric timestamp columns as seconds since the Unix epoch and decoding the tags column from JSON into `[String]`. Rows are skipped when required fields are malformed (invalid UUIDs, unknown status or priority). If tag JSON fails to decode, an empty tag array is used.
+    /// - Parameters:
+    ///   - statement: A prepared SQLite statement positioned at the result set; the function will step through all rows.
+    /// - Returns: An array of `Issue` objects parsed from the statement; rows with invalid or unparseable data are omitted.
     private func parseIssues(from statement: OpaquePointer?) throws -> [Issue] {
         var issues: [Issue] = []
         
@@ -1501,7 +1517,10 @@ public class DatabaseManager {
 
     // MARK: - Version Control: Branch Operations
 
-    /// Inserts a new branch record
+    /// Inserts a new version-control branch record into the database.
+    /// - Parameters:
+    ///   - branch: The `VCBranch` to persist. Its `id`, `name`, `createdAt`, and `isActive` fields are stored; `headCommitId` is stored when present.
+    /// - Throws: `DatabaseError.notInitialized` if the database manager has not been initialized; `DatabaseError.queryFailed` if preparing or executing the SQL statement fails.
     public func insertVCBranch(_ branch: VCBranch) throws {
         guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
         let sql = """
@@ -1527,7 +1546,9 @@ public class DatabaseManager {
         }
     }
 
-    /// Updates the head commit and active flag for a branch
+    /// Updates a version-control branch's head commit and active flag in the database.
+    /// - Parameter branch: The branch containing the new `headCommitId`, `isActive` flag, and `id` to identify which row to update.
+    /// - Throws: `DatabaseError.notInitialized` if the database manager has not been initialized; `DatabaseError.queryFailed` if preparing or executing the SQL update fails.
     public func updateVCBranch(_ branch: VCBranch) throws {
         guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
         let sql = "UPDATE vc_branches SET head_commit_id = ?, is_active = ? WHERE id = ?;"
@@ -1550,7 +1571,12 @@ public class DatabaseManager {
 
     /// Atomically sets all branches inactive then marks one as active.
     /// The two-statement update is wrapped in a transaction so a crash between
-    /// statements cannot leave every branch inactive.
+    /// Atomically activates the branch with the given id and deactivates all other branches.
+    /// 
+    /// Performs the operation inside a transaction: sets all branches' `is_active` to 0, then sets the specified branch's `is_active` to 1. On any failure the transaction is rolled back.
+    /// - Parameters:
+    ///   - id: The UUID of the branch to activate.
+    /// - Throws: `DatabaseError.notInitialized` if the database has not been initialized; `DatabaseError.queryFailed` if any SQLite operation fails (message contains the underlying SQLite error).
     public func setActiveBranch(id: UUID) throws {
         guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
         try execute("BEGIN;")
@@ -1573,7 +1599,10 @@ public class DatabaseManager {
         }
     }
 
-    /// Returns all branches ordered by creation date
+    /// Retrieves all version-control branches ordered by creation time (oldest first).
+    /// - Returns: An array of `VCBranch` objects ordered by `createdAt` ascending.
+    /// - Throws: `DatabaseError.notInitialized` if the database manager is not initialized or the connection is closed.
+    /// - Throws: `DatabaseError.queryFailed` if preparing or executing the SQL query fails.
     public func getAllVCBranches() throws -> [VCBranch] {
         guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
         let sql = """
@@ -1604,7 +1633,12 @@ public class DatabaseManager {
         return branches
     }
 
-    /// Returns the branch with the given name, or nil
+    /// Fetches a version-control branch by its name.
+    /// - Parameters:
+    ///   - name: The branch name to look up.
+    /// - Returns: The matching `VCBranch` if found, `nil` otherwise.
+    /// - Throws: `DatabaseError.notInitialized` if the database has not been initialized.
+    /// - Throws: `DatabaseError.queryFailed` if preparing or executing the SQL query fails.
     public func getVCBranch(name: String) throws -> VCBranch? {
         guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
         let sql = """
@@ -1635,7 +1669,12 @@ public class DatabaseManager {
 
     // MARK: - Version Control: Commit Operations
 
-    /// Inserts a new commit record
+    /// Inserts a new version-control commit record into the database.
+    ///
+    /// The provided `VCCommit` is persisted to the `vc_commits` table; optional fields on the model are stored as NULL when absent.
+    /// - Parameter commit: The commit record to insert.
+    /// - Throws: `DatabaseError.notInitialized` if the database manager has not been initialized.  
+    ///           `DatabaseError.queryFailed` if preparing or executing the SQL statement fails.
     public func insertVCCommit(_ commit: VCCommit) throws {
         guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
         let sql = """
@@ -1672,7 +1711,11 @@ public class DatabaseManager {
         }
     }
 
-    /// Returns all commits on a branch ordered from oldest to newest
+    /// Fetches all commits for the specified branch, ordered by timestamp ascending.
+    /// - Parameters:
+    ///   - branchId: UUID of the branch whose commits should be retrieved.
+    /// - Returns: An array of `VCCommit` objects for the branch ordered by ascending timestamp.
+    /// - Throws: `DatabaseError.notInitialized` if the database manager is not initialized; `DatabaseError.queryFailed` if preparing or executing the SQL query fails.
     public func getVCCommits(branchId: UUID) throws -> [VCCommit] {
         guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
         let sql = """
@@ -1710,7 +1753,9 @@ public class DatabaseManager {
 
     // MARK: - Version Control: Snapshot Operations
 
-    /// Inserts a document snapshot for a commit
+    /// Inserts a document snapshot into the version control snapshots table.
+    /// - Parameter snapshot: The `VCDocumentSnapshot` to persist (id, commitId, documentId, title, content, category, wordCount, capturedAt).
+    /// - Throws: `DatabaseError.notInitialized` if the database has not been opened; `DatabaseError.queryFailed` if the SQL prepare or execution fails.
     public func insertVCSnapshot(_ snapshot: VCDocumentSnapshot) throws {
         guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
         let sql = """
@@ -1736,7 +1781,10 @@ public class DatabaseManager {
         }
     }
 
-    /// Returns all snapshots belonging to a commit
+    /// Retrieves all document snapshots associated with a given commit.
+    /// - Parameter commitId: The commit UUID whose snapshots to retrieve.
+    /// - Returns: An array of `VCDocumentSnapshot` records for the specified commit.
+    /// - Throws: `DatabaseError.notInitialized` if the database is not initialized; `DatabaseError.queryFailed` if the SQL preparation or execution fails.
     public func getVCSnapshots(commitId: UUID) throws -> [VCDocumentSnapshot] {
         guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
         let sql = """
@@ -1752,7 +1800,11 @@ public class DatabaseManager {
         return try collectSnapshots(stmt: stmt)
     }
 
-    /// Returns all snapshots for a document across all commits, ordered by capture time
+    /// Retrieves all version-control document snapshots for the given document ordered from oldest to newest by capture time.
+    /// - Parameters:
+    ///   - documentId: The UUID of the document whose snapshots will be returned.
+    /// - Returns: An array of `VCDocumentSnapshot` objects for the specified document ordered by `capturedAt` ascending.
+    /// - Throws: `DatabaseError.notInitialized` if the database manager is not initialized; `DatabaseError.queryFailed` if preparing or executing the query fails.
     public func getVCSnapshotsForDocument(documentId: UUID) throws -> [VCDocumentSnapshot] {
         guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
         let sql = """
@@ -1769,7 +1821,11 @@ public class DatabaseManager {
     }
 
     /// Returns the most recent snapshot for each document captured at or before the given date.
-    /// Analogous to Dolt's `SELECT * FROM table AS OF 'date'`.
+    /// Fetches the most recent snapshot for each document with a captured_at timestamp less than or equal to the provided date.
+    /// - Parameters:
+    ///   - date: The cutoff date; snapshots with `captured_at` less than or equal to this date are considered.
+    /// - Returns: An array of `VCDocumentSnapshot` containing, for each document, the snapshot with the latest `captured_at` at or before `date`.
+    /// - Throws: `DatabaseError.notInitialized` if the database manager is not initialized; `DatabaseError.queryFailed` if the SQL query fails.
     public func getVCSnapshotsAsOf(date: Date) throws -> [VCDocumentSnapshot] {
         guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
         let sql = """
@@ -1792,7 +1848,14 @@ public class DatabaseManager {
         return try collectSnapshots(stmt: stmt)
     }
 
-    // MARK: - Version Control: Private Helpers
+    /// Collects `VCDocumentSnapshot` records from an SQLite result statement.
+    /// 
+    /// Reads rows from `stmt` and constructs `VCDocumentSnapshot` values from the
+    /// columns in the following order: `id`, `commit_id`, `document_id`, `title`,
+    /// `content`, `category`, `word_count`, `captured_at`. Rows missing required
+    /// values or containing invalid UUIDs are skipped.
+    /// - Parameter stmt: A prepared SQLite statement positioned before the first row.
+    /// - Returns: An array of `VCDocumentSnapshot` parsed from the statement's result rows.
 
     private func collectSnapshots(stmt: OpaquePointer?) throws -> [VCDocumentSnapshot] {
         var snapshots: [VCDocumentSnapshot] = []
