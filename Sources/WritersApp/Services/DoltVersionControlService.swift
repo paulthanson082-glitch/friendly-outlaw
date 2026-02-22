@@ -34,12 +34,15 @@ public class DoltVersionControlService {
 
     // MARK: - Branch Operations
 
-    /// Lists all branches, mirroring `dolt branch`.
+    /// Retrieve all version-control branches stored in the database.
+    /// - Returns: An array of `VCBranch` representing all persisted branches.
     public func listBranches() throws -> [VCBranch] {
         return try db.getAllVCBranches()
     }
 
-    /// Returns the currently active branch, or nil if none has been checked out yet.
+    /// Retrieve the currently active version-control branch, if one exists.
+    /// - Returns: The active `VCBranch` if one is marked active, `nil` otherwise.
+    /// - Throws: Any error encountered while fetching branches from the database.
     public func currentBranch() throws -> VCBranch? {
         let branches = try db.getAllVCBranches()
         return branches.first(where: { $0.isActive })
@@ -50,7 +53,12 @@ public class DoltVersionControlService {
     /// - Parameters:
     ///   - name: Branch name.
     ///   - createNew: When `true` a new branch is created; throws if it already exists.
-    /// - Returns: The branch that is now active.
+    /// Checks out the specified branch, activating it in the repository; optionally creates and activates a new branch with the same head as the current branch.
+    /// - Parameters:
+    ///   - name: The name of the branch to check out or create.
+    ///   - createNew: If `true`, create a new branch with the given name and activate it; if `false`, activate an existing branch.
+    /// - Returns: The authoritative `VCBranch` instance after activation.
+    /// - Throws: `VersionControlError.branchAlreadyExists(name)` if `createNew` is `true` and a branch with `name` already exists; `VersionControlError.branchNotFound(name)` if `createNew` is `false` and the branch does not exist.
     @discardableResult
     public func checkoutBranch(name: String, createNew: Bool = false) throws -> VCBranch {
         if createNew {
@@ -82,7 +90,9 @@ public class DoltVersionControlService {
     }
 
     /// Ensures the default "main" branch exists, creating it if needed.
-    /// Call once during app setup to mirror `dolt init`.
+    /// Ensures the default branch exists and is marked active, creating and checking it out if necessary.
+    /// - Returns: The authoritative `VCBranch` for the repository's default branch (`defaultBranchName`).
+    /// - Throws: Any error produced by database operations or by `checkoutBranch(name:createNew:)`.
     @discardableResult
     public func initializeDefaultBranch() throws -> VCBranch {
         if let existing = try db.getVCBranch(name: defaultBranchName) {
@@ -103,7 +113,13 @@ public class DoltVersionControlService {
     ///   - message: Human-readable description of the change.
     ///   - documents: The current state of every document to capture.
     ///   - authorId: Optional author identifier.
-    /// - Returns: The created commit.
+    /// Create a new commit on the currently active branch and record snapshots for the provided documents.
+    /// - Parameters:
+    ///   - message: The commit message describing the change.
+    ///   - documents: The documents to capture as snapshots for this commit.
+    ///   - authorId: Optional identifier of the commit author.
+    /// - Returns: The created `VCCommit` representing the new branch head.
+    /// - Throws: `VersionControlError.noActiveBranch` if there is no active branch.
     @discardableResult
     public func commit(message: String,
                        documents: [Document],
@@ -140,7 +156,11 @@ public class DoltVersionControlService {
         return newCommit
     }
 
-    /// Returns the ordered commit history for a branch, mirroring `dolt log`.
+    /// Retrieves the commit history for the specified branch.
+    /// - Parameters:
+    ///   - branchName: The name of the branch whose commits should be returned.
+    /// - Returns: An array of `VCCommit` representing the branch's commit history.
+    /// - Throws: `VersionControlError.branchNotFound(branchName)` if no branch with the given name exists.
     public func log(branch branchName: String) throws -> [VCCommit] {
         guard let branch = try db.getVCBranch(name: branchName) else {
             throw VersionControlError.branchNotFound(branchName)
@@ -156,14 +176,25 @@ public class DoltVersionControlService {
     /// `.added` — present in `to` but not `from`
     /// `.deleted` — present in `from` but not `to`
     /// `.modified` — content differs between commits
-    /// `.unchanged` — identical in both commits
+    /// Computes the document-level diffs between the head commits of two branches.
+    /// - Parameters:
+    ///   - fromBranch: The source branch name to diff from.
+    ///   - toBranch: The target branch name to diff to.
+    /// - Returns: An array of `VCDiff` entries describing per-document changes from `fromBranch` to `toBranch`.
+    /// - Throws: `VersionControlError` if either branch does not exist or if a branch has no head commit.
     public func diff(fromBranch: String, toBranch: String) throws -> [VCDiff] {
         let fromCommitId = try headCommitId(for: fromBranch)
         let toCommitId = try headCommitId(for: toBranch)
         return try diff(fromCommitId: fromCommitId, toCommitId: toCommitId)
     }
 
-    /// Computes a diff between two specific commits.
+    /// Compute per-document diffs between two commits.
+    /// 
+    /// Compares snapshots from `fromCommitId` (base) to `toCommitId` (target) and produces a `VCDiff` for each document indicating whether it was added, deleted, modified, or unchanged. The returned diffs are sorted by document title.
+    /// - Parameters:
+    ///   - fromCommitId: Commit ID to compare from (base).
+    ///   - toCommitId: Commit ID to compare to (target).
+    /// - Returns: An array of `VCDiff` entries describing per-document changes between the two commits.
     public func diff(fromCommitId: UUID, toCommitId: UUID) throws -> [VCDiff] {
         let fromSnapshots = try db.getVCSnapshots(commitId: fromCommitId)
         let toSnapshots = try db.getVCSnapshots(commitId: toCommitId)
@@ -213,12 +244,15 @@ public class DoltVersionControlService {
     // MARK: - Time Travel
 
     /// Returns the state of all documents at or before `date`,
-    /// mirroring `SELECT * FROM table AS OF '<date>'`.
+    /// Retrieves all document snapshots as of the specified date.
+    /// - Parameter date: The point in time to query document state for.
+    /// - Returns: An array of `VCDocumentSnapshot` representing each document's state at the given date.
     public func query(asOf date: Date) throws -> [VCDocumentSnapshot] {
         return try db.getVCSnapshotsAsOf(date: date)
     }
 
-    /// Returns the full version history of a single document across all commits.
+    /// Retrieves the snapshot history for a document across commits.
+    /// - Returns: An array of `VCDocumentSnapshot` containing all stored snapshots for the specified document.
     public func history(of documentId: UUID) throws -> [VCDocumentSnapshot] {
         return try db.getVCSnapshotsForDocument(documentId: documentId)
     }
@@ -232,7 +266,12 @@ public class DoltVersionControlService {
     /// Otherwise a three-way merge is attempted; only non-conflicting documents
     /// (those unchanged in `intoBranch` since the fork) are brought in.
     ///
-    /// - Returns: A `VCMergeResult` describing what happened.
+    /// Merges the changes from one branch into another using either a fast‑forward or a three‑way merge.
+    /// - Parameters:
+    ///   - fromBranch: The name of the source branch to merge from.
+    ///   - intoBranch: The name of the target branch to merge into.
+    /// - Returns: A `VCMergeResult` describing the merge strategy used, the resulting commit id (if created), the number of document-level changes applied, and whether the merge succeeded.
+    /// - Throws: `VersionControlError.branchNotFound` if either the source or target branch does not exist.
     @discardableResult
     public func merge(fromBranch: String, into intoBranch: String) throws -> VCMergeResult {
         guard var targetBranch = try db.getVCBranch(name: intoBranch) else {
@@ -312,7 +351,10 @@ public class DoltVersionControlService {
                              diffCount: changedCount, success: true)
     }
 
-    // MARK: - Private Helpers
+    /// Get the head commit identifier for the specified branch.
+    /// - Parameter branchName: The name of the branch to look up.
+    /// - Returns: The head commit `UUID` for the branch.
+    /// - Throws: `VersionControlError.branchNotFound` if the branch does not exist; `VersionControlError.commitNotFound` if the branch has no commits.
 
     private func headCommitId(for branchName: String) throws -> UUID {
         guard let branch = try db.getVCBranch(name: branchName) else {
