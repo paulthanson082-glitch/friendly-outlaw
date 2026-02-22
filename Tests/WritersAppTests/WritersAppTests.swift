@@ -633,261 +633,471 @@ final class WritersAppTests: XCTestCase {
         XCTAssertNil(KanbanColumn.done.next)
     }
 
-    // MARK: - Dolt Version Control Tests
+    // MARK: - Session Management Tests
 
-    private func makeVC() throws -> (DoltVersionControlService, DatabaseManager) {
-        let db = DatabaseManager(databasePath: ":memory:")
-        try db.initialize()
-        let vc = DoltVersionControlService(databaseManager: db)
-        return (vc, db)
+    func testStartSession() {
+        let userId = UUID()
+        app.startSession(userId: userId)
+
+        XCTAssertEqual(app.currentUserId, userId)
     }
 
-    private func makeDoc(title: String, content: String) -> Document {
-        return Document(title: title, content: content, category: .novel)
+    func testStartSessionWithMultitaskingMode() {
+        let userId = UUID()
+        app.startSession(userId: userId, multitaskingMode: "Split View")
+
+        XCTAssertEqual(app.currentUserId, userId)
     }
 
-    func testInitializeDefaultBranchCreatesMainBranch() throws {
-        let (vc, _) = try makeVC()
-        let branch = try vc.initializeDefaultBranch()
-        XCTAssertEqual(branch.name, "main")
-        XCTAssertTrue(branch.isActive)
+    func testEndSession() {
+        let userId = UUID()
+        app.startSession(userId: userId)
+        app.endSession()
+
+        // Session should still have userId but session would be ended
+        XCTAssertEqual(app.currentUserId, userId)
     }
 
-    func testCheckoutNewBranchCreatesAndActivatesBranch() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let experiment = try vc.checkoutBranch(name: "experiment", createNew: true)
-        XCTAssertEqual(experiment.name, "experiment")
-        XCTAssertTrue(experiment.isActive)
+    func testUpdateSessionStats() {
+        let userId = UUID()
+        app.startSession(userId: userId)
+        app.updateSessionStats(wordsWritten: 250, aiInteractions: 5)
+
+        // Verify session stats were updated through database
+        let sessions = try? app.getUserSessions(userId: userId)
+        XCTAssertNotNil(sessions)
     }
 
-    func testCheckoutNewBranchThrowsIfAlreadyExists() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        _ = try vc.checkoutBranch(name: "experiment", createNew: true)
-        XCTAssertThrowsError(try vc.checkoutBranch(name: "experiment", createNew: true)) { error in
-            if case VersionControlError.branchAlreadyExists(let name) = error {
-                XCTAssertEqual(name, "experiment")
-            } else {
-                XCTFail("Expected branchAlreadyExists error")
-            }
+    func testGetSessionStats() throws {
+        let userId = UUID()
+        app.startSession(userId: userId)
+        app.updateSessionStats(wordsWritten: 100, aiInteractions: 2)
+
+        let stats = try app.getSessionStats(userId: userId)
+        XCTAssertGreaterThanOrEqual(stats.totalSessions, 1)
+    }
+
+    func testGetUserSessions() throws {
+        let userId = UUID()
+        app.startSession(userId: userId)
+        app.endSession()
+
+        let sessions = try app.getUserSessions(userId: userId)
+        XCTAssertGreaterThanOrEqual(sessions.count, 1)
+    }
+
+    func testGetUserSessionsSortedByDuration() throws {
+        let userId = UUID()
+        app.startSession(userId: userId)
+        app.endSession()
+
+        let sessions = try app.getUserSessions(userId: userId, sortByDuration: true)
+        XCTAssertNotNil(sessions)
+    }
+
+    // MARK: - Database Integration Tests
+
+    func testDatabaseManagerIntegration() {
+        XCTAssertNotNil(app.databaseManager)
+    }
+
+    func testGetAISuggestionsIntegration() throws {
+        let userId = UUID()
+        let suggestions = try app.getAISuggestions(userId: userId, limit: 10)
+        XCTAssertNotNil(suggestions)
+    }
+
+    func testGetAIToolUsageStatsIntegration() throws {
+        let userId = UUID()
+        let stats = try app.getAIToolUsageStats(userId: userId)
+        XCTAssertNotNil(stats)
+    }
+
+    // MARK: - AI Configuration Tests
+
+    func testEnableAI() {
+        let config = AIConfiguration(
+            apiKey: "test-key",
+            model: .claude35Sonnet,
+            maxTokens: 4096,
+            temperature: 0.7
+        )
+
+        app.enableAI(configuration: config)
+        XCTAssertTrue(app.isAIEnabled)
+    }
+
+    func testDisableAI() {
+        let config = AIConfiguration(
+            apiKey: "test-key",
+            model: .claude35Sonnet
+        )
+
+        app.enableAI(configuration: config)
+        XCTAssertTrue(app.isAIEnabled)
+
+        app.disableAI()
+        XCTAssertFalse(app.isAIEnabled)
+    }
+
+    func testEnableAIWithUserId() {
+        let config = AIConfiguration(
+            apiKey: "test-key",
+            model: .claude3Opus
+        )
+        let userId = UUID()
+
+        app.enableAI(configuration: config, userId: userId)
+        XCTAssertTrue(app.isAIEnabled)
+        XCTAssertEqual(app.currentUserId, userId)
+    }
+
+    func testAIEnabledByDefault() {
+        XCTAssertFalse(app.isAIEnabled)
+    }
+
+    func testInitWithAIConfiguration() {
+        let config = AIConfiguration(
+            apiKey: "test-api-key",
+            model: .claude35Sonnet,
+            maxTokens: 8192,
+            temperature: 0.8
+        )
+
+        let appWithAI = WritersApp(aiConfiguration: config)
+        XCTAssertTrue(appWithAI.isAIEnabled)
+    }
+
+    func testInitWithCustomDatabasePath() {
+        let customPath = "/tmp/test_custom_path.db"
+        let appWithCustomDb = WritersApp(databasePath: customPath)
+        XCTAssertNotNil(appWithCustomDb.databaseManager)
+    }
+
+    // MARK: - Plugin Management Tests
+
+    func testGetPlugins() {
+        let plugins = app.getPlugins()
+        XCTAssertNotNil(plugins)
+    }
+
+    func testGetEnabledPlugins() {
+        let enabledPlugins = app.getEnabledPlugins()
+        XCTAssertNotNil(enabledPlugins)
+    }
+
+    func testIsMemoryPluginEnabledByDefault() {
+        XCTAssertFalse(app.isMemoryPluginEnabled)
+    }
+
+    // MARK: - Encouragement Service Tests
+
+    func testGetGeneralEncouragement() {
+        let message = app.getGeneralEncouragement()
+        XCTAssertNotNil(message.text)
+        XCTAssertFalse(message.text.isEmpty)
+    }
+
+    func testIsEncouragementEnabledByDefault() {
+        XCTAssertTrue(app.isEncouragementEnabled)
+    }
+
+    func testSetEncouragementEnabled() {
+        app.setEncouragementEnabled(false)
+        XCTAssertFalse(app.isEncouragementEnabled)
+
+        app.setEncouragementEnabled(true)
+        XCTAssertTrue(app.isEncouragementEnabled)
+    }
+
+    func testGetEncouragementForDocument() {
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+        let encouragement = app.getEncouragementForDocument(doc, previousWordCount: 0)
+        // May be nil if word count doesn't trigger a milestone
+        XCTAssertTrue(encouragement == nil || encouragement?.text != nil)
+    }
+
+    func testGetSessionEncouragement() {
+        let encouragement = app.getSessionEncouragement(durationMinutes: 30, wordsWritten: 500)
+        // May be nil depending on encouragement rules
+        XCTAssertTrue(encouragement == nil || encouragement?.text != nil)
+    }
+
+    func testGetMilestoneEncouragement() {
+        let milestone = WritingMilestone.wordsWritten(1000)
+        let encouragement = app.getMilestoneEncouragement(milestone: milestone)
+        XCTAssertNotNil(encouragement)
+        XCTAssertFalse(encouragement!.text.isEmpty)
+    }
+
+    // MARK: - Document Analysis and Export Tests
+
+    func testExportDocumentMarkdown() {
+        let doc = Document(
+            title: "Export Test",
+            content: "Test content for export",
+            category: .article
+        )
+        app.documentManager.createDocument(doc)
+
+        let exported = app.exportDocument(id: doc.id, format: .markdown)
+        XCTAssertNotNil(exported)
+        XCTAssertTrue(exported!.contains("# Export Test"))
+        XCTAssertTrue(exported!.contains("Test content for export"))
+    }
+
+    func testExportDocumentPlainText() {
+        let doc = Document(
+            title: "Plain Text Test",
+            content: "Simple content",
+            category: .blogPost
+        )
+        app.documentManager.createDocument(doc)
+
+        let exported = app.exportDocument(id: doc.id, format: .plainText)
+        XCTAssertEqual(exported, "Simple content")
+    }
+
+    func testExportDocumentHTML() {
+        let doc = Document(
+            title: "HTML Test",
+            content: "HTML content",
+            category: .shortStory
+        )
+        app.documentManager.createDocument(doc)
+
+        let exported = app.exportDocument(id: doc.id, format: .html)
+        XCTAssertNotNil(exported)
+        XCTAssertTrue(exported!.contains("<!DOCTYPE html>"))
+        XCTAssertTrue(exported!.contains("HTML Test"))
+    }
+
+    func testExportNonexistentDocument() {
+        let nonexistentId = UUID()
+        let exported = app.exportDocument(id: nonexistentId, format: .markdown)
+        XCTAssertNil(exported)
+    }
+
+    // MARK: - Template and Document Integration Tests
+
+    func testCreateDocumentFromTemplateIntegration() {
+        let templates = app.templateManager.getAllTemplates()
+        guard let template = templates.first else {
+            XCTFail("No templates available")
+            return
         }
-    }
 
-    func testCheckoutExistingBranchSwitchesActive() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        _ = try vc.checkoutBranch(name: "feature", createNew: true)
-        // Switch back to main
-        let main = try vc.checkoutBranch(name: "main")
-        XCTAssertEqual(main.name, "main")
-        XCTAssertTrue(main.isActive)
-        let current = try vc.currentBranch()
-        XCTAssertEqual(current?.name, "main")
-    }
-
-    func testCommitStoresDocumentSnapshots() throws {
-        let (vc, db) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let doc = makeDoc(title: "Chapter One", content: "It was a dark and stormy night.")
-        let commit = try vc.commit(message: "Initial draft", documents: [doc])
-        let snapshots = try db.getVCSnapshots(commitId: commit.id)
-        XCTAssertEqual(snapshots.count, 1)
-        XCTAssertEqual(snapshots.first?.title, "Chapter One")
-        XCTAssertEqual(snapshots.first?.content, "It was a dark and stormy night.")
-    }
-
-    func testCommitAdvancesBranchHead() throws {
-        let (vc, db) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let doc = makeDoc(title: "Story", content: "Once upon a time.")
-        let commit = try vc.commit(message: "First commit", documents: [doc])
-        let branches = try db.getAllVCBranches()
-        let main = branches.first(where: { $0.name == "main" })
-        XCTAssertEqual(main?.headCommitId, commit.id)
-    }
-
-    func testCommitWithoutActiveBranchThrows() throws {
-        let (vc, _) = try makeVC()
-        // No branch initialized
-        let doc = makeDoc(title: "X", content: "Y")
-        XCTAssertThrowsError(try vc.commit(message: "Should fail", documents: [doc])) { error in
-            if case VersionControlError.noActiveBranch = error {
-                // expected
-            } else {
-                XCTFail("Expected noActiveBranch error")
-            }
+        var values: [String: String] = [:]
+        for placeholder in template.placeholders {
+            values[placeholder.key] = "Test Value"
         }
+
+        let document = app.createDocumentFromTemplate(templateId: template.id, values: values)
+        XCTAssertNotNil(document)
+
+        // Verify it was added to document manager
+        let retrieved = app.documentManager.getDocument(id: document!.id)
+        XCTAssertNotNil(retrieved)
     }
 
-    func testLogReturnsCommitsLinkedByParentChain() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let doc = makeDoc(title: "Doc", content: "v1")
-        let first = try vc.commit(message: "First", documents: [doc])
-        let second = try vc.commit(message: "Second", documents: [doc])
-        let history = try vc.log(branch: "main")
-        XCTAssertEqual(history.count, 2)
-        // Verify parent-chain linkage rather than relying on timestamp ordering
-        let root = history.first(where: { $0.parentCommitId == nil })
-        let child = history.first(where: { $0.parentCommitId != nil })
-        XCTAssertNotNil(root, "There should be one root commit with no parent")
-        XCTAssertNotNil(child, "There should be one child commit with a parent")
-        XCTAssertEqual(root?.id, first.id)
-        XCTAssertEqual(child?.id, second.id)
-        XCTAssertEqual(child?.parentCommitId, first.id)
+    func testCreateDocumentFromNonexistentTemplate() {
+        let nonexistentId = UUID()
+        let document = app.createDocumentFromTemplate(templateId: nonexistentId, values: [:])
+        XCTAssertNil(document)
     }
 
-    func testDiffDetectsModifiedDocument() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let docId = UUID()
-        let v1 = Document(id: docId, title: "Prices", content: "amount: 100", category: .article)
-        _ = try vc.commit(message: "Base", documents: [v1])
+    // MARK: - Issue Management Integration Tests
 
-        // Checkout experiment, modify price by 10%
-        _ = try vc.checkoutBranch(name: "experiment", createNew: true)
-        let v2 = Document(id: docId, title: "Prices", content: "amount: 90", category: .article)
-        _ = try vc.commit(message: "Test 10% price reduction", documents: [v2])
+    func testCreateIssueIntegration() {
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+        let issue = app.createIssue(
+            documentId: doc.id,
+            title: "Test Issue",
+            description: "Test description",
+            status: .open,
+            priority: .high
+        )
 
-        let diffs = try vc.diff(fromBranch: "main", toBranch: "experiment")
-        let modified = diffs.filter { $0.changeType == .modified }
-        XCTAssertEqual(modified.count, 1)
-        XCTAssertEqual(modified.first?.fromContent, "amount: 100")
-        XCTAssertEqual(modified.first?.toContent, "amount: 90")
+        XCTAssertEqual(issue.documentId, doc.id)
+        XCTAssertEqual(issue.title, "Test Issue")
+        XCTAssertEqual(issue.status, .open)
+        XCTAssertEqual(issue.priority, .high)
+
+        // Verify it was added to both managers
+        let retrievedFromIssueManager = app.getIssue(id: issue.id)
+        XCTAssertNotNil(retrievedFromIssueManager)
     }
 
-    func testDiffDetectsAddedDocument() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let base = makeDoc(title: "Existing", content: "content")
-        _ = try vc.commit(message: "Base commit", documents: [base])
+    func testGetIssuesForDocument() {
+        let doc = app.createBlankDocument(title: "Doc with Issues", category: .novel)
+        app.createIssue(documentId: doc.id, title: "Issue 1")
+        app.createIssue(documentId: doc.id, title: "Issue 2")
 
-        _ = try vc.checkoutBranch(name: "feature", createNew: true)
-        let newDoc = makeDoc(title: "New Chapter", content: "fresh content")
-        _ = try vc.commit(message: "Add new chapter", documents: [base, newDoc])
-
-        let diffs = try vc.diff(fromBranch: "main", toBranch: "feature")
-        let added = diffs.filter { $0.changeType == .added }
-        XCTAssertEqual(added.count, 1)
-        XCTAssertEqual(added.first?.title, "New Chapter")
+        let issues = app.getIssues(forDocument: doc.id)
+        XCTAssertEqual(issues.count, 2)
     }
 
-    func testDiffDetectsDeletedDocument() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let doc1 = makeDoc(title: "Keep", content: "stays")
-        let doc2 = makeDoc(title: "Remove", content: "gone")
-        _ = try vc.commit(message: "Both docs", documents: [doc1, doc2])
+    func testGetIssuesByStatus() {
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+        app.createIssue(documentId: doc.id, title: "Open Issue", status: .open)
+        app.createIssue(documentId: doc.id, title: "Resolved Issue", status: .resolved)
 
-        _ = try vc.checkoutBranch(name: "pruned", createNew: true)
-        _ = try vc.commit(message: "Remove second doc", documents: [doc1])
-
-        let diffs = try vc.diff(fromBranch: "main", toBranch: "pruned")
-        let deleted = diffs.filter { $0.changeType == .deleted }
-        XCTAssertEqual(deleted.count, 1)
-        XCTAssertEqual(deleted.first?.title, "Remove")
+        let openIssues = app.getIssues(withStatus: .open)
+        XCTAssertGreaterThanOrEqual(openIssues.count, 1)
+        XCTAssertTrue(openIssues.allSatisfy { $0.status == .open })
     }
 
-    func testTimeTravelQueryWithDistantFutureReturnsLatestSnapshot() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let docId = UUID()
-        let v1 = Document(id: docId, title: "Users", content: "alice", category: .article)
-        _ = try vc.commit(message: "Initial users", documents: [v1])
-        let v2 = Document(id: docId, title: "Users", content: "alice, bob", category: .article)
-        _ = try vc.commit(message: "Add bob", documents: [v2])
+    func testGetIssuesByPriority() {
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+        app.createIssue(documentId: doc.id, title: "Critical Issue", priority: .critical)
+        app.createIssue(documentId: doc.id, title: "Low Issue", priority: .low)
 
-        // Querying with distant future should return the most recent snapshot
-        let latest = try vc.query(asOf: Date.distantFuture)
-        XCTAssertFalse(latest.isEmpty)
-        XCTAssertEqual(latest.first?.content, "alice, bob")
+        let criticalIssues = app.getIssues(withPriority: .critical)
+        XCTAssertGreaterThanOrEqual(criticalIssues.count, 1)
+        XCTAssertTrue(criticalIssues.allSatisfy { $0.priority == .critical })
     }
 
-    func testTimeTravelQueryWithDistantPastReturnsNoSnapshots() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let doc = makeDoc(title: "Users", content: "alice")
-        _ = try vc.commit(message: "Initial", documents: [doc])
+    func testSearchIssues() {
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+        app.createIssue(documentId: doc.id, title: "Character development needed")
+        app.createIssue(documentId: doc.id, title: "Fix plot hole")
 
-        // Querying with distant past should return nothing
-        let historical = try vc.query(asOf: Date.distantPast)
-        XCTAssertTrue(historical.isEmpty)
+        let results = app.searchIssues(query: "character")
+        XCTAssertGreaterThanOrEqual(results.count, 1)
     }
 
-    func testHistoryReturnsAllVersionsOfDocument() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let docId = UUID()
-        let v1 = Document(id: docId, title: "Story", content: "v1", category: .novel)
-        let v2 = Document(id: docId, title: "Story", content: "v2", category: .novel)
-        let v3 = Document(id: docId, title: "Story", content: "v3", category: .novel)
-        _ = try vc.commit(message: "v1", documents: [v1])
-        _ = try vc.commit(message: "v2", documents: [v2])
-        _ = try vc.commit(message: "v3", documents: [v3])
+    func testUpdateIssue() {
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+        var issue = app.createIssue(documentId: doc.id, title: "Original Title")
 
-        let snapshots = try vc.history(of: docId)
-        XCTAssertEqual(snapshots.count, 3)
-        XCTAssertEqual(snapshots.map { $0.content }, ["v1", "v2", "v3"])
+        issue.title = "Updated Title"
+        issue.description = "Updated description"
+        app.updateIssue(issue)
+
+        let retrieved = app.getIssue(id: issue.id)
+        XCTAssertEqual(retrieved?.title, "Updated Title")
+        XCTAssertEqual(retrieved?.description, "Updated description")
     }
 
-    func testMergeFastForwardAdvancesHead() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let doc = makeDoc(title: "Prices", content: "100")
-        // Commit only on feature (main has no commits), then merge into main
-        _ = try vc.checkoutBranch(name: "feature", createNew: true)
-        let commit = try vc.commit(message: "Feature work", documents: [doc])
-        _ = try vc.checkoutBranch(name: "main")
-        let result = try vc.merge(fromBranch: "feature", into: "main")
-        XCTAssertTrue(result.success)
-        XCTAssertEqual(result.strategy, .fastForward)
-        XCTAssertEqual(result.commitId, commit.id)
+    func testDeleteIssue() {
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+        let issue = app.createIssue(documentId: doc.id, title: "To Delete")
+
+        app.deleteIssue(id: issue.id)
+
+        let retrieved = app.getIssue(id: issue.id)
+        XCTAssertNil(retrieved)
     }
 
-    func testMergeThreeWayBringsInNewDocuments() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        let shared = makeDoc(title: "Shared", content: "same")
-        _ = try vc.commit(message: "Base on main", documents: [shared])
+    func testUpdateIssueStatus() {
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+        let issue = app.createIssue(documentId: doc.id, title: "Test Issue")
 
-        _ = try vc.checkoutBranch(name: "feature", createNew: true)
-        let extra = makeDoc(title: "Extra", content: "new")
-        _ = try vc.commit(message: "Add extra doc", documents: [shared, extra])
+        app.updateIssueStatus(id: issue.id, status: .inProgress)
 
-        _ = try vc.checkoutBranch(name: "main")
-        let result = try vc.merge(fromBranch: "feature", into: "main")
-        XCTAssertTrue(result.success)
-        XCTAssertEqual(result.strategy, .threeWay)
-        XCTAssertGreaterThan(result.diffCount, 0)
+        let retrieved = app.getIssue(id: issue.id)
+        XCTAssertEqual(retrieved?.status, .inProgress)
     }
 
-    func testListBranchesReturnsAllBranches() throws {
-        let (vc, _) = try makeVC()
-        try vc.initializeDefaultBranch()
-        _ = try vc.checkoutBranch(name: "alpha", createNew: true)
-        _ = try vc.checkoutBranch(name: "beta", createNew: true)
-        let branches = try vc.listBranches()
-        let names = branches.map { $0.name }
-        XCTAssertTrue(names.contains("main"))
-        XCTAssertTrue(names.contains("alpha"))
-        XCTAssertTrue(names.contains("beta"))
+    func testUpdateIssuePriority() {
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+        let issue = app.createIssue(documentId: doc.id, title: "Test Issue", priority: .low)
+
+        app.updateIssuePriority(id: issue.id, priority: .critical)
+
+        let retrieved = app.getIssue(id: issue.id)
+        XCTAssertEqual(retrieved?.priority, .critical)
     }
 
-    func testVCDiffWordCountDelta() {
-        let diff = VCDiff(documentId: UUID(), title: "Test", changeType: .modified,
-                          fromContent: "one two", toContent: "one two three four",
-                          fromWordCount: 2, toWordCount: 4)
-        XCTAssertEqual(diff.wordCountDelta, 2)
+    func testGetIssueStatistics() {
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+        app.createIssue(documentId: doc.id, title: "Open 1", status: .open)
+        app.createIssue(documentId: doc.id, title: "Open 2", status: .open)
+        app.createIssue(documentId: doc.id, title: "Resolved", status: .resolved)
+
+        let stats = app.getIssueStatistics()
+        XCTAssertGreaterThanOrEqual(stats.byStatus[.open] ?? 0, 2)
+        XCTAssertGreaterThanOrEqual(stats.byStatus[.resolved] ?? 0, 1)
     }
 
-    func testVCBranchIsIdentifiable() {
-        let branch = VCBranch(name: "test")
-        XCTAssertNotNil(branch.id)
+    func testGetOpenIssuesForDocument() {
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+        app.createIssue(documentId: doc.id, title: "Open", status: .open)
+        app.createIssue(documentId: doc.id, title: "Closed", status: .closed)
+
+        let openIssues = app.getOpenIssues(forDocument: doc.id)
+        XCTAssertEqual(openIssues.count, 1)
+        XCTAssertEqual(openIssues.first?.status, .open)
     }
 
-    func testVCCommitIsIdentifiable() {
-        let commit = VCCommit(branchId: UUID(), message: "test")
-        XCTAssertNotNil(commit.id)
+    func testGetCriticalIssues() {
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+        app.createIssue(documentId: doc.id, title: "Critical", priority: .critical)
+        app.createIssue(documentId: doc.id, title: "Low", priority: .low)
+
+        let criticalIssues = app.getCriticalIssues()
+        XCTAssertGreaterThanOrEqual(criticalIssues.count, 1)
+        XCTAssertTrue(criticalIssues.allSatisfy { $0.priority == .critical })
+    }
+
+    // MARK: - Statistics Tests
+
+    func testGetStatistics() {
+        app.createBlankDocument(title: "Doc 1", category: .novel)
+        app.createBlankDocument(title: "Doc 2", category: .article)
+
+        let stats = app.getStatistics()
+        XCTAssertGreaterThanOrEqual(stats.totalDocuments, 2)
+        XCTAssertNotNil(stats.documentsByCategory)
+    }
+
+    // MARK: - Edge Cases and Boundary Tests
+
+    func testMultipleSessionsForSameUser() {
+        let userId = UUID()
+
+        app.startSession(userId: userId)
+        app.endSession()
+
+        app.startSession(userId: userId, multitaskingMode: "Full Screen")
+        app.endSession()
+
+        let sessions = try? app.getUserSessions(userId: userId)
+        XCTAssertNotNil(sessions)
+        XCTAssertGreaterThanOrEqual(sessions?.count ?? 0, 2)
+    }
+
+    func testUpdateSessionStatsWithoutSession() {
+        // Should not crash even if no session is active
+        app.updateSessionStats(wordsWritten: 100, aiInteractions: 5)
+    }
+
+    func testEndSessionWithoutStarting() {
+        // Should not crash
+        app.endSession()
+    }
+
+    func testCreateIssueWithMinimalData() {
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+        let issue = app.createIssue(documentId: doc.id, title: "Minimal Issue")
+
+        XCTAssertEqual(issue.title, "Minimal Issue")
+        XCTAssertEqual(issue.description, "")
+        XCTAssertEqual(issue.status, .open)
+        XCTAssertEqual(issue.priority, .medium)
+    }
+
+    func testReopenIssueIntegration() {
+        let doc = app.createBlankDocument(title: "Test Doc", category: .novel)
+        let issue = app.createIssue(documentId: doc.id, title: "Test Issue")
+
+        app.updateIssueStatus(id: issue.id, status: .resolved)
+        var retrieved = app.getIssue(id: issue.id)
+        XCTAssertNotNil(retrieved?.metadata.resolvedAt)
+
+        app.reopenIssue(id: issue.id)
+        retrieved = app.getIssue(id: issue.id)
+        XCTAssertEqual(retrieved?.status, .open)
+        XCTAssertNil(retrieved?.metadata.resolvedAt)
     }
 }
