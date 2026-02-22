@@ -9,6 +9,7 @@ public class WritersApp {
     public let databaseManager: DatabaseManager
     public let pluginManager: PluginManager
     public let encouragementService: EncouragementService
+    public let versionControl: DoltVersionControlService
     public private(set) var aiService: AIService?
     public private(set) var currentUserId: UUID?
     private var currentSessionId: UUID?
@@ -19,10 +20,12 @@ public class WritersApp {
         self.documentManager = DocumentManager()
         self.issueManager = IssueManager()
         self.kanbanManager = KanbanManager()
-        self.databaseManager = DatabaseManager()
+        let db = DatabaseManager()
+        self.databaseManager = db
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
-        try? self.databaseManager.initialize()
+        self.versionControl = DoltVersionControlService(databaseManager: db)
+        try? db.initialize()
     }
 
     /// Initialize with AI capabilities
@@ -31,10 +34,12 @@ public class WritersApp {
         self.documentManager = DocumentManager()
         self.issueManager = IssueManager()
         self.kanbanManager = KanbanManager()
-        self.databaseManager = DatabaseManager()
+        let db = DatabaseManager()
+        self.databaseManager = db
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
-        try? self.databaseManager.initialize()
+        self.versionControl = DoltVersionControlService(databaseManager: db)
+        try? db.initialize()
         self.aiService = AIService(configuration: aiConfiguration)
     }
 
@@ -44,10 +49,12 @@ public class WritersApp {
         self.documentManager = DocumentManager()
         self.issueManager = IssueManager()
         self.kanbanManager = KanbanManager()
-        self.databaseManager = DatabaseManager(databasePath: databasePath)
+        let db = DatabaseManager(databasePath: databasePath)
+        self.databaseManager = db
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
-        try? self.databaseManager.initialize()
+        self.versionControl = DoltVersionControlService(databaseManager: db)
+        try? db.initialize()
     }
 
     /// Enable AI features by providing configuration

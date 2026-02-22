@@ -632,4 +632,262 @@ final class WritersAppTests: XCTestCase {
         XCTAssertEqual(KanbanColumn.review.next, .done)
         XCTAssertNil(KanbanColumn.done.next)
     }
+
+    // MARK: - Dolt Version Control Tests
+
+    private func makeVC() throws -> (DoltVersionControlService, DatabaseManager) {
+        let db = DatabaseManager(databasePath: ":memory:")
+        try db.initialize()
+        let vc = DoltVersionControlService(databaseManager: db)
+        return (vc, db)
+    }
+
+    private func makeDoc(title: String, content: String) -> Document {
+        return Document(title: title, content: content, category: .novel)
+    }
+
+    func testInitializeDefaultBranchCreatesMainBranch() throws {
+        let (vc, _) = try makeVC()
+        let branch = try vc.initializeDefaultBranch()
+        XCTAssertEqual(branch.name, "main")
+        XCTAssertTrue(branch.isActive)
+    }
+
+    func testCheckoutNewBranchCreatesAndActivatesBranch() throws {
+        let (vc, _) = try makeVC()
+        try vc.initializeDefaultBranch()
+        let experiment = try vc.checkoutBranch(name: "experiment", createNew: true)
+        XCTAssertEqual(experiment.name, "experiment")
+        XCTAssertTrue(experiment.isActive)
+    }
+
+    func testCheckoutNewBranchThrowsIfAlreadyExists() throws {
+        let (vc, _) = try makeVC()
+        try vc.initializeDefaultBranch()
+        _ = try vc.checkoutBranch(name: "experiment", createNew: true)
+        XCTAssertThrowsError(try vc.checkoutBranch(name: "experiment", createNew: true)) { error in
+            if case VersionControlError.branchAlreadyExists(let name) = error {
+                XCTAssertEqual(name, "experiment")
+            } else {
+                XCTFail("Expected branchAlreadyExists error")
+            }
+        }
+    }
+
+    func testCheckoutExistingBranchSwitchesActive() throws {
+        let (vc, _) = try makeVC()
+        try vc.initializeDefaultBranch()
+        _ = try vc.checkoutBranch(name: "feature", createNew: true)
+        // Switch back to main
+        let main = try vc.checkoutBranch(name: "main")
+        XCTAssertEqual(main.name, "main")
+        XCTAssertTrue(main.isActive)
+        let current = try vc.currentBranch()
+        XCTAssertEqual(current?.name, "main")
+    }
+
+    func testCommitStoresDocumentSnapshots() throws {
+        let (vc, db) = try makeVC()
+        try vc.initializeDefaultBranch()
+        let doc = makeDoc(title: "Chapter One", content: "It was a dark and stormy night.")
+        let commit = try vc.commit(message: "Initial draft", documents: [doc])
+        let snapshots = try db.getVCSnapshots(commitId: commit.id)
+        XCTAssertEqual(snapshots.count, 1)
+        XCTAssertEqual(snapshots.first?.title, "Chapter One")
+        XCTAssertEqual(snapshots.first?.content, "It was a dark and stormy night.")
+    }
+
+    func testCommitAdvancesBranchHead() throws {
+        let (vc, db) = try makeVC()
+        try vc.initializeDefaultBranch()
+        let doc = makeDoc(title: "Story", content: "Once upon a time.")
+        let commit = try vc.commit(message: "First commit", documents: [doc])
+        let branches = try db.getAllVCBranches()
+        let main = branches.first(where: { $0.name == "main" })
+        XCTAssertEqual(main?.headCommitId, commit.id)
+    }
+
+    func testCommitWithoutActiveBranchThrows() throws {
+        let (vc, _) = try makeVC()
+        // No branch initialized
+        let doc = makeDoc(title: "X", content: "Y")
+        XCTAssertThrowsError(try vc.commit(message: "Should fail", documents: [doc])) { error in
+            if case VersionControlError.noActiveBranch = error {
+                // expected
+            } else {
+                XCTFail("Expected noActiveBranch error")
+            }
+        }
+    }
+
+    func testLogReturnsCommitsLinkedByParentChain() throws {
+        let (vc, _) = try makeVC()
+        try vc.initializeDefaultBranch()
+        let doc = makeDoc(title: "Doc", content: "v1")
+        let first = try vc.commit(message: "First", documents: [doc])
+        let second = try vc.commit(message: "Second", documents: [doc])
+        let history = try vc.log(branch: "main")
+        XCTAssertEqual(history.count, 2)
+        // Verify parent-chain linkage rather than relying on timestamp ordering
+        let root = history.first(where: { $0.parentCommitId == nil })
+        let child = history.first(where: { $0.parentCommitId != nil })
+        XCTAssertNotNil(root, "There should be one root commit with no parent")
+        XCTAssertNotNil(child, "There should be one child commit with a parent")
+        XCTAssertEqual(root?.id, first.id)
+        XCTAssertEqual(child?.id, second.id)
+        XCTAssertEqual(child?.parentCommitId, first.id)
+    }
+
+    func testDiffDetectsModifiedDocument() throws {
+        let (vc, _) = try makeVC()
+        try vc.initializeDefaultBranch()
+        let docId = UUID()
+        let v1 = Document(id: docId, title: "Prices", content: "amount: 100", category: .article)
+        _ = try vc.commit(message: "Base", documents: [v1])
+
+        // Checkout experiment, modify price by 10%
+        _ = try vc.checkoutBranch(name: "experiment", createNew: true)
+        let v2 = Document(id: docId, title: "Prices", content: "amount: 90", category: .article)
+        _ = try vc.commit(message: "Test 10% price reduction", documents: [v2])
+
+        let diffs = try vc.diff(fromBranch: "main", toBranch: "experiment")
+        let modified = diffs.filter { $0.changeType == .modified }
+        XCTAssertEqual(modified.count, 1)
+        XCTAssertEqual(modified.first?.fromContent, "amount: 100")
+        XCTAssertEqual(modified.first?.toContent, "amount: 90")
+    }
+
+    func testDiffDetectsAddedDocument() throws {
+        let (vc, _) = try makeVC()
+        try vc.initializeDefaultBranch()
+        let base = makeDoc(title: "Existing", content: "content")
+        _ = try vc.commit(message: "Base commit", documents: [base])
+
+        _ = try vc.checkoutBranch(name: "feature", createNew: true)
+        let newDoc = makeDoc(title: "New Chapter", content: "fresh content")
+        _ = try vc.commit(message: "Add new chapter", documents: [base, newDoc])
+
+        let diffs = try vc.diff(fromBranch: "main", toBranch: "feature")
+        let added = diffs.filter { $0.changeType == .added }
+        XCTAssertEqual(added.count, 1)
+        XCTAssertEqual(added.first?.title, "New Chapter")
+    }
+
+    func testDiffDetectsDeletedDocument() throws {
+        let (vc, _) = try makeVC()
+        try vc.initializeDefaultBranch()
+        let doc1 = makeDoc(title: "Keep", content: "stays")
+        let doc2 = makeDoc(title: "Remove", content: "gone")
+        _ = try vc.commit(message: "Both docs", documents: [doc1, doc2])
+
+        _ = try vc.checkoutBranch(name: "pruned", createNew: true)
+        _ = try vc.commit(message: "Remove second doc", documents: [doc1])
+
+        let diffs = try vc.diff(fromBranch: "main", toBranch: "pruned")
+        let deleted = diffs.filter { $0.changeType == .deleted }
+        XCTAssertEqual(deleted.count, 1)
+        XCTAssertEqual(deleted.first?.title, "Remove")
+    }
+
+    func testTimeTravelQueryWithDistantFutureReturnsLatestSnapshot() throws {
+        let (vc, _) = try makeVC()
+        try vc.initializeDefaultBranch()
+        let docId = UUID()
+        let v1 = Document(id: docId, title: "Users", content: "alice", category: .article)
+        _ = try vc.commit(message: "Initial users", documents: [v1])
+        let v2 = Document(id: docId, title: "Users", content: "alice, bob", category: .article)
+        _ = try vc.commit(message: "Add bob", documents: [v2])
+
+        // Querying with distant future should return the most recent snapshot
+        let latest = try vc.query(asOf: Date.distantFuture)
+        XCTAssertFalse(latest.isEmpty)
+        XCTAssertEqual(latest.first?.content, "alice, bob")
+    }
+
+    func testTimeTravelQueryWithDistantPastReturnsNoSnapshots() throws {
+        let (vc, _) = try makeVC()
+        try vc.initializeDefaultBranch()
+        let doc = makeDoc(title: "Users", content: "alice")
+        _ = try vc.commit(message: "Initial", documents: [doc])
+
+        // Querying with distant past should return nothing
+        let historical = try vc.query(asOf: Date.distantPast)
+        XCTAssertTrue(historical.isEmpty)
+    }
+
+    func testHistoryReturnsAllVersionsOfDocument() throws {
+        let (vc, _) = try makeVC()
+        try vc.initializeDefaultBranch()
+        let docId = UUID()
+        let v1 = Document(id: docId, title: "Story", content: "v1", category: .novel)
+        let v2 = Document(id: docId, title: "Story", content: "v2", category: .novel)
+        let v3 = Document(id: docId, title: "Story", content: "v3", category: .novel)
+        _ = try vc.commit(message: "v1", documents: [v1])
+        _ = try vc.commit(message: "v2", documents: [v2])
+        _ = try vc.commit(message: "v3", documents: [v3])
+
+        let snapshots = try vc.history(of: docId)
+        XCTAssertEqual(snapshots.count, 3)
+        XCTAssertEqual(snapshots.map { $0.content }, ["v1", "v2", "v3"])
+    }
+
+    func testMergeFastForwardAdvancesHead() throws {
+        let (vc, _) = try makeVC()
+        try vc.initializeDefaultBranch()
+        let doc = makeDoc(title: "Prices", content: "100")
+        // Commit only on feature (main has no commits), then merge into main
+        _ = try vc.checkoutBranch(name: "feature", createNew: true)
+        let commit = try vc.commit(message: "Feature work", documents: [doc])
+        _ = try vc.checkoutBranch(name: "main")
+        let result = try vc.merge(fromBranch: "feature", into: "main")
+        XCTAssertTrue(result.success)
+        XCTAssertEqual(result.strategy, .fastForward)
+        XCTAssertEqual(result.commitId, commit.id)
+    }
+
+    func testMergeThreeWayBringsInNewDocuments() throws {
+        let (vc, _) = try makeVC()
+        try vc.initializeDefaultBranch()
+        let shared = makeDoc(title: "Shared", content: "same")
+        _ = try vc.commit(message: "Base on main", documents: [shared])
+
+        _ = try vc.checkoutBranch(name: "feature", createNew: true)
+        let extra = makeDoc(title: "Extra", content: "new")
+        _ = try vc.commit(message: "Add extra doc", documents: [shared, extra])
+
+        _ = try vc.checkoutBranch(name: "main")
+        let result = try vc.merge(fromBranch: "feature", into: "main")
+        XCTAssertTrue(result.success)
+        XCTAssertEqual(result.strategy, .threeWay)
+        XCTAssertGreaterThan(result.diffCount, 0)
+    }
+
+    func testListBranchesReturnsAllBranches() throws {
+        let (vc, _) = try makeVC()
+        try vc.initializeDefaultBranch()
+        _ = try vc.checkoutBranch(name: "alpha", createNew: true)
+        _ = try vc.checkoutBranch(name: "beta", createNew: true)
+        let branches = try vc.listBranches()
+        let names = branches.map { $0.name }
+        XCTAssertTrue(names.contains("main"))
+        XCTAssertTrue(names.contains("alpha"))
+        XCTAssertTrue(names.contains("beta"))
+    }
+
+    func testVCDiffWordCountDelta() {
+        let diff = VCDiff(documentId: UUID(), title: "Test", changeType: .modified,
+                          fromContent: "one two", toContent: "one two three four",
+                          fromWordCount: 2, toWordCount: 4)
+        XCTAssertEqual(diff.wordCountDelta, 2)
+    }
+
+    func testVCBranchIsIdentifiable() {
+        let branch = VCBranch(name: "test")
+        XCTAssertNotNil(branch.id)
+    }
+
+    func testVCCommitIsIdentifiable() {
+        let commit = VCCommit(branchId: UUID(), message: "test")
+        XCTAssertNotNil(commit.id)
+    }
 }
