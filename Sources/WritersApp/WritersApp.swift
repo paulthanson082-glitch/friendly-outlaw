@@ -5,6 +5,7 @@ public class WritersApp {
     public let templateManager: TemplateManager
     public let documentManager: DocumentManager
     public let issueManager: IssueManager
+    public let kanbanManager: KanbanManager
     public let databaseManager: DatabaseManager
     public let pluginManager: PluginManager
     public let encouragementService: EncouragementService
@@ -17,6 +18,7 @@ public class WritersApp {
         self.templateManager = TemplateManager()
         self.documentManager = DocumentManager()
         self.issueManager = IssueManager()
+        self.kanbanManager = KanbanManager()
         self.databaseManager = DatabaseManager()
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
@@ -28,6 +30,7 @@ public class WritersApp {
         self.templateManager = TemplateManager()
         self.documentManager = DocumentManager()
         self.issueManager = IssueManager()
+        self.kanbanManager = KanbanManager()
         self.databaseManager = DatabaseManager()
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
@@ -40,6 +43,7 @@ public class WritersApp {
         self.templateManager = TemplateManager()
         self.documentManager = DocumentManager()
         self.issueManager = IssueManager()
+        self.kanbanManager = KanbanManager()
         self.databaseManager = DatabaseManager(databasePath: databasePath)
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
@@ -449,6 +453,98 @@ public class WritersApp {
     /// Gets critical issues across all documents
     public func getCriticalIssues() -> [Issue] {
         return issueManager.getCriticalIssues()
+    }
+
+    // MARK: - Kanban Board Management
+
+    /// Creates a new Kanban board
+    public func createKanbanBoard(name: String, description: String = "") -> KanbanBoard {
+        let board = KanbanBoard(name: name, description: description)
+        kanbanManager.createBoard(board)
+        return board
+    }
+
+    /// Retrieves a Kanban board by ID
+    public func getKanbanBoard(id: UUID) -> KanbanBoard? {
+        return kanbanManager.getBoard(id: id)
+    }
+
+    /// Retrieves all Kanban boards
+    public func getAllKanbanBoards() -> [KanbanBoard] {
+        return kanbanManager.getAllBoards()
+    }
+
+    /// Deletes a Kanban board and all its tasks
+    public func deleteKanbanBoard(id: UUID) {
+        kanbanManager.deleteBoard(id: id)
+    }
+
+    // MARK: - Kanban Task Management
+
+    /// Creates a new task on a Kanban board
+    public func createKanbanTask(
+        boardId: UUID,
+        title: String,
+        description: String = "",
+        column: KanbanColumn = .backlog
+    ) -> KanbanTask {
+        let task = KanbanTask(
+            title: title,
+            description: description,
+            column: column,
+            boardId: boardId
+        )
+        kanbanManager.createTask(task)
+        return task
+    }
+
+    /// Retrieves a Kanban task by ID
+    public func getKanbanTask(id: UUID) -> KanbanTask? {
+        return kanbanManager.getTask(id: id)
+    }
+
+    /// Retrieves all tasks for a board
+    public func getKanbanTasks(forBoard boardId: UUID) -> [KanbanTask] {
+        return kanbanManager.getTasks(forBoard: boardId)
+    }
+
+    /// Retrieves tasks in a specific column on a board
+    public func getKanbanTasks(forBoard boardId: UUID, inColumn column: KanbanColumn) -> [KanbanTask] {
+        return kanbanManager.getTasks(forBoard: boardId, inColumn: column)
+    }
+
+    /// Searches Kanban tasks by title or description
+    public func searchKanbanTasks(query: String) -> [KanbanTask] {
+        return kanbanManager.searchTasks(query: query)
+    }
+
+    /// Deletes a Kanban task
+    public func deleteKanbanTask(id: UUID) {
+        kanbanManager.deleteTask(id: id)
+    }
+
+    /// Moves a Kanban task to a specific column
+    public func moveKanbanTask(id: UUID, toColumn column: KanbanColumn) {
+        kanbanManager.moveTask(id: id, toColumn: column)
+    }
+
+    /// Advances a Kanban task to the next column in the workflow
+    /// - Returns: The new column, or nil if the task was already in Done
+    @discardableResult
+    public func advanceKanbanTask(id: UUID) -> KanbanColumn? {
+        return kanbanManager.advanceTask(id: id)
+    }
+
+    /// Moves a Kanban task back to the previous column in the workflow
+    /// - Returns: The new column, or nil if the task was already in Backlog
+    @discardableResult
+    public func regressKanbanTask(id: UUID) -> KanbanColumn? {
+        return kanbanManager.regressTask(id: id)
+    }
+
+    /// Gets task counts by column for a board
+    public func getKanbanTaskCounts(forBoard boardId: UUID) -> [KanbanColumn: Int] {
+        return kanbanManager.getTaskCountByColumn(forBoard: boardId)
     }
 
     // MARK: - AI-Powered Features

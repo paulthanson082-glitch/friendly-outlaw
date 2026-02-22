@@ -448,4 +448,188 @@ final class WritersAppTests: XCTestCase {
         XCTAssertEqual(reopened?.status, .open)
         XCTAssertNil(reopened?.metadata.resolvedAt, "resolvedAt should be nil after status set to open")
     }
+
+    // MARK: - Kanban Tests
+
+    func testKanbanBoardCreationAssignsUniqueId() {
+        let board1 = app.createKanbanBoard(name: "Board One")
+        let board2 = app.createKanbanBoard(name: "Board Two")
+        XCTAssertNotEqual(board1.id, board2.id)
+    }
+
+    func testKanbanBoardRetrievedById() {
+        let board = app.createKanbanBoard(name: "My Board", description: "A test board")
+        let retrieved = app.getKanbanBoard(id: board.id)
+        XCTAssertNotNil(retrieved)
+        XCTAssertEqual(retrieved?.name, "My Board")
+        XCTAssertEqual(retrieved?.description, "A test board")
+    }
+
+    func testGetAllKanbanBoardsReturnsAllBoards() {
+        let before = app.getAllKanbanBoards().count
+        _ = app.createKanbanBoard(name: "Board A")
+        _ = app.createKanbanBoard(name: "Board B")
+        let after = app.getAllKanbanBoards()
+        XCTAssertEqual(after.count, before + 2)
+    }
+
+    func testDeleteKanbanBoardRemovesBoardAndTasks() {
+        let board = app.createKanbanBoard(name: "Delete Me")
+        _ = app.createKanbanTask(boardId: board.id, title: "Task on deleted board")
+        app.deleteKanbanBoard(id: board.id)
+        XCTAssertNil(app.getKanbanBoard(id: board.id))
+        XCTAssertTrue(app.getKanbanTasks(forBoard: board.id).isEmpty)
+    }
+
+    func testKanbanTaskCreationAssignsUniqueId() {
+        let board = app.createKanbanBoard(name: "Task Board")
+        let task1 = app.createKanbanTask(boardId: board.id, title: "Task One")
+        let task2 = app.createKanbanTask(boardId: board.id, title: "Task Two")
+        XCTAssertNotEqual(task1.id, task2.id)
+    }
+
+    func testKanbanTaskDefaultsToBacklog() {
+        let board = app.createKanbanBoard(name: "Workflow Board")
+        let task = app.createKanbanTask(boardId: board.id, title: "New Task")
+        XCTAssertEqual(task.column, .backlog)
+    }
+
+    func testKanbanTaskRetrievedById() {
+        let board = app.createKanbanBoard(name: "Retrieval Board")
+        let task = app.createKanbanTask(boardId: board.id, title: "Findable Task", description: "Find me")
+        let retrieved = app.getKanbanTask(id: task.id)
+        XCTAssertNotNil(retrieved)
+        XCTAssertEqual(retrieved?.title, "Findable Task")
+        XCTAssertEqual(retrieved?.description, "Find me")
+    }
+
+    func testGetKanbanTasksForBoardReturnsAllTasks() {
+        let board = app.createKanbanBoard(name: "Multi-task Board")
+        _ = app.createKanbanTask(boardId: board.id, title: "Alpha")
+        _ = app.createKanbanTask(boardId: board.id, title: "Beta")
+        _ = app.createKanbanTask(boardId: board.id, title: "Gamma")
+        let tasks = app.getKanbanTasks(forBoard: board.id)
+        XCTAssertEqual(tasks.count, 3)
+    }
+
+    func testGetKanbanTasksInColumnFiltersCorrectly() {
+        let board = app.createKanbanBoard(name: "Column Filter Board")
+        _ = app.createKanbanTask(boardId: board.id, title: "Backlog Task", column: .backlog)
+        _ = app.createKanbanTask(boardId: board.id, title: "Done Task", column: .done)
+        let backlogTasks = app.getKanbanTasks(forBoard: board.id, inColumn: .backlog)
+        let doneTasks = app.getKanbanTasks(forBoard: board.id, inColumn: .done)
+        XCTAssertEqual(backlogTasks.count, 1)
+        XCTAssertEqual(doneTasks.count, 1)
+        XCTAssertEqual(backlogTasks.first?.title, "Backlog Task")
+        XCTAssertEqual(doneTasks.first?.title, "Done Task")
+    }
+
+    func testDeleteKanbanTaskRemovesTask() {
+        let board = app.createKanbanBoard(name: "Delete Task Board")
+        let task = app.createKanbanTask(boardId: board.id, title: "Temporary Task")
+        app.deleteKanbanTask(id: task.id)
+        XCTAssertNil(app.getKanbanTask(id: task.id))
+    }
+
+    func testMoveKanbanTaskBetweenColumnsUpdatesState() {
+        let board = app.createKanbanBoard(name: "Move Board")
+        let task = app.createKanbanTask(boardId: board.id, title: "Moveable Task")
+        XCTAssertEqual(task.column, .backlog)
+        app.moveKanbanTask(id: task.id, toColumn: .running)
+        let moved = app.getKanbanTask(id: task.id)
+        XCTAssertEqual(moved?.column, .running)
+    }
+
+    func testAdvanceKanbanTaskMovesForwardInWorkflow() {
+        let board = app.createKanbanBoard(name: "Advance Board")
+        let task = app.createKanbanTask(boardId: board.id, title: "Advancing Task")
+        let newColumn = app.advanceKanbanTask(id: task.id)
+        XCTAssertEqual(newColumn, .planning)
+        XCTAssertEqual(app.getKanbanTask(id: task.id)?.column, .planning)
+    }
+
+    func testAdvanceKanbanTaskThroughFullWorkflow() {
+        let board = app.createKanbanBoard(name: "Full Workflow Board")
+        let task = app.createKanbanTask(boardId: board.id, title: "Workflow Task")
+        app.advanceKanbanTask(id: task.id) // backlog → planning
+        app.advanceKanbanTask(id: task.id) // planning → running
+        app.advanceKanbanTask(id: task.id) // running → review
+        app.advanceKanbanTask(id: task.id) // review → done
+        XCTAssertEqual(app.getKanbanTask(id: task.id)?.column, .done)
+    }
+
+    func testAdvanceKanbanTaskAtDoneReturnsNil() {
+        let board = app.createKanbanBoard(name: "Done Board")
+        let task = app.createKanbanTask(boardId: board.id, title: "Done Task", column: .done)
+        let result = app.advanceKanbanTask(id: task.id)
+        XCTAssertNil(result, "Advancing from Done should return nil")
+        XCTAssertEqual(app.getKanbanTask(id: task.id)?.column, .done)
+    }
+
+    func testRegressKanbanTaskMovesBackwardInWorkflow() {
+        let board = app.createKanbanBoard(name: "Regress Board")
+        let task = app.createKanbanTask(boardId: board.id, title: "Regressing Task", column: .running)
+        let newColumn = app.regressKanbanTask(id: task.id)
+        XCTAssertEqual(newColumn, .planning)
+        XCTAssertEqual(app.getKanbanTask(id: task.id)?.column, .planning)
+    }
+
+    func testRegressKanbanTaskAtBacklogReturnsNil() {
+        let board = app.createKanbanBoard(name: "Backlog Board")
+        let task = app.createKanbanTask(boardId: board.id, title: "Backlog Task")
+        let result = app.regressKanbanTask(id: task.id)
+        XCTAssertNil(result, "Regressing from Backlog should return nil")
+        XCTAssertEqual(app.getKanbanTask(id: task.id)?.column, .backlog)
+    }
+
+    func testMoveKanbanTaskToDoneSetsCompletedAt() {
+        let board = app.createKanbanBoard(name: "Completion Board")
+        let task = app.createKanbanTask(boardId: board.id, title: "Completable Task")
+        XCTAssertNil(task.metadata.completedAt)
+        app.moveKanbanTask(id: task.id, toColumn: .done)
+        let completed = app.getKanbanTask(id: task.id)
+        XCTAssertNotNil(completed?.metadata.completedAt)
+    }
+
+    func testMoveKanbanTaskFromDoneClearsCompletedAt() {
+        let board = app.createKanbanBoard(name: "Reopen Board")
+        let task = app.createKanbanTask(boardId: board.id, title: "Reopenable Task")
+        app.moveKanbanTask(id: task.id, toColumn: .done)
+        XCTAssertNotNil(app.getKanbanTask(id: task.id)?.metadata.completedAt, "completedAt should be set on Done")
+        app.moveKanbanTask(id: task.id, toColumn: .review)
+        let moved = app.getKanbanTask(id: task.id)
+        XCTAssertNil(moved?.metadata.completedAt, "completedAt should be cleared when moved out of Done")
+    }
+
+    func testGetKanbanTaskCountsByColumn() {
+        let board = app.createKanbanBoard(name: "Count Board")
+        _ = app.createKanbanTask(boardId: board.id, title: "T1", column: .backlog)
+        _ = app.createKanbanTask(boardId: board.id, title: "T2", column: .backlog)
+        _ = app.createKanbanTask(boardId: board.id, title: "T3", column: .running)
+        let counts = app.getKanbanTaskCounts(forBoard: board.id)
+        XCTAssertEqual(counts[.backlog], 2)
+        XCTAssertEqual(counts[.running], 1)
+        XCTAssertEqual(counts[.planning], 0)
+        XCTAssertEqual(counts[.review], 0)
+        XCTAssertEqual(counts[.done], 0)
+    }
+
+    func testSearchKanbanTasksByTitle() {
+        let board = app.createKanbanBoard(name: "Search Board")
+        _ = app.createKanbanTask(boardId: board.id, title: "Write chapter one")
+        _ = app.createKanbanTask(boardId: board.id, title: "Edit draft")
+        _ = app.createKanbanTask(boardId: board.id, title: "Write synopsis")
+        let results = app.searchKanbanTasks(query: "Write")
+        XCTAssertEqual(results.count, 2)
+        XCTAssertTrue(results.allSatisfy { $0.title.localizedCaseInsensitiveContains("Write") })
+    }
+
+    func testKanbanColumnWorkflowOrder() {
+        XCTAssertNil(KanbanColumn.backlog.previous)
+        XCTAssertEqual(KanbanColumn.backlog.next, .planning)
+        XCTAssertEqual(KanbanColumn.planning.next, .running)
+        XCTAssertEqual(KanbanColumn.running.next, .review)
+        XCTAssertEqual(KanbanColumn.review.next, .done)
+        XCTAssertNil(KanbanColumn.done.next)
+    }
 }
