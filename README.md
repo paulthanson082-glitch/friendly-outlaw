@@ -833,6 +833,16 @@ When running as an MCP server, the following tools are available:
 - [QUICK_START.md](QUICK_START.md) - Quick start guide
 - [VSCODE_SETUP.md](VSCODE_SETUP.md) - VS Code setup guide
 
+## Support the Project
+
+If you find this project useful, consider supporting development with a cryptocurrency donation:
+
+| Currency | Address |
+|----------|---------|
+| BTC | `bc1q7zldmzjwspnaa48udvelwe6k3fef7xrrhg5625` |
+| LTC | `LRWgqwEYDwqau1WeiTs6Mjg85NJ7m3fsdQ` |
+| ETH | `0x3f844B2cc3c4b7242964373fB0A41C4fdffB192A` |
+
 ## License
 
 MIT License - See LICENSE file for details
