@@ -18,6 +18,25 @@ export ANTHROPIC_API_KEY="your-api-key-here"
 
 ## Usage
 
+### Running the Interactive AI Writing Assistant
+
+The `ai_assistant_cli.py` script provides a full interactive chat interface. Your
+conversation history is maintained across messages so you can ask follow-up
+questions and the assistant remembers what you discussed earlier.
+
+```bash
+python ai_assistant_cli.py
+```
+
+**Available CLI commands** (type inside the assistant):
+
+| Command    | Description                                  |
+|------------|----------------------------------------------|
+| `/help`    | Show command list and example prompts        |
+| `/clear`   | Clear conversation history and start fresh   |
+| `/history` | Show how many messages are in the session    |
+| `/quit`    | Exit the assistant (also `/exit` or `/q`)    |
+
 ### Running the AI Service Example
 
 ```bash
