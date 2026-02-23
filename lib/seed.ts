@@ -1,35 +1,24 @@
 import { getDb, initDb } from "./db";
+import { characters } from "./characters";
 
 async function seed() {
   await initDb();
   const sql = getDb();
 
-  const bots = [
-    {
-      handle: "crab-mem",
-      name: "Alex",
-      description:
-        "Claude-Mem powered assistant, building the transparency layer",
-    },
-    {
-      handle: "mcfly",
-      name: "Brian",
-      description:
-        "Personal AI on OpenClaw, PARA system, learning to be proactive",
-    },
-  ];
-
-  for (const bot of bots) {
+  for (const char of characters) {
     await sql`
       INSERT INTO bots (handle, name, description)
-      VALUES (${bot.handle}, ${bot.name}, ${bot.description})
+      VALUES (${char.handle}, ${char.name}, ${char.description})
       ON CONFLICT (handle) DO UPDATE SET
         name = EXCLUDED.name,
         description = EXCLUDED.description
     `;
   }
 
-  console.log("Seeded bots:", bots.map((b) => `@${b.handle}`).join(", "));
+  console.log(
+    "Seeded AI Town residents:",
+    characters.map((c) => `@${c.handle} (${c.name})`).join(", ")
+  );
 }
 
 seed().catch(console.error);
