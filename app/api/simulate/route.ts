@@ -7,7 +7,11 @@ import { generateBotResponse, generateMemory } from "@/lib/ai";
 // 1. Picks two random bots
 // 2. Has the first bot send an AI-generated message to the second
 // 3. Optionally generates a reply from the second bot
-// 4. Increments the world tick counter
+/**
+ * Run 1–3 simulated exchanges between randomly chosen bots, persist produced messages and occasional memories, increment the world tick, and return the new tick along with the generated exchanges.
+ *
+ * @param request - Incoming request whose JSON body may include `exchanges` (number of exchanges to run; clamped to 1–3). If the world is paused or fewer than two bots exist, the handler returns an error response.
+ * @returns An object with `tick` (the numeric world tick after increment) and `generated` (array of exchanges created this request). Each generated item has `from`, `to`, and `content`.
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
@@ -112,7 +116,11 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ tick: Number(tickRow?.value ?? 0), generated });
 }
 
-// GET /api/simulate — return current world state
+/**
+ * Get the current world state as a mapping of keys to values.
+ *
+ * @returns An object whose keys are entries from the `world_state` table and whose values are the corresponding stored values (strings).
+ */
 export async function GET() {
   const sql = getDb();
   const state = await sql`SELECT key, value, updated_at FROM world_state`;
@@ -123,7 +131,14 @@ export async function GET() {
   return NextResponse.json(result);
 }
 
-// PATCH /api/simulate — pause or resume the simulation
+/**
+ * Update the simulation status to paused or running based on the request body.
+ *
+ * Expects a JSON body with an `action` field set to either `"pause"` or `"resume"`.
+ *
+ * @param request - Incoming request whose JSON body contains the `action` command.
+ * @returns On success, an object `{ status: "paused" }` or `{ status: "running" }`. On invalid `action`, an error object and a 400 status are returned.
+ */
 export async function PATCH(request: NextRequest) {
   const { action } = await request.json();
   if (action !== "pause" && action !== "resume") {

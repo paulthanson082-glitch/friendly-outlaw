@@ -5,6 +5,11 @@ export function getDb() {
   return sql;
 }
 
+/**
+ * Ensure required database schema exists and seed initial world state.
+ *
+ * Creates tables `bots`, `messages`, `bot_memories`, and `world_state`, adds indexes used for queries, and inserts default `world_state` keys (`status` = `running`, `tick` = `0`) if they are missing.
+ */
 export async function initDb() {
   const sql = getDb();
 

@@ -6,7 +6,17 @@ import { getDb } from "@/lib/db";
 // - All residents (bots) with their descriptions
 // - Recent messages (last 30, across all pairs)
 // - World state (tick, status)
-// - Per-bot recent memory summaries
+/**
+ * Return a snapshot of the AI Town state including world state, residents, and recent messages.
+ *
+ * The response includes the current world key/value pairs, all bots augmented with their
+ * latest per-bot memory (or `null` if none), and the 30 most recent messages with sender/recipient names.
+ *
+ * @returns An object with:
+ *  - `world`: a record mapping world state keys to string values,
+ *  - `residents`: an array of bot objects (id, handle, name, description, created_at) each with `latestMemory` (string or `null`),
+ *  - `feed`: an array of recent message objects containing `id`, `from`, `to`, `content`, `type`, `timestamp`, `from_name`, and `to_name`.
+ */
 
 export async function GET() {
   const sql = getDb();
