@@ -41,10 +41,22 @@ const AVATARS: Record<string, string> = {
   zara: "☕",
 };
 
+/**
+ * Get the emoji avatar for a resident handle.
+ *
+ * @param handle - The resident's handle (key used to look up an avatar)
+ * @returns The emoji associated with `handle`, or the robot emoji `🤖` if none is defined
+ */
 function avatar(handle: string): string {
   return AVATARS[handle] ?? "🤖";
 }
 
+/**
+ * Formats a timestamp as a concise relative time (seconds, minutes, or hours).
+ *
+ * @param ts - A parseable timestamp string (e.g., ISO 8601) to compare against the current time
+ * @returns A string such as `5s ago`, `3m ago`, or `2h ago` indicating how long ago `ts` was
+ */
 function timeAgo(ts: string): string {
   const diff = Date.now() - new Date(ts).getTime();
   const s = Math.floor(diff / 1000);
@@ -55,6 +67,13 @@ function timeAgo(ts: string): string {
   return `${h}h ago`;
 }
 
+/**
+ * Renders the AI Town dashboard UI for viewing and controlling the simulation.
+ *
+ * Displays current world status and tick, provides controls to run ticks, toggle auto-run, pause/resume, and refresh; shows a residents list (selectable to filter conversations), the town feed with timestamps and avatars, loading and error states, and an API reference footer.
+ *
+ * @returns The Home page JSX element containing the simulation controls, residents panel, feed view, and footer.
+ */
 export default function Home() {
   const [town, setTown] = useState<TownData | null>(null);
   const [loading, setLoading] = useState(true);

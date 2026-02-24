@@ -1,6 +1,11 @@
 import { getDb, initDb } from "./db";
 import { characters } from "./characters";
 
+/**
+ * Initializes the database and upserts the project's characters into the `bots` table.
+ *
+ * Inserts each character from the `characters` list and, on a handle conflict, updates that record's `name` and `description`. Logs a summary of seeded residents to the console.
+ */
 async function seed() {
   await initDb();
   const sql = getDb();

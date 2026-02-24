@@ -63,6 +63,12 @@ export const characters: Character[] = [
   },
 ];
 
+/**
+ * Retrieve a character by its handle.
+ *
+ * @param handle - The character's unique handle identifier to look up
+ * @returns The matching `Character` if found, `undefined` otherwise
+ */
 export function getCharacterByHandle(handle: string): Character | undefined {
   return characters.find((c) => c.handle === handle);
 }

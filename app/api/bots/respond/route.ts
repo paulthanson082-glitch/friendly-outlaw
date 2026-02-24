@@ -5,7 +5,12 @@ import { generateBotResponse, generateMemory } from "@/lib/ai";
 // POST /api/bots/respond
 // Body: { speaker: "pixel", listener: "sage" }
 // The speaker bot generates a Claude-powered reply to the listener,
-// stores it as a message, and saves a memory summary.
+/**
+ * Generate an AI reply from a speaker bot to a listener bot, store the reply as a message, and periodically create and store a memory summary for the speaker.
+ *
+ * @param request - Incoming request whose JSON body must include `speaker` and `listener` bot handles; validates handles, ensures bots exist, and uses recent messages and memories to generate the reply.
+ * @returns The created message record containing `id`, `from`, `to`, `content`, `type`, and `timestamp`.
+ */
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const { speaker, listener } = body;

@@ -19,8 +19,12 @@ export interface Memory {
 }
 
 /**
- * Generate a bot response using Claude. The bot speaks in character based on
- * its personality definition and recent conversation history.
+ * Produce a one- to two-sentence in-character reply from `speakerHandle` to `listenerHandle` using Claude.
+ *
+ * The reply is grounded in the speaker's persona, recent conversation history (up to 10 messages), and provided memories.
+ *
+ * @returns A trimmed string containing the speaker's in-character reply (one to two sentences).
+ * @throws If the Claude response block is not of type `text`.
  */
 export async function generateBotResponse(
   speakerHandle: string,
@@ -64,6 +68,14 @@ export async function generateBotResponse(
   return block.text.trim();
 }
 
+/**
+ * Builds the system prompt that defines the speaker's persona, context, and conversational constraints for the model.
+ *
+ * @param speakerHandle - Character handle used to resolve the speaker's display name, personality, interests, and initial plan; falls back to the handle or sensible defaults when character data is missing.
+ * @param listenerHandle - Character handle used to resolve the listener's display name; falls back to the handle when character data is missing.
+ * @param memories - Recent memories to include in the prompt as a short bullet list; pass an empty array to omit the memory section.
+ * @returns The complete system prompt string to provide as the model's system instruction.
+ */
 function buildSystemPrompt(
   speakerHandle: string,
   listenerHandle: string,
@@ -97,8 +109,12 @@ Rules:
 }
 
 /**
- * Generate a memory summary after a conversation exchange.
- * This keeps a compact record of notable things said.
+ * Create a one-sentence memory summarizing what the bot learned or felt from a recent conversation.
+ *
+ * @param botHandle - The handle of the bot character
+ * @param otherHandle - The handle of the other character in the conversation
+ * @param messages - Conversation messages (the function uses up to the last six messages to build the transcript)
+ * @returns A single-sentence, first-person memory summary (no quotes) or an empty string if no text response was produced
  */
 export async function generateMemory(
   botHandle: string,
