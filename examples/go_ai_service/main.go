@@ -112,7 +112,7 @@ type AIService struct {
 	apiBase    string
 }
 
-// NewAIService creates a new AIService instance.
+// The service is initialized with an HTTP client using a 60-second timeout and the Anthropic API base URL.
 func NewAIService(config AIConfiguration) *AIService {
 	return &AIService{
 		config:     config,
@@ -378,11 +378,17 @@ func (s *AIService) CustomRequest(ctx context.Context, text, instruction string,
 	return s.callAPI(ctx, prompt, -1)
 }
 
-// separator prints a visual divider.
+// separator prints a visual divider to standard output: a blank line followed by 50 '=' characters.
 func separator() {
 	fmt.Println("\n" + strings.Repeat("=", 50))
 }
 
+// main is the program entry point that demonstrates the AI writing service.
+// It reads the ANTHROPIC_API_KEY environment variable, constructs an AIService
+// with a sample configuration, and runs example operations (continue writing,
+// generate titles, and improve text) on a short sample. Results are printed to
+// stdout; unrecoverable errors are reported to stderr and cause the process to exit
+// with a non-zero status.
 func main() {
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	if apiKey == "" {
