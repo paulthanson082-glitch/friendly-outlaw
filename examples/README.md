@@ -1,6 +1,6 @@
-# Python Examples for Anthropic API
+# Examples for Anthropic API
 
-This directory contains Python examples demonstrating how to use the Anthropic API with the official Python SDK.
+This directory contains examples demonstrating how to use the Anthropic API from multiple languages.
 
 ## Setup
 
@@ -137,16 +137,98 @@ Provides context for AI requests:
 - `writing_style` - Desired style
 - `additional_notes` - Extra context
 
+## Go Example
+
+The `go_ai_service/` directory contains a Go implementation of the same writing assistant.
+Inspired by [PicoClaw](https://github.com/sipeed/picoclaw)'s ultra-lightweight Go design, it uses only the Go standard library — no external SDK required.
+
+### Setup
+
+Go 1.21+ is required. No dependencies to install.
+
+```bash
+cd go_ai_service
+export ANTHROPIC_API_KEY="your-api-key-here"
+go run main.go
+```
+
+### Using in Your Code
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "os"
+)
+
+func main() {
+    config := AIConfiguration{
+        APIKey:      os.Getenv("ANTHROPIC_API_KEY"),
+        Model:       Claude35Sonnet,
+        MaxTokens:   4096,
+        Temperature: 0.7,
+    }
+    service := NewAIService(config)
+    ctx := context.Background()
+
+    aiCtx := &AIContext{Genre: "Science Fiction", TargetAudience: "Young Adult"}
+
+    // Continue writing
+    continuation, _ := service.ContinueWriting(ctx, "The spaceship drifted through the void...", aiCtx)
+    fmt.Println(continuation)
+
+    // Generate titles
+    titles, _ := service.GenerateTitles(ctx, "Your content here", aiCtx, 5)
+    for i, t := range titles {
+        fmt.Printf("%d. %s\n", i+1, t)
+    }
+
+    // Improve text
+    improved, _ := service.ImproveText(ctx, "Your text to improve", aiCtx)
+    fmt.Println(improved)
+
+    // Check grammar
+    corrected, _ := service.CheckGrammar(ctx, "Text with potential errors")
+    fmt.Println(corrected)
+
+    // Brainstorm ideas
+    ideas, _ := service.BrainstormIdeas(ctx, "Time travel paradoxes", aiCtx)
+    fmt.Println(ideas)
+
+    // Develop a character
+    character, _ := service.DevelopCharacter(ctx, "A reluctant hero with a mysterious past", aiCtx)
+    fmt.Println(character)
+
+    // Generate an outline
+    outline, _ := service.GenerateOutline(ctx, "A story about AI consciousness", aiCtx)
+    fmt.Println(outline)
+
+    // Change tone
+    formal, _ := service.ChangeTone(ctx, "Hey! This is really cool!", ToneFormal, nil)
+    fmt.Println(formal)
+
+    // Custom request
+    result, _ := service.CustomRequest(ctx, "Your text", "Rewrite this as a haiku", aiCtx)
+    fmt.Println(result)
+}
+```
+
+---
+
 ## Comparison with Swift Implementation
 
-This Python implementation mirrors the functionality of the Swift `AIService` found in `Sources/WritersApp/Services/AIService.swift`, but uses the official Anthropic Python SDK instead of raw HTTP requests.
+All three implementations (Swift, Python, Go) mirror the `AIService` found in
+`Sources/WritersApp/Services/AIService.swift`.
 
-### Key Differences:
-
-1. **SDK vs Raw HTTP**: Python uses the official `anthropic` SDK, while Swift uses URLSession for raw HTTP requests
-2. **Type Safety**: Both implementations use strong typing (Python dataclasses, Swift structs)
-3. **Async/Await**: Both support asynchronous operations
-4. **Error Handling**: Python uses exceptions, Swift uses Result types
+| Aspect | Swift | Python | Go |
+|---|---|---|---|
+| HTTP | URLSession (raw) | `anthropic` SDK | `net/http` (raw) |
+| Types | Structs + enums | Dataclasses + enums | Structs + typed consts |
+| Async | async/await | sync (SDK handles) | `context.Context` |
+| Errors | Result / throws | Exceptions | `error` return value |
+| Dependencies | None | `anthropic>=0.79.0` | None (stdlib only) |
 
 ## Getting an API Key
 
