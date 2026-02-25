@@ -11,6 +11,9 @@ let package = Package(
         .library(
             name: "WritersApp",
             targets: ["WritersApp"]),
+        .library(
+            name: "WritersAppIOS",
+            targets: ["WritersAppIOS"]),
         .executable(
             name: "WritersAppCLI",
             targets: ["WritersAppCLI"])
@@ -24,6 +27,9 @@ let package = Package(
             dependencies: ["CSQLite"]),
         .executableTarget(
             name: "WritersAppCLI",
+            dependencies: ["WritersApp"]),
+        .target(
+            name: "WritersAppIOS",
             dependencies: ["WritersApp"]),
         .testTarget(
             name: "WritersAppTests",
