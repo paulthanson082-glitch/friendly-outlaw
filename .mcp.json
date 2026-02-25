@@ -3,6 +3,14 @@
     "openbrowser": {
       "command": "uvx",
       "args": ["openbrowser-ai[mcp]", "--mcp"]
+    },
+    "gemini": {
+      "command": "npx",
+      "args": ["-y", "@rlabs-inc/gemini-mcp"],
+      "env": {
+        "GEMINI_API_KEY": "${GEMINI_API_KEY}",
+        "GEMINI_OUTPUT_DIR": "/tmp/gemini-output"
+      }
     }
   }
 }
