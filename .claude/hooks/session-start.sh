@@ -60,3 +60,4 @@ claude plugin install pyright-lsp@claude-plugins-official 2>&1 || true
 claude plugin install supabase@claude-plugins-official 2>&1 || true
 claude plugin install claude-code-setup@claude-plugins-official 2>&1 || true
 claude plugin install plugin-dev@claude-plugins-official 2>&1 || true
+claude plugin install explanatory-output-style@claude-plugins-official 2>&1 || true
