@@ -53,3 +53,4 @@ claude plugin install security-guidance@claude-plugins-official 2>&1 || true
 claude plugin install commit-commands@claude-plugins-official 2>&1 || true
 claude plugin install playwright@claude-plugins-official 2>&1 || true
 claude plugin install claude-md-management@claude-plugins-official 2>&1 || true
+claude plugin install pr-review-toolkit@claude-plugins-official 2>&1 || true
