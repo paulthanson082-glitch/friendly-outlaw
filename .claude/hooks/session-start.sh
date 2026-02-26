@@ -35,3 +35,14 @@ fi
 # Build the project to resolve dependencies and cache build artifacts
 cd "$CLAUDE_PROJECT_DIR"
 swift build 2>&1
+
+# Install Claude plugins
+claude plugin install context7@claude-plugins-official 2>&1 || true
+claude plugin install frontend-design@claude-plugins-official 2>&1 || true
+claude plugin install code-review@claude-plugins-official 2>&1 || true
+claude plugin install superpowers@claude-plugins-official 2>&1 || true
+claude plugin install github@claude-plugins-official 2>&1 || true
+claude plugin install feature-dev@claude-plugins-official 2>&1 || true
+claude plugin install code-simplifier@claude-plugins-official 2>&1 || true
+claude plugin install ralph-loop@claude-plugins-official 2>&1 || true
+claude plugin install typescript-lsp@claude-plugins-official 2>&1 || true
