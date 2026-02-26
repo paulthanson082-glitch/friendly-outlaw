@@ -900,10 +900,13 @@ public class WritersAppViewModel: ObservableObject {
         // TODO: Implement document export functionality
     }
 
+    /// Presents the document information interface, showing the current document's metadata and available actions such as export and metadata editing.
     public func showDocumentInfo() {
         // TODO: Implement document info display
     }
 
+    /// Shows the word count detail sheet.
+    /// Sets the view model's sheet visibility flag so the WordCountDetailView is presented.
     public func showWordCount() {
         showWordCountSheet = true
     }
