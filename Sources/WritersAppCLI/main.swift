@@ -25,6 +25,7 @@ struct WritersAppCLI {
             var shouldShowHelp = false
             var listDocs = false
             var analyzeTraces = false
+            var shouldDance = false
             
             var i = 1
             while i < arguments.count {
@@ -57,6 +58,9 @@ struct WritersAppCLI {
                 case "--analyze-traces":
                     analyzeTraces = true
                     i += 1
+                case "--dance":
+                    shouldDance = true
+                    i += 1
                 default:
                     print("Unknown option: \(arg)")
                     print("Use --help for usage information")
@@ -77,6 +81,11 @@ struct WritersAppCLI {
 
             if analyzeTraces {
                 runTraceAnalysis(app: app)
+                return
+            }
+
+            if shouldDance {
+                await claudeDance()
                 return
             }
             
@@ -2026,6 +2035,101 @@ private let uuidDisplayLength = 8
 private let titleColumnWidth = 24
 private let categoryColumnWidth = 13
 
+// MARK: - Dance
+
+func claudeDance() async {
+    let frames: [String] = [
+        """
+        ╔══════════════════════════════╗
+        ║       ♪ ♫  CLAUDE  ♫ ♪       ║
+        ╚══════════════════════════════╝
+
+              \\o/   ← arms up!
+               |
+              / \\
+        """,
+        """
+        ╔══════════════════════════════╗
+        ║       ♫ ♪  CLAUDE  ♪ ♫       ║
+        ╚══════════════════════════════╝
+
+               o    ← lean right
+              /|
+              / \\
+        """,
+        """
+        ╔══════════════════════════════╗
+        ║       ♪ ♫  CLAUDE  ♫ ♪       ║
+        ╚══════════════════════════════╝
+
+               o    ← lean left
+               |\\
+              / \\
+        """,
+        """
+        ╔══════════════════════════════╗
+        ║       ♫ ♪  CLAUDE  ♪ ♫       ║
+        ╚══════════════════════════════╝
+
+              \\o/   ← spin!
+               |
+              / \\
+        """,
+        """
+        ╔══════════════════════════════╗
+        ║       ♪ ♫  CLAUDE  ♫ ♪       ║
+        ╚══════════════════════════════╝
+
+              \\o    ← groove left
+               |\\
+              /  \\
+        """,
+        """
+        ╔══════════════════════════════╗
+        ║       ♫ ♪  CLAUDE  ♪ ♫       ║
+        ╚══════════════════════════════╝
+
+               o/   ← groove right
+              /|
+              /  \\
+        """,
+        """
+        ╔══════════════════════════════╗
+        ║       ♪ ♫  CLAUDE  ♫ ♪       ║
+        ╚══════════════════════════════╝
+
+              \\O/   ← jazz hands!
+               |
+              / \\
+        """,
+        """
+        ╔══════════════════════════════╗
+        ║    🎉  DANCE COMPLETE!  🎉    ║
+        ╚══════════════════════════════╝
+
+              \\o/
+               |    Thanks for watching!
+              / \\
+        """
+    ]
+
+    print("\nGet ready... Claude is about to dance!\n")
+    try? await Task.sleep(nanoseconds: 800_000_000)
+
+    let repeatCount = 2
+    for rep in 0..<repeatCount {
+        let framesToShow = rep < repeatCount - 1 ? frames.dropLast() : Array(frames)
+        for frame in framesToShow {
+            // Clear previous frame (move cursor up 8 lines)
+            print("\u{1B}[8A\u{1B}[J", terminator: "")
+            print(frame)
+            try? await Task.sleep(nanoseconds: 350_000_000)
+        }
+    }
+
+    print("\n  ♪ Never gonna give you up, never gonna let you down ♪\n")
+}
+
 func showHelp() {
     print("""
     Writers App CLI - Command-Line Interface
@@ -2039,6 +2143,7 @@ func showHelp() {
         --open, -o <id|title>   Open a document by ID or title
         --run, -r [type]        Start a focus session (types: freewrite, pomodoro, sprint, deepwork, marathon)
         --analyze-traces        Run trace analysis report (productivity by session length, tool usage)
+        --dance                 Make Claude dance ♪
 
     COMBINED OPTIONS:
         --open <id|title> --run [type]   Open a document and start a focus session on it
