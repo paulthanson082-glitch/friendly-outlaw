@@ -65,3 +65,4 @@ claude plugin install greptile@claude-plugins-official 2>&1 || true
 claude plugin install hookify@claude-plugins-official 2>&1 || true
 claude plugin install vercel@claude-plugins-official 2>&1 || true
 claude plugin install linear@claude-plugins-official 2>&1 || true
+claude plugin install sentry@claude-plugins-official 2>&1 || true
