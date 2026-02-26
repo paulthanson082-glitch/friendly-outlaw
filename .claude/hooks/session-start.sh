@@ -58,3 +58,4 @@ claude plugin install serena@claude-plugins-official 2>&1 || true
 claude plugin install figma@claude-plugins-official 2>&1 || true
 claude plugin install pyright-lsp@claude-plugins-official 2>&1 || true
 claude plugin install supabase@claude-plugins-official 2>&1 || true
+claude plugin install claude-code-setup@claude-plugins-official 2>&1 || true
