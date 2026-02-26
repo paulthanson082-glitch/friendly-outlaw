@@ -168,6 +168,87 @@ struct DocumentEditorView: View {
             EditorStatusBarView(viewModel: viewModel)
         }
         .background(Color(uiColor: .systemBackground))
+        .sheet(isPresented: $viewModel.showWordCountSheet) {
+            WordCountDetailView(viewModel: viewModel)
+        }
+    }
+}
+
+// MARK: - Word Count Detail View
+
+/// Sheet displaying detailed word count statistics for the current document
+@available(iOS 16.0, macOS 13.0, *)
+struct WordCountDetailView: View {
+    @ObservedObject var viewModel: WritersAppViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    private var sentenceCount: Int {
+        let content = viewModel.currentDocumentContent
+        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return 0 }
+        let sentences = content.components(separatedBy: CharacterSet(charactersIn: ".!?"))
+        return sentences.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
+    }
+
+    private var paragraphCount: Int {
+        let content = viewModel.currentDocumentContent
+        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return 0 }
+        let paragraphs = content.components(separatedBy: "\n\n")
+        return paragraphs.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Writing Stats") {
+                    StatRow(label: "Words", value: "\(viewModel.wordCount)")
+                    StatRow(label: "Characters", value: "\(viewModel.characterCount)")
+                    StatRow(label: "Sentences", value: "\(sentenceCount)")
+                    StatRow(label: "Paragraphs", value: "\(paragraphCount)")
+                    StatRow(label: "Reading Time", value: "\(viewModel.readingTime) min")
+                }
+
+                if let goal = viewModel.wordCountGoal {
+                    Section("Word Count Goal") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ProgressView(value: Double(min(viewModel.wordCount, goal)), total: Double(goal))
+                            HStack {
+                                Text("\(viewModel.wordCount) of \(goal) words")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                let remaining = max(0, goal - viewModel.wordCount)
+                                Text(remaining == 0 ? "Goal reached!" : "\(remaining) remaining")
+                                    .font(.caption)
+                                    .foregroundColor(remaining == 0 ? .green : .secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+            .navigationTitle("Word Count")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+}
+
+private struct StatRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack {
+            Text(label)
+            Spacer()
+            Text(value)
+                .foregroundColor(.secondary)
+        }
     }
 }
 
@@ -743,6 +824,7 @@ public class WritersAppViewModel: ObservableObject {
     @Published public var isFocusMode: Bool = false
     @Published public var isSaving: Bool = false
     @Published public var aiResponse: String = ""
+    @Published public var showWordCountSheet: Bool = false
 
     // Statistics
     @Published public var wordCount: Int = 0
@@ -823,7 +905,7 @@ public class WritersAppViewModel: ObservableObject {
     }
 
     public func showWordCount() {
-        // TODO: Implement detailed word count display
+        showWordCountSheet = true
     }
 
     // MARK: - Formatting
