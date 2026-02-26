@@ -36,6 +36,9 @@ fi
 cd "$CLAUDE_PROJECT_DIR"
 swift build 2>&1
 
+# Ensure the official Claude plugins marketplace is registered
+claude plugin marketplace add anthropics/claude-plugins-official 2>&1 || true
+
 # Install Claude plugins
 claude plugin install context7@claude-plugins-official 2>&1 || true
 claude plugin install frontend-design@claude-plugins-official 2>&1 || true
@@ -46,3 +49,7 @@ claude plugin install feature-dev@claude-plugins-official 2>&1 || true
 claude plugin install code-simplifier@claude-plugins-official 2>&1 || true
 claude plugin install ralph-loop@claude-plugins-official 2>&1 || true
 claude plugin install typescript-lsp@claude-plugins-official 2>&1 || true
+claude plugin install security-guidance@claude-plugins-official 2>&1 || true
+claude plugin install commit-commands@claude-plugins-official 2>&1 || true
+claude plugin install playwright@claude-plugins-official 2>&1 || true
+claude plugin install claude-md-management@claude-plugins-official 2>&1 || true
