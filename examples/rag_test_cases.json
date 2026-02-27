@@ -1,0 +1,85 @@
+{
+  "metadata": {
+    "name": "Summary Indexing + Re-Ranking Evaluation",
+    "version": "1.0",
+    "target_metrics": {
+      "average_precision": 0.44,
+      "average_recall": 0.71,
+      "average_mrr": 0.865,
+      "end_to_end_accuracy": 0.81
+    }
+  },
+  "test_cases": [
+    {
+      "query": "How can you create multiple test cases for an evaluation in the Anthropic Evaluation tool?",
+      "retrieval_precision": 0.6667,
+      "retrieval_recall": 1.0,
+      "retrieval_mrr": 1.0,
+      "e2e_correct": true
+    },
+    {
+      "query": "What embeddings provider does Anthropic recommend for customized domain-specific models?",
+      "retrieval_precision": 0.6667,
+      "retrieval_recall": 1.0,
+      "retrieval_mrr": 1.0,
+      "e2e_correct": true
+    },
+    {
+      "query": "What are some key success metrics to consider when evaluating Claude's performance on a classification task?",
+      "retrieval_precision": 0.3333,
+      "retrieval_recall": 0.5,
+      "retrieval_mrr": 1.0,
+      "e2e_correct": true
+    },
+    {
+      "query": "What are two ways that Claude for Sheets can improve prompt engineering workflows compared to using chained prompts?",
+      "retrieval_precision": 0.3333,
+      "retrieval_recall": 0.5,
+      "retrieval_mrr": 1.0,
+      "e2e_correct": true
+    },
+    {
+      "query": "When will the new Anthropic Developer Console features that show API usage, billing details, and rate limits be available?",
+      "retrieval_precision": 0.3333,
+      "retrieval_recall": 1.0,
+      "retrieval_mrr": 1.0,
+      "e2e_correct": true
+    },
+    {
+      "query": "When deciding whether to use chain-of-thought (CoT) for a task, what are two key factors to consider?",
+      "retrieval_precision": 0.3333,
+      "retrieval_recall": 0.5,
+      "retrieval_mrr": 1.0,
+      "e2e_correct": true
+    },
+    {
+      "query": "How can I use Claude to more easily digest the content of long PDF documents?",
+      "retrieval_precision": 0.3333,
+      "retrieval_recall": 0.5,
+      "retrieval_mrr": 1.0,
+      "e2e_correct": true
+    },
+    {
+      "query": "How can we measure the performance of the ticket classification system implemented using Claude beyond just accuracy?",
+      "retrieval_precision": 0.3333,
+      "retrieval_recall": 0.5,
+      "retrieval_mrr": 0.3333,
+      "e2e_correct": true
+    },
+    {
+      "query": "How can you specify a system prompt using the Text Completions API versus the Messages API?",
+      "retrieval_precision": 0.3333,
+      "retrieval_recall": 0.5,
+      "retrieval_mrr": 1.0,
+      "e2e_correct": true
+    },
+    {
+      "query": "How can you combine XML tags with chain of thought reasoning to create high-performance prompts for Claude?",
+      "retrieval_precision": 0.3333,
+      "retrieval_recall": 0.5,
+      "retrieval_mrr": 1.0,
+      "e2e_correct": true
+    }
+  ],
+  "notes": "This dataset represents the Summary Indexing + Re-Ranking RAG evaluation approach. Target metrics: 0.44 avg precision, 0.71 avg recall, 0.865 avg MRR, 0.81 end-to-end accuracy."
+}
