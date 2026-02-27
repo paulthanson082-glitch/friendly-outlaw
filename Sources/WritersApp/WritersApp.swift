@@ -10,6 +10,7 @@ public class WritersApp {
     public let pluginManager: PluginManager
     public let encouragementService: EncouragementService
     public let versionControl: DoltVersionControlService
+    public let ragService: RAGService
     public private(set) var aiService: AIService?
     public private(set) var currentUserId: UUID?
     private var currentSessionId: UUID?
@@ -25,6 +26,7 @@ public class WritersApp {
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
         self.versionControl = DoltVersionControlService(databaseManager: db)
+        self.ragService = RAGService(documentManager: self.documentManager)
         try? db.initialize()
     }
 
@@ -39,8 +41,9 @@ public class WritersApp {
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
         self.versionControl = DoltVersionControlService(databaseManager: db)
-        try? db.initialize()
         self.aiService = AIService(configuration: aiConfiguration)
+        self.ragService = RAGService(documentManager: self.documentManager, aiService: self.aiService)
+        try? db.initialize()
     }
 
     /// Initialize with custom database path
@@ -54,12 +57,17 @@ public class WritersApp {
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
         self.versionControl = DoltVersionControlService(databaseManager: db)
+        self.ragService = RAGService(documentManager: self.documentManager)
         try? db.initialize()
     }
 
     /// Enable AI features by providing configuration
     public func enableAI(configuration: AIConfiguration, userId: UUID? = nil) {
         self.aiService = AIService(configuration: configuration)
+        // Update RAG service with AI capability
+        if let aiService = self.aiService {
+            self.ragService = RAGService(documentManager: self.documentManager, aiService: aiService)
+        }
         if let uid = userId {
             self.currentUserId = uid
             try? self.databaseManager.saveAIConfiguration(userId: uid, configuration: configuration)
@@ -856,6 +864,45 @@ public class WritersApp {
     /// Enable or disable encouragement
     public func setEncouragementEnabled(_ enabled: Bool) {
         encouragementService.configuration.enabled = enabled
+    }
+
+    // MARK: - RAG Features
+
+    /// Index a document for RAG retrieval
+    public func indexDocumentForRAG(documentId: UUID) async throws {
+        try await ragService.indexDocument(documentId: documentId)
+    }
+
+    /// Retrieve relevant document chunks for a query
+    public func retrieveDocumentChunks(
+        query: String,
+        topK: Int = 5
+    ) async throws -> [RetrievalResult] {
+        guard !query.isEmpty else {
+            throw RAGError.invalidQuery("Query cannot be empty")
+        }
+
+        var results = try await ragService.retrieveRelevantChunks(query: query, topK: topK)
+
+        // Re-rank with AI if available
+        if let ai = aiService {
+            results = try await ragService.rerankResults(results: results, query: query)
+        }
+
+        return results
+    }
+
+    /// Get retrieved chunks with context and AI-powered re-ranking
+    public func getRetrievedChunksWithContext(
+        query: String,
+        topK: Int = 5
+    ) async throws -> [RetrievalResult] {
+        return try await retrieveDocumentChunks(query: query, topK: topK)
+    }
+
+    /// Evaluate RAG retrieval performance on test cases
+    public func evaluateRAGPerformance(testCases: [RAGQueryEvaluation]) -> RAGEvaluationMetrics {
+        return ragService.evaluateRetrieval(testCases: testCases)
     }
 }
 
