@@ -6,6 +6,7 @@ public class WritersApp {
     public let documentManager: DocumentManager
     public let issueManager: IssueManager
     public let kanbanManager: KanbanManager
+    public let hardwareManager: HardwareManager
     public let databaseManager: DatabaseManager
     public let pluginManager: PluginManager
     public let encouragementService: EncouragementService
@@ -20,6 +21,7 @@ public class WritersApp {
         self.documentManager = DocumentManager()
         self.issueManager = IssueManager()
         self.kanbanManager = KanbanManager()
+        self.hardwareManager = HardwareManager()
         let db = DatabaseManager()
         self.databaseManager = db
         self.pluginManager = PluginManager.shared
@@ -34,6 +36,7 @@ public class WritersApp {
         self.documentManager = DocumentManager()
         self.issueManager = IssueManager()
         self.kanbanManager = KanbanManager()
+        self.hardwareManager = HardwareManager()
         let db = DatabaseManager()
         self.databaseManager = db
         self.pluginManager = PluginManager.shared
@@ -49,6 +52,7 @@ public class WritersApp {
         self.documentManager = DocumentManager()
         self.issueManager = IssueManager()
         self.kanbanManager = KanbanManager()
+        self.hardwareManager = HardwareManager()
         let db = DatabaseManager(databasePath: databasePath)
         self.databaseManager = db
         self.pluginManager = PluginManager.shared
@@ -856,6 +860,32 @@ public class WritersApp {
     /// Enable or disable encouragement
     public func setEncouragementEnabled(_ enabled: Bool) {
         encouragementService.configuration.enabled = enabled
+    }
+
+    // MARK: - Hardware Board Management
+
+    /// Creates a new hardware board with validation
+    public func createHardwareBoard(name: String, type: BoardType,
+                                   description: String = "",
+                                   serialPort: String? = nil,
+                                   baudRate: Int = 9600) throws -> HardwareBoard {
+        let board = HardwareBoard(
+            name: name,
+            boardType: type,
+            description: description,
+            serialPort: serialPort,
+            baudRate: baudRate
+        )
+        try hardwareManager.createBoard(board)
+        return board
+    }
+
+    /// Retrieves hardware board statistics
+    public func getHardwareStatistics() -> (totalBoards: Int, byType: [String: Int], activeCount: Int) {
+        let stats = hardwareManager.getBoardStatistics()
+        let byTypeStrings = Dictionary(uniqueKeysWithValues:
+            stats.byType.map { ($0.key.rawValue, $0.value) })
+        return (stats.totalBoards, byTypeStrings, stats.activeCount)
     }
 }
 

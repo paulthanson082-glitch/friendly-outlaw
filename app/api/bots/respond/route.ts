@@ -89,7 +89,12 @@ export async function POST(request: NextRequest) {
   const msgCount = recentMessages.length + 1;
   if (msgCount % 3 === 0) {
     const allMessages = [
-      ...recentMessages,
+      ...recentMessages.map((m) => ({
+        from: m.from,
+        to: m.to,
+        content: m.content,
+        timestamp: m.timestamp,
+      })),
       { from: speaker, to: listener, content: responseText, timestamp: new Date().toISOString() },
     ];
 
