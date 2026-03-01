@@ -567,6 +567,34 @@ The **knowledge-advisor** subagent reads the relevant files and returns a focuse
 - `advanceKanbanTask` / `regressKanbanTask` automatically set/clear `completedAt` when transitioning to/from `.done`
 - `reopenIssue` sets status to `.open` and clears `metadata.resolvedAt`
 
+## Key Learnings
+
+Hard-won lessons from this codebase — know these before touching the code:
+
+1. **`CSQLite` requires a system library** — `libsqlite3-dev` and `pkg-config` must be installed on the host before `swift build` can succeed. Session-start hook handles this automatically.
+2. **AI features degrade gracefully** — `AIService` is optional. Never require an API key at init; always check `isAIEnabled` before calling AI methods.
+3. **`PluginManager` is a singleton** — use `PluginManager.shared`; never instantiate `PluginManager` directly. Register plugins once at startup.
+4. **In-memory + SQLite are dual-layered** — `IssueManager` and `DoltVersionControlService` keep in-memory state and SQLite in sync. Always go through `WritersApp` facade methods to update both layers.
+5. **`FoundationNetworking` is Linux-only** — always guard the import with `#if canImport(FoundationNetworking)` or `#if os(Linux)`. Missing this breaks macOS builds.
+6. **Test isolation requires `:memory:`** — pass `DatabaseManager(databasePath: ":memory:")` in every test that touches the DB. Never use the on-disk default path in tests.
+7. **`advanceKanbanTask` side-effects** — automatically sets/clears `completedAt` when transitioning to/from `.done`. Do not manually set `completedAt` in callers.
+8. **`reopenIssue` is the only safe path** — it atomically sets status to `.open` and clears `metadata.resolvedAt`. Setting status directly bypasses the clear.
+9. **All dates are ISO 8601** — use `ISO8601DateFormatter` for any date serialization. Mixing formats breaks `Codable` round-trips.
+10. **Placeholder keys are strict** — format is `{{snake_case_key}}`. Every key in template `content` must have a matching `Placeholder` struct entry and vice versa.
+
+## What NOT to Do
+
+- **Don't add external Swift dependencies** — only `CSQLite` (system library) is permitted. The project has zero external Swift packages by design.
+- **Don't hardcode API keys or secrets** — not in source files, not in comments, not in test fixtures. Read from environment variables only.
+- **Don't call `async` AI functions from synchronous contexts** — propagate `async throws` up the call stack; do not wrap in `Task {}` unless at a UI boundary.
+- **Don't modify `DatabaseManager` schema without a migration** — adding or renaming columns will break existing `.db` files and all tests that rely on the schema.
+- **Don't force-unwrap optionals from dictionary lookups or `first(where:)`** — use `guard let` or `if let`. Force-unwraps here are the primary source of crashes.
+- **Don't bypass `WritersApp` facade for VC or issue updates** — going directly to `IssueManager` or `DoltVersionControlService` without also updating the DB (or vice versa) leaves the layers out of sync.
+- **Don't touch `Sources/WritersApp/Views/`** Metal rendering code without understanding the Metal pipeline — Metal shader compilation errors surface only at runtime.
+- **Don't add `Kanban​Column` cases** without also updating the `next` and `previous` computed properties — the advance/regress workflow will silently break.
+- **Don't share `DatabaseManager` instances** across tests — always create a fresh `":memory:"` instance per test to avoid state bleed.
+- **Don't skip `swift build` after edits** — always run `swift build 2>&1` to catch compiler errors before marking work done.
+
 ## VS Code Integration
 
 Pre-configured tasks available via `Cmd+Shift+B`:
