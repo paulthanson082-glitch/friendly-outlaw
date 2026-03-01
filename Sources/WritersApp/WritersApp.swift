@@ -4,17 +4,20 @@ import Foundation
 public class WritersApp {
     public let templateManager: TemplateManager
     public let documentManager: DocumentManager
+    public let hardwareManager: HardwareManager
     public private(set) var aiService: AIService?
 
     public init() {
         self.templateManager = TemplateManager()
         self.documentManager = DocumentManager()
+        self.hardwareManager = HardwareManager()
     }
 
     /// Initialize with AI capabilities
     public init(aiConfiguration: AIConfiguration) {
         self.templateManager = TemplateManager()
         self.documentManager = DocumentManager()
+        self.hardwareManager = HardwareManager()
         self.aiService = AIService(configuration: aiConfiguration)
     }
 
@@ -293,6 +296,32 @@ public class WritersApp {
             characterConcept: characterConcept,
             context: context
         )
+    }
+
+    // MARK: - Hardware Board Management
+
+    /// Creates a new hardware board with validation
+    public func createHardwareBoard(name: String, type: BoardType,
+                                    description: String = "",
+                                    serialPort: String? = nil,
+                                    baudRate: Int = 9600) throws -> HardwareBoard {
+        let board = HardwareBoard(
+            name: name,
+            boardType: type,
+            description: description,
+            serialPort: serialPort,
+            baudRate: baudRate
+        )
+        try hardwareManager.createBoard(board)
+        return board
+    }
+
+    /// Retrieves hardware board statistics
+    public func getHardwareStatistics() -> (totalBoards: Int, byType: [String: Int], activeCount: Int) {
+        let stats = hardwareManager.getBoardStatistics()
+        let byTypeStrings = Dictionary(uniqueKeysWithValues:
+            stats.byType.map { ($0.key.rawValue, $0.value) })
+        return (stats.totalBoards, byTypeStrings, stats.activeCount)
     }
 
     // MARK: - Statistics

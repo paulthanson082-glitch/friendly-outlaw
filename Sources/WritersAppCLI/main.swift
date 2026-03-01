@@ -46,6 +46,14 @@ struct WritersAppCLI {
                 print("16. Generate Outline (AI)")
             }
 
+            print("\nHardware Boards:")
+            print("80. Add Hardware Board")
+            print("81. List Hardware Boards")
+            print("82. View Board Details")
+            print("83. Remove Hardware Board")
+            print("84. Manage Pin Aliases")
+            print("85. View Board Statistics")
+
             print("\n0. Exit")
             print()
             print("Enter choice: ", terminator: "")
@@ -84,6 +92,18 @@ struct WritersAppCLI {
                 await developCharacterWithAI(app: app)
             case 16:
                 await generateOutlineWithAI(app: app)
+            case 80:
+                addHardwareBoard(app: app)
+            case 81:
+                listHardwareBoards(app: app)
+            case 82:
+                viewBoardDetails(app: app)
+            case 83:
+                removeHardwareBoard(app: app)
+            case 84:
+                managePinAliases(app: app)
+            case 85:
+                viewHardwareStatistics(app: app)
             case 0:
                 running = false
                 print("\nThank you for using Writers App!")
@@ -517,5 +537,298 @@ func generateOutlineWithAI(app: WritersApp) async {
         print()
     } catch {
         print("\n✗ Error: \(error.localizedDescription)")
+    }
+}
+
+// MARK: - Hardware Board Functions
+
+func addHardwareBoard(app: WritersApp) {
+    print("\nAdd Hardware Board")
+    print("==================")
+
+    print("Board name: ", terminator: "")
+    guard let name = readLine(), !name.isEmpty else {
+        print("Board name is required")
+        return
+    }
+
+    print("\nSelect board type:")
+    let types = BoardType.allCases
+    for (index, type) in types.enumerated() {
+        print("\(index + 1). \(type.rawValue)")
+    }
+    print("Choice: ", terminator: "")
+
+    guard let typeStr = readLine(), let typeIndex = Int(typeStr),
+          typeIndex > 0, typeIndex <= types.count else {
+        print("Invalid choice")
+        return
+    }
+
+    let boardType = types[typeIndex - 1]
+
+    print("Description (optional): ", terminator: "")
+    let description = readLine() ?? ""
+
+    print("Serial port (e.g., /dev/ttyUSB0, COM3) [optional]: ", terminator: "")
+    let serialPortInput = readLine() ?? ""
+    let serialPort = serialPortInput.isEmpty ? nil : serialPortInput
+
+    print("Baud rate [9600]: ", terminator: "")
+    let baudInput = readLine() ?? ""
+    let baudRate = Int(baudInput) ?? 9600
+
+    do {
+        let board = try app.createHardwareBoard(
+            name: name,
+            type: boardType,
+            description: description,
+            serialPort: serialPort,
+            baudRate: baudRate
+        )
+        print("\n✓ Board created successfully!")
+        print("Board ID: \(board.id.uuidString)")
+    } catch {
+        print("Error creating board: \(error.localizedDescription)")
+    }
+}
+
+func listHardwareBoards(app: WritersApp) {
+    print("\nHardware Boards")
+    print("===============")
+
+    let boards = app.hardwareManager.getAllBoards()
+    if boards.isEmpty {
+        print("No boards configured")
+        return
+    }
+
+    for (index, board) in boards.enumerated() {
+        print("\(index + 1). \(board.name)")
+        print("   Type: \(board.boardType.rawValue)")
+        if let port = board.serialPort {
+            print("   Port: \(port) @ \(board.baudRate) baud")
+        }
+        print("   Pins: \(board.pinAliases.count) aliases")
+        print("   Status: \(board.metadata.isActive ? "Active" : "Inactive")")
+        print()
+    }
+}
+
+func viewBoardDetails(app: WritersApp) {
+    print("\nView Board Details")
+    print("==================")
+
+    let boards = app.hardwareManager.getAllBoards()
+    guard !boards.isEmpty else {
+        print("No boards configured")
+        return
+    }
+
+    print("Select board:")
+    for (index, board) in boards.enumerated() {
+        print("\(index + 1). \(board.name)")
+    }
+    print("Choice: ", terminator: "")
+
+    guard let choiceStr = readLine(), let choice = Int(choiceStr),
+          choice > 0, choice <= boards.count else {
+        print("Invalid choice")
+        return
+    }
+
+    let board = boards[choice - 1]
+
+    print("\n--- Board: \(board.name) ---")
+    print("ID: \(board.id.uuidString)")
+    print("Type: \(board.boardType.rawValue)")
+    if !board.description.isEmpty {
+        print("Description: \(board.description)")
+    }
+    print("Transport: \(board.transportType.rawValue)")
+    if let port = board.serialPort {
+        print("Serial Port: \(port)")
+    }
+    print("Baud Rate: \(board.baudRate)")
+    print("Status: \(board.metadata.isActive ? "Active" : "Inactive")")
+
+    if !board.pinAliases.isEmpty {
+        print("\nPin Aliases (\(board.pinAliases.count)):")
+        for pin in board.pinAliases {
+            print("  - \(pin.alias) (Pin \(pin.physicalPin)): \(pin.description) [\(pin.pinType)]")
+        }
+    } else {
+        print("\nNo pin aliases configured")
+    }
+
+    if let url = board.datasheetURL {
+        print("\nDatasheet: \(url)")
+    }
+}
+
+func removeHardwareBoard(app: WritersApp) {
+    print("\nRemove Hardware Board")
+    print("====================")
+
+    let boards = app.hardwareManager.getAllBoards()
+    guard !boards.isEmpty else {
+        print("No boards configured")
+        return
+    }
+
+    print("Select board to remove:")
+    for (index, board) in boards.enumerated() {
+        print("\(index + 1). \(board.name)")
+    }
+    print("Choice: ", terminator: "")
+
+    guard let choiceStr = readLine(), let choice = Int(choiceStr),
+          choice > 0, choice <= boards.count else {
+        print("Invalid choice")
+        return
+    }
+
+    let board = boards[choice - 1]
+    print("Really remove '\(board.name)'? (y/n): ", terminator: "")
+    guard let confirm = readLine(), confirm.lowercased() == "y" else {
+        print("Cancelled")
+        return
+    }
+
+    do {
+        try app.hardwareManager.deleteBoard(id: board.id)
+        print("Board removed successfully")
+    } catch {
+        print("Error removing board: \(error.localizedDescription)")
+    }
+}
+
+func managePinAliases(app: WritersApp) {
+    print("\nManage Pin Aliases")
+    print("==================")
+
+    let boards = app.hardwareManager.getAllBoards()
+    guard !boards.isEmpty else {
+        print("No boards configured")
+        return
+    }
+
+    print("Select board:")
+    for (index, board) in boards.enumerated() {
+        print("\(index + 1). \(board.name)")
+    }
+    print("Choice: ", terminator: "")
+
+    guard let choiceStr = readLine(), let choice = Int(choiceStr),
+          choice > 0, choice <= boards.count else {
+        print("Invalid choice")
+        return
+    }
+
+    let board = boards[choice - 1]
+
+    print("\nPin Management Options:")
+    print("1. Add pin alias")
+    print("2. Remove pin alias")
+    print("3. List pin aliases")
+    print("Choice: ", terminator: "")
+
+    guard let optionStr = readLine(), let option = Int(optionStr) else {
+        print("Invalid choice")
+        return
+    }
+
+    switch option {
+    case 1:
+        print("Alias name (e.g., 'red_led'): ", terminator: "")
+        guard let aliasName = readLine(), !aliasName.isEmpty else {
+            print("Name cannot be empty")
+            return
+        }
+
+        print("Physical pin number: ", terminator: "")
+        guard let pinStr = readLine(), let pin = Int(pinStr) else {
+            print("Invalid pin number")
+            return
+        }
+
+        print("Description: ", terminator: "")
+        let description = readLine() ?? ""
+
+        print("Pin type (digital/analog/pwm) [digital]: ", terminator: "")
+        let pinTypeInput = readLine() ?? ""
+        let pinType = pinTypeInput.isEmpty ? "digital" : pinTypeInput
+
+        let alias = PinAlias(
+            alias: aliasName,
+            physicalPin: pin,
+            description: description,
+            pinType: pinType
+        )
+
+        do {
+            try app.hardwareManager.addPinAlias(to: board.id, alias: alias)
+            print("Pin alias added successfully")
+        } catch {
+            print("Error adding pin alias: \(error.localizedDescription)")
+        }
+
+    case 2:
+        guard !board.pinAliases.isEmpty else {
+            print("No pin aliases to remove")
+            return
+        }
+        print("Pin aliases:")
+        for (index, pin) in board.pinAliases.enumerated() {
+            print("\(index + 1). \(pin.alias) (Pin \(pin.physicalPin))")
+        }
+        print("Choice: ", terminator: "")
+
+        guard let idxStr = readLine(), let idx = Int(idxStr),
+              idx > 0, idx <= board.pinAliases.count else {
+            print("Invalid choice")
+            return
+        }
+
+        let pinToRemove = board.pinAliases[idx - 1]
+        do {
+            try app.hardwareManager.removePinAlias(from: board.id, aliasId: pinToRemove.id)
+            print("Pin alias removed successfully")
+        } catch {
+            print("Error removing pin alias: \(error.localizedDescription)")
+        }
+
+    case 3:
+        print("\nPin Aliases for '\(board.name)':")
+        if board.pinAliases.isEmpty {
+            print("  No pin aliases configured")
+        } else {
+            for pin in board.pinAliases {
+                print("  - \(pin.alias) -> Pin \(pin.physicalPin) (\(pin.pinType))")
+                if !pin.description.isEmpty {
+                    print("    \(pin.description)")
+                }
+            }
+        }
+
+    default:
+        print("Invalid option")
+    }
+}
+
+func viewHardwareStatistics(app: WritersApp) {
+    print("\nHardware Statistics")
+    print("===================")
+
+    let stats = app.getHardwareStatistics()
+
+    print("Total boards: \(stats.totalBoards)")
+    print("Active boards: \(stats.activeCount)")
+
+    if !stats.byType.isEmpty {
+        print("\nBoards by type:")
+        for (type, count) in stats.byType.sorted(by: { $0.key < $1.key }) {
+            print("  \(type): \(count)")
+        }
     }
 }
