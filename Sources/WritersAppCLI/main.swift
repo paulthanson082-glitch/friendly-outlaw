@@ -8,6 +8,85 @@ var focusManager = FocusSessionManager()
 var goalManager = WritingGoalManager()
 var analyticsService: ProductivityAnalytics!
 
+// MARK: - Clother Provider Detection
+
+struct ClotherProvider {
+    let name: String
+    let command: String
+    let baseUrl: String?
+    let description: String
+}
+
+func detectClotherProvider() -> ClotherProvider? {
+    let env = ProcessInfo.processInfo.environment
+
+    // Check for custom base URL (set by Clother launchers)
+    if let baseUrl = env["ANTHROPIC_BASE_URL"] {
+        // Detect provider based on endpoint
+        switch baseUrl {
+        case _ where baseUrl.contains("z.ai"):
+            return ClotherProvider(
+                name: "Z.AI (GLM-5)",
+                command: "clother-zai",
+                baseUrl: baseUrl,
+                description: "GLM-5 via Z.AI"
+            )
+        case _ where baseUrl.contains("deepseek"):
+            return ClotherProvider(
+                name: "DeepSeek",
+                command: "clother-deepseek",
+                baseUrl: baseUrl,
+                description: "DeepSeek Chat API"
+            )
+        case _ where baseUrl.contains("openrouter"):
+            return ClotherProvider(
+                name: "OpenRouter",
+                command: "clother-or-*",
+                baseUrl: baseUrl,
+                description: "100+ LLM models via OpenRouter"
+            )
+        case _ where baseUrl.contains("ollama"):
+            return ClotherProvider(
+                name: "Ollama (Local)",
+                command: "clother-ollama",
+                baseUrl: baseUrl,
+                description: "Local LLM via Ollama"
+            )
+        case _ where baseUrl.contains("anthropic"):
+            return ClotherProvider(
+                name: "Anthropic Claude",
+                command: "clother-native",
+                baseUrl: baseUrl,
+                description: "Claude API (Anthropic)"
+            )
+        default:
+            return ClotherProvider(
+                name: "Custom Provider",
+                command: "custom",
+                baseUrl: baseUrl,
+                description: "Custom LLM endpoint"
+            )
+        }
+    }
+
+    return nil
+}
+
+func displayProviderInfo() {
+    if let provider = detectClotherProvider() {
+        print("🔗 LLM Provider: \(provider.name)")
+        print("   Command: \(provider.command)")
+        print("   Details: \(provider.description)")
+    } else {
+        print("ⓘ LLM Provider: Standard (Anthropic API)")
+        print("   To use alternative providers, install Clother:")
+        print("   → curl -fsSL https://raw.githubusercontent.com/jolehuit/clother/main/clother.sh | bash")
+        print("   → clother config")
+        print("   → clother-<provider> swift run WritersAppCLI")
+        print("   See CLOTHER.md for details")
+    }
+}
+
 @main
 struct WritersAppCLI {
     static func main() async {
@@ -112,10 +191,20 @@ struct WritersAppCLI {
         print("╚══════════════════════════════════════╝")
         print()
 
+        // Display LLM provider information
+        displayProviderInfo()
+        print()
+
         // Check for API key in environment
         if let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"], !apiKey.isEmpty {
             print("✓ AI features enabled (Claude API)")
             let config = AIConfiguration(apiKey: apiKey, model: .claude35Sonnet)
+            app.enableAI(configuration: config)
+        } else if ProcessInfo.processInfo.environment["ANTHROPIC_AUTH_TOKEN"] != nil {
+            // Clother provider configured
+            print("✓ AI features enabled (via Clother)")
+            // Create config with default values; Clother handles auth via env vars
+            let config = AIConfiguration(apiKey: "clother-managed", model: .claude35Sonnet)
             app.enableAI(configuration: config)
         } else {
             print("ⓘ AI features disabled (set ANTHROPIC_API_KEY to enable)")
@@ -182,7 +271,10 @@ struct WritersAppCLI {
             print("50. Get Encouragement")
             print("51. Toggle Encouragement")
             print("52. View Encouragement History")
-            
+
+            print("\nLLM Provider:")
+            print("53. Display LLM Provider Information")
+
             print("\nIssue Management:")
             print("60. Create Issue")
             print("61. View Issues for Document")
@@ -284,6 +376,8 @@ struct WritersAppCLI {
                 toggleEncouragement(app: app)
             case 52:
                 viewEncouragementHistory(app: app)
+            case 53:
+                displayClotherProviderInfo()
             case 60:
                 createIssue(app: app)
             case 61:
@@ -2077,9 +2171,64 @@ func showHelp() {
         WritersAppCLI --open <doc-id> --run deepwork      # Open by ID and start 90-min deep work
 
     ENVIRONMENT VARIABLES:
-        ANTHROPIC_API_KEY      Set this to enable AI features
+        ANTHROPIC_API_KEY      Set this to enable AI features (Anthropic Claude)
+
+    USING ALTERNATIVE LLM PROVIDERS WITH CLOTHER:
+        Clother allows you to use 100+ LLM providers without changing code.
+        See CLOTHER.md for complete setup and provider list.
+
+        Quick Start:
+            1. Install Clother:
+               curl -fsSL https://raw.githubusercontent.com/jolehuit/clother/main/clother.sh | bash
+
+            2. Configure a provider:
+               clother config                    # Interactive setup
+               clother config zai                # Z.AI (GLM-5)
+               clother config deepseek           # DeepSeek
+
+            3. Run with your provider:
+               clother-native swift run WritersAppCLI          # Claude
+               clother-zai swift run WritersAppCLI             # Z.AI
+               clother-deepseek swift run WritersAppCLI        # DeepSeek
+               clother-ollama --model qwen3-coder swift run WritersAppCLI  # Local Ollama
+
+        Supported Providers:
+            Cloud: Claude (Anthropic), Z.AI, DeepSeek, OpenRouter, Kimi, Moonshot, MiniMax
+            Local: Ollama, LM Studio, llama.cpp
 
     For interactive mode, run without arguments.
+    """)
+}
+
+func displayClotherProviderInfo() {
+    print("\n=== LLM Provider Information ===\n")
+
+    displayProviderInfo()
+
+    print("\n--- Provider Setup ---")
+    print("""
+    To change your LLM provider, install and configure Clother:
+
+    1. INSTALL CLOTHER (one-time)
+       curl -fsSL https://raw.githubusercontent.com/jolehuit/clother/main/clother.sh | bash
+
+    2. CONFIGURE A PROVIDER
+       clother config                   # Interactive setup wizard
+       clother test                     # Verify your configuration
+
+    3. POPULAR PROVIDERS
+       • clother-native                 # Claude (Anthropic) - requires Pro/Team
+       • clother-zai                    # Z.AI (GLM-5) - affordable
+       • clother-deepseek               # DeepSeek - affordable
+       • clother-ollama                 # Local Ollama - free, offline
+       • clother-or-*                   # OpenRouter - 100+ models
+
+    4. RUN WITH YOUR PROVIDER
+       clother-zai swift run WritersAppCLI
+       clother-deepseek swift run WritersAppCLI
+       clother-ollama --model qwen3-coder swift run WritersAppCLI
+
+    For complete setup instructions, see CLOTHER.md
     """)
 }
 
