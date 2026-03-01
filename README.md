@@ -562,6 +562,34 @@ When AI is enabled, additional menu options will appear:
 - Develop Character (AI)
 - Generate Outline (AI)
 
+#### Using Alternative LLM Providers with Clother (NEW!)
+
+The CLI integrates with [Clother](https://github.com/jolehuit/clother), enabling access to 100+ LLM providers without changing your code:
+
+**Supported Providers:**
+- ☁️ **Cloud**: Claude (Anthropic), GLM-5 (Z.AI), DeepSeek, Kimi, Moonshot, MiniMax, Alibaba Qwen, OpenRouter (100+ models)
+- 🏠 **Local**: Ollama, LM Studio, llama.cpp (no API key needed)
+- 🌐 **China Endpoints**: Z.AI CN, MiniMax CN, Volcano, Alibaba CN
+
+**Quick Setup:**
+
+```bash
+# 1. Install Clother (one-time)
+curl -fsSL https://raw.githubusercontent.com/jolehuit/clother/main/clother.sh | bash
+
+# 2. Configure a provider
+clother config zai      # Choose Z.AI (GLM-5), DeepSeek, Ollama, etc.
+
+# 3. Run with your chosen provider
+clother-zai swift run WritersAppCLI          # Uses Z.AI
+clother-deepseek swift run WritersAppCLI     # Uses DeepSeek
+clother-ollama --model qwen3-coder swift run WritersAppCLI  # Uses local Ollama
+```
+
+**All AI features work seamlessly with any provider** — no code changes needed!
+
+See [CLOTHER.md](CLOTHER.md) for complete provider setup, model recommendations, and troubleshooting.
+
 #### Encouragement Features in CLI
 
 The CLI includes built-in encouragement features to keep you motivated:
@@ -832,6 +860,8 @@ When running as an MCP server, the following tools are available:
 - [DATABASE.md](DATABASE.md) - Complete database documentation
 - [QUICK_START.md](QUICK_START.md) - Quick start guide
 - [VSCODE_SETUP.md](VSCODE_SETUP.md) - VS Code setup guide
+- [CLOTHER.md](CLOTHER.md) - Using 100+ LLM providers with Clother
+- [CLOTHER_SETUP.md](CLOTHER_SETUP.md) - Contributor guide for Clother development
 
 ## License
 
