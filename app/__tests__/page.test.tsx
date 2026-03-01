@@ -86,7 +86,7 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('AI Town')).toBeInTheDocument();
+        expect(screen.getByText(/AI Town/i)).toBeInTheDocument();
       });
     });
 
@@ -94,8 +94,8 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('Pixel')).toBeInTheDocument();
-        expect(screen.getByText('Sage')).toBeInTheDocument();
+        expect(screen.getAllByText('Pixel')[0]).toBeInTheDocument();
+        expect(screen.getAllByText('Sage')[0]).toBeInTheDocument();
       });
     });
 
@@ -150,8 +150,8 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('Pixel')).toBeInTheDocument();
-        expect(screen.getByText('Sage')).toBeInTheDocument();
+        expect(screen.getAllByText('Pixel')[0]).toBeInTheDocument();
+        expect(screen.getAllByText('Sage')[0]).toBeInTheDocument();
       });
     });
 
@@ -186,10 +186,10 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('Pixel')).toBeInTheDocument();
+        expect(screen.getAllByText('Pixel')[0]).toBeInTheDocument();
       });
 
-      const pixelButton = screen.getByText('Pixel').closest('button');
+      const pixelButton = screen.getAllByText('Pixel')[0].closest('button');
       await user.click(pixelButton!);
 
       await waitFor(() => {
@@ -202,10 +202,10 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('Pixel')).toBeInTheDocument();
+        expect(screen.getAllByText('Pixel')[0]).toBeInTheDocument();
       });
 
-      const pixelButton = screen.getByText('Pixel').closest('button');
+      const pixelButton = screen.getAllByText('Pixel')[0].closest('button');
       await user.click(pixelButton!);
 
       await waitFor(() => {
@@ -459,7 +459,7 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText(/ago/i)).toBeInTheDocument();
+        expect(screen.getAllByText(/ago/i)[0]).toBeInTheDocument();
       });
     });
 
@@ -468,10 +468,10 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('Pixel')).toBeInTheDocument();
+        expect(screen.getAllByText('Pixel')[0]).toBeInTheDocument();
       });
 
-      const pixelButton = screen.getByText('Pixel').closest('button');
+      const pixelButton = screen.getAllByText('Pixel')[0].closest('button');
       await user.click(pixelButton!);
 
       await waitFor(() => {
@@ -501,8 +501,8 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('🎨')).toBeInTheDocument(); // pixel
-        expect(screen.getByText('📚')).toBeInTheDocument(); // sage
+        expect(screen.getAllByText('🎨')[0]).toBeInTheDocument(); // pixel
+        expect(screen.getAllByText('📚')[0]).toBeInTheDocument(); // sage
       });
     });
   });
@@ -609,9 +609,17 @@ describe('Home Page', () => {
         expect(screen.getByText(/▶ Tick/i)).toBeInTheDocument();
       });
 
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: async () => ({ tick: 6, generated: [] }),
+      (global.fetch as jest.Mock).mockImplementation((url: string) => {
+        if (url === '/api/simulate') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ tick: 6, generated: [] }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => mockTownData,
+        });
       });
 
       const tickButton = screen.getByText(/▶ Tick/i);
@@ -631,8 +639,8 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('🎨')).toBeInTheDocument();
-        expect(screen.getByText('📚')).toBeInTheDocument();
+        expect(screen.getAllByText('🎨')[0]).toBeInTheDocument();
+        expect(screen.getAllByText('📚')[0]).toBeInTheDocument();
       });
     });
   });

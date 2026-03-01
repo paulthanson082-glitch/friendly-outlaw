@@ -10,9 +10,22 @@ if (typeof Request === 'undefined') {
 
 if (typeof Response === 'undefined') {
   global.Response = class Response {
-    constructor(public body?: any, public init?: any) {}
-    public status = 200;
-    public headers = new Map();
+    body: any;
+    init: any;
+    status: number;
+    headers: Map<string, string>;
+
+    constructor(body?: any, init?: ResponseInit & { headers?: any }) {
+      this.body = body;
+      this.init = init;
+      this.status = init?.status ?? 200;
+      this.headers = new Map();
+      if (init?.headers instanceof Map) {
+        (init.headers as Map<string, string>).forEach((v, k) => this.headers.set(k, v));
+      } else if (init?.headers) {
+        Object.entries(init.headers).forEach(([k, v]) => this.headers.set(k, v as string));
+      }
+    }
 
     async json() {
       return typeof this.body === 'string' ? JSON.parse(this.body) : this.body;
@@ -22,11 +35,10 @@ if (typeof Response === 'undefined') {
       return typeof this.body === 'string' ? this.body : JSON.stringify(this.body);
     }
 
-    static json(data: any, init?: any) {
-      const response = new Response(data, init);
-      response.status = init?.status || 200;
-      if (init?.headers) {
-        response.headers = new Map(Object.entries(init.headers));
+    static json(data: any, init?: ResponseInit) {
+      const response = new (global as any).Response(data, init);
+      if ((init as any)?.headers) {
+        response.headers = new Map(Object.entries((init as any).headers));
       }
       response.headers.set('content-type', 'application/json');
       return response;

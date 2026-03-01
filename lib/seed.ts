@@ -21,8 +21,7 @@ async function seed() {
   }
 
   console.log(
-    "Seeded AI Town residents:",
-    characters.map((c) => `@${c.handle} (${c.name})`).join(", ")
+    "Seeded AI Town residents: " + characters.map((c) => `@${c.handle} (${c.name})`).join(", ")
   );
 }
 

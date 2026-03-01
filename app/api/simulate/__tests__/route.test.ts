@@ -20,6 +20,12 @@ const originalRandom = Math.random;
 describe('/api/simulate', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Use deterministic random (>= 0.4) so memory generation is skipped by default.
+    // Individual tests that need memory generation override this explicitly.
+    Math.random = jest.fn().mockReturnValue(0.5);
+  });
+
+  afterAll(() => {
     Math.random = originalRandom;
   });
 

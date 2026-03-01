@@ -19,7 +19,7 @@ describe('RootLayout', () => {
       </RootLayout>
     );
 
-    const html = container.querySelector('html');
+    const html = document.documentElement;
     expect(html).toHaveAttribute('lang', 'en');
   });
 
@@ -30,7 +30,7 @@ describe('RootLayout', () => {
       </RootLayout>
     );
 
-    const body = container.querySelector('body');
+    const body = document.body;
     expect(body).toBeInTheDocument();
   });
 
@@ -66,8 +66,8 @@ describe('RootLayout', () => {
       </RootLayout>
     );
 
-    expect(container.querySelector('html')).toBeInTheDocument();
-    expect(container.querySelector('body')).toBeInTheDocument();
+    expect(document.documentElement).toBeInTheDocument();
+    expect(document.body).toBeInTheDocument();
   });
 
   it('should handle complex nested children', () => {
