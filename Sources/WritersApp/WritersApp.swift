@@ -17,44 +17,29 @@ public class WritersApp {
     private var memoryPlugin: ClaudeMemoryPlugin?
 
     public init() {
-        self.templateManager = TemplateManager()
-        self.documentManager = DocumentManager()
-        self.issueManager = IssueManager()
-        self.kanbanManager = KanbanManager()
-        self.hardwareManager = HardwareManager()
-        let db = DatabaseManager()
-        self.databaseManager = db
-        self.pluginManager = PluginManager.shared
-        self.encouragementService = EncouragementService()
-        self.versionControl = DoltVersionControlService(databaseManager: db)
-        try? db.initialize()
+        self.databaseManager = DatabaseManager()
+        self.setupManagers(with: self.databaseManager)
     }
 
     /// Initialize with AI capabilities
     public init(aiConfiguration: AIConfiguration) {
-        self.templateManager = TemplateManager()
-        self.documentManager = DocumentManager()
-        self.issueManager = IssueManager()
-        self.kanbanManager = KanbanManager()
-        self.hardwareManager = HardwareManager()
-        let db = DatabaseManager()
-        self.databaseManager = db
-        self.pluginManager = PluginManager.shared
-        self.encouragementService = EncouragementService()
-        self.versionControl = DoltVersionControlService(databaseManager: db)
-        try? db.initialize()
+        self.databaseManager = DatabaseManager()
+        self.setupManagers(with: self.databaseManager)
         self.aiService = AIService(configuration: aiConfiguration)
     }
 
     /// Initialize with custom database path
     public init(databasePath: String? = nil) {
+        self.databaseManager = DatabaseManager(databasePath: databasePath)
+        self.setupManagers(with: self.databaseManager)
+    }
+
+    private func setupManagers(with db: DatabaseManager) {
         self.templateManager = TemplateManager()
         self.documentManager = DocumentManager()
         self.issueManager = IssueManager()
         self.kanbanManager = KanbanManager()
         self.hardwareManager = HardwareManager()
-        let db = DatabaseManager(databasePath: databasePath)
-        self.databaseManager = db
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
         self.versionControl = DoltVersionControlService(databaseManager: db)
