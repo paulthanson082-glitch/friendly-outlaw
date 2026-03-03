@@ -226,6 +226,126 @@ public class WritersApp {
         await pluginManager.shutdownAll()
     }
 
+    // MARK: - Tmux Agent Communication
+
+    private var tmuxAgentPlugin: TmuxAgentPlugin?
+
+    /// Enable tmux-based agent communication
+    public func enableTmuxAgentCommunication(
+        configuration: TmuxConfiguration? = nil
+    ) async throws {
+        let plugin = TmuxAgentPlugin()
+        try await plugin.initialize()
+        pluginManager.registerPlugin(plugin)
+        tmuxAgentPlugin = plugin
+    }
+
+    /// Check if tmux agent communication is enabled
+    public var isTmuxAgentEnabled: Bool {
+        return tmuxAgentPlugin?.isEnabled ?? false
+    }
+
+    /// Register an agent for tmux communication
+    public func registerAgentForTmux(
+        agentId: String,
+        paneTarget: String
+    ) async throws -> AgentSession {
+        guard let plugin = tmuxAgentPlugin else {
+            throw PluginError.notInitialized
+        }
+
+        let action = PluginAction(type: .custom, parameters: [
+            "action": "register_agent",
+            "agent_id": agentId,
+            "pane_target": paneTarget
+        ])
+
+        let result = try await plugin.execute(action: action)
+        guard let session = result.data as? AgentSession else {
+            throw PluginError.executionFailed("Failed to register agent")
+        }
+        return session
+    }
+
+    /// Send a message to another agent via tmux
+    public func sendAgentMessage(
+        message: AgentMessage,
+        awaitResponse: Bool = false,
+        timeoutSeconds: Int = 30
+    ) async throws -> AgentResponse {
+        guard let plugin = tmuxAgentPlugin else {
+            throw PluginError.notInitialized
+        }
+
+        let action = PluginAction(type: .custom, parameters: [
+            "action": "send_message",
+            "from_agent_id": message.fromAgentId,
+            "to_agent_id": message.toAgentId,
+            "content": message.content,
+            "await_response": awaitResponse,
+            "timeout_seconds": timeoutSeconds
+        ])
+
+        let result = try await plugin.execute(action: action)
+        guard let response = result.data as? AgentResponse else {
+            throw PluginError.executionFailed("Failed to send message")
+        }
+        return response
+    }
+
+    /// Receive a message from another agent via tmux
+    public func receiveAgentMessage(
+        fromAgentId: String,
+        timeoutSeconds: Int = 30
+    ) async throws -> AgentMessage? {
+        guard let plugin = tmuxAgentPlugin else {
+            throw PluginError.notInitialized
+        }
+
+        let action = PluginAction(type: .custom, parameters: [
+            "action": "receive_message",
+            "from_agent_id": fromAgentId,
+            "timeout_seconds": timeoutSeconds
+        ])
+
+        let result = try await plugin.execute(action: action)
+        return result.data as? AgentMessage
+    }
+
+    /// Get all active tmux agent sessions
+    public func getTmuxAgentSessions() -> [AgentSession] {
+        guard let plugin = tmuxAgentPlugin else {
+            return []
+        }
+
+        let action = PluginAction(type: .custom, parameters: ["action": "get_sessions"])
+        do {
+            let result = try await plugin.execute(action: action)
+            return (result.data as? [AgentSession]) ?? []
+        } catch {
+            return []
+        }
+    }
+
+    /// Get a specific tmux agent session
+    public func getTmuxAgentSession(agentId: String) -> AgentSession? {
+        guard let plugin = tmuxAgentPlugin else {
+            return nil
+        }
+
+        let action = PluginAction(type: .custom, parameters: [
+            "action": "get_session",
+            "agent_id": agentId
+        ])
+
+        do {
+            let result = try await plugin.execute(action: action)
+            return result.data as? AgentSession
+        } catch {
+            return nil
+        }
+    }
+
     // MARK: - Document Creation from Templates
 
     /// Creates a new document from a template

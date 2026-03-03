@@ -890,4 +890,307 @@ final class WritersAppTests: XCTestCase {
         let commit = VCCommit(branchId: UUID(), message: "test")
         XCTAssertNotNil(commit.id)
     }
+
+    // MARK: - Tmux Agent Models Tests
+
+    func testAgentMessageCreation() {
+        let message = AgentMessage(
+            fromAgentId: "agent1",
+            toAgentId: "agent2",
+            content: "Hello from agent1"
+        )
+        XCTAssertEqual(message.fromAgentId, "agent1")
+        XCTAssertEqual(message.toAgentId, "agent2")
+        XCTAssertEqual(message.content, "Hello from agent1")
+        XCTAssertNotNil(message.id)
+    }
+
+    func testAgentMessageCodable() {
+        let message = AgentMessage(
+            fromAgentId: "agent1",
+            toAgentId: "agent2",
+            content: "Test message",
+            metadata: ["key": "value"]
+        )
+
+        let encoder = JSONEncoder()
+        guard let encoded = try? encoder.encode(message) else {
+            XCTFail("Failed to encode message")
+            return
+        }
+
+        let decoder = JSONDecoder()
+        guard let decoded = try? decoder.decode(AgentMessage.self, from: encoded) else {
+            XCTFail("Failed to decode message")
+            return
+        }
+
+        XCTAssertEqual(decoded.fromAgentId, message.fromAgentId)
+        XCTAssertEqual(decoded.toAgentId, message.toAgentId)
+        XCTAssertEqual(decoded.content, message.content)
+    }
+
+    func testAgentSessionCreation() {
+        let session = AgentSession(
+            agentId: "agent1",
+            paneTarget: "0:1"
+        )
+        XCTAssertEqual(session.agentId, "agent1")
+        XCTAssertEqual(session.paneTarget, "0:1")
+        XCTAssertEqual(session.status, .active)
+        XCTAssertEqual(session.messageCount, 0)
+    }
+
+    func testAgentSessionStatusEnum() {
+        let statuses: [AgentSessionStatus] = [.active, .idle, .disconnected, .error]
+        XCTAssertEqual(statuses.count, 4)
+    }
+
+    func testAgentResponseCreation() {
+        let messageId = UUID()
+        let response = AgentResponse(
+            messageId: messageId,
+            status: .received,
+            content: "Response content"
+        )
+        XCTAssertEqual(response.messageId, messageId)
+        XCTAssertEqual(response.status, .received)
+        XCTAssertEqual(response.content, "Response content")
+    }
+
+    func testAgentResponseStatusEnum() {
+        let statuses: [ResponseStatus] = [.pending, .received, .processed, .error, .timeout]
+        XCTAssertEqual(statuses.count, 5)
+    }
+
+    func testTmuxConfigurationDefaults() {
+        let config = TmuxConfiguration()
+        XCTAssertEqual(config.sessionName, "claude")
+        XCTAssertEqual(config.windowIndex, 0)
+        XCTAssertEqual(config.readTimeoutSeconds, 30)
+        XCTAssertEqual(config.writeRetries, 3)
+        XCTAssertEqual(config.keystrokeDelay, 50)
+    }
+
+    func testTmuxConfigurationCustom() {
+        let config = TmuxConfiguration(
+            sessionName: "custom",
+            windowIndex: 1,
+            readTimeoutSeconds: 60,
+            writeRetries: 5,
+            keystrokeDelay: 100
+        )
+        XCTAssertEqual(config.sessionName, "custom")
+        XCTAssertEqual(config.windowIndex, 1)
+        XCTAssertEqual(config.readTimeoutSeconds, 60)
+        XCTAssertEqual(config.writeRetries, 5)
+        XCTAssertEqual(config.keystrokeDelay, 100)
+    }
+
+    // MARK: - Tmux Agent Error Tests
+
+    func testTmuxAgentErrorDescriptions() {
+        let error1 = TmuxAgentError.tmuxNotAvailable
+        XCTAssertNotNil(error1.errorDescription)
+
+        let error2 = TmuxAgentError.invalidPaneFormat("bad")
+        XCTAssertNotNil(error2.errorDescription)
+
+        let error3 = TmuxAgentError.paneNotFound("0:5")
+        XCTAssertNotNil(error3.errorDescription)
+
+        let error4 = TmuxAgentError.sendKeysFailed("reason")
+        XCTAssertNotNil(error4.errorDescription)
+
+        let error5 = TmuxAgentError.responseTimeout("message")
+        XCTAssertNotNil(error5.errorDescription)
+    }
+
+    func testTmuxAgentErrorRecoverySuggestions() {
+        let error = TmuxAgentError.tmuxNotAvailable
+        XCTAssertNotNil(error.recoverySuggestion)
+    }
+
+    // MARK: - Tmux Agent Service Tests
+
+    func testTmuxServiceInitialization() async {
+        let service = TmuxAgentService()
+        XCTAssertNotNil(service)
+
+        do {
+            try await service.initialize()
+            // Initialization succeeds (tmux is typically available in test environments)
+        } catch {
+            // Tmux might not be available, which is expected in CI
+            if let tmuxError = error as? TmuxAgentError,
+               case .tmuxNotAvailable = tmuxError {
+                // This is acceptable for testing
+            } else {
+                XCTFail("Unexpected error: \(error)")
+            }
+        }
+    }
+
+    func testAgentSessionRegistration() async {
+        let service = TmuxAgentService()
+        do {
+            try await service.initialize()
+
+            let session = try await service.registerAgent(
+                agentId: "test-agent",
+                paneTarget: "0:0"
+            )
+
+            XCTAssertEqual(session.agentId, "test-agent")
+            XCTAssertEqual(session.paneTarget, "0:0")
+
+            // Clean up
+            try await service.unregisterAgent(agentId: "test-agent")
+        } catch let error as TmuxAgentError {
+            if case .tmuxNotAvailable = error {
+                // Expected in environments without tmux
+                return
+            }
+            XCTFail("Unexpected error: \(error)")
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testAgentSessionRetrieval() async {
+        let service = TmuxAgentService()
+        do {
+            try await service.initialize()
+
+            let session = try await service.registerAgent(
+                agentId: "test-agent",
+                paneTarget: "0:0"
+            )
+
+            let retrieved = service.getSession(agentId: "test-agent")
+            XCTAssertNotNil(retrieved)
+            XCTAssertEqual(retrieved?.agentId, "test-agent")
+
+            try await service.unregisterAgent(agentId: "test-agent")
+        } catch let error as TmuxAgentError {
+            if case .tmuxNotAvailable = error {
+                return
+            }
+            XCTFail("Unexpected error: \(error)")
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testGetAllAgentSessions() async {
+        let service = TmuxAgentService()
+        do {
+            try await service.initialize()
+
+            try await service.registerAgent(agentId: "agent1", paneTarget: "0:0")
+            try await service.registerAgent(agentId: "agent2", paneTarget: "0:1")
+
+            let sessions = service.getAllSessions()
+            XCTAssertEqual(sessions.count, 2)
+
+            try await service.unregisterAgent(agentId: "agent1")
+            try await service.unregisterAgent(agentId: "agent2")
+        } catch let error as TmuxAgentError {
+            if case .tmuxNotAvailable = error {
+                return
+            }
+            XCTFail("Unexpected error: \(error)")
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testPaneFormatValidation() async {
+        let service = TmuxAgentService()
+        do {
+            try await service.initialize()
+
+            // Valid format: window:pane
+            let session1 = try await service.registerAgent(
+                agentId: "agent1",
+                paneTarget: "0:1"
+            )
+            XCTAssertNotNil(session1)
+
+            // Valid format: numeric index
+            let session2 = try await service.registerAgent(
+                agentId: "agent2",
+                paneTarget: "5"
+            )
+            XCTAssertNotNil(session2)
+
+            try await service.unregisterAgent(agentId: "agent1")
+            try await service.unregisterAgent(agentId: "agent2")
+        } catch let error as TmuxAgentError {
+            if case .tmuxNotAvailable = error {
+                return
+            }
+            XCTFail("Unexpected error: \(error)")
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testDuplicateAgentRegistration() async {
+        let service = TmuxAgentService()
+        do {
+            try await service.initialize()
+
+            try await service.registerAgent(agentId: "agent1", paneTarget: "0:0")
+
+            // Attempting to register the same agent should fail
+            do {
+                _ = try await service.registerAgent(agentId: "agent1", paneTarget: "0:1")
+                XCTFail("Should have thrown error for duplicate agent")
+            } catch let error as TmuxAgentError {
+                if case .sendKeysFailed = error {
+                    // Expected
+                } else {
+                    throw error
+                }
+            }
+
+            try await service.unregisterAgent(agentId: "agent1")
+        } catch let error as TmuxAgentError {
+            if case .tmuxNotAvailable = error {
+                return
+            }
+            XCTFail("Unexpected error: \(error)")
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    // MARK: - Tmux Agent Plugin Tests
+
+    func testTmuxPluginInitialization() async {
+        let plugin = TmuxAgentPlugin()
+        XCTAssertEqual(plugin.id, "tmux-agent")
+        XCTAssertNotNil(plugin.name)
+        XCTAssertNotNil(plugin.version)
+        XCTAssertTrue(plugin.isEnabled)
+
+        do {
+            try await plugin.initialize()
+            try await plugin.shutdown()
+        } catch let error as TmuxAgentError {
+            if case .tmuxNotAvailable = error {
+                return
+            }
+            XCTFail("Unexpected error: \(error)")
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testTmuxPluginCapabilities() {
+        let plugin = TmuxAgentPlugin()
+        XCTAssertTrue(plugin.capabilities.contains(.customActions))
+        XCTAssertTrue(plugin.capabilities.contains(.tools))
+    }
 }
