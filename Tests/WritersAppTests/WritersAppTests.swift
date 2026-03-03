@@ -890,4 +890,190 @@ final class WritersAppTests: XCTestCase {
         let commit = VCCommit(branchId: UUID(), message: "test")
         XCTAssertNotNil(commit.id)
     }
+
+    // MARK: - Chatbot Tests
+
+    func testChatbotInitialization() {
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        app.enableAI(configuration: config)
+
+        XCTAssertNotNil(app.chatbotService, "Chatbot service should be initialized when AI is enabled")
+        XCTAssertNil(app.currentSession, "Current session should be nil before starting")
+    }
+
+    func testChatbotStartSession() {
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        app.enableAI(configuration: config)
+
+        guard let chatbot = app.chatbotService else {
+            XCTFail("Chatbot service not available")
+            return
+        }
+
+        let session = chatbot.startSession()
+        XCTAssertNotNil(session.id)
+        XCTAssertEqual(session.messages.count, 0, "New session should have no messages")
+    }
+
+    func testChatbotValidatesEmptyMessages() async {
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        app.enableAI(configuration: config)
+
+        guard let chatbot = app.chatbotService else {
+            XCTFail("Chatbot service not available")
+            return
+        }
+
+        var session = chatbot.startSession()
+
+        do {
+            _ = try await chatbot.sendMessage("", in: &session)
+            XCTFail("Should throw error for empty message")
+        } catch ChatbotError.emptyMessage {
+            // Expected error
+        } catch {
+            XCTFail("Wrong error type: \(error)")
+        }
+    }
+
+    func testChatbotValidatesMessageLength() async {
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        app.enableAI(configuration: config)
+
+        guard let chatbot = app.chatbotService else {
+            XCTFail("Chatbot service not available")
+            return
+        }
+
+        var session = chatbot.startSession()
+        let longMessage = String(repeating: "a", count: 5000)
+
+        do {
+            _ = try await chatbot.sendMessage(longMessage, in: &session)
+            XCTFail("Should throw error for message that's too long")
+        } catch ChatbotError.messageTooLong {
+            // Expected error
+        } catch {
+            XCTFail("Wrong error type: \(error)")
+        }
+    }
+
+    func testChatbotConversationContext() {
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        app.enableAI(configuration: config)
+
+        guard let chatbot = app.chatbotService else {
+            XCTFail("Chatbot service not available")
+            return
+        }
+
+        let doc1 = app.createBlankDocument(title: "Doc 1", category: .novel)
+        let doc2 = app.createBlankDocument(title: "Doc 2", category: .article)
+
+        let context = ConversationContext(
+            activeDocumentId: doc1.id,
+            documentTitles: ["Doc 1", "Doc 2"],
+            recentTopics: ["writing", "planning"]
+        )
+
+        let session = chatbot.startSession(context: context)
+        XCTAssertEqual(session.context.documentTitles.count, 2)
+        XCTAssertEqual(session.context.activeDocumentId, doc1.id)
+    }
+
+    func testChatbotConversationHistory() {
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        app.enableAI(configuration: config)
+
+        guard let chatbot = app.chatbotService else {
+            XCTFail("Chatbot service not available")
+            return
+        }
+
+        let session = chatbot.startSession()
+        let history = chatbot.getConversationHistory(from: session)
+        XCTAssertEqual(history.count, 0, "New session should have empty history")
+    }
+
+    func testChatbotClearHistory() {
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        app.enableAI(configuration: config)
+
+        guard let chatbot = app.chatbotService else {
+            XCTFail("Chatbot service not available")
+            return
+        }
+
+        var session = chatbot.startSession()
+        session.messages.append(ChatMessage(role: .user, content: "Test", timestamp: Date()))
+        session.messages.append(ChatMessage(role: .assistant, content: "Response", timestamp: Date()))
+
+        XCTAssertEqual(session.messages.count, 2)
+
+        chatbot.clearHistory(for: &session)
+        XCTAssertEqual(session.messages.count, 0, "History should be cleared")
+    }
+
+    func testChatbotDisableAI() {
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        app.enableAI(configuration: config)
+
+        XCTAssertNotNil(app.chatbotService)
+
+        app.disableAI()
+
+        XCTAssertNil(app.chatbotService, "Chatbot service should be nil after disabling AI")
+        XCTAssertNil(app.aiService, "AI service should be nil after disabling AI")
+    }
+
+    func testChatMessageIsIdentifiable() {
+        let message = ChatMessage(role: .user, content: "Test")
+        XCTAssertNotNil(message.id)
+        XCTAssertEqual(message.role, .user)
+    }
+
+    func testConversationSessionIsIdentifiable() {
+        let session = ConversationSession()
+        XCTAssertNotNil(session.id)
+    }
+
+    func testChatbotErrorMessages() {
+        let emptyError = ChatbotError.emptyMessage
+        XCTAssertNotNil(emptyError.errorDescription)
+        XCTAssertTrue(emptyError.errorDescription!.contains("message"))
+
+        let lengthError = ChatbotError.messageTooLong
+        XCTAssertNotNil(lengthError.errorDescription)
+
+        let aiError = ChatbotError.aiNotAvailable
+        XCTAssertNotNil(aiError.errorDescription)
+        XCTAssertTrue(aiError.errorDescription!.contains("AI"))
+    }
+
+    func testChatMessageCodable() throws {
+        let message = ChatMessage(role: .user, content: "Test message")
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(message)
+
+        let decoder = JSONDecoder()
+        let decoded = try decoder.decode(ChatMessage.self, from: data)
+
+        XCTAssertEqual(decoded.id, message.id)
+        XCTAssertEqual(decoded.role, message.role)
+        XCTAssertEqual(decoded.content, message.content)
+    }
+
+    func testConversationSessionCodable() throws {
+        let session = ConversationSession(
+            context: ConversationContext(documentTitles: ["Doc1", "Doc2"])
+        )
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(session)
+
+        let decoder = JSONDecoder()
+        let decoded = try decoder.decode(ConversationSession.self, from: data)
+
+        XCTAssertEqual(decoded.id, session.id)
+        XCTAssertEqual(decoded.context.documentTitles.count, 2)
+    }
 }
