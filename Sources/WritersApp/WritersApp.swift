@@ -96,6 +96,21 @@ public class WritersApp {
         return aiService != nil
     }
 
+    /// Enable adult content mode for Jules (no content restrictions, curse words allowed)
+    public func enableJulesAdultMode() {
+        chatbotService?.isAdultModeEnabled = true
+    }
+
+    /// Disable adult content mode for Jules
+    public func disableJulesAdultMode() {
+        chatbotService?.isAdultModeEnabled = false
+    }
+
+    /// Check if Jules is in adult mode
+    public var isJulesAdultModeEnabled: Bool {
+        return chatbotService?.isAdultModeEnabled ?? false
+    }
+
     // MARK: - Plugin Management
 
     /// Enable the Claude Memory plugin

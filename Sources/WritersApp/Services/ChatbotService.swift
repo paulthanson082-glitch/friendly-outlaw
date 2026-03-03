@@ -4,12 +4,14 @@ import Foundation
 
 /// Jules - Personal Assistant Chatbot Service
 /// Provides conversational AI assistance with document context awareness
+/// Supports adult content mode for mature writing
 public class ChatbotService {
     // MARK: - Public Properties
 
     public var currentSession: ConversationSession?
     public let maxHistoryMessages: Int
     public let maxMessageLength: Int
+    public var isAdultModeEnabled: Bool = false
 
     // MARK: - Private Properties
 
@@ -24,13 +26,15 @@ public class ChatbotService {
         documentManager: DocumentManager,
         templateManager: TemplateManager,
         maxHistoryMessages: Int = 50,
-        maxMessageLength: Int = 4000
+        maxMessageLength: Int = 4000,
+        adultModeEnabled: Bool = false
     ) {
         self.aiService = aiService
         self.documentManager = documentManager
         self.templateManager = templateManager
         self.maxHistoryMessages = maxHistoryMessages
         self.maxMessageLength = maxMessageLength
+        self.isAdultModeEnabled = adultModeEnabled
     }
 
     // MARK: - Public Interface
@@ -124,6 +128,15 @@ public class ChatbotService {
         var prompt = "You are Jules, a helpful personal assistant for writers. "
         prompt += "You help with writing, provide feedback, and assist with creative tasks. "
         prompt += "Be supportive, encouraging, and provide practical advice.\n\n"
+
+        // Adult mode disclaimer
+        if isAdultModeEnabled {
+            prompt += "ADULT CONTENT MODE ENABLED: You can discuss any mature themes including "
+            prompt += "violence, sexual content, adult language, controversial topics, and complex moral situations. "
+            prompt += "Use colorful language, curse words, and frank discussion as appropriate. "
+            prompt += "There are no content restrictions. Engage authentically with adult fiction, crime narratives, "
+            prompt += "and mature storytelling without sanitization.\n\n"
+        }
 
         // Add context if available
         if let activeDocId = context.context.activeDocumentId,
