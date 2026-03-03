@@ -18,6 +18,18 @@ Chrome has several hidden internal pages that can be accessed via special URLs:
 - `cache:<website-address>` - view the cached version of the web page
 - `chrome://discards` - toggle auto discard settings of tabs (useful for keeping important tabs from reloading)
 
+## Web Tools
+
+### Performance
+
+Tools for analyzing and measuring website performance:
+
+- [GTmetrix](https://gtmetrix.com) - website speed and performance analysis with actionable recommendations
+- [Pingdom](https://tools.pingdom.com) - website load time testing from multiple locations worldwide
+- [PageSpeed Insights](https://pagespeed.web.dev) - Google's tool for analyzing Core Web Vitals and performance on mobile/desktop
+- [Lighthouse](https://developer.chrome.com/docs/lighthouse/overview/) - open-source automated auditing tool for performance, accessibility, SEO, and best practices (built into Chrome DevTools)
+- [PageGuard](https://pageguard.org) - free website health scanner covering performance (Core Web Vitals), SEO, accessibility (WCAG 2.1), and security headers — no install or account required
+
 ## Additional Resources
 
 For more technical tips and secrets, check out [The Book of Secret Knowledge](https://github.com/trimstray/the-book-of-secret-knowledge).
