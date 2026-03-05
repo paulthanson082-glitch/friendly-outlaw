@@ -20,7 +20,9 @@ const originalRandom = Math.random;
 describe('/api/simulate', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    Math.random = originalRandom;
+    // Default to 0.5 (≥ 0.4 threshold) so memory generation is skipped
+    // unless a test explicitly overrides Math.random.
+    Math.random = jest.fn().mockReturnValue(0.5);
   });
 
   const createMockRequest = (body: any) => {
