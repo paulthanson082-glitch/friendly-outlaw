@@ -233,6 +233,156 @@ class APIClient {
     }
   }
 
+  // Document Methods
+  async createDocument(title: string, content?: string, category?: string): Promise<any> {
+    const response = await this.client.post('/documents', { title, content, category });
+    return response.data;
+  }
+
+  async getDocuments(limit = 50, offset = 0): Promise<any> {
+    const response = await this.client.get('/documents', { params: { limit, offset } });
+    return response.data;
+  }
+
+  async getDocument(id: string): Promise<any> {
+    const response = await this.client.get(`/documents/${id}`);
+    return response.data;
+  }
+
+  async updateDocument(id: string, data: any): Promise<any> {
+    const response = await this.client.put(`/documents/${id}`, data);
+    return response.data;
+  }
+
+  async deleteDocument(id: string): Promise<void> {
+    await this.client.delete(`/documents/${id}`);
+  }
+
+  async searchDocuments(query: string): Promise<any[]> {
+    const response = await this.client.get('/documents/search', { params: { q: query } });
+    return response.data;
+  }
+
+  async exportDocument(id: string, format: 'markdown' | 'plaintext' | 'html' = 'markdown'): Promise<string> {
+    const response = await this.client.get(`/documents/${id}/export`, { params: { format } });
+    return response.data;
+  }
+
+  async duplicateDocument(id: string): Promise<any> {
+    const response = await this.client.post(`/documents/${id}/duplicate`);
+    return response.data;
+  }
+
+  // Template Methods
+  async getTemplates(category?: string): Promise<any[]> {
+    const response = await this.client.get('/templates', { params: category ? { category } : {} });
+    return response.data;
+  }
+
+  async getTemplate(id: string): Promise<any> {
+    const response = await this.client.get(`/templates/${id}`);
+    return response.data;
+  }
+
+  async createTemplate(name: string, category: string, content: string, placeholders?: any[], description?: string): Promise<any> {
+    const response = await this.client.post('/templates', { name, category, content, placeholders, description });
+    return response.data;
+  }
+
+  async fillTemplate(id: string, values: Record<string, string>): Promise<{ content: string }> {
+    const response = await this.client.post(`/templates/${id}/fill`, { values });
+    return response.data;
+  }
+
+  async createDocumentFromTemplate(templateId: string, title: string, values?: Record<string, string>): Promise<any> {
+    const response = await this.client.post(`/templates/${templateId}/create-doc`, { title, values });
+    return response.data;
+  }
+
+  // Kanban Methods
+  async createBoard(name: string, description?: string): Promise<any> {
+    const response = await this.client.post('/kanban/boards', { name, description });
+    return response.data;
+  }
+
+  async getBoards(): Promise<any[]> {
+    const response = await this.client.get('/kanban/boards');
+    return response.data;
+  }
+
+  async getBoard(boardId: string): Promise<any> {
+    const response = await this.client.get(`/kanban/boards/${boardId}`);
+    return response.data;
+  }
+
+  async deleteBoard(boardId: string): Promise<void> {
+    await this.client.delete(`/kanban/boards/${boardId}`);
+  }
+
+  async createTask(boardId: string, title: string, description?: string, column?: string): Promise<any> {
+    const response = await this.client.post('/kanban/tasks', { boardId, title, description, column });
+    return response.data;
+  }
+
+  async getTask(taskId: string): Promise<any> {
+    const response = await this.client.get(`/kanban/tasks/${taskId}`);
+    return response.data;
+  }
+
+  async updateTask(taskId: string, data: any): Promise<any> {
+    const response = await this.client.put(`/kanban/tasks/${taskId}`, data);
+    return response.data;
+  }
+
+  async moveTask(taskId: string, column: string): Promise<any> {
+    const response = await this.client.post(`/kanban/tasks/${taskId}/move`, { column });
+    return response.data;
+  }
+
+  async deleteTask(taskId: string): Promise<void> {
+    await this.client.delete(`/kanban/tasks/${taskId}`);
+  }
+
+  async searchTasks(query: string): Promise<any[]> {
+    const response = await this.client.get('/kanban/tasks/search', { params: { q: query } });
+    return response.data;
+  }
+
+  // Writing Goals Methods
+  async createGoal(title: string, goalType: string, unit: string, targetValue: number, description?: string, deadline?: string): Promise<any> {
+    const response = await this.client.post('/writing-goals', { title, goalType, unit, targetValue, description, deadline });
+    return response.data;
+  }
+
+  async getGoals(): Promise<any[]> {
+    const response = await this.client.get('/writing-goals');
+    return response.data;
+  }
+
+  async getGoal(id: string): Promise<any> {
+    const response = await this.client.get(`/writing-goals/${id}`);
+    return response.data;
+  }
+
+  async updateGoal(id: string, data: any): Promise<any> {
+    const response = await this.client.put(`/writing-goals/${id}`, data);
+    return response.data;
+  }
+
+  async updateGoalProgress(id: string, currentValue: number): Promise<any> {
+    const response = await this.client.post(`/writing-goals/${id}/progress`, { currentValue });
+    return response.data;
+  }
+
+  async deleteGoal(id: string): Promise<void> {
+    await this.client.delete(`/writing-goals/${id}`);
+  }
+
+  async getGoalStats(id: string): Promise<any> {
+    const response = await this.client.get(`/writing-goals/${id}/stats`);
+    return response.data;
+  }
+
   // Auth state management
   setAuth(token: string): void {
     this.token = token;

@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database (optional - for production)
+  # postgres:
+  #   image: postgres:16-alpine
+  #   environment:
+  #     POSTGRES_USER: writers_app
+  #     POSTGRES_PASSWORD: secure_password
+  #     POSTGRES_DB: writers_app
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U writers_app"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+  # Redis for caching (optional)
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+  # Jules API & Frontend
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      JWT_SECRET: ${JWT_SECRET:-this-is-a-very-long-secret-key-that-is-definitely-more-than-32-chars-long}
+      CORS_ORIGIN: http://localhost:3000,http://localhost:3001
+      LOG_LEVEL: info
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/src:/app/src
+    depends_on: []
+      # - postgres
+      # - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # Optional: Development helper for live reload
+  # backend-dev:
+  #   build:
+  #     context: .
+  #     dockerfile: backend.dev.Dockerfile
+  #   ports:
+  #     - "3001:3000"
+  #   volumes:
+  #     - ./backend/src:/app/src
+  #   environment:
+  #     NODE_ENV: development
+
+volumes:
+  postgres_data:
+  redis_data:

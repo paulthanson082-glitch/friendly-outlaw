@@ -5,6 +5,10 @@ import logger from './utils/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import chatRoutes from './routes/chat.js';
 import authRoutes from './routes/auth.js';
+import documentRoutes from './routes/documents.js';
+import templateRoutes from './routes/templates.js';
+import kanbanRoutes from './routes/kanban.js';
+import goalRoutes from './routes/goals.js';
 import { initializeDatabase } from './db/connection.js';
 import { templateService } from './services/templateService.js';
 
@@ -57,17 +61,25 @@ app.get('/health', (req: Request, res: Response) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/documents', documentRoutes);
+app.use('/api/templates', templateRoutes);
+app.use('/api/kanban', kanbanRoutes);
+app.use('/api/writing-goals', goalRoutes);
 
 // Root endpoint
 app.get('/', (req: Request, res: Response) => {
   res.json({
-    name: 'Writers App API',
+    name: 'Writers App API - Jules',
     version: '1.0.0',
-    description: 'Jules AI-powered writing assistant API',
+    description: 'AI-powered writing assistant API',
     endpoints: {
       health: '/health',
-      auth: '/api/auth',
-      chat: '/api/chat',
+      auth: '/api/auth (register, login, profile)',
+      chat: '/api/chat (sessions, messages, streaming)',
+      documents: '/api/documents (CRUD, search, export)',
+      templates: '/api/templates (browse, create, fill)',
+      kanban: '/api/kanban (boards, tasks, workflow)',
+      goals: '/api/writing-goals (create, track, update)',
     },
   });
 });

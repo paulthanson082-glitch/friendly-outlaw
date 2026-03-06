@@ -209,9 +209,4 @@ export class KanbanService {
   }
 }
 
-function getDatabase() {
-  const { getDatabase: getDb } = require('../db/connection.js');
-  return getDb();
-}
-
 export const kanbanService = new KanbanService();

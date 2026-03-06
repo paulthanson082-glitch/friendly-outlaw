@@ -1,0 +1,106 @@
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.container h1 {
+  font-size: 28px;
+  margin-bottom: 24px;
+  color: #333;
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.filterBtn {
+  padding: 8px 16px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.filterBtn:hover {
+  border-color: #007bff;
+  color: #007bff;
+}
+
+.filterBtn.active {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}
+
+.templateGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.templateCard {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow 0.2s ease;
+}
+
+.templateCard:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.templateCard h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.category {
+  margin: 0;
+  font-size: 12px;
+  color: #999;
+  text-transform: uppercase;
+}
+
+.description {
+  margin: 12px 0;
+  font-size: 14px;
+  color: #666;
+  flex: 1;
+}
+
+.placeholders {
+  margin: 12px 0;
+  font-size: 12px;
+  color: #999;
+}
+
+.useBtn {
+  margin-top: 12px;
+  padding: 10px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.useBtn:hover {
+  background: #0056b3;
+}
