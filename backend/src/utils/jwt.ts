@@ -9,14 +9,14 @@ export interface JWTPayload {
 }
 
 export const generateToken = (payload: Omit<JWTPayload, 'iat' | 'exp'>): string => {
-  return jwt.sign(payload, config.JWT_SECRET, {
+  return jwt.sign(payload as any, config.JWT_SECRET as any, {
     expiresIn: config.JWT_EXPIRES_IN,
-  });
+  } as any);
 };
 
 export const verifyToken = (token: string): JWTPayload => {
   try {
-    return jwt.verify(token, config.JWT_SECRET) as JWTPayload;
+    return jwt.verify(token, config.JWT_SECRET as any) as JWTPayload;
   } catch (error) {
     throw new Error('Invalid or expired token');
   }

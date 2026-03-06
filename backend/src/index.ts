@@ -5,8 +5,21 @@ import logger from './utils/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import chatRoutes from './routes/chat.js';
 import authRoutes from './routes/auth.js';
+import { initializeDatabase } from './db/connection.js';
+import { templateService } from './services/templateService.js';
 
 const app: Express = express();
+
+// Initialize database
+try {
+  const dbPath = config.NODE_ENV === 'test' ? ':memory:' : (config.SQLITE_PATH || './data/writers_app.db');
+  initializeDatabase(dbPath);
+  templateService.seedDefaults();
+  logger.info('Database initialized and seeded');
+} catch (error) {
+  logger.error('Failed to initialize database:', error);
+  process.exit(1);
+}
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));

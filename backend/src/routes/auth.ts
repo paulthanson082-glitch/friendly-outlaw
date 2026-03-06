@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { hash, compare } from 'bcryptjs';
-import { generateToken, JWTPayload } from '../utils/jwt.js';
+import bcryptjs from 'bcryptjs';
+import { generateToken } from '../utils/jwt.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { ValidationError, UnauthorizedError, ConflictError } from '../utils/errors.js';
@@ -47,7 +47,7 @@ router.post(
     }
 
     // Hash password
-    const passwordHash = await hash(password, 10);
+    const passwordHash = await bcryptjs.hash(password, 10);
 
     // Create user
     const user: User = {
@@ -98,7 +98,7 @@ router.post(
     }
 
     // Verify password
-    const isValid = await compare(password, user.passwordHash);
+    const isValid = await bcryptjs.compare(password, user.passwordHash);
     if (!isValid) {
       throw new UnauthorizedError('Invalid email or password');
     }
