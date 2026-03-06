@@ -267,8 +267,8 @@ public class HardwareManager {
             name: "Raspberry Pi 4 GPIO Template",
             boardType: .rpiGPIO,
             description: "Raspberry Pi 4B with 40-pin GPIO header (BCM numbering)",
-            transportType: .native,
             serialPort: "native",
+            transportType: .native,
             pinAliases: [
                 PinAlias(alias: "led_red", physicalPin: 17, description: "Red LED GPIO17", pinType: "digital"),
                 PinAlias(alias: "led_green", physicalPin: 27, description: "Green LED GPIO27", pinType: "digital"),
