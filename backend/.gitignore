@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+*.log
+logs/
+data/
+.DS_Store
+.idea/
+*.swp
+*.swo
+*~
+coverage/
+.coverage
