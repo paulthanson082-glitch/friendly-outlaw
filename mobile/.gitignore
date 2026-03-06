@@ -1,0 +1,40 @@
+# Expo
+.expo/
+.expo-shared/
+dist/
+npm-debug.*
+.env.local
+.env.*.local
+
+# Node
+node_modules/
+package-lock.json
+yarn.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+build/
+*.jks
+*.keystore
+
+# Logs
+*.log
+
+# Platform specific
+ios/Pods
+ios/Podfile.lock
+android/.gradle
+android/build
+android/app/build
+android/app/*.apk
+android/app/*.aab
