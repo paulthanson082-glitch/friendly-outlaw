@@ -165,7 +165,9 @@ public class DoltVersionControlService {
         guard let branch = try db.getVCBranch(name: branchName) else {
             throw VersionControlError.branchNotFound(branchName)
         }
-        return try db.getVCCommits(branchId: branch.id)
+        let result = try db.getVCCommits(branchId: branch.id)
+        let msgs = result.map { $0.message }.joined(separator: ",")
+        return result
     }
 
     // MARK: - Diff Operations
