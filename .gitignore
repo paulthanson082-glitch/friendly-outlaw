@@ -68,6 +68,13 @@ node_modules/
 .env.local
 .env.*.local
 
+# SEO Machine — credentials and API configs (never commit these)
+data_sources/config/
+config/competitors.json
+
+# SEO Machine — API response cache
+data_sources/cache/
+
 # Python
 __pycache__/
 *.py[cod]

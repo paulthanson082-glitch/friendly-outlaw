@@ -1,0 +1,45 @@
+{
+  "_instructions": "Copy this file to config/competitors.json and fill in your data. config/competitors.json is git-ignored.",
+  "your_site": {
+    "url": "https://yoursite.com",
+    "name": "Your Brand",
+    "sitemap": "https://yoursite.com/sitemap.xml"
+  },
+  "competitors": [
+    {
+      "name": "Competitor One",
+      "url": "https://competitorone.com",
+      "priority": "high",
+      "notes": "Main direct competitor, targets same ICP"
+    },
+    {
+      "name": "Competitor Two",
+      "url": "https://competitortwo.com",
+      "priority": "medium",
+      "notes": "Secondary competitor, lower market share"
+    },
+    {
+      "name": "Competitor Three",
+      "url": "https://competitorthree.com",
+      "priority": "low",
+      "notes": "Indirect competitor, different pricing tier"
+    }
+  ],
+  "target_keywords": [
+    {
+      "keyword": "your main keyword here",
+      "priority": "high",
+      "cluster": "core"
+    },
+    {
+      "keyword": "secondary keyword",
+      "priority": "medium",
+      "cluster": "supporting"
+    }
+  ],
+  "location": {
+    "country_code": 2840,
+    "country_name": "United States",
+    "language_code": "en"
+  }
+}
