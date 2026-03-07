@@ -36,14 +36,18 @@ public struct VCBranch: Codable, Identifiable {
     public let id: UUID
     public let name: String
     public var headCommitId: UUID?
+    /// The commit this branch was forked from; used for LCA computation during merges.
+    public var baseCommitId: UUID?
     public let createdAt: Date
     public var isActive: Bool
 
     public init(id: UUID = UUID(), name: String, headCommitId: UUID? = nil,
+                baseCommitId: UUID? = nil,
                 createdAt: Date = Date(), isActive: Bool = false) {
         self.id = id
         self.name = name
         self.headCommitId = headCommitId
+        self.baseCommitId = baseCommitId
         self.createdAt = createdAt
         self.isActive = isActive
     }

@@ -175,6 +175,7 @@ public class DatabaseManager {
             id TEXT PRIMARY KEY,
             name TEXT UNIQUE NOT NULL,
             head_commit_id TEXT,
+            base_commit_id TEXT,
             created_at REAL NOT NULL,
             is_active INTEGER DEFAULT 0
         );
@@ -1524,8 +1525,8 @@ public class DatabaseManager {
     public func insertVCBranch(_ branch: VCBranch) throws {
         guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
         let sql = """
-        INSERT INTO vc_branches (id, name, head_commit_id, created_at, is_active)
-        VALUES (?, ?, ?, ?, ?);
+        INSERT INTO vc_branches (id, name, head_commit_id, base_commit_id, created_at, is_active)
+        VALUES (?, ?, ?, ?, ?, ?);
         """
         var stmt: OpaquePointer?
         defer { sqlite3_finalize(stmt) }
@@ -1539,8 +1540,13 @@ public class DatabaseManager {
         } else {
             sqlite3_bind_null(stmt, 3)
         }
-        sqlite3_bind_double(stmt, 4, branch.createdAt.timeIntervalSince1970)
-        sqlite3_bind_int(stmt, 5, branch.isActive ? 1 : 0)
+        if let bc = branch.baseCommitId {
+            sqlite3_bind_text(stmt, 4, bc.uuidString, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(stmt, 4)
+        }
+        sqlite3_bind_double(stmt, 5, branch.createdAt.timeIntervalSince1970)
+        sqlite3_bind_int(stmt, 6, branch.isActive ? 1 : 0)
         guard sqlite3_step(stmt) == SQLITE_DONE else {
             throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
         }
@@ -1551,7 +1557,7 @@ public class DatabaseManager {
     /// - Throws: `DatabaseError.notInitialized` if the database manager has not been initialized; `DatabaseError.queryFailed` if preparing or executing the SQL update fails.
     public func updateVCBranch(_ branch: VCBranch) throws {
         guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
-        let sql = "UPDATE vc_branches SET head_commit_id = ?, is_active = ? WHERE id = ?;"
+        let sql = "UPDATE vc_branches SET head_commit_id = ?, base_commit_id = ?, is_active = ? WHERE id = ?;"
         var stmt: OpaquePointer?
         defer { sqlite3_finalize(stmt) }
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
@@ -1562,8 +1568,13 @@ public class DatabaseManager {
         } else {
             sqlite3_bind_null(stmt, 1)
         }
-        sqlite3_bind_int(stmt, 2, branch.isActive ? 1 : 0)
-        sqlite3_bind_text(stmt, 3, branch.id.uuidString, -1, SQLITE_TRANSIENT)
+        if let bc = branch.baseCommitId {
+            sqlite3_bind_text(stmt, 2, bc.uuidString, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(stmt, 2)
+        }
+        sqlite3_bind_int(stmt, 3, branch.isActive ? 1 : 0)
+        sqlite3_bind_text(stmt, 4, branch.id.uuidString, -1, SQLITE_TRANSIENT)
         guard sqlite3_step(stmt) == SQLITE_DONE else {
             throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
         }
@@ -1606,7 +1617,7 @@ public class DatabaseManager {
     public func getAllVCBranches() throws -> [VCBranch] {
         guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
         let sql = """
-        SELECT id, name, head_commit_id, created_at, is_active
+        SELECT id, name, head_commit_id, base_commit_id, created_at, is_active
         FROM vc_branches ORDER BY created_at ASC;
         """
         var stmt: OpaquePointer?
@@ -1619,16 +1630,13 @@ public class DatabaseManager {
             guard let idText = sqlite3_column_text(stmt, 0),
                   let nameText = sqlite3_column_text(stmt, 1),
                   let id = UUID(uuidString: String(cString: idText)) else { continue }
-            let headId: UUID?
-            if let hcText = sqlite3_column_text(stmt, 2) {
-                headId = UUID(uuidString: String(cString: hcText))
-            } else {
-                headId = nil
-            }
-            let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 3))
-            let isActive = sqlite3_column_int(stmt, 4) != 0
+            let headId: UUID? = sqlite3_column_text(stmt, 2).flatMap { UUID(uuidString: String(cString: $0)) }
+            let baseId: UUID? = sqlite3_column_text(stmt, 3).flatMap { UUID(uuidString: String(cString: $0)) }
+            let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 4))
+            let isActive = sqlite3_column_int(stmt, 5) != 0
             branches.append(VCBranch(id: id, name: String(cString: nameText),
-                                     headCommitId: headId, createdAt: createdAt, isActive: isActive))
+                                     headCommitId: headId, baseCommitId: baseId,
+                                     createdAt: createdAt, isActive: isActive))
         }
         return branches
     }
@@ -1642,7 +1650,7 @@ public class DatabaseManager {
     public func getVCBranch(name: String) throws -> VCBranch? {
         guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
         let sql = """
-        SELECT id, name, head_commit_id, created_at, is_active
+        SELECT id, name, head_commit_id, base_commit_id, created_at, is_active
         FROM vc_branches WHERE name = ?;
         """
         var stmt: OpaquePointer?
@@ -1655,16 +1663,13 @@ public class DatabaseManager {
         guard let idText = sqlite3_column_text(stmt, 0),
               let nameText = sqlite3_column_text(stmt, 1),
               let id = UUID(uuidString: String(cString: idText)) else { return nil }
-        let headId: UUID?
-        if let hcText = sqlite3_column_text(stmt, 2) {
-            headId = UUID(uuidString: String(cString: hcText))
-        } else {
-            headId = nil
-        }
-        let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 3))
-        let isActive = sqlite3_column_int(stmt, 4) != 0
+        let headId: UUID? = sqlite3_column_text(stmt, 2).flatMap { UUID(uuidString: String(cString: $0)) }
+        let baseId: UUID? = sqlite3_column_text(stmt, 3).flatMap { UUID(uuidString: String(cString: $0)) }
+        let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 4))
+        let isActive = sqlite3_column_int(stmt, 5) != 0
         return VCBranch(id: id, name: String(cString: nameText),
-                        headCommitId: headId, createdAt: createdAt, isActive: isActive)
+                        headCommitId: headId, baseCommitId: baseId,
+                        createdAt: createdAt, isActive: isActive)
     }
 
     // MARK: - Version Control: Commit Operations
@@ -1751,6 +1756,37 @@ public class DatabaseManager {
         return commits
     }
 
+    /// Fetches a single commit by its primary key.
+    /// - Parameter id: The UUID of the commit to retrieve.
+    /// - Returns: The matching `VCCommit`, or `nil` if not found.
+    public func getVCCommitById(id: UUID) throws -> VCCommit? {
+        guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
+        let sql = """
+        SELECT id, branch_id, message, author_id, timestamp,
+               parent_commit_id, second_parent_commit_id
+        FROM vc_commits WHERE id = ?;
+        """
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        sqlite3_bind_text(stmt, 1, id.uuidString, -1, SQLITE_TRANSIENT)
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+        guard let idText = sqlite3_column_text(stmt, 0),
+              let branchText = sqlite3_column_text(stmt, 1),
+              let msgText = sqlite3_column_text(stmt, 2),
+              let cId = UUID(uuidString: String(cString: idText)),
+              let bId = UUID(uuidString: String(cString: branchText)) else { return nil }
+        let author: String? = sqlite3_column_text(stmt, 3).map { String(cString: $0) }
+        let ts = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 4))
+        let parent: UUID? = sqlite3_column_text(stmt, 5).flatMap { UUID(uuidString: String(cString: $0)) }
+        let secondParent: UUID? = sqlite3_column_text(stmt, 6).flatMap { UUID(uuidString: String(cString: $0)) }
+        return VCCommit(id: cId, branchId: bId, message: String(cString: msgText),
+                        authorId: author, timestamp: ts,
+                        parentCommitId: parent, secondParentCommitId: secondParent)
+    }
+
     // MARK: - Version Control: Snapshot Operations
 
     /// Inserts a document snapshot into the version control snapshots table.
@@ -1781,11 +1817,12 @@ public class DatabaseManager {
         }
     }
 
-    /// Retrieves all document snapshots associated with a given commit.
+    /// Retrieves the snapshots stored directly on a single commit (no parent chain walk).
+    /// Use this for diff and merge computations where you need the exact delta recorded at that commit.
     /// - Parameter commitId: The commit UUID whose snapshots to retrieve.
-    /// - Returns: An array of `VCDocumentSnapshot` records for the specified commit.
+    /// - Returns: An array of `VCDocumentSnapshot` records stored directly on the given commit.
     /// - Throws: `DatabaseError.notInitialized` if the database is not initialized; `DatabaseError.queryFailed` if the SQL preparation or execution fails.
-    public func getVCSnapshots(commitId: UUID) throws -> [VCDocumentSnapshot] {
+    public func getVCSnapshotsDirect(commitId: UUID) throws -> [VCDocumentSnapshot] {
         guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
         let sql = """
         SELECT id, commit_id, document_id, title, content, category, word_count, captured_at
@@ -1798,6 +1835,35 @@ public class DatabaseManager {
         }
         sqlite3_bind_text(stmt, 1, commitId.uuidString, -1, SQLITE_TRANSIENT)
         return try collectSnapshots(stmt: stmt)
+    }
+
+    /// Retrieves the full document state at a commit.
+    ///
+    /// For merge commits (those with a `secondParentCommitId`) the directly stored snapshots
+    /// represent the complete merged state and are returned as-is. For regular commits the
+    /// parent chain is walked so that documents not explicitly touched in this commit are
+    /// still returned, giving the complete repository state at that point in time.
+    /// - Parameter commitId: The commit UUID to reconstruct state for.
+    /// - Returns: An array of `VCDocumentSnapshot` representing the full document set at that commit.
+    public func getVCSnapshots(commitId: UUID) throws -> [VCDocumentSnapshot] {
+        guard let commit = try getVCCommitById(id: commitId) else {
+            return try getVCSnapshotsDirect(commitId: commitId)
+        }
+        // Merge commits store the complete merged state directly — no chain walk needed.
+        if commit.secondParentCommitId != nil {
+            return try getVCSnapshotsDirect(commitId: commitId)
+        }
+        // Regular commits store a delta; walk the parent chain to reconstruct full state.
+        var snapshotsByDocId: [UUID: VCDocumentSnapshot] = [:]
+        var currentCommitId: UUID? = commitId
+        while let cId = currentCommitId {
+            let direct = try getVCSnapshotsDirect(commitId: cId)
+            for snap in direct where snapshotsByDocId[snap.documentId] == nil {
+                snapshotsByDocId[snap.documentId] = snap
+            }
+            currentCommitId = (try getVCCommitById(id: cId))?.parentCommitId
+        }
+        return Array(snapshotsByDocId.values)
     }
 
     /// Retrieves all version-control document snapshots for the given document ordered from oldest to newest by capture time.

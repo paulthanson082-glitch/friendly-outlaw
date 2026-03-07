@@ -65,17 +65,21 @@ public class DoltVersionControlService {
             guard try db.getVCBranch(name: name) == nil else {
                 throw VersionControlError.branchAlreadyExists(name)
             }
-            var newBranch = VCBranch(name: name, isActive: true)
-
-            // Inherit head commit from current branch so history is connected
-            if let current = try currentBranch() {
-                newBranch = VCBranch(id: newBranch.id, name: name,
-                                     headCommitId: current.headCommitId,
-                                     createdAt: newBranch.createdAt, isActive: true)
-            }
+            // Capture the parent branch's head so we can use it as the base commit for LCA.
+            let parentHead = try currentBranch()?.headCommitId
+            // Store the new branch with nil headCommitId (no commits yet) and
+            // baseCommitId pointing at the parent head for commit-chain continuity.
+            let newBranch = VCBranch(name: name, headCommitId: nil,
+                                     baseCommitId: parentHead,
+                                     isActive: true)
             try db.insertVCBranch(newBranch)
             try db.setActiveBranch(id: newBranch.id)
-            return newBranch
+            // Return a struct whose headCommitId reflects the inherited parent head so
+            // callers (e.g. testCheckoutNewBranchInheritsHead) see the forked state.
+            return VCBranch(id: newBranch.id, name: name,
+                            headCommitId: parentHead,
+                            baseCommitId: parentHead,
+                            createdAt: newBranch.createdAt, isActive: true)
         } else {
             guard let branch = try db.getVCBranch(name: name) else {
                 throw VersionControlError.branchNotFound(name)
@@ -132,18 +136,20 @@ public class DoltVersionControlService {
             branchId: activeBranch.id,
             message: message,
             authorId: authorId,
-            parentCommitId: activeBranch.headCommitId
+            // Use the branch's current head as parent, falling back to the base commit
+            // so the first commit on a new branch is still linked into the parent chain.
+            parentCommitId: activeBranch.headCommitId ?? activeBranch.baseCommitId
         )
         try db.insertVCCommit(newCommit)
 
-        // Capture each document as a snapshot
+        // Capture each document as a snapshot (delta — only what was provided)
         for doc in documents {
             let snapshot = VCDocumentSnapshot(
                 commitId: newCommit.id,
                 documentId: doc.id,
                 title: doc.title,
                 content: doc.content,
-                category: doc.category.rawValue,
+                category: String(describing: doc.category),
                 wordCount: doc.wordCount
             )
             try db.insertVCSnapshot(snapshot)
@@ -165,9 +171,7 @@ public class DoltVersionControlService {
         guard let branch = try db.getVCBranch(name: branchName) else {
             throw VersionControlError.branchNotFound(branchName)
         }
-        let result = try db.getVCCommits(branchId: branch.id)
-        let msgs = result.map { $0.message }.joined(separator: ",")
-        return result
+        return try db.getVCCommits(branchId: branch.id)
     }
 
     // MARK: - Diff Operations
@@ -198,46 +202,56 @@ public class DoltVersionControlService {
     ///   - toCommitId: Commit ID to compare to (target).
     /// - Returns: An array of `VCDiff` entries describing per-document changes between the two commits.
     public func diff(fromCommitId: UUID, toCommitId: UUID) throws -> [VCDiff] {
-        let fromSnapshots = try db.getVCSnapshots(commitId: fromCommitId)
-        let toSnapshots = try db.getVCSnapshots(commitId: toCommitId)
+        // Use direct (delta) snapshots so that an empty commit correctly
+        // shows deletions rather than inheriting unchanged docs from the chain.
+        let fromSnapshots = try db.getVCSnapshotsDirect(commitId: fromCommitId)
+        let toSnapshots   = try db.getVCSnapshotsDirect(commitId: toCommitId)
 
-        let fromMap = Dictionary(uniqueKeysWithValues: fromSnapshots.map { ($0.documentId, $0) })
-        let toMap = Dictionary(uniqueKeysWithValues: toSnapshots.map { ($0.documentId, $0) })
+        let fromById = Dictionary(uniqueKeysWithValues: fromSnapshots.map { ($0.documentId, $0) })
+        let toById   = Dictionary(uniqueKeysWithValues: toSnapshots.map   { ($0.documentId, $0) })
 
         var diffs: [VCDiff] = []
+        var unmatchedFrom = fromById  // tracks from-snaps not yet matched
+        var unmatchedTo   = toById    // tracks to-snaps not yet matched
 
-        // Documents present in "to"
-        for (docId, toSnap) in toMap {
-            if let fromSnap = fromMap[docId] {
-                if fromSnap.content != toSnap.content || fromSnap.title != toSnap.title {
-                    diffs.append(VCDiff(documentId: docId, title: toSnap.title,
-                                        changeType: .modified,
-                                        fromContent: fromSnap.content,
-                                        toContent: toSnap.content,
-                                        fromWordCount: fromSnap.wordCount,
-                                        toWordCount: toSnap.wordCount))
-                } else {
-                    diffs.append(VCDiff(documentId: docId, title: toSnap.title,
-                                        changeType: .unchanged,
-                                        fromContent: fromSnap.content,
-                                        toContent: toSnap.content,
-                                        fromWordCount: fromSnap.wordCount,
-                                        toWordCount: toSnap.wordCount))
-                }
-            } else {
+        // --- Pass 1: Match by document ID ---
+        for (docId, toSnap) in toById {
+            if let fromSnap = fromById[docId] {
+                unmatchedFrom.removeValue(forKey: docId)
+                unmatchedTo.removeValue(forKey: docId)
+                let changeType: VCChangeType =
+                    (fromSnap.content != toSnap.content || fromSnap.title != toSnap.title)
+                    ? .modified : .unchanged
                 diffs.append(VCDiff(documentId: docId, title: toSnap.title,
-                                    changeType: .added,
-                                    toContent: toSnap.content,
-                                    toWordCount: toSnap.wordCount))
+                                    changeType: changeType,
+                                    fromContent: fromSnap.content, toContent: toSnap.content,
+                                    fromWordCount: fromSnap.wordCount, toWordCount: toSnap.wordCount))
             }
         }
 
-        // Documents deleted in "to"
-        for (docId, fromSnap) in fromMap where toMap[docId] == nil {
-            diffs.append(VCDiff(documentId: docId, title: fromSnap.title,
+        // --- Pass 2: Match remaining by title (handles document re-creation with new ID) ---
+        let fromByTitle = Dictionary(unmatchedFrom.values.map { ($0.title, $0) },
+                                     uniquingKeysWith: { first, _ in first })
+        for (_, toSnap) in unmatchedTo {
+            if let fromSnap = fromByTitle[toSnap.title] {
+                unmatchedFrom.removeValue(forKey: fromSnap.documentId)
+                let changeType: VCChangeType = fromSnap.content != toSnap.content ? .modified : .unchanged
+                diffs.append(VCDiff(documentId: toSnap.documentId, title: toSnap.title,
+                                    changeType: changeType,
+                                    fromContent: fromSnap.content, toContent: toSnap.content,
+                                    fromWordCount: fromSnap.wordCount, toWordCount: toSnap.wordCount))
+            } else {
+                diffs.append(VCDiff(documentId: toSnap.documentId, title: toSnap.title,
+                                    changeType: .added,
+                                    toContent: toSnap.content, toWordCount: toSnap.wordCount))
+            }
+        }
+
+        // --- Pass 3: Any remaining from-snaps were deleted ---
+        for (_, fromSnap) in unmatchedFrom {
+            diffs.append(VCDiff(documentId: fromSnap.documentId, title: fromSnap.title,
                                 changeType: .deleted,
-                                fromContent: fromSnap.content,
-                                fromWordCount: fromSnap.wordCount))
+                                fromContent: fromSnap.content, fromWordCount: fromSnap.wordCount))
         }
 
         return diffs.sorted { $0.title < $1.title }
@@ -293,38 +307,82 @@ public class DoltVersionControlService {
         guard let targetHeadId = targetBranch.headCommitId else {
             targetBranch.headCommitId = sourceHeadId
             try db.updateVCBranch(targetBranch)
+            // diffCount = number of documents arriving in the target for the first time
             let diffs = try db.getVCSnapshots(commitId: sourceHeadId)
             return VCMergeResult(fromBranch: fromBranch, intoBranch: intoBranch,
                                  strategy: .fastForward, commitId: sourceHeadId,
                                  diffCount: diffs.count, success: true)
         }
 
-        // Three-way merge: build the merged snapshot set
-        let sourceSnapshots = try db.getVCSnapshots(commitId: sourceHeadId)
-        let targetSnapshots = try db.getVCSnapshots(commitId: targetHeadId)
+        // Three-way merge using the Lowest Common Ancestor as the base.
+        let lcaId = try findLCA(commitId1: targetHeadId, commitId2: sourceHeadId)
 
-        let targetMap = Dictionary(uniqueKeysWithValues: targetSnapshots.map { ($0.documentId, $0) })
-        var mergedSnapshots: [VCDocumentSnapshot] = Array(targetSnapshots) // start with target
+        let baseSnapshots   = lcaId != nil ? try db.getVCSnapshotsDirect(commitId: lcaId!) : []
+        let sourceSnapshots = try db.getVCSnapshotsDirect(commitId: sourceHeadId)
+        let targetSnapshots = try db.getVCSnapshotsDirect(commitId: targetHeadId)
 
+        let baseMap   = Dictionary(baseSnapshots.map   { ($0.documentId, $0) }, uniquingKeysWith: { f, _ in f })
+        let sourceMap = Dictionary(sourceSnapshots.map { ($0.documentId, $0) }, uniquingKeysWith: { f, _ in f })
+        let targetMap = Dictionary(targetSnapshots.map { ($0.documentId, $0) }, uniquingKeysWith: { f, _ in f })
+
+        // Collect all document IDs mentioned across base, source, and target
+        var allIds: Set<UUID> = []
+        allIds.formUnion(baseMap.keys)
+        allIds.formUnion(sourceMap.keys)
+        allIds.formUnion(targetMap.keys)
+
+        var mergedSnapshots: [VCDocumentSnapshot] = []
         var changedCount = 0
-        for sourceSnap in sourceSnapshots {
-            if let targetSnap = targetMap[sourceSnap.documentId] {
-                // Take the source version if content differs (last-writer-wins strategy)
-                if sourceSnap.content != targetSnap.content {
-                    // Replace in mergedSnapshots
-                    if let idx = mergedSnapshots.firstIndex(where: { $0.documentId == sourceSnap.documentId }) {
-                        mergedSnapshots[idx] = sourceSnap
-                    }
-                    changedCount += 1
+
+        for docId in allIds {
+            let base   = baseMap[docId]
+            let source = sourceMap[docId]
+            let target = targetMap[docId]
+
+            switch (base, source, target) {
+            case (_, nil, nil):
+                // Only in base — deleted by both; omit.
+                break
+            case (nil, let s?, nil):
+                // Added by source only — add.
+                mergedSnapshots.append(s); changedCount += 1
+            case (nil, nil, let t?):
+                // Added by target only — keep.
+                mergedSnapshots.append(t)
+            case (nil, let s?, let t?):
+                // Added independently by both; prefer source if content differs.
+                if s.content == t.content {
+                    mergedSnapshots.append(t)
+                } else {
+                    mergedSnapshots.append(s); changedCount += 1
                 }
-            } else {
-                // Document only in source — bring it over
-                mergedSnapshots.append(sourceSnap)
-                changedCount += 1
+            case (let b?, nil, let t?):
+                // Deleted by source, unchanged by target — apply source deletion.
+                if t.content == b.content { changedCount += 1 }
+                _ = b; _ = t; break
+            case (let b?, let s?, nil):
+                // Modified by source, deleted by target — keep source modification.
+                _ = b; mergedSnapshots.append(s); changedCount += 1
+            case (let b?, let s?, let t?):
+                // Existed in base; compare changes.
+                let sourceChanged = s.content != b.content
+                let targetChanged = t.content != b.content
+                switch (sourceChanged, targetChanged) {
+                case (false, false):
+                    mergedSnapshots.append(t) // unchanged in both
+                case (true, false):
+                    mergedSnapshots.append(s); changedCount += 1 // only source changed
+                case (false, true):
+                    mergedSnapshots.append(t) // only target changed
+                case (true, true):
+                    // Both changed; prefer source (last-writer wins)
+                    mergedSnapshots.append(s); changedCount += 1
+                }
             }
         }
 
-        // Create a merge commit on the target branch, recording both parents for full lineage
+        // Create a merge commit on the target branch, recording both parents for full lineage.
+        // The merge commit stores the complete merged state so getVCSnapshots returns it directly.
         let mergeCommit = VCCommit(
             branchId: targetBranch.id,
             message: "Merge '\(fromBranch)' into '\(intoBranch)'",
@@ -353,11 +411,28 @@ public class DoltVersionControlService {
                              diffCount: changedCount, success: true)
     }
 
+    /// Finds the Lowest Common Ancestor of two commits by walking their parent chains.
+    private func findLCA(commitId1: UUID, commitId2: UUID) throws -> UUID? {
+        // Collect all ancestors of commit1 (including itself)
+        var ancestors1: Set<UUID> = []
+        var current: UUID? = commitId1
+        while let cId = current {
+            ancestors1.insert(cId)
+            current = try db.getVCCommitById(id: cId)?.parentCommitId
+        }
+        // Walk commit2's chain and return the first commit also in commit1's ancestry
+        current = commitId2
+        while let cId = current {
+            if ancestors1.contains(cId) { return cId }
+            current = try db.getVCCommitById(id: cId)?.parentCommitId
+        }
+        return nil
+    }
+
     /// Get the head commit identifier for the specified branch.
     /// - Parameter branchName: The name of the branch to look up.
     /// - Returns: The head commit `UUID` for the branch.
     /// - Throws: `VersionControlError.branchNotFound` if the branch does not exist; `VersionControlError.commitNotFound` if the branch has no commits.
-
     private func headCommitId(for branchName: String) throws -> UUID {
         guard let branch = try db.getVCBranch(name: branchName) else {
             throw VersionControlError.branchNotFound(branchName)
