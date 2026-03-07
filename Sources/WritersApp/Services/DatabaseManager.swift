@@ -1847,7 +1847,8 @@ public class DatabaseManager {
     /// - Returns: An array of `VCDocumentSnapshot` representing the full document set at that commit.
     public func getVCSnapshots(commitId: UUID) throws -> [VCDocumentSnapshot] {
         guard let commit = try getVCCommitById(id: commitId) else {
-            return try getVCSnapshotsDirect(commitId: commitId)
+            // Commit record not found; return empty rather than masking the missing data.
+            return []
         }
         // Merge commits store the complete merged state directly — no chain walk needed.
         if commit.secondParentCommitId != nil {

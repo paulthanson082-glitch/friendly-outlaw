@@ -65,17 +65,22 @@ public class DoltVersionControlService {
             guard try db.getVCBranch(name: name) == nil else {
                 throw VersionControlError.branchAlreadyExists(name)
             }
-            // Capture the parent branch's head so we can use it as the base commit for LCA.
+            // Capture the parent branch's head to use as the base commit for LCA during merges.
             let parentHead = try currentBranch()?.headCommitId
-            // Store the new branch with nil headCommitId (no commits yet) and
-            // baseCommitId pointing at the parent head for commit-chain continuity.
+
+            // The DB record stores headCommitId=nil (the new branch has no commits yet).
+            // baseCommitId records where the branch was forked from; commit() uses it as the
+            // parentCommitId for the first commit so the chain stays connected.
             let newBranch = VCBranch(name: name, headCommitId: nil,
                                      baseCommitId: parentHead,
                                      isActive: true)
             try db.insertVCBranch(newBranch)
             try db.setActiveBranch(id: newBranch.id)
-            // Return a struct whose headCommitId reflects the inherited parent head so
-            // callers (e.g. testCheckoutNewBranchInheritsHead) see the forked state.
+
+            // Return a view with headCommitId = parentHead so that callers reading the
+            // returned value see the inherited head state.  The DB record retains nil —
+            // currentBranch() always reads from the DB, so it correctly returns nil head
+            // for this branch until the first commit lands on it.
             return VCBranch(id: newBranch.id, name: name,
                             headCommitId: parentHead,
                             baseCommitId: parentHead,
@@ -357,9 +362,15 @@ public class DoltVersionControlService {
                     mergedSnapshots.append(s); changedCount += 1
                 }
             case (let b?, nil, let t?):
-                // Deleted by source, unchanged by target — apply source deletion.
-                if t.content == b.content { changedCount += 1 }
-                _ = b; _ = t; break
+                // Deleted by source, unchanged in target — apply the deletion when target
+                // hasn't diverged from base (t == b means no target-side modification).
+                if t.content == b.content {
+                    // Document is removed from the merge result; count as one change.
+                    changedCount += 1
+                } else {
+                    // Target modified it independently; keep target's version.
+                    mergedSnapshots.append(t)
+                }
             case (let b?, let s?, nil):
                 // Modified by source, deleted by target — keep source modification.
                 _ = b; mergedSnapshots.append(s); changedCount += 1
