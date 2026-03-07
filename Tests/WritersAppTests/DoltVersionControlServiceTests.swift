@@ -963,7 +963,7 @@ final class DoltVersionControlServiceTests: XCTestCase {
         let mainBranch = try databaseManager.getVCBranch(name: "main")
         let snapshots = try databaseManager.getVCSnapshots(commitId: mainBranch!.headCommitId!)
         // The feature branch was created fresh (no inherited state), so it has no knowledge of
-        // doc2; the three-way merge keeps doc2 from the target branch.
+        // doc2 ("Delete"); the three-way merge keeps both "Keep" and "Delete" from the target.
         XCTAssertEqual(snapshots.count, 2)
         XCTAssertTrue(snapshots.contains { $0.title == "Keep" })
     }

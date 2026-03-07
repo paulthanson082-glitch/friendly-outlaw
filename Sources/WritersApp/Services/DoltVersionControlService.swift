@@ -215,14 +215,18 @@ public class DoltVersionControlService {
         }
 
         // Pass 2 – title-based pairing for UUID-unmatched docs (branch divergence)
-        var unmatchedFrom = fromMap.filter { !matchedFromIds.contains($0.key) }
-        var unmatchedFromByTitle = Dictionary(grouping: unmatchedFrom.values, by: { $0.title })
+        // Track unmatched from-doc IDs in a Set to avoid copying the full dictionary.
+        var unmatchedFromIds = Set(fromMap.keys.filter { !matchedFromIds.contains($0) })
+        var unmatchedFromByTitle = Dictionary(
+            grouping: unmatchedFromIds.compactMap { fromMap[$0] },
+            by: { $0.title }
+        )
 
         for (docId, toSnap) in toMap where fromMap[docId] == nil {
             if var pool = unmatchedFromByTitle[toSnap.title], !pool.isEmpty {
                 let fromSnap = pool.removeFirst()
                 unmatchedFromByTitle[toSnap.title] = pool
-                unmatchedFrom.removeValue(forKey: fromSnap.documentId)
+                unmatchedFromIds.remove(fromSnap.documentId)
                 diffs.append(VCDiff(documentId: docId, title: toSnap.title,
                                     changeType: .modified,
                                     fromContent: fromSnap.content,
@@ -238,7 +242,8 @@ public class DoltVersionControlService {
         }
 
         // Remaining unmatched from-docs are deletions
-        for (_, fromSnap) in unmatchedFrom {
+        for id in unmatchedFromIds {
+            guard let fromSnap = fromMap[id] else { continue }
             diffs.append(VCDiff(documentId: fromSnap.documentId, title: fromSnap.title,
                                 changeType: .deleted,
                                 fromContent: fromSnap.content,

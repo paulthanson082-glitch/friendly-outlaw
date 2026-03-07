@@ -1808,12 +1808,15 @@ public class DatabaseManager {
     /// - Throws: `DatabaseError.notInitialized` if the database is not initialized;
     ///   `DatabaseError.queryFailed` if any SQL query fails.
     public func getVCSnapshots(commitId: UUID) throws -> [VCDocumentSnapshot] {
+        let maxDepth = 10_000
         var accumulator: [UUID: VCDocumentSnapshot] = [:]
         var currentId: UUID? = commitId
         var visited = Set<UUID>()
-        while let cId = currentId {
+        var depth = 0
+        while let cId = currentId, depth < maxDepth {
             guard !visited.contains(cId) else { break }
             visited.insert(cId)
+            depth += 1
             for snap in try getVCSnapshotsDirect(commitId: cId) {
                 if accumulator[snap.documentId] == nil {
                     accumulator[snap.documentId] = snap
