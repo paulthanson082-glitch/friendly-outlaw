@@ -3,10 +3,29 @@ import Foundation
 import FoundationNetworking
 #endif
 
-/// Service for AI-powered writing assistance using Claude API
+/// Service for AI-powered writing assistance.
+///
+/// Supports two backends:
+/// - **Anthropic** (`AIBackend.anthropic`): the default Claude API at `api.anthropic.com`.
+/// - **AReaL** (`AIBackend.areal(baseURL:)`): an AReaL RL training service that exposes an
+///   OpenAI-compatible `/v1/chat/completions` endpoint. Swap in your own RL-trained model by
+///   supplying the AReaL base URL and API key — no other changes required.
 public class AIService {
     private let configuration: AIConfiguration
-    private let apiURL = "https://api.anthropic.com/v1/messages"
+
+    /// Anthropic Messages API endpoint.
+    private static let anthropicAPIURL = "https://api.anthropic.com/v1/messages"
+
+    /// Returns the resolved endpoint URL for the configured backend.
+    private var apiURL: String {
+        switch configuration.backend {
+        case .anthropic:
+            return Self.anthropicAPIURL
+        case .areal(let baseURL):
+            let trimmed = baseURL.hasSuffix("/") ? String(baseURL.dropLast()) : baseURL
+            return "\(trimmed)/v1/chat/completions"
+        }
+    }
 
     public init(configuration: AIConfiguration) {
         self.configuration = configuration
@@ -240,6 +259,19 @@ public class AIService {
     // MARK: - API Communication
 
     private func sendRequest(prompt: String) async throws -> String {
+        switch configuration.backend {
+        case .anthropic:
+            return try await sendAnthropicRequest(prompt: prompt)
+        case .areal:
+            return try await sendOpenAICompatibleRequest(
+                messages: [["role": "user", "content": prompt]]
+            )
+        }
+    }
+
+    // MARK: Anthropic backend
+
+    private func sendAnthropicRequest(prompt: String) async throws -> String {
         guard let url = URL(string: apiURL) else {
             throw AIServiceError.invalidURL
         }
@@ -285,6 +317,60 @@ public class AIService {
         return text
     }
 
+    // MARK: AReaL / OpenAI-compatible backend
+
+    /// Send a request to an OpenAI-compatible endpoint (used by AReaL).
+    ///
+    /// The `messages` array follows the OpenAI chat format:
+    /// `[{"role": "user"/"assistant"/"tool", "content": ...}]`
+    private func sendOpenAICompatibleRequest(
+        messages: [[String: Any]],
+        tools: [[String: Any]]? = nil
+    ) async throws -> String {
+        guard let url = URL(string: apiURL) else {
+            throw AIServiceError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(configuration.apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var requestBody: [String: Any] = [
+            "model": configuration.model.rawValue,
+            "max_tokens": configuration.maxTokens,
+            "temperature": configuration.temperature,
+            "messages": messages
+        ]
+
+        if let tools = tools, !tools.isEmpty {
+            requestBody["tools"] = tools
+        }
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AIServiceError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw AIServiceError.apiError(statusCode: httpResponse.statusCode, message: errorMessage)
+        }
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let choices = json["choices"] as? [[String: Any]],
+              let firstChoice = choices.first,
+              let message = firstChoice["message"] as? [String: Any],
+              let content = message["content"] as? String else {
+            throw AIServiceError.invalidResponseFormat
+        }
+
+        return content
+    }
+
     // MARK: - Tool Loop
 
     /// Get AI assistance with tool support, implementing the client SDK tool loop pattern.
@@ -327,6 +413,32 @@ public class AIService {
     ///     response = client.messages.create(tool_result=result, **params)
     /// ```
     private func sendRequestWithToolLoop(
+        prompt: String,
+        tools: [ToolDefinition],
+        toolExecutor: AIToolExecutor,
+        maxIterations: Int
+    ) async throws -> String {
+        switch configuration.backend {
+        case .anthropic:
+            return try await sendAnthropicToolLoop(
+                prompt: prompt,
+                tools: tools,
+                toolExecutor: toolExecutor,
+                maxIterations: maxIterations
+            )
+        case .areal:
+            return try await sendOpenAICompatibleToolLoop(
+                prompt: prompt,
+                tools: tools,
+                toolExecutor: toolExecutor,
+                maxIterations: maxIterations
+            )
+        }
+    }
+
+    // MARK: Anthropic tool loop
+
+    private func sendAnthropicToolLoop(
         prompt: String,
         tools: [ToolDefinition],
         toolExecutor: AIToolExecutor,
@@ -390,13 +502,11 @@ public class AIService {
 
             // If the model wants to use tools, execute them and continue the loop
             if stopReason == "tool_use" {
-                // Add the assistant's response (with tool_use blocks) to the conversation
                 messages.append([
                     "role": "assistant",
                     "content": content
                 ])
 
-                // Extract and execute each tool use block
                 let toolUseBlocks = content.compactMap { ToolUseBlock(from: $0) }
 
                 var toolResults: [[String: Any]] = []
@@ -419,7 +529,6 @@ public class AIService {
                     }
                 }
 
-                // Send tool results back as a user message
                 messages.append([
                     "role": "user",
                     "content": toolResults
@@ -435,6 +544,135 @@ public class AIService {
             }
             if !textParts.isEmpty {
                 return textParts.joined()
+            }
+
+            throw AIServiceError.invalidResponseFormat
+        }
+
+        throw AIServiceError.toolLoopExhausted(iterations: maxIterations)
+    }
+
+    // MARK: AReaL / OpenAI-compatible tool loop
+
+    /// Tool loop for OpenAI-compatible endpoints (AReaL).
+    ///
+    /// Follows the OpenAI function-calling protocol:
+    /// - Tools are sent as `{"type":"function","function":{...}}` objects.
+    /// - The model signals tool use via `finish_reason == "tool_calls"` and
+    ///   `message.tool_calls` in the response.
+    /// - Tool results are sent back as `{"role":"tool","tool_call_id":...,"content":...}` messages.
+    private func sendOpenAICompatibleToolLoop(
+        prompt: String,
+        tools: [ToolDefinition],
+        toolExecutor: AIToolExecutor,
+        maxIterations: Int
+    ) async throws -> String {
+        var messages: [[String: Any]] = [
+            ["role": "user", "content": prompt]
+        ]
+
+        // Convert ToolDefinition (Anthropic format) to OpenAI function format
+        let openAITools: [[String: Any]] = tools.map { tool in
+            return [
+                "type": "function",
+                "function": [
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.inputSchema
+                ] as [String: Any]
+            ]
+        }
+
+        for _ in 0..<maxIterations {
+            guard let url = URL(string: apiURL) else {
+                throw AIServiceError.invalidURL
+            }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("Bearer \(configuration.apiKey)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+            var requestBody: [String: Any] = [
+                "model": configuration.model.rawValue,
+                "max_tokens": configuration.maxTokens,
+                "temperature": configuration.temperature,
+                "messages": messages
+            ]
+
+            if !openAITools.isEmpty {
+                requestBody["tools"] = openAITools
+            }
+
+            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw AIServiceError.invalidResponse
+            }
+
+            guard httpResponse.statusCode == 200 else {
+                let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+                throw AIServiceError.apiError(statusCode: httpResponse.statusCode, message: errorMessage)
+            }
+
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let choices = json["choices"] as? [[String: Any]],
+                  let firstChoice = choices.first,
+                  let finishReason = firstChoice["finish_reason"] as? String,
+                  let message = firstChoice["message"] as? [String: Any] else {
+                throw AIServiceError.invalidResponseFormat
+            }
+
+            // Final text response
+            if finishReason == "stop" {
+                guard let content = message["content"] as? String else {
+                    throw AIServiceError.invalidResponseFormat
+                }
+                return content
+            }
+
+            // Model wants to call tools
+            if finishReason == "tool_calls" {
+                // Add assistant message (with tool_calls) to conversation
+                messages.append(["role": "assistant", "content": message])
+
+                guard let toolCalls = message["tool_calls"] as? [[String: Any]] else {
+                    throw AIServiceError.invalidResponseFormat
+                }
+
+                for toolCall in toolCalls {
+                    guard let toolCallId = toolCall["id"] as? String,
+                          let function = toolCall["function"] as? [String: Any],
+                          let name = function["name"] as? String,
+                          let argumentsString = function["arguments"] as? String,
+                          let argumentsData = argumentsString.data(using: .utf8),
+                          let input = try JSONSerialization.jsonObject(with: argumentsData) as? [String: Any]
+                    else {
+                        continue
+                    }
+
+                    let resultContent: String
+                    do {
+                        resultContent = try await toolExecutor.executeTool(name: name, input: input)
+                    } catch {
+                        resultContent = "Error: \(error.localizedDescription)"
+                    }
+
+                    messages.append([
+                        "role": "tool",
+                        "tool_call_id": toolCallId,
+                        "content": resultContent
+                    ])
+                }
+
+                continue
+            }
+
+            // Unknown finish reason — try to return content if present
+            if let content = message["content"] as? String, !content.isEmpty {
+                return content
             }
 
             throw AIServiceError.invalidResponseFormat

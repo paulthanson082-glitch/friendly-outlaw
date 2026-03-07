@@ -890,4 +890,108 @@ final class WritersAppTests: XCTestCase {
         let commit = VCCommit(branchId: UUID(), message: "test")
         XCTAssertNotNil(commit.id)
     }
+
+    // MARK: - AReaL Backend Tests
+
+    func testAIBackendDefaultIsAnthropic() {
+        let config = AIConfiguration(apiKey: "sk-test")
+        if case .anthropic = config.backend {
+            // expected
+        } else {
+            XCTFail("Default backend should be .anthropic")
+        }
+    }
+
+    func testAIConfigurationWithArealBackend() {
+        let baseURL = "https://areal.example.com"
+        let config = AIConfiguration(
+            apiKey: "areal-key",
+            model: .custom("my-rl-model"),
+            backend: .areal(baseURL: baseURL)
+        )
+        if case .areal(let url) = config.backend {
+            XCTAssertEqual(url, baseURL)
+        } else {
+            XCTFail("Backend should be .areal")
+        }
+        XCTAssertEqual(config.apiKey, "areal-key")
+        XCTAssertEqual(config.model.rawValue, "my-rl-model")
+    }
+
+    func testAIBackendCodableRoundTripAnthropic() throws {
+        let backend = AIBackend.anthropic
+        let data = try JSONEncoder().encode(backend)
+        let decoded = try JSONDecoder().decode(AIBackend.self, from: data)
+        if case .anthropic = decoded {
+            // expected
+        } else {
+            XCTFail("Decoded backend should be .anthropic")
+        }
+    }
+
+    func testAIBackendCodableRoundTripAreal() throws {
+        let baseURL = "https://areal.example.com"
+        let backend = AIBackend.areal(baseURL: baseURL)
+        let data = try JSONEncoder().encode(backend)
+        let decoded = try JSONDecoder().decode(AIBackend.self, from: data)
+        if case .areal(let url) = decoded {
+            XCTAssertEqual(url, baseURL)
+        } else {
+            XCTFail("Decoded backend should be .areal")
+        }
+    }
+
+    func testAIConfigurationCodableRoundTrip() throws {
+        let config = AIConfiguration(
+            apiKey: "sk-test",
+            model: .claude35Sonnet,
+            maxTokens: 2048,
+            temperature: 0.5,
+            backend: .areal(baseURL: "https://areal.example.com")
+        )
+        let data = try JSONEncoder().encode(config)
+        let decoded = try JSONDecoder().decode(AIConfiguration.self, from: data)
+        XCTAssertEqual(decoded.apiKey, config.apiKey)
+        XCTAssertEqual(decoded.maxTokens, config.maxTokens)
+        XCTAssertEqual(decoded.temperature, config.temperature)
+        XCTAssertEqual(decoded.model.rawValue, config.model.rawValue)
+        if case .areal(let url) = decoded.backend {
+            XCTAssertEqual(url, "https://areal.example.com")
+        } else {
+            XCTFail("Decoded backend should be .areal")
+        }
+    }
+
+    func testAIModelCustomRawValue() {
+        let model = AIModel.custom("qwen2.5-7b-rl")
+        XCTAssertEqual(model.rawValue, "qwen2.5-7b-rl")
+        XCTAssertEqual(model.displayName, "qwen2.5-7b-rl")
+    }
+
+    func testAIModelCustomCodableRoundTrip() throws {
+        let model = AIModel.custom("my-areal-model")
+        let data = try JSONEncoder().encode(model)
+        let decoded = try JSONDecoder().decode(AIModel.self, from: data)
+        XCTAssertEqual(decoded.rawValue, "my-areal-model")
+    }
+
+    func testAIModelKnownValuesCodableRoundTrip() throws {
+        let models: [AIModel] = [.claude35Sonnet, .claude3Opus, .claude3Sonnet, .claude3Haiku]
+        for model in models {
+            let data = try JSONEncoder().encode(model)
+            let decoded = try JSONDecoder().decode(AIModel.self, from: data)
+            XCTAssertEqual(decoded.rawValue, model.rawValue)
+        }
+    }
+
+    func testAIConfigurationAnthropicDefaultBackendCodableRoundTrip() throws {
+        let config = AIConfiguration(apiKey: "sk-test", model: .claude3Haiku)
+        let data = try JSONEncoder().encode(config)
+        let decoded = try JSONDecoder().decode(AIConfiguration.self, from: data)
+        if case .anthropic = decoded.backend {
+            // expected
+        } else {
+            XCTFail("Default backend should survive round-trip as .anthropic")
+        }
+    }
 }

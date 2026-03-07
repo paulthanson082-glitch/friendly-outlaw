@@ -196,18 +196,30 @@ struct WritersAppCLI {
         print()
 
         // Check for API key in environment
-        if let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"], !apiKey.isEmpty {
+        let env = ProcessInfo.processInfo.environment
+        if let arealBaseURL = env["AREAL_BASE_URL"], !arealBaseURL.isEmpty,
+           let arealApiKey = env["AREAL_API_KEY"], !arealApiKey.isEmpty {
+            // AReaL RL service (OpenAI-compatible endpoint)
+            let modelId = env["AREAL_MODEL"] ?? "default"
+            print("✓ AI features enabled (AReaL RL service at \(arealBaseURL))")
+            let config = AIConfiguration(
+                apiKey: arealApiKey,
+                model: .custom(modelId),
+                backend: .areal(baseURL: arealBaseURL)
+            )
+            app.enableAI(configuration: config)
+        } else if let apiKey = env["ANTHROPIC_API_KEY"], !apiKey.isEmpty {
             print("✓ AI features enabled (Claude API)")
             let config = AIConfiguration(apiKey: apiKey, model: .claude35Sonnet)
             app.enableAI(configuration: config)
-        } else if ProcessInfo.processInfo.environment["ANTHROPIC_AUTH_TOKEN"] != nil {
+        } else if env["ANTHROPIC_AUTH_TOKEN"] != nil {
             // Clother provider configured
             print("✓ AI features enabled (via Clother)")
             // Create config with default values; Clother handles auth via env vars
             let config = AIConfiguration(apiKey: "clother-managed", model: .claude35Sonnet)
             app.enableAI(configuration: config)
         } else {
-            print("ⓘ AI features disabled (set ANTHROPIC_API_KEY to enable)")
+            print("ⓘ AI features disabled (set ANTHROPIC_API_KEY or AREAL_BASE_URL+AREAL_API_KEY to enable)")
         }
 
         // Initialize Claude Memory plugin
@@ -2172,6 +2184,9 @@ func showHelp() {
 
     ENVIRONMENT VARIABLES:
         ANTHROPIC_API_KEY      Set this to enable AI features (Anthropic Claude)
+        AREAL_BASE_URL         Base URL of your AReaL RL service (e.g. https://your-areal-host)
+        AREAL_API_KEY          API key for the AReaL service
+        AREAL_MODEL            Model name served by AReaL (default: "default")
 
     USING ALTERNATIVE LLM PROVIDERS WITH CLOTHER:
         Clother allows you to use 100+ LLM providers without changing code.

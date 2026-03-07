@@ -1,33 +1,130 @@
 import Foundation
 
+// MARK: - AI Backend
+
+/// The backend service used for AI assistance.
+///
+/// Use `.anthropic` for the default Claude API, or `.areal(baseURL:)` to connect
+/// to an AReaL RL training service that exposes an OpenAI-compatible endpoint.
+/// AReaL lets you swap in your own RL-trained model by replacing the base URL and
+/// API key — no other code changes required.
+public enum AIBackend: Codable {
+    /// Anthropic Claude API (default).
+    case anthropic
+    /// AReaL RL service with an OpenAI-compatible API at the given base URL.
+    /// - Parameter baseURL: The root URL of the AReaL server, e.g. `"https://your-areal-host"`.
+    case areal(baseURL: String)
+
+    // MARK: Codable
+
+    private enum CodingKeys: String, CodingKey {
+        case type, baseURL
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .anthropic:
+            try container.encode("anthropic", forKey: .type)
+        case .areal(let baseURL):
+            try container.encode("areal", forKey: .type)
+            try container.encode(baseURL, forKey: .baseURL)
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let type = try container.decode(String.self, forKey: .type)
+        switch type {
+        case "areal":
+            let baseURL = try container.decode(String.self, forKey: .baseURL)
+            self = .areal(baseURL: baseURL)
+        default:
+            self = .anthropic
+        }
+    }
+}
+
 // MARK: - AI Configuration
 
 /// Configuration for AI service
-public struct AIConfiguration {
+public struct AIConfiguration: Codable {
     public let apiKey: String
     public let model: AIModel
     public let maxTokens: Int
     public let temperature: Double
+    /// The backend service to use for AI requests.
+    public let backend: AIBackend
 
     public init(
         apiKey: String,
         model: AIModel = .claude35Sonnet,
         maxTokens: Int = 4096,
-        temperature: Double = 0.7
+        temperature: Double = 0.7,
+        backend: AIBackend = .anthropic
     ) {
         self.apiKey = apiKey
         self.model = model
         self.maxTokens = maxTokens
         self.temperature = temperature
+        self.backend = backend
     }
 }
 
 /// Available AI models
-public enum AIModel: String {
-    case claude35Sonnet = "claude-3-5-sonnet-20241022"
-    case claude3Opus = "claude-3-opus-20240229"
-    case claude3Sonnet = "claude-3-sonnet-20240229"
-    case claude3Haiku = "claude-3-haiku-20240307"
+public enum AIModel: Codable {
+    case claude35Sonnet
+    case claude3Opus
+    case claude3Sonnet
+    case claude3Haiku
+    /// A custom model identifier, used when connecting to AReaL or other
+    /// OpenAI-compatible endpoints that host their own model names.
+    case custom(String)
+
+    /// The model identifier string sent in API requests.
+    public var rawValue: String {
+        switch self {
+        case .claude35Sonnet: return "claude-3-5-sonnet-20241022"
+        case .claude3Opus: return "claude-3-opus-20240229"
+        case .claude3Sonnet: return "claude-3-sonnet-20240229"
+        case .claude3Haiku: return "claude-3-haiku-20240307"
+        case .custom(let id): return id
+        }
+    }
+
+    /// Initialise from a raw model identifier string.
+    ///
+    /// Known Claude model IDs are mapped to their corresponding enum cases;
+    /// any other value is wrapped in `.custom(_:)`.  Returns `nil` only for
+    /// empty strings so that existing callers using optional-binding patterns
+    /// continue to work.
+    public init?(rawValue: String) {
+        guard !rawValue.isEmpty else { return nil }
+        switch rawValue {
+        case "claude-3-5-sonnet-20241022": self = .claude35Sonnet
+        case "claude-3-opus-20240229": self = .claude3Opus
+        case "claude-3-sonnet-20240229": self = .claude3Sonnet
+        case "claude-3-haiku-20240307": self = .claude3Haiku
+        default: self = .custom(rawValue)
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let raw = try container.decode(String.self)
+        switch raw {
+        case "claude-3-5-sonnet-20241022": self = .claude35Sonnet
+        case "claude-3-opus-20240229": self = .claude3Opus
+        case "claude-3-sonnet-20240229": self = .claude3Sonnet
+        case "claude-3-haiku-20240307": self = .claude3Haiku
+        default: self = .custom(raw)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 
     public var displayName: String {
         switch self {
@@ -35,6 +132,7 @@ public enum AIModel: String {
         case .claude3Opus: return "Claude 3 Opus"
         case .claude3Sonnet: return "Claude 3 Sonnet"
         case .claude3Haiku: return "Claude 3 Haiku"
+        case .custom(let id): return id
         }
     }
 }
