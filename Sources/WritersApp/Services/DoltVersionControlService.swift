@@ -65,14 +65,7 @@ public class DoltVersionControlService {
             guard try db.getVCBranch(name: name) == nil else {
                 throw VersionControlError.branchAlreadyExists(name)
             }
-            var newBranch = VCBranch(name: name, isActive: true)
-
-            // Inherit head commit from current branch so history is connected
-            if let current = try currentBranch() {
-                newBranch = VCBranch(id: newBranch.id, name: name,
-                                     headCommitId: current.headCommitId,
-                                     createdAt: newBranch.createdAt, isActive: true)
-            }
+            let newBranch = VCBranch(name: name, isActive: true)
             try db.insertVCBranch(newBranch)
             try db.setActiveBranch(id: newBranch.id)
             return newBranch
@@ -189,39 +182,53 @@ public class DoltVersionControlService {
     }
 
     /// Compute per-document diffs between two commits.
-    /// 
-    /// Compares snapshots from `fromCommitId` (base) to `toCommitId` (target) and produces a `VCDiff` for each document indicating whether it was added, deleted, modified, or unchanged. The returned diffs are sorted by document title.
+    ///
+    /// Uses the direct (non-accumulated) snapshot set for each commit so that documents
+    /// absent from a later commit on the same branch are correctly reported as deleted.
+    /// Documents with different UUIDs but the same title are paired as modifications
+    /// (handles branch divergence where the same logical document gets a new UUID).
     /// - Parameters:
     ///   - fromCommitId: Commit ID to compare from (base).
     ///   - toCommitId: Commit ID to compare to (target).
-    /// - Returns: An array of `VCDiff` entries describing per-document changes between the two commits.
+    /// - Returns: An array of `VCDiff` entries sorted by title.
     public func diff(fromCommitId: UUID, toCommitId: UUID) throws -> [VCDiff] {
-        let fromSnapshots = try db.getVCSnapshots(commitId: fromCommitId)
-        let toSnapshots = try db.getVCSnapshots(commitId: toCommitId)
+        let fromSnapshots = try db.getVCSnapshotsDirect(commitId: fromCommitId)
+        let toSnapshots   = try db.getVCSnapshotsDirect(commitId: toCommitId)
 
         let fromMap = Dictionary(uniqueKeysWithValues: fromSnapshots.map { ($0.documentId, $0) })
-        let toMap = Dictionary(uniqueKeysWithValues: toSnapshots.map { ($0.documentId, $0) })
+        let toMap   = Dictionary(uniqueKeysWithValues: toSnapshots.map   { ($0.documentId, $0) })
 
         var diffs: [VCDiff] = []
+        var matchedFromIds = Set<UUID>()
 
-        // Documents present in "to"
+        // Pass 1 – UUID-matched documents
         for (docId, toSnap) in toMap {
-            if let fromSnap = fromMap[docId] {
-                if fromSnap.content != toSnap.content || fromSnap.title != toSnap.title {
-                    diffs.append(VCDiff(documentId: docId, title: toSnap.title,
-                                        changeType: .modified,
-                                        fromContent: fromSnap.content,
-                                        toContent: toSnap.content,
-                                        fromWordCount: fromSnap.wordCount,
-                                        toWordCount: toSnap.wordCount))
-                } else {
-                    diffs.append(VCDiff(documentId: docId, title: toSnap.title,
-                                        changeType: .unchanged,
-                                        fromContent: fromSnap.content,
-                                        toContent: toSnap.content,
-                                        fromWordCount: fromSnap.wordCount,
-                                        toWordCount: toSnap.wordCount))
-                }
+            guard let fromSnap = fromMap[docId] else { continue }
+            matchedFromIds.insert(docId)
+            let changed = fromSnap.content != toSnap.content || fromSnap.title != toSnap.title
+            diffs.append(VCDiff(documentId: docId, title: toSnap.title,
+                                changeType: changed ? .modified : .unchanged,
+                                fromContent: fromSnap.content,
+                                toContent: toSnap.content,
+                                fromWordCount: fromSnap.wordCount,
+                                toWordCount: toSnap.wordCount))
+        }
+
+        // Pass 2 – title-based pairing for UUID-unmatched docs (branch divergence)
+        var unmatchedFrom = fromMap.filter { !matchedFromIds.contains($0.key) }
+        var unmatchedFromByTitle = Dictionary(grouping: unmatchedFrom.values, by: { $0.title })
+
+        for (docId, toSnap) in toMap where fromMap[docId] == nil {
+            if var pool = unmatchedFromByTitle[toSnap.title], !pool.isEmpty {
+                let fromSnap = pool.removeFirst()
+                unmatchedFromByTitle[toSnap.title] = pool
+                unmatchedFrom.removeValue(forKey: fromSnap.documentId)
+                diffs.append(VCDiff(documentId: docId, title: toSnap.title,
+                                    changeType: .modified,
+                                    fromContent: fromSnap.content,
+                                    toContent: toSnap.content,
+                                    fromWordCount: fromSnap.wordCount,
+                                    toWordCount: toSnap.wordCount))
             } else {
                 diffs.append(VCDiff(documentId: docId, title: toSnap.title,
                                     changeType: .added,
@@ -230,9 +237,9 @@ public class DoltVersionControlService {
             }
         }
 
-        // Documents deleted in "to"
-        for (docId, fromSnap) in fromMap where toMap[docId] == nil {
-            diffs.append(VCDiff(documentId: docId, title: fromSnap.title,
+        // Remaining unmatched from-docs are deletions
+        for (_, fromSnap) in unmatchedFrom {
+            diffs.append(VCDiff(documentId: fromSnap.documentId, title: fromSnap.title,
                                 changeType: .deleted,
                                 fromContent: fromSnap.content,
                                 fromWordCount: fromSnap.wordCount))

@@ -1781,11 +1781,11 @@ public class DatabaseManager {
         }
     }
 
-    /// Retrieves all document snapshots associated with a given commit.
-    /// - Parameter commitId: The commit UUID whose snapshots to retrieve.
-    /// - Returns: An array of `VCDocumentSnapshot` records for the specified commit.
+    /// Retrieves only the snapshots stored directly on a given commit (no parent-chain walk).
+    /// - Parameter commitId: The commit UUID whose direct snapshots to retrieve.
+    /// - Returns: An array of `VCDocumentSnapshot` records stored for the specified commit.
     /// - Throws: `DatabaseError.notInitialized` if the database is not initialized; `DatabaseError.queryFailed` if the SQL preparation or execution fails.
-    public func getVCSnapshots(commitId: UUID) throws -> [VCDocumentSnapshot] {
+    public func getVCSnapshotsDirect(commitId: UUID) throws -> [VCDocumentSnapshot] {
         guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
         let sql = """
         SELECT id, commit_id, document_id, title, content, category, word_count, captured_at
@@ -1798,6 +1798,66 @@ public class DatabaseManager {
         }
         sqlite3_bind_text(stmt, 1, commitId.uuidString, -1, SQLITE_TRANSIENT)
         return try collectSnapshots(stmt: stmt)
+    }
+
+    /// Retrieves the accumulated document state at a given commit by walking the parent-commit
+    /// chain. For each document, the snapshot from the most recent commit in the chain wins.
+    /// - Parameter commitId: The commit UUID to start from (most recent).
+    /// - Returns: One `VCDocumentSnapshot` per unique document, reflecting the state at
+    ///   `commitId`, sorted by title.
+    /// - Throws: `DatabaseError.notInitialized` if the database is not initialized;
+    ///   `DatabaseError.queryFailed` if any SQL query fails.
+    public func getVCSnapshots(commitId: UUID) throws -> [VCDocumentSnapshot] {
+        var accumulator: [UUID: VCDocumentSnapshot] = [:]
+        var currentId: UUID? = commitId
+        var visited = Set<UUID>()
+        while let cId = currentId {
+            guard !visited.contains(cId) else { break }
+            visited.insert(cId)
+            for snap in try getVCSnapshotsDirect(commitId: cId) {
+                if accumulator[snap.documentId] == nil {
+                    accumulator[snap.documentId] = snap
+                }
+            }
+            guard let commit = try getVCCommit(id: cId) else { break }
+            currentId = commit.parentCommitId
+        }
+        return Array(accumulator.values).sorted { $0.title < $1.title }
+    }
+
+    /// Retrieves a single version-control commit by its unique identifier.
+    /// - Parameter id: The UUID of the commit to look up.
+    /// - Returns: The matching `VCCommit`, or `nil` if not found.
+    /// - Throws: `DatabaseError.notInitialized` if the database is not initialized;
+    ///   `DatabaseError.queryFailed` if the SQL preparation or execution fails.
+    public func getVCCommit(id: UUID) throws -> VCCommit? {
+        guard isInitialized, let db = db else { throw DatabaseError.notInitialized }
+        let sql = """
+        SELECT id, branch_id, message, author_id, timestamp,
+               parent_commit_id, second_parent_commit_id
+        FROM vc_commits WHERE id = ?;
+        """
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        sqlite3_bind_text(stmt, 1, id.uuidString, -1, SQLITE_TRANSIENT)
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
+        guard let idText = sqlite3_column_text(stmt, 0),
+              let branchText = sqlite3_column_text(stmt, 1),
+              let msgText = sqlite3_column_text(stmt, 2),
+              let cId = UUID(uuidString: String(cString: idText)),
+              let bId = UUID(uuidString: String(cString: branchText)) else { return nil }
+        let author: String? = sqlite3_column_text(stmt, 3).map { String(cString: $0) }
+        let ts = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 4))
+        let parent: UUID? = sqlite3_column_text(stmt, 5)
+            .flatMap { UUID(uuidString: String(cString: $0)) }
+        let secondParent: UUID? = sqlite3_column_text(stmt, 6)
+            .flatMap { UUID(uuidString: String(cString: $0)) }
+        return VCCommit(id: cId, branchId: bId, message: String(cString: msgText),
+                        authorId: author, timestamp: ts,
+                        parentCommitId: parent, secondParentCommitId: secondParent)
     }
 
     /// Retrieves all version-control document snapshots for the given document ordered from oldest to newest by capture time.
