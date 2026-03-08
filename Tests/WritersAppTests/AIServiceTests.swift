@@ -226,7 +226,9 @@ final class AIServiceTests: XCTestCase {
     func testAIServiceErrorDescriptions() {
         XCTAssertEqual(AIServiceError.invalidURL.errorDescription, "Invalid API URL")
         XCTAssertEqual(AIServiceError.invalidResponse.errorDescription, "Invalid response from API")
-        XCTAssertEqual(AIServiceError.invalidResponseFormat.errorDescription, "Could not parse API response")
+        let formatError = AIServiceError.invalidResponseFormat(body: "{\"unexpected\": true}")
+        XCTAssertTrue(formatError.errorDescription?.contains("Could not parse API response") ?? false)
+        XCTAssertTrue(formatError.errorDescription?.contains("{\"unexpected\": true}") ?? false)
 
         let apiError = AIServiceError.apiError(statusCode: 401, message: "Unauthorized")
         XCTAssertTrue(apiError.errorDescription?.contains("401") ?? false)

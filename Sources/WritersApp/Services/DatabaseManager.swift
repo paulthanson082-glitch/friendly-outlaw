@@ -1252,8 +1252,10 @@ public class DatabaseManager {
         
         // Encode tags as JSON
         let tagsData = try JSONEncoder().encode(issue.metadata.tags)
-        let tagsString = String(data: tagsData, encoding: .utf8) ?? "[]"
-        
+        guard let tagsString = String(data: tagsData, encoding: .utf8) else {
+            throw DatabaseError.invalidData("Failed to encode issue tags as UTF-8 JSON string")
+        }
+
         sqlite3_bind_text(statement, 1, issue.id.uuidString, -1, SQLITE_TRANSIENT)
         sqlite3_bind_text(statement, 2, issue.documentId.uuidString, -1, SQLITE_TRANSIENT)
         sqlite3_bind_text(statement, 3, issue.title, -1, SQLITE_TRANSIENT)
@@ -1305,8 +1307,10 @@ public class DatabaseManager {
         
         // Encode tags as JSON
         let tagsData = try JSONEncoder().encode(issue.metadata.tags)
-        let tagsString = String(data: tagsData, encoding: .utf8) ?? "[]"
-        
+        guard let tagsString = String(data: tagsData, encoding: .utf8) else {
+            throw DatabaseError.invalidData("Failed to encode issue tags as UTF-8 JSON string")
+        }
+
         sqlite3_bind_text(statement, 1, issue.title, -1, SQLITE_TRANSIENT)
         sqlite3_bind_text(statement, 2, issue.description, -1, SQLITE_TRANSIENT)
         sqlite3_bind_text(statement, 3, issue.status.rawValue, -1, SQLITE_TRANSIENT)
@@ -1487,7 +1491,12 @@ public class DatabaseManager {
             
             // Decode tags from JSON
             let tagsString = String(cString: sqlite3_column_text(statement, 9))
-            let tags = (try? JSONDecoder().decode([String].self, from: Data(tagsString.utf8))) ?? []
+            let tags: [String]
+            do {
+                tags = try JSONDecoder().decode([String].self, from: Data(tagsString.utf8))
+            } catch {
+                throw DatabaseError.invalidData("Failed to decode issue tags JSON '\(tagsString)': \(error.localizedDescription)")
+            }
             
             let notes = String(cString: sqlite3_column_text(statement, 10))
             

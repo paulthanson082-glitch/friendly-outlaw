@@ -275,11 +275,12 @@ public class AIService {
             throw AIServiceError.apiError(statusCode: httpResponse.statusCode, message: errorMessage)
         }
 
+        let rawBody = String(data: data, encoding: .utf8) ?? "<non-UTF-8 data>"
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let content = json["content"] as? [[String: Any]],
               let firstContent = content.first,
               let text = firstContent["text"] as? String else {
-            throw AIServiceError.invalidResponseFormat
+            throw AIServiceError.invalidResponseFormat(body: rawBody)
         }
 
         return text
@@ -373,10 +374,11 @@ public class AIService {
                 throw AIServiceError.apiError(statusCode: httpResponse.statusCode, message: errorMessage)
             }
 
+            let rawBody = String(data: data, encoding: .utf8) ?? "<non-UTF-8 data>"
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let stopReason = json["stop_reason"] as? String,
                   let content = json["content"] as? [[String: Any]] else {
-                throw AIServiceError.invalidResponseFormat
+                throw AIServiceError.invalidResponseFormat(body: rawBody)
             }
 
             // If the model finished with a text response, extract and return it
@@ -437,7 +439,7 @@ public class AIService {
                 return textParts.joined()
             }
 
-            throw AIServiceError.invalidResponseFormat
+            throw AIServiceError.invalidResponseFormat(body: rawBody)
         }
 
         throw AIServiceError.toolLoopExhausted(iterations: maxIterations)
@@ -551,7 +553,7 @@ public struct WritingInsights {
 public enum AIServiceError: LocalizedError {
     case invalidURL
     case invalidResponse
-    case invalidResponseFormat
+    case invalidResponseFormat(body: String)
     case apiError(statusCode: Int, message: String)
     case networkError(Error)
     case toolLoopExhausted(iterations: Int)
@@ -563,8 +565,8 @@ public enum AIServiceError: LocalizedError {
             return "Invalid API URL"
         case .invalidResponse:
             return "Invalid response from API"
-        case .invalidResponseFormat:
-            return "Could not parse API response"
+        case .invalidResponseFormat(let body):
+            return "Could not parse API response: \(body)"
         case .apiError(let statusCode, let message):
             return "API error (status \(statusCode)): \(message)"
         case .networkError(let error):
