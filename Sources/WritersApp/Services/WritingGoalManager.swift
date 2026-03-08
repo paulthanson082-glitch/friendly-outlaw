@@ -219,30 +219,24 @@ public class WritingGoalManager {
 
     /// Resets daily goals (call at midnight)
     public func resetDailyGoals() {
-        for (id, var goal) in goals where goal.type == .daily && goal.isActive {
-            goal.current = 0
-            goal.startDate = Date()
-            goal.endDate = calculateEndDate(for: .daily)
-            goals[id] = goal
-        }
+        resetGoals(ofType: .daily)
     }
 
     /// Resets weekly goals (call at start of week)
     public func resetWeeklyGoals() {
-        for (id, var goal) in goals where goal.type == .weekly && goal.isActive {
-            goal.current = 0
-            goal.startDate = Date()
-            goal.endDate = calculateEndDate(for: .weekly)
-            goals[id] = goal
-        }
+        resetGoals(ofType: .weekly)
     }
 
     /// Resets monthly goals (call at start of month)
     public func resetMonthlyGoals() {
-        for (id, var goal) in goals where goal.type == .monthly && goal.isActive {
+        resetGoals(ofType: .monthly)
+    }
+
+    private func resetGoals(ofType type: GoalType) {
+        for (id, var goal) in goals where goal.type == type && goal.isActive {
             goal.current = 0
             goal.startDate = Date()
-            goal.endDate = calculateEndDate(for: .monthly)
+            goal.endDate = calculateEndDate(for: type)
             goals[id] = goal
         }
     }

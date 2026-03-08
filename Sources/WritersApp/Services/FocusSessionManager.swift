@@ -181,12 +181,7 @@ public class FocusSessionManager {
             typeCounts[session.type, default: 0] += 1
         }
 
-        let avgWPM: Double
-        if totalTime > 0 {
-            avgWPM = Double(totalWords) / (totalTime / 60)
-        } else {
-            avgWPM = 0
-        }
+        let avgWPM = averageWordsPerMinute(totalWords: totalWords, totalDuration: totalTime)
 
         // Find favorite session type
         let favorite = typeCounts.max(by: { $0.value < $1.value })?.key
@@ -222,12 +217,7 @@ public class FocusSessionManager {
             totalPomodoros += session.completedPomodoros
         }
 
-        let avgWPM: Double
-        if totalTime > 0 {
-            avgWPM = Double(totalWords) / (totalTime / 60)
-        } else {
-            avgWPM = 0
-        }
+        let avgWPM = averageWordsPerMinute(totalWords: totalWords, totalDuration: totalTime)
 
         return FocusSessionStats(
             totalSessions: todaySessions.count,
@@ -247,6 +237,11 @@ public class FocusSessionManager {
     }
 
     // MARK: - Private Helpers
+
+    private func averageWordsPerMinute(totalWords: Int, totalDuration: TimeInterval) -> Double {
+        guard totalDuration > 0 else { return 0 }
+        return Double(totalWords) / (totalDuration / 60)
+    }
 
     private func calculateStreaks() -> (current: Int, longest: Int) {
         let calendar = Calendar.current
