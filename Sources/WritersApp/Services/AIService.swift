@@ -244,26 +244,8 @@ public class AIService {
             throw AIServiceError.invalidURL
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(configuration.apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.setValue("application/json", forHTTPHeaderField: "content-type")
-
-        let requestBody: [String: Any] = [
-            "model": configuration.model.rawValue,
-            "max_tokens": configuration.maxTokens,
-            "temperature": configuration.temperature,
-            "messages": [
-                [
-                    "role": "user",
-                    "content": prompt
-                ]
-            ]
-        ]
-
-        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
-
+        let messages: [[String: Any]] = [["role": "user", "content": prompt]]
+        let request = try buildAPIURLRequest(url: url, messages: messages, toolDefinitions: [])
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -276,9 +258,11 @@ public class AIService {
         }
 
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let content = json["content"] as? [[String: Any]],
-              let firstContent = content.first,
-              let text = firstContent["text"] as? String else {
+              let content = json["content"] as? [[String: Any]] else {
+            throw AIServiceError.invalidResponseFormat
+        }
+
+        guard let text = extractText(from: content) else {
             throw AIServiceError.invalidResponseFormat
         }
 
@@ -340,28 +324,10 @@ public class AIService {
             ["role": "user", "content": prompt]
         ]
 
-        let toolDefs = tools.map { $0.toDict() }
+        let toolDefinitions = tools.map { $0.toDict() }
 
         for _ in 0..<maxIterations {
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue(configuration.apiKey, forHTTPHeaderField: "x-api-key")
-            request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-            request.setValue("application/json", forHTTPHeaderField: "content-type")
-
-            var requestBody: [String: Any] = [
-                "model": configuration.model.rawValue,
-                "max_tokens": configuration.maxTokens,
-                "temperature": configuration.temperature,
-                "messages": messages
-            ]
-
-            if !toolDefs.isEmpty {
-                requestBody["tools"] = toolDefs
-            }
-
-            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
-
+            let request = try buildAPIURLRequest(url: url, messages: messages, toolDefinitions: toolDefinitions)
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
@@ -381,66 +347,95 @@ public class AIService {
 
             // If the model finished with a text response, extract and return it
             if stopReason == "end_turn" {
-                let textParts = content.compactMap { block -> String? in
-                    guard block["type"] as? String == "text" else { return nil }
-                    return block["text"] as? String
-                }
-                return textParts.joined()
+                return extractText(from: content) ?? ""
             }
 
             // If the model wants to use tools, execute them and continue the loop
             if stopReason == "tool_use" {
                 // Add the assistant's response (with tool_use blocks) to the conversation
-                messages.append([
-                    "role": "assistant",
-                    "content": content
-                ])
+                messages.append(["role": "assistant", "content": content])
 
-                // Extract and execute each tool use block
-                let toolUseBlocks = content.compactMap { ToolUseBlock(from: $0) }
-
-                var toolResults: [[String: Any]] = []
-                for toolUse in toolUseBlocks {
-                    do {
-                        let result = try await toolExecutor.executeTool(
-                            name: toolUse.name,
-                            input: toolUse.input
-                        )
-                        toolResults.append(ToolResult(
-                            toolUseId: toolUse.id,
-                            content: result
-                        ).toDict())
-                    } catch {
-                        toolResults.append(ToolResult(
-                            toolUseId: toolUse.id,
-                            content: "Error: \(error.localizedDescription)",
-                            isError: true
-                        ).toDict())
-                    }
-                }
+                // Execute each tool use block and collect results
+                let toolResults = try await executeToolUseBlocks(in: content, using: toolExecutor)
 
                 // Send tool results back as a user message
-                messages.append([
-                    "role": "user",
-                    "content": toolResults
-                ])
+                messages.append(["role": "user", "content": toolResults])
 
                 continue
             }
 
             // Unknown stop reason — try to extract text if available
-            let textParts = content.compactMap { block -> String? in
-                guard block["type"] as? String == "text" else { return nil }
-                return block["text"] as? String
-            }
-            if !textParts.isEmpty {
-                return textParts.joined()
+            if let text = extractText(from: content) {
+                return text
             }
 
             throw AIServiceError.invalidResponseFormat
         }
 
         throw AIServiceError.toolLoopExhausted(iterations: maxIterations)
+    }
+
+    /// Builds a configured URLRequest for the Anthropic Messages API.
+    private func buildAPIURLRequest(
+        url: URL,
+        messages: [[String: Any]],
+        toolDefinitions: [[String: Any]]
+    ) throws -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(configuration.apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+
+        var requestBody: [String: Any] = [
+            "model": configuration.model.rawValue,
+            "max_tokens": configuration.maxTokens,
+            "temperature": configuration.temperature,
+            "messages": messages
+        ]
+
+        if !toolDefinitions.isEmpty {
+            requestBody["tools"] = toolDefinitions
+        }
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        return request
+    }
+
+    /// Extracts joined text from a list of content blocks.
+    /// Returns nil if no text blocks are present.
+    private func extractText(from content: [[String: Any]]) -> String? {
+        let textParts = content.compactMap { block -> String? in
+            guard block["type"] as? String == "text" else { return nil }
+            return block["text"] as? String
+        }
+        return textParts.isEmpty ? nil : textParts.joined()
+    }
+
+    /// Executes all tool_use blocks found in an assistant response and returns their results.
+    private func executeToolUseBlocks(
+        in content: [[String: Any]],
+        using toolExecutor: AIToolExecutor
+    ) async throws -> [[String: Any]] {
+        let toolUseBlocks = content.compactMap { ToolUseBlock(from: $0) }
+
+        var toolResults: [[String: Any]] = []
+        for toolUse in toolUseBlocks {
+            do {
+                let result = try await toolExecutor.executeTool(
+                    name: toolUse.name,
+                    input: toolUse.input
+                )
+                toolResults.append(ToolResult(toolUseId: toolUse.id, content: result).toDict())
+            } catch {
+                toolResults.append(ToolResult(
+                    toolUseId: toolUse.id,
+                    content: "Error: \(error.localizedDescription)",
+                    isError: true
+                ).toDict())
+            }
+        }
+        return toolResults
     }
 
     // MARK: - Batch Operations
