@@ -95,82 +95,62 @@ public class EncouragementService {
     /// Get encouragement based on word count achievement
     public func getWordCountEncouragement(wordCount: Int, previousCount: Int = 0) -> EncouragementMessage? {
         guard configuration.enabled else { return nil }
-        
+
         let wordsWritten = wordCount - previousCount
         guard wordsWritten >= configuration.minimumWordsForEncouragement else { return nil }
-        
-        let message = selectWordCountMessage(wordsWritten: wordsWritten, totalWords: wordCount)
-        let encouragement = EncouragementMessage(
+
+        return record(EncouragementMessage(
             type: .wordCount,
-            message: message,
+            message: selectWordCountMessage(wordsWritten: wordsWritten, totalWords: wordCount),
             context: [
                 "words_written": "\(wordsWritten)",
                 "total_words": "\(wordCount)"
             ]
-        )
-        
-        history.append(encouragement)
-        return encouragement
+        ))
     }
-    
+
     /// Get encouragement for session duration
     public func getSessionEncouragement(durationMinutes: Int, wordsWritten: Int) -> EncouragementMessage? {
         guard configuration.enabled && configuration.showOnSessionEnd else { return nil }
-        
-        let message = selectSessionMessage(durationMinutes: durationMinutes, wordsWritten: wordsWritten)
-        let encouragement = EncouragementMessage(
+
+        return record(EncouragementMessage(
             type: .sessionDuration,
-            message: message,
+            message: selectSessionMessage(durationMinutes: durationMinutes, wordsWritten: wordsWritten),
             context: [
                 "duration_minutes": "\(durationMinutes)",
                 "words_written": "\(wordsWritten)"
             ]
-        )
-        
-        history.append(encouragement)
-        return encouragement
+        ))
     }
-    
+
     /// Get encouragement for reaching a milestone
     public func getMilestoneEncouragement(milestone: WritingMilestone) -> EncouragementMessage? {
         guard configuration.enabled && configuration.showOnMilestones else { return nil }
-        
-        let message = selectMilestoneMessage(for: milestone)
-        let encouragement = EncouragementMessage(
+
+        return record(EncouragementMessage(
             type: .milestone,
-            message: message,
+            message: selectMilestoneMessage(for: milestone),
             context: [
                 "milestone_type": milestone.type.rawValue,
                 "milestone_value": "\(milestone.value)"
             ]
-        )
-        
-        history.append(encouragement)
-        return encouragement
+        ))
     }
-    
+
     /// Get a general encouragement message
     public func getGeneralEncouragement() -> EncouragementMessage {
-        let message = generalMessages.randomElement() ?? "Keep up the great work!"
-        let encouragement = EncouragementMessage(
+        return record(EncouragementMessage(
             type: .general,
-            message: message
-        )
-        
-        history.append(encouragement)
-        return encouragement
+            message: generalMessages.randomElement() ?? "Keep up the great work!"
+        ))
     }
-    
+
     /// Get encouragement for perseverance (continuing to write despite challenges)
     public func getPerseveranceEncouragement() -> EncouragementMessage {
-        let message = perseveranceMessages.randomElement() ?? "Your dedication is inspiring!"
-        let encouragement = EncouragementMessage(
+        return record(EncouragementMessage(
             type: .perseverance,
-            message: message
-        )
-        
-        history.append(encouragement)
-        return encouragement
+            message: perseveranceMessages.randomElement() ?? "Your dedication is inspiring!"
+        ))
     }
     
     /// Get the history of encouragement messages
@@ -184,7 +164,13 @@ public class EncouragementService {
     }
     
     // MARK: - Private Methods
-    
+
+    @discardableResult
+    private func record(_ encouragement: EncouragementMessage) -> EncouragementMessage {
+        history.append(encouragement)
+        return encouragement
+    }
+
     private func selectWordCountMessage(wordsWritten: Int, totalWords: Int) -> String {
         switch wordsWritten {
         case 0..<100:
