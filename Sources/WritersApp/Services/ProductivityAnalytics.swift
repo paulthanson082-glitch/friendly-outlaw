@@ -273,29 +273,8 @@ public class ProductivityAnalytics {
 
         // Streak insight
         let streak = goalManager.getStreak()
-        if streak.currentStreak > 0 {
-            if streak.currentStreak >= streak.longestStreak && streak.currentStreak > 1 {
-                insights.append(ProductivityInsight(
-                    type: .achievement,
-                    title: "New Record!",
-                    message: "You're on your longest writing streak: \(streak.currentStreak) days! Keep it up!",
-                    priority: 0
-                ))
-            } else if streak.currentStreak >= 7 {
-                insights.append(ProductivityInsight(
-                    type: .streak,
-                    title: "Writing Streak",
-                    message: "Amazing! \(streak.currentStreak)-day writing streak. You're building a solid habit!",
-                    priority: 1
-                ))
-            } else if streak.currentStreak >= 3 {
-                insights.append(ProductivityInsight(
-                    type: .streak,
-                    title: "Streak Building",
-                    message: "\(streak.currentStreak) days in a row. Keep the momentum going!",
-                    priority: 2
-                ))
-            }
+        if let streakInsight = makeStreakInsight(streak: streak) {
+            insights.append(streakInsight)
         }
 
         // Goal progress insight
@@ -482,6 +461,34 @@ public class ProductivityAnalytics {
         }
 
         return (0..<24).compactMap { hourlyMap[$0] }
+    }
+
+    private func makeStreakInsight(streak: WritingStreak) -> ProductivityInsight? {
+        guard streak.currentStreak > 0 else { return nil }
+
+        if streak.currentStreak >= streak.longestStreak && streak.currentStreak > 1 {
+            return ProductivityInsight(
+                type: .achievement,
+                title: "New Record!",
+                message: "You're on your longest writing streak: \(streak.currentStreak) days! Keep it up!",
+                priority: 0
+            )
+        } else if streak.currentStreak >= 7 {
+            return ProductivityInsight(
+                type: .streak,
+                title: "Writing Streak",
+                message: "Amazing! \(streak.currentStreak)-day writing streak. You're building a solid habit!",
+                priority: 1
+            )
+        } else if streak.currentStreak >= 3 {
+            return ProductivityInsight(
+                type: .streak,
+                title: "Streak Building",
+                message: "\(streak.currentStreak) days in a row. Keep the momentum going!",
+                priority: 2
+            )
+        }
+        return nil
     }
 
     private func formatHour(_ hour: Int) -> String {
