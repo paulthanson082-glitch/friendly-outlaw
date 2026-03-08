@@ -170,37 +170,25 @@ public class FocusSessionManager {
     /// - Returns: A `FocusSessionStats` populated with aggregated values derived from the manager's session history; `favoriteSessionType` is `nil` if there are no completed sessions.
     public func getStats() -> FocusSessionStats {
         let completed = sessionHistory.filter { $0.state == .completed }
-
-        // Single-pass calculation of time, words, and pomodoros
-        var totalTime: TimeInterval = 0.0
-        var totalWords: Int = 0
-        var totalPomodoros: Int = 0
+        let totals = accumulateTotals(for: completed)
         var typeCounts: [FocusSessionType: Int] = [:]
-        
         for session in completed {
-            totalTime += session.actualDuration
-            totalWords += session.wordsWritten
-            totalPomodoros += session.completedPomodoros
             typeCounts[session.type, default: 0] += 1
         }
 
-        let avgWPM = averageWordsPerMinute(totalWords: totalWords, totalDuration: totalTime)
-
-        // Find favorite session type
+        let avgWPM = averageWordsPerMinute(totalWords: totals.words, totalDuration: totals.time)
         let favorite = typeCounts.max(by: { $0.value < $1.value })?.key
-
-        // Calculate streaks
         let streaks = calculateStreaks()
 
         return FocusSessionStats(
             totalSessions: sessionHistory.count,
             completedSessions: completed.count,
-            totalFocusTime: totalTime,
-            totalWordsWritten: totalWords,
+            totalFocusTime: totals.time,
+            totalWordsWritten: totals.words,
             averageWordsPerMinute: avgWPM,
             longestStreak: streaks.longest,
             currentStreak: streaks.current,
-            pomodorosCompleted: totalPomodoros,
+            pomodorosCompleted: totals.pomodoros,
             favoriteSessionType: favorite
         )
     }
@@ -209,27 +197,16 @@ public class FocusSessionManager {
     /// - Returns: A `FocusSessionStats` containing counts and totals for today's completed sessions: totalSessions, completedSessions, totalFocusTime (seconds), totalWordsWritten, averageWordsPerMinute, and pomodorosCompleted.
     public func getTodayStats() -> FocusSessionStats {
         let todaySessions = getTodaySessions().filter { $0.state == .completed }
-
-        // Single-pass calculation
-        var totalTime: TimeInterval = 0.0
-        var totalWords: Int = 0
-        var totalPomodoros: Int = 0
-        
-        for session in todaySessions {
-            totalTime += session.actualDuration
-            totalWords += session.wordsWritten
-            totalPomodoros += session.completedPomodoros
-        }
-
-        let avgWPM = averageWordsPerMinute(totalWords: totalWords, totalDuration: totalTime)
+        let totals = accumulateTotals(for: todaySessions)
+        let avgWPM = averageWordsPerMinute(totalWords: totals.words, totalDuration: totals.time)
 
         return FocusSessionStats(
             totalSessions: todaySessions.count,
             completedSessions: todaySessions.count,
-            totalFocusTime: totalTime,
-            totalWordsWritten: totalWords,
+            totalFocusTime: totals.time,
+            totalWordsWritten: totals.words,
             averageWordsPerMinute: avgWPM,
-            pomodorosCompleted: totalPomodoros
+            pomodorosCompleted: totals.pomodoros
         )
     }
 
@@ -245,6 +222,22 @@ public class FocusSessionManager {
     ///   - totalWords: The total number of words written.
     ///   - totalDuration: The total duration in seconds during which the words were written.
     /// - Returns: The average words per minute as a `Double`; `0` if `totalDuration` is less than or equal to zero.
+
+    private struct SessionTotals {
+        var time: TimeInterval = 0
+        var words: Int = 0
+        var pomodoros: Int = 0
+    }
+
+    private func accumulateTotals(for sessions: [FocusSession]) -> SessionTotals {
+        var totals = SessionTotals()
+        for session in sessions {
+            totals.time += session.actualDuration
+            totals.words += session.wordsWritten
+            totals.pomodoros += session.completedPomodoros
+        }
+        return totals
+    }
 
     private func averageWordsPerMinute(totalWords: Int, totalDuration: TimeInterval) -> Double {
         guard totalDuration > 0 else { return 0 }
