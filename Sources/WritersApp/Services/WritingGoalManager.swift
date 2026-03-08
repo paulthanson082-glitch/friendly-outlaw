@@ -179,23 +179,26 @@ public class WritingGoalManager {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
 
-        if let lastDate = streak.lastWritingDate {
-            if calendar.isDateInToday(lastDate) {
-                // Already wrote today, no change needed
-                return
-            } else if calendar.isDateInYesterday(lastDate) {
-                // Wrote yesterday, extend streak
-                streak.currentStreak += 1
-                streak.longestStreak = max(streak.longestStreak, streak.currentStreak)
-            } else {
-                // Streak broken, start new one
-                streak.currentStreak = 1
-                streak.streakStartDate = today
-            }
-        } else {
+        guard let lastDate = streak.lastWritingDate else {
             // First time writing
             streak.currentStreak = 1
             streak.longestStreak = 1
+            streak.streakStartDate = today
+            streak.lastWritingDate = Date()
+            streak.totalDaysWritten += 1
+            return
+        }
+
+        // Already wrote today — no change needed
+        guard !calendar.isDateInToday(lastDate) else { return }
+
+        if calendar.isDateInYesterday(lastDate) {
+            // Wrote yesterday — extend streak
+            streak.currentStreak += 1
+            streak.longestStreak = max(streak.longestStreak, streak.currentStreak)
+        } else {
+            // Gap in writing — restart streak
+            streak.currentStreak = 1
             streak.streakStartDate = today
         }
 

@@ -176,14 +176,14 @@ public class FocusSessionManager {
             typeCounts[session.type, default: 0] += 1
         }
 
-        let avgWPM = averageWordsPerMinute(totalWords: totals.words, totalDuration: totals.time)
+        let avgWPM = averageWordsPerMinute(totalWords: totals.words, totalDuration: totals.totalFocusTime)
         let favorite = typeCounts.max(by: { $0.value < $1.value })?.key
         let streaks = calculateStreaks()
 
         return FocusSessionStats(
             totalSessions: sessionHistory.count,
             completedSessions: completed.count,
-            totalFocusTime: totals.time,
+            totalFocusTime: totals.totalFocusTime,
             totalWordsWritten: totals.words,
             averageWordsPerMinute: avgWPM,
             longestStreak: streaks.longest,
@@ -198,12 +198,12 @@ public class FocusSessionManager {
     public func getTodayStats() -> FocusSessionStats {
         let todaySessions = getTodaySessions().filter { $0.state == .completed }
         let totals = accumulateTotals(for: todaySessions)
-        let avgWPM = averageWordsPerMinute(totalWords: totals.words, totalDuration: totals.time)
+        let avgWPM = averageWordsPerMinute(totalWords: totals.words, totalDuration: totals.totalFocusTime)
 
         return FocusSessionStats(
             totalSessions: todaySessions.count,
             completedSessions: todaySessions.count,
-            totalFocusTime: totals.time,
+            totalFocusTime: totals.totalFocusTime,
             totalWordsWritten: totals.words,
             averageWordsPerMinute: avgWPM,
             pomodorosCompleted: totals.pomodoros
@@ -224,7 +224,7 @@ public class FocusSessionManager {
     /// - Returns: The average words per minute as a `Double`; `0` if `totalDuration` is less than or equal to zero.
 
     private struct SessionTotals {
-        var time: TimeInterval = 0
+        var totalFocusTime: TimeInterval = 0
         var words: Int = 0
         var pomodoros: Int = 0
     }
@@ -232,7 +232,7 @@ public class FocusSessionManager {
     private func accumulateTotals(for sessions: [FocusSession]) -> SessionTotals {
         var totals = SessionTotals()
         for session in sessions {
-            totals.time += session.actualDuration
+            totals.totalFocusTime += session.actualDuration
             totals.words += session.wordsWritten
             totals.pomodoros += session.completedPomodoros
         }
@@ -268,8 +268,8 @@ public class FocusSessionManager {
 
         for date in sortedDates {
             if let prev = previousDate {
-                let diff = calendar.dateComponents([.day], from: date, to: prev).day ?? 0
-                if diff == 1 {
+                let daysDifference = calendar.dateComponents([.day], from: date, to: prev).day ?? 0
+                if daysDifference == 1 {
                     streak += 1
                 } else {
                     longestStreak = max(longestStreak, streak)

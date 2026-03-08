@@ -73,12 +73,12 @@ public class DocumentManager {
     }
 
     /// Gets documents by word count goal progress
-    public func getDocumentsByProgress() -> [(Document, Double)] {
+    public func getDocumentsByProgress() -> [(document: Document, progress: Double)] {
         return documents.values.compactMap { doc in
             guard let goal = doc.metadata.wordCountGoal, goal > 0 else { return nil }
             let progress = Double(doc.wordCount) / Double(goal)
-            return (doc, progress)
-        }.sorted { $0.1 > $1.1 }
+            return (document: doc, progress: progress)
+        }.sorted { $0.progress > $1.progress }
     }
 
     /// Gets recently modified documents
