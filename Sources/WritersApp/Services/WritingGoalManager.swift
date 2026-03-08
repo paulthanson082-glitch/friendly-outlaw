@@ -217,21 +217,30 @@ public class WritingGoalManager {
 
     // MARK: - Goal Reset (for recurring goals)
 
-    /// Resets daily goals (call at midnight)
+    /// Resets all active daily goals to start a new daily period.
+    /// 
+    /// For each active daily goal this sets its progress back to zero, updates its start date to now, and recalculates its end date.
     public func resetDailyGoals() {
         resetGoals(ofType: .daily)
     }
 
-    /// Resets weekly goals (call at start of week)
+    /// Reset all active weekly goals to the start of a new weekly period.
+    /// 
+    /// Sets each active weekly goal's current progress to 0, updates its start date to now, and recalculates its end date for the new week.
     public func resetWeeklyGoals() {
         resetGoals(ofType: .weekly)
     }
 
-    /// Resets monthly goals (call at start of month)
+    /// Resets all active monthly goals by setting their current progress to 0, updating their start date to now, and recalculating their end date for the new monthly period.
     public func resetMonthlyGoals() {
         resetGoals(ofType: .monthly)
     }
 
+    /// Resets all active goals of the specified type to start a new period.
+    /// 
+    /// For each active goal matching `type`, sets `current` to 0, updates `startDate` to now, and recalculates `endDate`.
+    /// - Parameters:
+    ///   - type: The goal recurrence type to reset (e.g., daily, weekly, monthly).
     private func resetGoals(ofType type: GoalType) {
         for (id, var goal) in goals where goal.type == type && goal.isActive {
             goal.current = 0

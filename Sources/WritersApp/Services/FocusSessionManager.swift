@@ -164,7 +164,10 @@ public class FocusSessionManager {
 
     // MARK: - Statistics
 
-    /// Gets overall focus session statistics
+    /// Compute aggregated statistics from completed focus sessions.
+    /// 
+    /// The returned stats include totals for sessions and completed sessions, total focused time, total words written, average words per minute, longest and current streaks of daily completed sessions, total pomodoros completed, and the most frequent session type when available.
+    /// - Returns: A `FocusSessionStats` populated with aggregated values derived from the manager's session history; `favoriteSessionType` is `nil` if there are no completed sessions.
     public func getStats() -> FocusSessionStats {
         let completed = sessionHistory.filter { $0.state == .completed }
 
@@ -202,7 +205,8 @@ public class FocusSessionManager {
         )
     }
 
-    /// Gets stats for today
+    /// Gathers aggregated statistics for completed focus sessions that started today.
+    /// - Returns: A `FocusSessionStats` containing counts and totals for today's completed sessions: totalSessions, completedSessions, totalFocusTime (seconds), totalWordsWritten, averageWordsPerMinute, and pomodorosCompleted.
     public func getTodayStats() -> FocusSessionStats {
         let todaySessions = getTodaySessions().filter { $0.state == .completed }
 
@@ -236,13 +240,21 @@ public class FocusSessionManager {
             .reduce(0.0) { $0 + $1.actualDuration }
     }
 
-    // MARK: - Private Helpers
+    /// Calculates the average writing speed in words per minute.
+    /// - Parameters:
+    ///   - totalWords: The total number of words written.
+    ///   - totalDuration: The total duration in seconds during which the words were written.
+    /// - Returns: The average words per minute as a `Double`; `0` if `totalDuration` is less than or equal to zero.
 
     private func averageWordsPerMinute(totalWords: Int, totalDuration: TimeInterval) -> Double {
         guard totalDuration > 0 else { return 0 }
         return Double(totalWords) / (totalDuration / 60)
     }
 
+    /// Compute the current and longest consecutive-day streaks based on completed sessions.
+    /// 
+    /// The calculation uses unique session days from `sessionHistory`. The current streak counts consecutive days up to today (including yesterday when applicable). If there are no completed session days, both values are `0`.
+    /// - Returns: A tuple where `current` is the number of consecutive days in the current streak and `longest` is the maximum consecutive-day streak observed.
     private func calculateStreaks() -> (current: Int, longest: Int) {
         let calendar = Calendar.current
         var dates = Set<Date>()
