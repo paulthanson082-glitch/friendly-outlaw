@@ -12,10 +12,46 @@ public class WritersApp {
     public let encouragementService: EncouragementService
     public let versionControl: DoltVersionControlService
     public private(set) var aiService: AIService?
+    public private(set) var chatbotService: ChatbotService?
     public private(set) var currentUserId: UUID?
     private var currentSessionId: UUID?
     private var memoryPlugin: ClaudeMemoryPlugin?
 
+    public init() {
+        self.templateManager = TemplateManager()
+        self.documentManager = DocumentManager()
+        self.issueManager = IssueManager()
+        self.kanbanManager = KanbanManager()
+        self.hardwareManager = HardwareManager()
+        let db = DatabaseManager()
+        self.databaseManager = db
+        self.pluginManager = PluginManager.shared
+        self.encouragementService = EncouragementService()
+        self.versionControl = DoltVersionControlService(databaseManager: db)
+        self.chatbotService = nil
+        try? db.initialize()
+    }
+
+    /// Initialize with AI capabilities
+    public init(aiConfiguration: AIConfiguration) {
+        self.templateManager = TemplateManager()
+        self.documentManager = DocumentManager()
+        self.issueManager = IssueManager()
+        self.kanbanManager = KanbanManager()
+        self.hardwareManager = HardwareManager()
+        let db = DatabaseManager()
+        self.databaseManager = db
+        self.pluginManager = PluginManager.shared
+        self.encouragementService = EncouragementService()
+        self.versionControl = DoltVersionControlService(databaseManager: db)
+        try? db.initialize()
+        let aiSvc = AIService(configuration: aiConfiguration)
+        self.aiService = aiSvc
+        self.chatbotService = ChatbotService(
+            aiService: aiSvc,
+            documentManager: self.documentManager,
+            templateManager: self.templateManager
+        )
     public convenience init() {
         self.init(databaseManager: DatabaseManager(), aiConfiguration: nil)
     }
@@ -39,6 +75,9 @@ public class WritersApp {
         self.databaseManager = databaseManager
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
+        self.versionControl = DoltVersionControlService(databaseManager: db)
+        self.chatbotService = nil
+        try? db.initialize()
         self.versionControl = DoltVersionControlService(databaseManager: databaseManager)
         self.aiService = aiConfiguration.map { AIService(configuration: $0) }
         try? databaseManager.initialize()
@@ -46,7 +85,13 @@ public class WritersApp {
 
     /// Enable AI features by providing configuration
     public func enableAI(configuration: AIConfiguration, userId: UUID? = nil) {
-        self.aiService = AIService(configuration: configuration)
+        let aiSvc = AIService(configuration: configuration)
+        self.aiService = aiSvc
+        self.chatbotService = ChatbotService(
+            aiService: aiSvc,
+            documentManager: self.documentManager,
+            templateManager: self.templateManager
+        )
         if let uid = userId {
             self.currentUserId = uid
             try? self.databaseManager.saveAIConfiguration(userId: uid, configuration: configuration)
@@ -56,11 +101,27 @@ public class WritersApp {
     /// Disable AI features
     public func disableAI() {
         self.aiService = nil
+        self.chatbotService = nil
     }
 
     /// Check if AI is available
     public var isAIEnabled: Bool {
         return aiService != nil
+    }
+
+    /// Enable adult content mode for Jules (no content restrictions, curse words allowed)
+    public func enableJulesAdultMode() {
+        chatbotService?.isAdultModeEnabled = true
+    }
+
+    /// Disable adult content mode for Jules
+    public func disableJulesAdultMode() {
+        chatbotService?.isAdultModeEnabled = false
+    }
+
+    /// Check if Jules is in adult mode
+    public var isJulesAdultModeEnabled: Bool {
+        return chatbotService?.isAdultModeEnabled ?? false
     }
 
     // MARK: - Plugin Management

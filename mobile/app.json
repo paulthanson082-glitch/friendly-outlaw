@@ -1,0 +1,64 @@
+{
+  "expo": {
+    "name": "Jules",
+    "slug": "jules-writers-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTabletOS": true,
+      "bundleIdentifier": "com.writers.jules",
+      "buildNumber": "1.0.0",
+      "infoPlist": {
+        "NSCameraUsageDescription": "We need camera access to capture writing inspiration",
+        "NSMicrophoneUsageDescription": "We need microphone access for voice notes",
+        "NSPhotoLibraryUsageDescription": "We need access to your photos for document covers"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.writers.jules",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#007bff"
+        }
+      ],
+      "expo-file-system",
+      "expo-document-picker",
+      "expo-camera",
+      "expo-av"
+    ],
+    "extra": {
+      "apiUrl": "https://api.julesapp.com",
+      "eas": {
+        "projectId": "YOUR_EAS_PROJECT_ID"
+      }
+    }
+  }
+}

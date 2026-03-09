@@ -249,6 +249,13 @@ struct WritersAppCLI {
                 print("14. Brainstorm Ideas (AI)")
                 print("15. Develop Character (AI)")
                 print("16. Generate Outline (AI)")
+                print("17. Chat with Jules (AI Assistant)")
+
+                if app.isJulesAdultModeEnabled {
+                    print("18. Disable Jules Adult Mode (currently ON)")
+                } else {
+                    print("18. Enable Jules Adult Mode (currently OFF)")
+                }
             }
 
             if app.isMemoryPluginEnabled {
@@ -345,6 +352,10 @@ struct WritersAppCLI {
                 await developCharacterWithAI(app: app)
             case 16:
                 await generateOutlineWithAI(app: app)
+            case 17:
+                await chatWithJules(app: app)
+            case 18:
+                toggleJulesAdultMode(app: app)
             case 20:
                 await storeMemory(app: app)
             case 21:
@@ -3280,6 +3291,67 @@ func viewHardwareStatistics(app: WritersApp) {
         for (type, count) in stats.byType.sorted(by: { $0.key < $1.key }) {
             print("  \(type): \(count)")
         }
+    }
+}
+
+// MARK: - Jules Chatbot
+
+func chatWithJules(app: WritersApp) async {
+    guard let chatbot = app.chatbotService else {
+        print("Error: Chatbot service not available (AI not enabled)")
+        return
+    }
+
+    print("\n╔════════════════════════════════════╗")
+    print("║ Jules - Your AI Writing Assistant  ║")
+    if chatbot.isAdultModeEnabled {
+        print("║        🔞 ADULT MODE ENABLED 🔞   ║")
+    }
+    print("╚════════════════════════════════════╝\n")
+
+    var session = chatbot.startSession()
+    print("Type 'exit' to end conversation\n")
+
+    while true {
+        print("You: ", terminator: "")
+        guard let userInput = readLine() else {
+            break
+        }
+
+        let trimmedInput = userInput.trimmingCharacters(in: .whitespaces)
+
+        if trimmedInput.lowercased() == "exit" {
+            print("\nJules: Goodbye! Happy writing! 📝\n")
+            break
+        }
+
+        if trimmedInput.isEmpty {
+            continue
+        }
+
+        do {
+            let response = try await chatbot.sendMessage(trimmedInput, in: &session)
+            print("\nJules: \(response)\n")
+        } catch let error as ChatbotError {
+            print("\nError: \(error.localizedDescription)\n")
+        } catch {
+            print("\nError: \(error.localizedDescription)\n")
+        }
+    }
+
+    chatbot.endSession()
+}
+
+func toggleJulesAdultMode(app: WritersApp) {
+    if app.isJulesAdultModeEnabled {
+        app.disableJulesAdultMode()
+        print("\n✓ Jules Adult Mode DISABLED")
+        print("  Jules will use standard language filters\n")
+    } else {
+        app.enableJulesAdultMode()
+        print("\n✓ Jules Adult Mode ENABLED")
+        print("  Jules can now discuss adult content and use colorful language")
+        print("  Suitable for: crime fiction, mature romance, edgy narratives, etc.\n")
     }
 }
 
