@@ -472,6 +472,63 @@ Run with: `swift test`
 |----------|---------|
 | `ANTHROPIC_API_KEY` | Claude API key for AI features |
 
+## Claude Code Extensions
+
+The `.claude/` directory organises all Claude Code extensions for this project.
+
+```
+.claude/
+├── settings.json          # Hooks registration + tool permissions
+├── hooks/
+│   └── session-start.sh   # SessionStart hook — installs deps, builds, installs plugins
+├── agents/                # Subagents (isolated workers with their own context)
+│   ├── knowledge-advisor.md
+│   ├── swift-code-reviewer.md
+│   ├── swift-debugger.md
+│   ├── template-designer.md
+│   └── test-runner.md
+├── skills/                # Skills (reusable workflows that run in the current context)
+│   ├── add-template.md
+│   ├── add-ai-feature.md
+│   ├── build-and-test.md
+│   └── add-version-control-op.md
+└── knowledge/             # Structured standards as JSON (used by knowledge-advisor)
+    ├── index.json
+    ├── swift.json
+    ├── architecture.json
+    ├── security.json
+    ├── templates.json
+    └── testing.json
+```
+
+### When to use each extension
+
+| Extension | Purpose | How to invoke |
+|-----------|---------|---------------|
+| **Subagent** (`.claude/agents/`) | Isolated worker — does research or runs tests without filling your context | Delegate tasks: "Use the swift-code-reviewer agent on this file" |
+| **Skill** (`.claude/skills/`) | Step-by-step workflow that runs in your current session | Say: "Use the add-template skill" or ask Claude to add a template |
+| **Hook** (`.claude/hooks/`) | Deterministic script on a lifecycle event (no LLM involved) | Runs automatically on `SessionStart` |
+| **MCP** (`.mcp.json`) | External service connections (browser, Gemini) | Available as tools throughout the session |
+
+### Available Subagents
+
+| Agent | When to use |
+|-------|-------------|
+| `knowledge-advisor` | Before any Swift code change — returns applicable standards |
+| `swift-code-reviewer` | After modifying `.swift` files — checks quality and conventions |
+| `swift-debugger` | On build errors, crashes, or test failures |
+| `template-designer` | When designing a complex new writing template |
+| `test-runner` | To get a concise pass/fail summary of `swift test` |
+
+### Available Skills
+
+| Skill | When to use |
+|-------|-------------|
+| `add-template` | Adding a new writing template to `TemplateManager` |
+| `add-ai-feature` | Implementing a new AI-assisted writing capability |
+| `build-and-test` | Building the project and running the full test suite |
+| `add-version-control-op` | Extending `DoltVersionControlService` with new operations |
+
 ## Knowledge System
 
 Project standards live in `.claude/knowledge/` as structured JSON files. Before making any code change, consult the relevant files or use the **knowledge-advisor** subagent to retrieve applicable rules automatically.
