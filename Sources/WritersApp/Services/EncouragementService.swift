@@ -76,6 +76,25 @@ public struct EncouragementConfiguration: Codable {
     }
 }
 
+// MARK: - Encouragement Thresholds
+
+private enum WordCountThreshold {
+    static let small = 100
+    static let medium = 250
+    static let large = 500
+    static let huge = 1000
+}
+
+private enum SessionDurationThreshold {
+    static let short = 15
+    static let medium = 30
+    static let long = 60
+}
+
+private enum WritingSpeedThreshold {
+    static let slowWordsPerMinute = 5.0
+}
+
 // MARK: - Encouragement Service
 
 /// Service for providing motivational feedback to writers
@@ -95,82 +114,62 @@ public class EncouragementService {
     /// Get encouragement based on word count achievement
     public func getWordCountEncouragement(wordCount: Int, previousCount: Int = 0) -> EncouragementMessage? {
         guard configuration.enabled else { return nil }
-        
+
         let wordsWritten = wordCount - previousCount
         guard wordsWritten >= configuration.minimumWordsForEncouragement else { return nil }
-        
-        let message = selectWordCountMessage(wordsWritten: wordsWritten, totalWords: wordCount)
-        let encouragement = EncouragementMessage(
+
+        return record(EncouragementMessage(
             type: .wordCount,
-            message: message,
+            message: selectWordCountMessage(wordsWritten: wordsWritten, totalWords: wordCount),
             context: [
                 "words_written": "\(wordsWritten)",
                 "total_words": "\(wordCount)"
             ]
-        )
-        
-        history.append(encouragement)
-        return encouragement
+        ))
     }
-    
+
     /// Get encouragement for session duration
     public func getSessionEncouragement(durationMinutes: Int, wordsWritten: Int) -> EncouragementMessage? {
         guard configuration.enabled && configuration.showOnSessionEnd else { return nil }
-        
-        let message = selectSessionMessage(durationMinutes: durationMinutes, wordsWritten: wordsWritten)
-        let encouragement = EncouragementMessage(
+
+        return record(EncouragementMessage(
             type: .sessionDuration,
-            message: message,
+            message: selectSessionMessage(durationMinutes: durationMinutes, wordsWritten: wordsWritten),
             context: [
                 "duration_minutes": "\(durationMinutes)",
                 "words_written": "\(wordsWritten)"
             ]
-        )
-        
-        history.append(encouragement)
-        return encouragement
+        ))
     }
-    
+
     /// Get encouragement for reaching a milestone
     public func getMilestoneEncouragement(milestone: WritingMilestone) -> EncouragementMessage? {
         guard configuration.enabled && configuration.showOnMilestones else { return nil }
-        
-        let message = selectMilestoneMessage(for: milestone)
-        let encouragement = EncouragementMessage(
+
+        return record(EncouragementMessage(
             type: .milestone,
-            message: message,
+            message: selectMilestoneMessage(for: milestone),
             context: [
                 "milestone_type": milestone.type.rawValue,
                 "milestone_value": "\(milestone.value)"
             ]
-        )
-        
-        history.append(encouragement)
-        return encouragement
+        ))
     }
-    
+
     /// Get a general encouragement message
     public func getGeneralEncouragement() -> EncouragementMessage {
-        let message = generalMessages.randomElement() ?? "Keep up the great work!"
-        let encouragement = EncouragementMessage(
+        return record(EncouragementMessage(
             type: .general,
-            message: message
-        )
-        
-        history.append(encouragement)
-        return encouragement
+            message: generalMessages.randomElement() ?? "Keep up the great work!"
+        ))
     }
-    
+
     /// Get encouragement for perseverance (continuing to write despite challenges)
     public func getPerseveranceEncouragement() -> EncouragementMessage {
-        let message = perseveranceMessages.randomElement() ?? "Your dedication is inspiring!"
-        let encouragement = EncouragementMessage(
+        return record(EncouragementMessage(
             type: .perseverance,
-            message: message
-        )
-        
-        history.append(encouragement)
-        return encouragement
+            message: perseveranceMessages.randomElement() ?? "Your dedication is inspiring!"
+        ))
     }
     
     /// Get the history of encouragement messages
@@ -184,40 +183,45 @@ public class EncouragementService {
     }
     
     // MARK: - Private Methods
-    
+
+    @discardableResult
+    private func record(_ encouragement: EncouragementMessage) -> EncouragementMessage {
+        history.append(encouragement)
+        return encouragement
+    }
+
     private func selectWordCountMessage(wordsWritten: Int, totalWords: Int) -> String {
         switch wordsWritten {
-        case 0..<100:
+        case 0..<WordCountThreshold.small:
             return wordCountMessages.small.randomElement() ?? "Nice progress! Every word counts."
-        case 100..<250:
+        case WordCountThreshold.small..<WordCountThreshold.medium:
             return wordCountMessages.medium.randomElement() ?? "You're on a roll! Keep the momentum going."
-        case 250..<500:
+        case WordCountThreshold.medium..<WordCountThreshold.large:
             return wordCountMessages.large.randomElement() ?? "Impressive word count! Your story is taking shape."
-        case 500..<1000:
+        case WordCountThreshold.large..<WordCountThreshold.huge:
             return wordCountMessages.huge.randomElement() ?? "Wow! That's a significant achievement. Your dedication shows!"
         default:
             return wordCountMessages.massive.randomElement() ?? "Outstanding! You're crushing it today!"
         }
     }
-    
+
     private func selectSessionMessage(durationMinutes: Int, wordsWritten: Int) -> String {
         let wordsPerMinute = durationMinutes > 0 ? Double(wordsWritten) / Double(durationMinutes) : 0
-        
-        switch (durationMinutes, wordsPerMinute) {
-        case (0..<15, _):
+        let isSlowPace = wordsPerMinute < WritingSpeedThreshold.slowWordsPerMinute
+
+        switch durationMinutes {
+        case 0..<SessionDurationThreshold.short:
             return "Great start! Even short sessions add up."
-        case (15..<30, 0..<5):
-            return "Nice focused session! Quality matters more than speed."
-        case (15..<30, 5...):
-            return "Productive session! You're making excellent progress."
-        case (30..<60, _):
+        case SessionDurationThreshold.short..<SessionDurationThreshold.medium:
+            return isSlowPace
+                ? "Nice focused session! Quality matters more than speed."
+                : "Productive session! You're making excellent progress."
+        case SessionDurationThreshold.medium..<SessionDurationThreshold.long:
             return "Fantastic dedication! A solid writing session."
-        case (60..., 0..<5):
-            return "Remarkable commitment! A marathon writing session."
-        case (60..., 5...):
-            return "Incredible! Both duration and productivity are outstanding!"
         default:
-            return "Well done! Keep up the great work."
+            return isSlowPace
+                ? "Remarkable commitment! A marathon writing session."
+                : "Incredible! Both duration and productivity are outstanding!"
         }
     }
     

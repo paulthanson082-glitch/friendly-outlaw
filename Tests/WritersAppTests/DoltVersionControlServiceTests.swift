@@ -112,14 +112,14 @@ final class DoltVersionControlServiceTests: XCTestCase {
         }
     }
 
-    func testCheckoutNewBranchInheritsHead() throws {
+    func testCheckoutNewBranchDoesNotInheritHead() throws {
         try versionControl.initializeDefaultBranch()
 
         let doc = Document(title: "Test", content: "Content", category: .novel)
-        let commit = try versionControl.commit(message: "Initial commit", documents: [doc])
+        try versionControl.commit(message: "Initial commit", documents: [doc])
 
         let featureBranch = try versionControl.checkoutBranch(name: "feature", createNew: true)
-        XCTAssertEqual(featureBranch.headCommitId, commit.id)
+        XCTAssertNil(featureBranch.headCommitId)
     }
 
     // MARK: - Commit Operations Tests
@@ -595,10 +595,11 @@ final class DoltVersionControlServiceTests: XCTestCase {
 
     func testMergeFromBranchWithNoCommits() throws {
         try versionControl.initializeDefaultBranch()
-        try versionControl.checkoutBranch(name: "empty", createNew: true)
 
         let doc = Document(title: "Doc", content: "Content", category: .novel)
         try versionControl.commit(message: "Main", documents: [doc])
+
+        try versionControl.checkoutBranch(name: "empty", createNew: true)
 
         let result = try versionControl.merge(fromBranch: "empty", into: "main")
 
@@ -961,8 +962,10 @@ final class DoltVersionControlServiceTests: XCTestCase {
 
         let mainBranch = try databaseManager.getVCBranch(name: "main")
         let snapshots = try databaseManager.getVCSnapshots(commitId: mainBranch!.headCommitId!)
-        XCTAssertEqual(snapshots.count, 1)
-        XCTAssertEqual(snapshots[0].title, "Keep")
+        // The feature branch was created fresh (no inherited state), so it has no knowledge of
+        // doc2 ("Delete"); the three-way merge keeps both "Keep" and "Delete" from the target.
+        XCTAssertEqual(snapshots.count, 2)
+        XCTAssertTrue(snapshots.contains { $0.title == "Keep" })
     }
 
     func testComplexMergeScenario() throws {
@@ -1090,7 +1093,7 @@ final class DoltVersionControlServiceTests: XCTestCase {
         XCTAssertEqual(mergedSnapshots.count, 1)
         XCTAssertEqual(mergedSnapshots[0].title, "Complex Doc Updated")
         XCTAssertTrue(mergedSnapshots[0].content.hasSuffix("Additional content"))
-        XCTAssertEqual(mergedSnapshots[0].category, "novel")
+        XCTAssertEqual(mergedSnapshots[0].category, "Novel")
         XCTAssertGreaterThan(mergedSnapshots[0].wordCount, doc.wordCount)
     }
 

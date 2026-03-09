@@ -255,7 +255,11 @@ public class ProductivityAnalytics {
 
     // MARK: - Insights Generation
 
-    /// Generates productivity insights and recommendations
+    /// Builds a prioritized list of productivity insights derived from recent sessions, goals, and focus statistics.
+    /// 
+    /// The returned insights can include peak writing time, streak progress or milestones, goal-behind warnings,
+    /// session-length suggestions, words-per-minute achievements, and reminders to preserve an active streak.
+    /// - Returns: An array of `ProductivityInsight` values sorted by ascending `priority`.
     public func generateInsights() -> [ProductivityInsight] {
         var insights: [ProductivityInsight] = []
 
@@ -273,29 +277,8 @@ public class ProductivityAnalytics {
 
         // Streak insight
         let streak = goalManager.getStreak()
-        if streak.currentStreak > 0 {
-            if streak.currentStreak >= streak.longestStreak && streak.currentStreak > 1 {
-                insights.append(ProductivityInsight(
-                    type: .achievement,
-                    title: "New Record!",
-                    message: "You're on your longest writing streak: \(streak.currentStreak) days! Keep it up!",
-                    priority: 0
-                ))
-            } else if streak.currentStreak >= 7 {
-                insights.append(ProductivityInsight(
-                    type: .streak,
-                    title: "Writing Streak",
-                    message: "Amazing! \(streak.currentStreak)-day writing streak. You're building a solid habit!",
-                    priority: 1
-                ))
-            } else if streak.currentStreak >= 3 {
-                insights.append(ProductivityInsight(
-                    type: .streak,
-                    title: "Streak Building",
-                    message: "\(streak.currentStreak) days in a row. Keep the momentum going!",
-                    priority: 2
-                ))
-            }
+        if let streakInsight = makeStreakInsight(streak: streak) {
+            insights.append(streakInsight)
         }
 
         // Goal progress insight
@@ -461,6 +444,9 @@ public class ProductivityAnalytics {
         return dailyMap.values.sorted { $0.date < $1.date }
     }
 
+    /// Builds an hourly aggregation of productivity metrics from the provided focus sessions.
+    /// - Parameter sessions: Focus sessions to aggregate; each session is attributed to the hour extracted from its `startTime`.
+    /// - Returns: An array of 24 `HourlyProductivity` entries for hours 0 through 23 where each entry's `wordsWritten`, `sessionsCount`, and `focusMinutes` reflect the totals for that hour.
     private func generateHourlyBreakdown(sessions: [FocusSession]) -> [HourlyProductivity] {
         var hourlyMap: [Int: HourlyProductivity] = [:]
 
@@ -484,6 +470,40 @@ public class ProductivityAnalytics {
         return (0..<24).compactMap { hourlyMap[$0] }
     }
 
+    /// Creates a productivity insight for a writing streak when the streak meets configured thresholds.
+    /// - Parameter streak: The writing streak metrics to evaluate.
+    /// - Returns: A `ProductivityInsight` that either celebrates a new record or recognizes a multi-day streak (3+ days); `nil` if the streak is zero or does not meet these thresholds.
+    private func makeStreakInsight(streak: WritingStreak) -> ProductivityInsight? {
+        guard streak.currentStreak > 0 else { return nil }
+
+        if streak.currentStreak >= streak.longestStreak && streak.currentStreak > 1 {
+            return ProductivityInsight(
+                type: .achievement,
+                title: "New Record!",
+                message: "You're on your longest writing streak: \(streak.currentStreak) days! Keep it up!",
+                priority: 0
+            )
+        } else if streak.currentStreak >= 7 {
+            return ProductivityInsight(
+                type: .streak,
+                title: "Writing Streak",
+                message: "Amazing! \(streak.currentStreak)-day writing streak. You're building a solid habit!",
+                priority: 1
+            )
+        } else if streak.currentStreak >= 3 {
+            return ProductivityInsight(
+                type: .streak,
+                title: "Streak Building",
+                message: "\(streak.currentStreak) days in a row. Keep the momentum going!",
+                priority: 2
+            )
+        }
+        return nil
+    }
+
+    /// Formats an hour of day into a localized 12-hour label (e.g., "3 PM").
+    /// - Parameter hour: Hour of the day (0–23).
+    /// - Returns: A localized string for the hour (e.g., "3 PM"); falls back to "`H:00`" if formatting fails.
     private func formatHour(_ hour: Int) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "h a"

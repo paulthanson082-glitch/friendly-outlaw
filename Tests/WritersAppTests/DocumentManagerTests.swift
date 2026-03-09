@@ -211,10 +211,10 @@ final class DocumentManagerTests: XCTestCase {
         let progressDocs = documentManager.getDocumentsByProgress()
 
         XCTAssertEqual(progressDocs.count, 2) // Only docs with goals
-        XCTAssertEqual(progressDocs[0].0.title, "Almost Done") // Sorted by progress descending
-        XCTAssertEqual(progressDocs[1].0.title, "Half Done")
-        XCTAssertEqual(progressDocs[0].1, 0.9, accuracy: 0.01)
-        XCTAssertEqual(progressDocs[1].1, 0.5, accuracy: 0.01)
+        XCTAssertEqual(progressDocs[0].document.title, "Almost Done") // Sorted by progress descending
+        XCTAssertEqual(progressDocs[1].document.title, "Half Done")
+        XCTAssertEqual(progressDocs[0].progress, 0.9, accuracy: 0.01)
+        XCTAssertEqual(progressDocs[1].progress, 0.5, accuracy: 0.01)
     }
 
     func testGetDocumentsByProgressWithZeroGoal() {

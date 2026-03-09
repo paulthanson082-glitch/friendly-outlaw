@@ -63,32 +63,7 @@ public class TraceAnalysisService {
         let traces = try databaseManager.getTraces()
         if traces.isEmpty { return [] }
 
-        // Build session metrics in memory (SQLite doesn't support CTEs with countIf)
-        var sessionMap: [String: (traceIds: Set<UUID>, changes: Int, reads: Int)] = [:]
-
-        for trace in traces {
-            if trace.sessionId.hasPrefix("historical-") { continue }
-            if sessionMap[trace.sessionId] == nil {
-                sessionMap[trace.sessionId] = (traceIds: [], changes: 0, reads: 0)
-            }
-            sessionMap[trace.sessionId]?.traceIds.insert(trace.id)
-
-            let observations = try databaseManager.getObservations(traceId: trace.id)
-            for obs in observations {
-                if obs.name == "Tool: Edit" || obs.name == "Tool: Write" {
-                    sessionMap[trace.sessionId]?.changes += 1
-                } else if obs.name == "Tool: Read" {
-                    sessionMap[trace.sessionId]?.reads += 1
-                }
-            }
-        }
-
-        // Filter to sessions with > 1 turn
-        let metrics: [SessionMetrics] = sessionMap.compactMap { (sessionId, data) in
-            let turns = data.traceIds.count
-            guard turns > 1 else { return nil }
-            return SessionMetrics(sessionId: sessionId, turns: turns, changes: data.changes, reads: data.reads)
-        }
+        let metrics = try buildSessionMetrics(from: traces)
 
         // Bucket sessions
         var buckets: [String: (sessions: Int, totalChangesPerTurn: Double, minTurns: Int)] = [:]
@@ -149,6 +124,13 @@ public class TraceAnalysisService {
     /// Returns per-session metrics for all non-historical sessions with > 1 turn
     public func getSessionMetrics() throws -> [SessionMetrics] {
         let traces = try databaseManager.getTraces()
+        return try buildSessionMetrics(from: traces).sorted { $0.turns > $1.turns }
+    }
+
+    // MARK: - Private Helpers
+
+    /// Builds per-session metrics from traces, excluding historical sessions and those with only 1 turn.
+    private func buildSessionMetrics(from traces: [Trace]) throws -> [SessionMetrics] {
         var sessionMap: [String: (traceIds: Set<UUID>, changes: Int, reads: Int)] = [:]
 
         for trace in traces {
@@ -172,7 +154,7 @@ public class TraceAnalysisService {
             let turns = data.traceIds.count
             guard turns > 1 else { return nil }
             return SessionMetrics(sessionId: sessionId, turns: turns, changes: data.changes, reads: data.reads)
-        }.sorted { $0.turns > $1.turns }
+        }
     }
 
     // MARK: - Totals

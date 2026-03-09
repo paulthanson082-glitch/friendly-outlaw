@@ -52,22 +52,35 @@ public class WritersApp {
             documentManager: self.documentManager,
             templateManager: self.templateManager
         )
+    public convenience init() {
+        self.init(databaseManager: DatabaseManager(), aiConfiguration: nil)
+    }
+
+    /// Initialize with AI capabilities
+    public convenience init(aiConfiguration: AIConfiguration) {
+        self.init(databaseManager: DatabaseManager(), aiConfiguration: aiConfiguration)
     }
 
     /// Initialize with custom database path
-    public init(databasePath: String? = nil) {
+    public convenience init(databasePath: String? = nil) {
+        self.init(databaseManager: DatabaseManager(databasePath: databasePath), aiConfiguration: nil)
+    }
+
+    private init(databaseManager: DatabaseManager, aiConfiguration: AIConfiguration?) {
         self.templateManager = TemplateManager()
         self.documentManager = DocumentManager()
         self.issueManager = IssueManager()
         self.kanbanManager = KanbanManager()
         self.hardwareManager = HardwareManager()
-        let db = DatabaseManager(databasePath: databasePath)
-        self.databaseManager = db
+        self.databaseManager = databaseManager
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
         self.versionControl = DoltVersionControlService(databaseManager: db)
         self.chatbotService = nil
         try? db.initialize()
+        self.versionControl = DoltVersionControlService(databaseManager: databaseManager)
+        self.aiService = aiConfiguration.map { AIService(configuration: $0) }
+        try? databaseManager.initialize()
     }
 
     /// Enable AI features by providing configuration
@@ -167,8 +180,8 @@ public class WritersApp {
         }
 
         var params: [String: Any] = ["query": query, "limit": limit]
-        if let cat = category {
-            params["category"] = cat
+        if let category {
+            params["category"] = category
         }
 
         let action = PluginAction(type: .searchMemory, parameters: params)
@@ -188,8 +201,8 @@ public class WritersApp {
         }
 
         var params: [String: Any] = ["limit": limit, "sortBy": sortBy]
-        if let cat = category {
-            params["category"] = cat
+        if let category {
+            params["category"] = category
         }
 
         let action = PluginAction(type: .listMemories, parameters: params)
@@ -209,11 +222,11 @@ public class WritersApp {
         }
 
         var params: [String: Any] = [:]
-        if let k = key {
-            params["key"] = k
+        if let key {
+            params["key"] = key
         }
-        if let cat = category {
-            params["category"] = cat
+        if let category {
+            params["category"] = category
         }
 
         let action = PluginAction(type: .clearMemory, parameters: params)
@@ -369,18 +382,16 @@ public class WritersApp {
     /// Ends the current session
     public func endSession() {
         guard let sessionId = currentSessionId, let userId = currentUserId else { return }
-        
+
         if let sessions = try? databaseManager.getUserSessions(userId: userId),
            let index = sessions.firstIndex(where: { $0.id == sessionId }) {
             var session = sessions[index]
-            session.endTime = Date()
-            let start = session.startTime.timeIntervalSince1970
-            if let end = session.endTime?.timeIntervalSince1970 {
-                session.durationSeconds = Int(end - start)
-            }
+            let endTime = Date()
+            session.endTime = endTime
+            session.durationSeconds = Int(endTime.timeIntervalSince(session.startTime))
             try? databaseManager.updateUserSession(session)
         }
-        
+
         currentSessionId = nil
     }
     
@@ -591,25 +602,25 @@ public class WritersApp {
 
     // MARK: - AI-Powered Features
 
+    /// Returns the active AI service and the document for `documentId`, throwing if either is unavailable.
+    private func requireAIAndDocument(documentId: UUID) throws -> (AIService, Document) {
+        guard let ai = aiService else {
+            throw AIError.aiNotEnabled
+        }
+        guard let document = documentManager.getDocument(id: documentId) else {
+            throw AIError.documentNotFound
+        }
+        return (ai, document)
+    }
+
     /// Get AI assistance for a document
     public func getAIAssistance(
         documentId: UUID,
         type: AIAssistanceType,
         context: AIContext? = nil
     ) async throws -> AIResponse {
-        guard let ai = aiService else {
-            throw AIError.aiNotEnabled
-        }
-
-        guard let document = documentManager.getDocument(id: documentId) else {
-            throw AIError.documentNotFound
-        }
-
-        return try await ai.getAssistance(
-            text: document.content,
-            type: type,
-            context: context
-        )
+        let (ai, document) = try requireAIAndDocument(documentId: documentId)
+        return try await ai.getAssistance(text: document.content, type: type, context: context)
     }
 
     /// Continue writing a document with AI
@@ -618,13 +629,7 @@ public class WritersApp {
         context: AIContext? = nil,
         appendToDocument: Bool = false
     ) async throws -> String {
-        guard let ai = aiService else {
-            throw AIError.aiNotEnabled
-        }
-
-        guard let document = documentManager.getDocument(id: documentId) else {
-            throw AIError.documentNotFound
-        }
+        let (ai, document) = try requireAIAndDocument(documentId: documentId)
 
         let continuation = try await ai.continueWriting(
             text: document.content,
@@ -658,13 +663,7 @@ public class WritersApp {
         context: AIContext? = nil,
         replaceContent: Bool = false
     ) async throws -> String {
-        guard let ai = aiService else {
-            throw AIError.aiNotEnabled
-        }
-
-        guard let document = documentManager.getDocument(id: documentId) else {
-            throw AIError.documentNotFound
-        }
+        let (ai, document) = try requireAIAndDocument(documentId: documentId)
 
         let improved = try await ai.improveText(
             text: document.content,
@@ -697,43 +696,19 @@ public class WritersApp {
         documentId: UUID,
         context: AIContext? = nil
     ) async throws -> [String] {
-        guard let ai = aiService else {
-            throw AIError.aiNotEnabled
-        }
-
-        guard let document = documentManager.getDocument(id: documentId) else {
-            throw AIError.documentNotFound
-        }
-
-        return try await ai.generateTitles(
-            content: document.content,
-            context: context
-        )
+        let (ai, document) = try requireAIAndDocument(documentId: documentId)
+        return try await ai.generateTitles(content: document.content, context: context)
     }
 
     /// Analyze a document comprehensively
     public func analyzeDocument(documentId: UUID) async throws -> DocumentAnalysis {
-        guard let ai = aiService else {
-            throw AIError.aiNotEnabled
-        }
-
-        guard let document = documentManager.getDocument(id: documentId) else {
-            throw AIError.documentNotFound
-        }
-
+        let (ai, document) = try requireAIAndDocument(documentId: documentId)
         return try await ai.analyzeDocument(document: document)
     }
 
     /// Get writing insights for a document
     public func getDocumentInsights(documentId: UUID) async throws -> WritingInsights {
-        guard let ai = aiService else {
-            throw AIError.aiNotEnabled
-        }
-
-        guard let document = documentManager.getDocument(id: documentId) else {
-            throw AIError.documentNotFound
-        }
-
+        let (ai, document) = try requireAIAndDocument(documentId: documentId)
         return try await ai.getWritingInsights(document: document)
     }
 
@@ -748,12 +723,7 @@ public class WritersApp {
         context: AIContext? = nil,
         maxIterations: Int = 10
     ) async throws -> AIResponse {
-        guard let ai = aiService else {
-            throw AIError.aiNotEnabled
-        }
-        guard let document = documentManager.getDocument(id: documentId) else {
-            throw AIError.documentNotFound
-        }
+        let (ai, document) = try requireAIAndDocument(documentId: documentId)
 
         let toolExecutor = WritingToolExecutor(
             documentManager: documentManager,
@@ -775,10 +745,7 @@ public class WritersApp {
         topic: String,
         context: AIContext? = nil
     ) async throws -> String {
-        guard let ai = aiService else {
-            throw AIError.aiNotEnabled
-        }
-
+        guard let ai = aiService else { throw AIError.aiNotEnabled }
         return try await ai.brainstormIdeas(topic: topic, context: context)
     }
 
@@ -787,10 +754,7 @@ public class WritersApp {
         concept: String,
         context: AIContext? = nil
     ) async throws -> String {
-        guard let ai = aiService else {
-            throw AIError.aiNotEnabled
-        }
-
+        guard let ai = aiService else { throw AIError.aiNotEnabled }
         return try await ai.generateOutline(concept: concept, context: context)
     }
 
@@ -799,40 +763,34 @@ public class WritersApp {
         characterConcept: String,
         context: AIContext? = nil
     ) async throws -> String {
-        guard let ai = aiService else {
-            throw AIError.aiNotEnabled
-        }
-
-        return try await ai.developCharacter(
-            characterConcept: characterConcept,
-            context: context
-        )
+        guard let ai = aiService else { throw AIError.aiNotEnabled }
+        return try await ai.developCharacter(characterConcept: characterConcept, context: context)
     }
 
     // MARK: - Statistics
     
     /// Gets AI tool usage statistics
     public func getAIToolUsageStats(userId: UUID? = nil) throws -> [AIToolUsageStats] {
-        let uid = userId ?? currentUserId ?? UUID()
-        return try databaseManager.getAIToolUsageStats(userId: uid)
+        let resolvedUserId = userId ?? currentUserId ?? UUID()
+        return try databaseManager.getAIToolUsageStats(userId: resolvedUserId)
     }
-    
+
     /// Gets session statistics
     public func getSessionStats(userId: UUID? = nil) throws -> SessionStats {
-        let uid = userId ?? currentUserId ?? UUID()
-        return try databaseManager.getSessionStats(userId: uid)
+        let resolvedUserId = userId ?? currentUserId ?? UUID()
+        return try databaseManager.getSessionStats(userId: resolvedUserId)
     }
-    
+
     /// Gets AI suggestions with pagination
     public func getAISuggestions(userId: UUID? = nil, limit: Int = 50, offset: Int = 0) throws -> [AISuggestion] {
-        let uid = userId ?? currentUserId ?? UUID()
-        return try databaseManager.getAISuggestions(userId: uid, limit: limit, offset: offset)
+        let resolvedUserId = userId ?? currentUserId ?? UUID()
+        return try databaseManager.getAISuggestions(userId: resolvedUserId, limit: limit, offset: offset)
     }
-    
+
     /// Gets user sessions sorted by duration
     public func getUserSessions(userId: UUID? = nil, sortByDuration: Bool = false) throws -> [UserSession] {
-        let uid = userId ?? currentUserId ?? UUID()
-        return try databaseManager.getUserSessions(userId: uid, sortByDuration: sortByDuration)
+        let resolvedUserId = userId ?? currentUserId ?? UUID()
+        return try databaseManager.getUserSessions(userId: resolvedUserId, sortByDuration: sortByDuration)
     }
 
     /// Gets application statistics

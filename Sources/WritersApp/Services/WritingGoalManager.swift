@@ -179,23 +179,26 @@ public class WritingGoalManager {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
 
-        if let lastDate = streak.lastWritingDate {
-            if calendar.isDateInToday(lastDate) {
-                // Already wrote today, no change needed
-                return
-            } else if calendar.isDateInYesterday(lastDate) {
-                // Wrote yesterday, extend streak
-                streak.currentStreak += 1
-                streak.longestStreak = max(streak.longestStreak, streak.currentStreak)
-            } else {
-                // Streak broken, start new one
-                streak.currentStreak = 1
-                streak.streakStartDate = today
-            }
-        } else {
+        guard let lastDate = streak.lastWritingDate else {
             // First time writing
             streak.currentStreak = 1
             streak.longestStreak = 1
+            streak.streakStartDate = today
+            streak.lastWritingDate = Date()
+            streak.totalDaysWritten += 1
+            return
+        }
+
+        // Already wrote today — no change needed
+        guard !calendar.isDateInToday(lastDate) else { return }
+
+        if calendar.isDateInYesterday(lastDate) {
+            // Wrote yesterday — extend streak
+            streak.currentStreak += 1
+            streak.longestStreak = max(streak.longestStreak, streak.currentStreak)
+        } else {
+            // Gap in writing — restart streak
+            streak.currentStreak = 1
             streak.streakStartDate = today
         }
 
@@ -217,32 +220,35 @@ public class WritingGoalManager {
 
     // MARK: - Goal Reset (for recurring goals)
 
-    /// Resets daily goals (call at midnight)
+    /// Resets all active daily goals to start a new daily period.
+    /// 
+    /// For each active daily goal this sets its progress back to zero, updates its start date to now, and recalculates its end date.
     public func resetDailyGoals() {
-        for (id, var goal) in goals where goal.type == .daily && goal.isActive {
-            goal.current = 0
-            goal.startDate = Date()
-            goal.endDate = calculateEndDate(for: .daily)
-            goals[id] = goal
-        }
+        resetGoals(ofType: .daily)
     }
 
-    /// Resets weekly goals (call at start of week)
+    /// Reset all active weekly goals to the start of a new weekly period.
+    /// 
+    /// Sets each active weekly goal's current progress to 0, updates its start date to now, and recalculates its end date for the new week.
     public func resetWeeklyGoals() {
-        for (id, var goal) in goals where goal.type == .weekly && goal.isActive {
-            goal.current = 0
-            goal.startDate = Date()
-            goal.endDate = calculateEndDate(for: .weekly)
-            goals[id] = goal
-        }
+        resetGoals(ofType: .weekly)
     }
 
-    /// Resets monthly goals (call at start of month)
+    /// Resets all active monthly goals by setting their current progress to 0, updating their start date to now, and recalculating their end date for the new monthly period.
     public func resetMonthlyGoals() {
-        for (id, var goal) in goals where goal.type == .monthly && goal.isActive {
+        resetGoals(ofType: .monthly)
+    }
+
+    /// Resets all active goals of the specified type to start a new period.
+    /// 
+    /// For each active goal matching `type`, sets `current` to 0, updates `startDate` to now, and recalculates `endDate`.
+    /// - Parameters:
+    ///   - type: The goal recurrence type to reset (e.g., daily, weekly, monthly).
+    private func resetGoals(ofType type: GoalType) {
+        for (id, var goal) in goals where goal.type == type && goal.isActive {
             goal.current = 0
             goal.startDate = Date()
-            goal.endDate = calculateEndDate(for: .monthly)
+            goal.endDate = calculateEndDate(for: type)
             goals[id] = goal
         }
     }

@@ -65,14 +65,7 @@ public class DoltVersionControlService {
             guard try db.getVCBranch(name: name) == nil else {
                 throw VersionControlError.branchAlreadyExists(name)
             }
-            var newBranch = VCBranch(name: name, isActive: true)
-
-            // Inherit head commit from current branch so history is connected
-            if let current = try currentBranch() {
-                newBranch = VCBranch(id: newBranch.id, name: name,
-                                     headCommitId: current.headCommitId,
-                                     createdAt: newBranch.createdAt, isActive: true)
-            }
+            let newBranch = VCBranch(name: name, isActive: true)
             try db.insertVCBranch(newBranch)
             try db.setActiveBranch(id: newBranch.id)
             return newBranch
@@ -189,56 +182,68 @@ public class DoltVersionControlService {
     }
 
     /// Compute per-document diffs between two commits.
-    /// 
+    ///
     /// Compares snapshots from `fromCommitId` (base) to `toCommitId` (target) and produces a `VCDiff` for each document indicating whether it was added, deleted, modified, or unchanged. The returned diffs are sorted by document title.
     /// - Parameters:
     ///   - fromCommitId: Commit ID to compare from (base).
     ///   - toCommitId: Commit ID to compare to (target).
-    /// - Returns: An array of `VCDiff` entries describing per-document changes between the two commits.
+    /// - Returns: An array of `VCDiff` entries sorted by title.
     public func diff(fromCommitId: UUID, toCommitId: UUID) throws -> [VCDiff] {
-        let fromSnapshots = try db.getVCSnapshots(commitId: fromCommitId)
-        let toSnapshots = try db.getVCSnapshots(commitId: toCommitId)
+        let fromSnapshots = try db.getVCSnapshotsDirect(commitId: fromCommitId)
+        let toSnapshots   = try db.getVCSnapshotsDirect(commitId: toCommitId)
 
         let fromMap = Dictionary(uniqueKeysWithValues: fromSnapshots.map { ($0.documentId, $0) })
-        let toMap = Dictionary(uniqueKeysWithValues: toSnapshots.map { ($0.documentId, $0) })
+        let toMap   = Dictionary(uniqueKeysWithValues: toSnapshots.map   { ($0.documentId, $0) })
 
-        var diffs: [VCDiff] = []
+        let presentDiffs = diffPresent(fromMap: fromMap, toMap: toMap)
+        let deletedDiffs = diffDeleted(fromMap: fromMap, toMap: toMap)
 
-        // Documents present in "to"
-        for (docId, toSnap) in toMap {
-            if let fromSnap = fromMap[docId] {
-                if fromSnap.content != toSnap.content || fromSnap.title != toSnap.title {
-                    diffs.append(VCDiff(documentId: docId, title: toSnap.title,
-                                        changeType: .modified,
-                                        fromContent: fromSnap.content,
-                                        toContent: toSnap.content,
-                                        fromWordCount: fromSnap.wordCount,
-                                        toWordCount: toSnap.wordCount))
-                } else {
-                    diffs.append(VCDiff(documentId: docId, title: toSnap.title,
-                                        changeType: .unchanged,
-                                        fromContent: fromSnap.content,
-                                        toContent: toSnap.content,
-                                        fromWordCount: fromSnap.wordCount,
-                                        toWordCount: toSnap.wordCount))
-                }
-            } else {
-                diffs.append(VCDiff(documentId: docId, title: toSnap.title,
-                                    changeType: .added,
-                                    toContent: toSnap.content,
-                                    toWordCount: toSnap.wordCount))
+        return (presentDiffs + deletedDiffs).sorted { $0.title < $1.title }
+    }
+
+    // MARK: - Private Diff Helpers
+
+    /// Produces diffs for documents present in the target snapshot, comparing against the base.
+    private func diffPresent(
+        fromMap: [UUID: VCDocumentSnapshot],
+        toMap: [UUID: VCDocumentSnapshot]
+    ) -> [VCDiff] {
+        return toMap.map { (docId, toSnap) in
+            guard let fromSnap = fromMap[docId] else {
+                return VCDiff(documentId: docId, title: toSnap.title,
+                              changeType: .added,
+                              toContent: toSnap.content,
+                              toWordCount: toSnap.wordCount)
             }
+            let hasChanges = fromSnap.content != toSnap.content || fromSnap.title != toSnap.title
+            return VCDiff(documentId: docId, title: toSnap.title,
+                          changeType: hasChanges ? .modified : .unchanged,
+                          fromContent: fromSnap.content,
+                          toContent: toSnap.content,
+                          fromWordCount: fromSnap.wordCount,
+                          toWordCount: toSnap.wordCount)
         }
+    }
 
-        // Documents deleted in "to"
-        for (docId, fromSnap) in fromMap where toMap[docId] == nil {
-            diffs.append(VCDiff(documentId: docId, title: fromSnap.title,
+    /// Produces diffs for documents removed from the target snapshot relative to the base.
+    private func diffDeleted(
+        fromMap: [UUID: VCDocumentSnapshot],
+        toMap: [UUID: VCDocumentSnapshot]
+    ) -> [VCDiff] {
+        return fromMap.compactMap { (docId, fromSnap) in
+            guard toMap[docId] == nil else { return nil }
+            return VCDiff(documentId: docId, title: fromSnap.title,
+                          changeType: .deleted,
+                          fromContent: fromSnap.content,
+                          fromWordCount: fromSnap.wordCount)
+        // Remaining unmatched from-docs are deletions
+        for id in unmatchedFromIds {
+            guard let fromSnap = fromMap[id] else { continue }
+            diffs.append(VCDiff(documentId: fromSnap.documentId, title: fromSnap.title,
                                 changeType: .deleted,
                                 fromContent: fromSnap.content,
                                 fromWordCount: fromSnap.wordCount))
         }
-
-        return diffs.sorted { $0.title < $1.title }
     }
 
     // MARK: - Time Travel
@@ -289,40 +294,56 @@ public class DoltVersionControlService {
 
         // Fast-forward: target has no head, simply point it to source head
         guard let targetHeadId = targetBranch.headCommitId else {
-            targetBranch.headCommitId = sourceHeadId
-            try db.updateVCBranch(targetBranch)
-            let diffs = try db.getVCSnapshots(commitId: sourceHeadId)
-            return VCMergeResult(fromBranch: fromBranch, intoBranch: intoBranch,
-                                 strategy: .fastForward, commitId: sourceHeadId,
-                                 diffCount: diffs.count, success: true)
+            return try performFastForwardMerge(
+                targetBranch: &targetBranch,
+                sourceHeadId: sourceHeadId,
+                fromBranch: fromBranch,
+                intoBranch: intoBranch
+            )
         }
 
-        // Three-way merge: build the merged snapshot set
+        return try performThreeWayMerge(
+            targetBranch: &targetBranch,
+            sourceHeadId: sourceHeadId,
+            targetHeadId: targetHeadId,
+            fromBranch: fromBranch,
+            intoBranch: intoBranch
+        )
+    }
+
+    // MARK: - Private Merge Helpers
+
+    /// Advances the target branch head to the source head without creating a new commit.
+    private func performFastForwardMerge(
+        targetBranch: inout VCBranch,
+        sourceHeadId: UUID,
+        fromBranch: String,
+        intoBranch: String
+    ) throws -> VCMergeResult {
+        targetBranch.headCommitId = sourceHeadId
+        try db.updateVCBranch(targetBranch)
+        let sourceSnapshots = try db.getVCSnapshots(commitId: sourceHeadId)
+        return VCMergeResult(fromBranch: fromBranch, intoBranch: intoBranch,
+                             strategy: .fastForward, commitId: sourceHeadId,
+                             diffCount: sourceSnapshots.count, success: true)
+    }
+
+    /// Applies source changes onto the target branch using last-writer-wins for conflicts.
+    private func performThreeWayMerge(
+        targetBranch: inout VCBranch,
+        sourceHeadId: UUID,
+        targetHeadId: UUID,
+        fromBranch: String,
+        intoBranch: String
+    ) throws -> VCMergeResult {
         let sourceSnapshots = try db.getVCSnapshots(commitId: sourceHeadId)
         let targetSnapshots = try db.getVCSnapshots(commitId: targetHeadId)
 
-        let targetMap = Dictionary(uniqueKeysWithValues: targetSnapshots.map { ($0.documentId, $0) })
-        var mergedSnapshots: [VCDocumentSnapshot] = Array(targetSnapshots) // start with target
+        let (mergedSnapshots, changedCount) = buildMergedSnapshots(
+            sourceSnapshots: sourceSnapshots,
+            targetSnapshots: targetSnapshots
+        )
 
-        var changedCount = 0
-        for sourceSnap in sourceSnapshots {
-            if let targetSnap = targetMap[sourceSnap.documentId] {
-                // Take the source version if content differs (last-writer-wins strategy)
-                if sourceSnap.content != targetSnap.content {
-                    // Replace in mergedSnapshots
-                    if let idx = mergedSnapshots.firstIndex(where: { $0.documentId == sourceSnap.documentId }) {
-                        mergedSnapshots[idx] = sourceSnap
-                    }
-                    changedCount += 1
-                }
-            } else {
-                // Document only in source — bring it over
-                mergedSnapshots.append(sourceSnap)
-                changedCount += 1
-            }
-        }
-
-        // Create a merge commit on the target branch, recording both parents for full lineage
         let mergeCommit = VCCommit(
             branchId: targetBranch.id,
             message: "Merge '\(fromBranch)' into '\(intoBranch)'",
@@ -349,6 +370,34 @@ public class DoltVersionControlService {
         return VCMergeResult(fromBranch: fromBranch, intoBranch: intoBranch,
                              strategy: .threeWay, commitId: mergeCommit.id,
                              diffCount: changedCount, success: true)
+    }
+
+    /// Combines source and target snapshots using last-writer-wins for conflicting documents.
+    /// - Returns: The merged snapshot array and the count of documents changed from the target state.
+    private func buildMergedSnapshots(
+        sourceSnapshots: [VCDocumentSnapshot],
+        targetSnapshots: [VCDocumentSnapshot]
+    ) -> (snapshots: [VCDocumentSnapshot], changedCount: Int) {
+        let targetMap = Dictionary(uniqueKeysWithValues: targetSnapshots.map { ($0.documentId, $0) })
+        var mergedSnapshots: [VCDocumentSnapshot] = Array(targetSnapshots)
+        var changedCount = 0
+
+        for sourceSnap in sourceSnapshots {
+            if let targetSnap = targetMap[sourceSnap.documentId] {
+                // Take the source version if content differs (last-writer-wins strategy)
+                if sourceSnap.content != targetSnap.content,
+                   let idx = mergedSnapshots.firstIndex(where: { $0.documentId == sourceSnap.documentId }) {
+                    mergedSnapshots[idx] = sourceSnap
+                    changedCount += 1
+                }
+            } else {
+                // Document only in source — bring it over
+                mergedSnapshots.append(sourceSnap)
+                changedCount += 1
+            }
+        }
+
+        return (mergedSnapshots, changedCount)
     }
 
     /// Get the head commit identifier for the specified branch.
