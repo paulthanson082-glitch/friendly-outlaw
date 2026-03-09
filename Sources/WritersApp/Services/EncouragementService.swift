@@ -76,6 +76,25 @@ public struct EncouragementConfiguration: Codable {
     }
 }
 
+// MARK: - Encouragement Thresholds
+
+private enum WordCountThreshold {
+    static let small = 100
+    static let medium = 250
+    static let large = 500
+    static let huge = 1000
+}
+
+private enum SessionDurationThreshold {
+    static let short = 15
+    static let medium = 30
+    static let long = 60
+}
+
+private enum WritingSpeedThreshold {
+    static let slowWordsPerMinute = 5.0
+}
+
 // MARK: - Encouragement Service
 
 /// Service for providing motivational feedback to writers
@@ -173,37 +192,36 @@ public class EncouragementService {
 
     private func selectWordCountMessage(wordsWritten: Int, totalWords: Int) -> String {
         switch wordsWritten {
-        case 0..<100:
+        case 0..<WordCountThreshold.small:
             return wordCountMessages.small.randomElement() ?? "Nice progress! Every word counts."
-        case 100..<250:
+        case WordCountThreshold.small..<WordCountThreshold.medium:
             return wordCountMessages.medium.randomElement() ?? "You're on a roll! Keep the momentum going."
-        case 250..<500:
+        case WordCountThreshold.medium..<WordCountThreshold.large:
             return wordCountMessages.large.randomElement() ?? "Impressive word count! Your story is taking shape."
-        case 500..<1000:
+        case WordCountThreshold.large..<WordCountThreshold.huge:
             return wordCountMessages.huge.randomElement() ?? "Wow! That's a significant achievement. Your dedication shows!"
         default:
             return wordCountMessages.massive.randomElement() ?? "Outstanding! You're crushing it today!"
         }
     }
-    
+
     private func selectSessionMessage(durationMinutes: Int, wordsWritten: Int) -> String {
         let wordsPerMinute = durationMinutes > 0 ? Double(wordsWritten) / Double(durationMinutes) : 0
-        
-        switch (durationMinutes, wordsPerMinute) {
-        case (0..<15, _):
+        let isSlowPace = wordsPerMinute < WritingSpeedThreshold.slowWordsPerMinute
+
+        switch durationMinutes {
+        case 0..<SessionDurationThreshold.short:
             return "Great start! Even short sessions add up."
-        case (15..<30, 0..<5):
-            return "Nice focused session! Quality matters more than speed."
-        case (15..<30, 5...):
-            return "Productive session! You're making excellent progress."
-        case (30..<60, _):
+        case SessionDurationThreshold.short..<SessionDurationThreshold.medium:
+            return isSlowPace
+                ? "Nice focused session! Quality matters more than speed."
+                : "Productive session! You're making excellent progress."
+        case SessionDurationThreshold.medium..<SessionDurationThreshold.long:
             return "Fantastic dedication! A solid writing session."
-        case (60..., 0..<5):
-            return "Remarkable commitment! A marathon writing session."
-        case (60..., 5...):
-            return "Incredible! Both duration and productivity are outstanding!"
         default:
-            return "Well done! Keep up the great work."
+            return isSlowPace
+                ? "Remarkable commitment! A marathon writing session."
+                : "Incredible! Both duration and productivity are outstanding!"
         }
     }
     
