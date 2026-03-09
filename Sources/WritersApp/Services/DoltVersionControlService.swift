@@ -65,14 +65,7 @@ public class DoltVersionControlService {
             guard try db.getVCBranch(name: name) == nil else {
                 throw VersionControlError.branchAlreadyExists(name)
             }
-            var newBranch = VCBranch(name: name, isActive: true)
-
-            // Inherit head commit from current branch so history is connected
-            if let current = try currentBranch() {
-                newBranch = VCBranch(id: newBranch.id, name: name,
-                                     headCommitId: current.headCommitId,
-                                     createdAt: newBranch.createdAt, isActive: true)
-            }
+            let newBranch = VCBranch(name: name, isActive: true)
             try db.insertVCBranch(newBranch)
             try db.setActiveBranch(id: newBranch.id)
             return newBranch
@@ -194,13 +187,13 @@ public class DoltVersionControlService {
     /// - Parameters:
     ///   - fromCommitId: Commit ID to compare from (base).
     ///   - toCommitId: Commit ID to compare to (target).
-    /// - Returns: An array of `VCDiff` entries describing per-document changes between the two commits.
+    /// - Returns: An array of `VCDiff` entries sorted by title.
     public func diff(fromCommitId: UUID, toCommitId: UUID) throws -> [VCDiff] {
-        let fromSnapshots = try db.getVCSnapshots(commitId: fromCommitId)
-        let toSnapshots = try db.getVCSnapshots(commitId: toCommitId)
+        let fromSnapshots = try db.getVCSnapshotsDirect(commitId: fromCommitId)
+        let toSnapshots   = try db.getVCSnapshotsDirect(commitId: toCommitId)
 
         let fromMap = Dictionary(uniqueKeysWithValues: fromSnapshots.map { ($0.documentId, $0) })
-        let toMap = Dictionary(uniqueKeysWithValues: toSnapshots.map { ($0.documentId, $0) })
+        let toMap   = Dictionary(uniqueKeysWithValues: toSnapshots.map   { ($0.documentId, $0) })
 
         let presentDiffs = diffPresent(fromMap: fromMap, toMap: toMap)
         let deletedDiffs = diffDeleted(fromMap: fromMap, toMap: toMap)
@@ -243,6 +236,13 @@ public class DoltVersionControlService {
                           changeType: .deleted,
                           fromContent: fromSnap.content,
                           fromWordCount: fromSnap.wordCount)
+        // Remaining unmatched from-docs are deletions
+        for id in unmatchedFromIds {
+            guard let fromSnap = fromMap[id] else { continue }
+            diffs.append(VCDiff(documentId: fromSnap.documentId, title: fromSnap.title,
+                                changeType: .deleted,
+                                fromContent: fromSnap.content,
+                                fromWordCount: fromSnap.wordCount))
         }
     }
 

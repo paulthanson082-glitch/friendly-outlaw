@@ -158,7 +158,7 @@ public class WritingToolExecutor: AIToolExecutor {
         }
         return """
         Title: \(doc.title)
-        Category: \(doc.category)
+        Category: \(doc.category.rawValue)
         Word Count: \(doc.wordCount)
         Content:
         \(doc.content)
