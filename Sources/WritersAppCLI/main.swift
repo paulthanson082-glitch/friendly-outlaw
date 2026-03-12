@@ -2357,6 +2357,7 @@ func showHelp() {
     ENVIRONMENT VARIABLES:
         ANTHROPIC_API_KEY      Set this to enable AI features (Anthropic Claude)
         GUI_NEW_API_KEY        Optional: gui.new Pro API key for extended canvas expiry
+        GUI_NEW_URL            Optional: custom gui.new base URL (e.g. for self-hosted instances)
 
     USING ALTERNATIVE LLM PROVIDERS WITH CLOTHER:
         Clother allows you to use 100+ LLM providers without changing code.
@@ -3447,7 +3448,7 @@ func exportDocumentToGui(app: WritersApp, searchTerm: String) async {
     let documents = app.documentManager.getAllDocuments()
     guard let document = documents.first(where: {
         $0.title.localizedCaseInsensitiveContains(searchTerm) ||
-        $0.id.uuidString.hasPrefix(searchTerm)
+        $0.id.uuidString.lowercased().hasPrefix(searchTerm.lowercased())
     }) else {
         print("✗ No document found matching: \(searchTerm)")
         return
@@ -3469,7 +3470,7 @@ func exportKanbanBoardToGui(app: WritersApp, searchTerm: String) async {
     let boards = app.getAllKanbanBoards()
     guard let board = boards.first(where: {
         $0.name.localizedCaseInsensitiveContains(searchTerm) ||
-        $0.id.uuidString.hasPrefix(searchTerm)
+        $0.id.uuidString.lowercased().hasPrefix(searchTerm.lowercased())
     }) else {
         print("✗ No Kanban board found matching: \(searchTerm)")
         return

@@ -1105,8 +1105,8 @@ final class WritersAppTests: XCTestCase {
         )
         let html = GuiNewService.statisticsHTML(stats, title: "My Dashboard")
         XCTAssertTrue(html.contains("My Dashboard"), "Should include custom title")
-        XCTAssertTrue(html.contains("5"), "Should show total documents")
-        XCTAssertTrue(html.contains("7"), "Should show template count")
+        XCTAssertTrue(html.contains("<div class=\"value\">5</div>"), "Should show total documents in value card")
+        XCTAssertTrue(html.contains("<div class=\"value\">7</div>"), "Should show template count in value card")
         XCTAssertTrue(html.contains("<!DOCTYPE html>"), "Should be complete HTML")
     }
 

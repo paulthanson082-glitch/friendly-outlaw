@@ -223,7 +223,7 @@ public class GuiNewService {
             <header>
               <h1>\(escapedTitle)</h1>
               <div class="meta">
-                <span class="badge">\(doc.category.rawValue)</span>
+                <span class="badge">\(escapeHTML(doc.category.rawValue))</span>
                 <span>&#128221; \(doc.wordCount) words</span>
                 <span>&#128337; \(doc.readingTime) min read</span>
                 <span>Created \(created)</span>
