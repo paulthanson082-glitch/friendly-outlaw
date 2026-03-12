@@ -105,6 +105,9 @@ struct WritersAppCLI {
             var listDocs = false
             var analyzeTraces = false
             var shouldDance = false
+            var guiDocArg: String? = nil
+            var guiStats = false
+            var guiKanbanArg: String? = nil
             
             var i = 1
             while i < arguments.count {
@@ -140,6 +143,27 @@ struct WritersAppCLI {
                 case "--dance":
                     shouldDance = true
                     i += 1
+                case "--gui-stats":
+                    guiStats = true
+                    i += 1
+                case "--gui-doc":
+                    if i + 1 < arguments.count {
+                        guiDocArg = arguments[i + 1]
+                        i += 2
+                    } else {
+                        print("Error: --gui-doc requires a document ID or title")
+                        print("Usage: WritersAppCLI --gui-doc <document-id-or-title>")
+                        return
+                    }
+                case "--gui-kanban":
+                    if i + 1 < arguments.count {
+                        guiKanbanArg = arguments[i + 1]
+                        i += 2
+                    } else {
+                        print("Error: --gui-kanban requires a board name or ID")
+                        print("Usage: WritersAppCLI --gui-kanban <board-name-or-id>")
+                        return
+                    }
                 default:
                     print("Unknown option: \(arg)")
                     print("Use --help for usage information")
@@ -187,9 +211,27 @@ struct WritersAppCLI {
             // Handle --run alone
             if let runSessionArg = runArg {
                 startFocusSessionDirect(
-                    app: app, 
+                    app: app,
                     sessionTypeName: runSessionArg.isEmpty ? nil : runSessionArg
                 )
+                return
+            }
+
+            // Handle --gui-stats
+            if guiStats {
+                await exportStatisticsToGui(app: app)
+                return
+            }
+
+            // Handle --gui-doc
+            if let docArg = guiDocArg {
+                await exportDocumentToGui(app: app, searchTerm: docArg)
+                return
+            }
+
+            // Handle --gui-kanban
+            if let boardArg = guiKanbanArg {
+                await exportKanbanBoardToGui(app: app, searchTerm: boardArg)
                 return
             }
         }
@@ -217,6 +259,15 @@ struct WritersAppCLI {
             app.enableAI(configuration: config)
         } else {
             print("ⓘ AI features disabled (set ANTHROPIC_API_KEY to enable)")
+        }
+
+        // Initialize gui.new client if API key is present (optional)
+        if ProcessInfo.processInfo.environment["GUI_NEW_API_KEY"] != nil {
+            app.enableGui()
+            print("✓ gui.new visual export enabled")
+        } else {
+            app.enableGui() // Free tier — no key required
+            print("ⓘ gui.new visual export available (set GUI_NEW_API_KEY for Pro)")
         }
 
         // Initialize Claude Memory plugin
@@ -311,6 +362,11 @@ struct WritersAppCLI {
             print("83. Remove Hardware Board")
             print("84. Manage Pin Aliases")
             print("85. View Board Statistics")
+
+            print("\ngui.new Visual Export:")
+            print("90. Export Statistics Dashboard to gui.new")
+            print("91. Export Document to gui.new")
+            print("92. Export Kanban Board to gui.new")
 
             print("\n0. Exit")
             print()
@@ -432,6 +488,12 @@ struct WritersAppCLI {
                 await managePinAliases(app: app)
             case 85:
                 viewHardwareStatistics(app: app)
+            case 90:
+                await exportStatisticsToGui(app: app)
+            case 91:
+                await exportDocumentToGuiInteractive(app: app)
+            case 92:
+                await exportKanbanBoardToGuiInteractive(app: app)
             case 0:
                 await app.shutdownPlugins()
                 running = false
@@ -2269,6 +2331,9 @@ func showHelp() {
         --run, -r [type]        Start a focus session (types: freewrite, pomodoro, sprint, deepwork, marathon)
         --analyze-traces        Run trace analysis report (productivity by session length, tool usage)
         --dance                 Make Claude dance ♪
+        --gui-stats             Export writing statistics dashboard to gui.new (prints shareable URL)
+        --gui-doc <id|title>    Export a document as a shareable gui.new page
+        --gui-kanban <name|id>  Export a Kanban board as a shareable gui.new canvas
 
     COMBINED OPTIONS:
         --open <id|title> --run [type]   Open a document and start a focus session on it
@@ -2285,9 +2350,13 @@ func showHelp() {
         WritersAppCLI --open "My Novel" --run pomodoro    # Open "My Novel" and start 25-min session
         WritersAppCLI --run sprint --open "Chapter 1"     # Same as above, order doesn't matter
         WritersAppCLI --open <doc-id> --run deepwork      # Open by ID and start 90-min deep work
+        WritersAppCLI --gui-stats                  # Publish statistics dashboard to gui.new
+        WritersAppCLI --gui-doc "My Novel"         # Publish document to gui.new
+        WritersAppCLI --gui-kanban "Sprint Board"  # Publish Kanban board to gui.new
 
     ENVIRONMENT VARIABLES:
         ANTHROPIC_API_KEY      Set this to enable AI features (Anthropic Claude)
+        GUI_NEW_API_KEY        Optional: gui.new Pro API key for extended canvas expiry
 
     USING ALTERNATIVE LLM PROVIDERS WITH CLOTHER:
         Clother allows you to use 100+ LLM providers without changing code.
@@ -3352,6 +3421,125 @@ func toggleJulesAdultMode(app: WritersApp) {
         print("\n✓ Jules Adult Mode ENABLED")
         print("  Jules can now discuss adult content and use colorful language")
         print("  Suitable for: crime fiction, mature romance, edgy narratives, etc.\n")
+    }
+}
+
+// MARK: - gui.new Visual Export
+
+func exportStatisticsToGui(app: WritersApp) async {
+    print("\n=== Export Statistics to gui.new ===\n")
+    do {
+        print("Publishing writing statistics dashboard...")
+        let canvas = try await app.exportStatisticsToGui()
+        print("✓ Dashboard published!")
+        print("  URL: \(canvas.url)")
+        print("  Canvas ID: \(canvas.id)")
+        print("  Expires: \(canvas.expiresAt)")
+        print()
+        print("Share this URL to let anyone view your writing stats.")
+    } catch {
+        print("✗ Export failed: \(error.localizedDescription)")
+    }
+}
+
+func exportDocumentToGui(app: WritersApp, searchTerm: String) async {
+    print("\n=== Export Document to gui.new ===\n")
+    let documents = app.documentManager.getAllDocuments()
+    guard let document = documents.first(where: {
+        $0.title.localizedCaseInsensitiveContains(searchTerm) ||
+        $0.id.uuidString.hasPrefix(searchTerm)
+    }) else {
+        print("✗ No document found matching: \(searchTerm)")
+        return
+    }
+    print("Publishing '\(document.title)'...")
+    do {
+        let canvas = try await app.exportDocumentToGui(id: document.id)
+        print("✓ Document published!")
+        print("  URL: \(canvas.url)")
+        print("  Canvas ID: \(canvas.id)")
+        print("  Expires: \(canvas.expiresAt)")
+    } catch {
+        print("✗ Export failed: \(error.localizedDescription)")
+    }
+}
+
+func exportKanbanBoardToGui(app: WritersApp, searchTerm: String) async {
+    print("\n=== Export Kanban Board to gui.new ===\n")
+    let boards = app.getAllKanbanBoards()
+    guard let board = boards.first(where: {
+        $0.name.localizedCaseInsensitiveContains(searchTerm) ||
+        $0.id.uuidString.hasPrefix(searchTerm)
+    }) else {
+        print("✗ No Kanban board found matching: \(searchTerm)")
+        return
+    }
+    print("Publishing board '\(board.name)'...")
+    do {
+        let canvas = try await app.exportKanbanBoardToGui(boardId: board.id)
+        print("✓ Kanban board published!")
+        print("  URL: \(canvas.url)")
+        print("  Canvas ID: \(canvas.id)")
+        print("  Expires: \(canvas.expiresAt)")
+    } catch {
+        print("✗ Export failed: \(error.localizedDescription)")
+    }
+}
+
+func exportDocumentToGuiInteractive(app: WritersApp) async {
+    print("\n=== Export Document to gui.new ===\n")
+    let documents = app.documentManager.getAllDocuments()
+    if documents.isEmpty {
+        print("No documents found. Create a document first.")
+        return
+    }
+    for (i, doc) in documents.enumerated() {
+        print("\(i + 1). \(doc.title) (\(doc.wordCount) words)")
+    }
+    print("\nSelect document number: ", terminator: "")
+    guard let input = readLine(),
+          let idx = Int(input), idx > 0, idx <= documents.count else {
+        print("Invalid selection.")
+        return
+    }
+    let doc = documents[idx - 1]
+    print("Publishing '\(doc.title)'...")
+    do {
+        let canvas = try await app.exportDocumentToGui(id: doc.id)
+        print("✓ Published!")
+        print("  URL: \(canvas.url)")
+        print("  Expires: \(canvas.expiresAt)")
+    } catch {
+        print("✗ Export failed: \(error.localizedDescription)")
+    }
+}
+
+func exportKanbanBoardToGuiInteractive(app: WritersApp) async {
+    print("\n=== Export Kanban Board to gui.new ===\n")
+    let boards = app.getAllKanbanBoards()
+    if boards.isEmpty {
+        print("No Kanban boards found. Create a board first.")
+        return
+    }
+    for (i, board) in boards.enumerated() {
+        let count = app.getKanbanTasks(forBoard: board.id).count
+        print("\(i + 1). \(board.name) (\(count) tasks)")
+    }
+    print("\nSelect board number: ", terminator: "")
+    guard let input = readLine(),
+          let idx = Int(input), idx > 0, idx <= boards.count else {
+        print("Invalid selection.")
+        return
+    }
+    let board = boards[idx - 1]
+    print("Publishing board '\(board.name)'...")
+    do {
+        let canvas = try await app.exportKanbanBoardToGui(boardId: board.id)
+        print("✓ Published!")
+        print("  URL: \(canvas.url)")
+        print("  Expires: \(canvas.expiresAt)")
+    } catch {
+        print("✗ Export failed: \(error.localizedDescription)")
     }
 }
 
