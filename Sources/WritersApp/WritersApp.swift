@@ -14,6 +14,7 @@ public class WritersApp {
     public private(set) var guiService: GuiNewService?
     public private(set) var aiService: AIService?
     public private(set) var chatbotService: ChatbotService?
+    public private(set) var ragieService: RagieService?
     public private(set) var currentUserId: UUID?
     private var currentSessionId: UUID?
     private var memoryPlugin: ClaudeMemoryPlugin?
@@ -81,6 +82,76 @@ public class WritersApp {
     /// Check if AI is available
     public var isAIEnabled: Bool {
         return aiService != nil
+    }
+
+    // MARK: - Ragie Integration
+
+    /// Enable Ragie document retrieval by providing configuration.
+    public func enableRagie(configuration: RagieConfiguration) {
+        self.ragieService = RagieService(configuration: configuration)
+    }
+
+    /// Disable Ragie document retrieval.
+    public func disableRagie() {
+        self.ragieService = nil
+    }
+
+    /// Whether the Ragie service is configured and available.
+    public var isRagieEnabled: Bool {
+        return ragieService != nil
+    }
+
+    /// Ingest a local document into Ragie for semantic retrieval.
+    ///
+    /// The document's content is sent to Ragie as raw text. The returned
+    /// `RagieDocument` includes the Ragie document id and initial processing status.
+    /// Poll `getRagieDocumentStatus(ragieId:)` until `isReady` is true before querying.
+    ///
+    /// - Parameter documentId: The id of the local `Document` to ingest.
+    /// - Returns: A `RagieDocument` describing the newly created Ragie document.
+    public func ingestDocumentToRagie(documentId: UUID) async throws -> RagieDocument {
+        guard let ragie = ragieService else { throw RagieError.ragieNotEnabled }
+        guard let document = documentManager.getDocument(id: documentId) else {
+            throw RagieError.documentNotFound
+        }
+        return try await ragie.ingestRawText(
+            document.content,
+            name: document.title,
+            metadata: ["document_id": documentId.uuidString, "category": document.category.rawValue]
+        )
+    }
+
+    /// Fetch the processing status of a Ragie document.
+    ///
+    /// - Parameter ragieId: The Ragie document id (from `ingestDocumentToRagie`).
+    /// - Returns: A `RagieDocument` with the current status (`isReady` when processable).
+    public func getRagieDocumentStatus(ragieId: String) async throws -> RagieDocument {
+        guard let ragie = ragieService else { throw RagieError.ragieNotEnabled }
+        return try await ragie.getDocument(id: ragieId)
+    }
+
+    /// Retrieve semantically relevant chunks from Ragie for a natural-language query.
+    ///
+    /// - Parameters:
+    ///   - query: The search query.
+    ///   - topK: Number of chunks to return (overrides configuration default).
+    ///   - rerank: Whether to apply reranking (overrides configuration default).
+    /// - Returns: A `RagieRetrievalResult` with matching text chunks and scores.
+    public func retrieveFromRagie(
+        query: String,
+        topK: Int? = nil,
+        rerank: Bool? = nil
+    ) async throws -> RagieRetrievalResult {
+        guard let ragie = ragieService else { throw RagieError.ragieNotEnabled }
+        return try await ragie.retrieve(query: query, topK: topK, rerank: rerank)
+    }
+
+    /// List all documents currently stored in Ragie.
+    ///
+    /// - Returns: An array of `RagieDocument` entries.
+    public func listRagieDocuments() async throws -> [RagieDocument] {
+        guard let ragie = ragieService else { throw RagieError.ragieNotEnabled }
+        return try await ragie.listDocuments()
     }
 
     /// Enable adult content mode for Jules (no content restrictions, curse words allowed)
@@ -930,6 +1001,20 @@ public enum AIError: LocalizedError {
         switch self {
         case .aiNotEnabled:
             return "AI features are not enabled. Please configure AI with enableAI(configuration:) first."
+        case .documentNotFound:
+            return "The specified document was not found."
+        }
+    }
+}
+
+public enum RagieError: LocalizedError, Equatable {
+    case ragieNotEnabled
+    case documentNotFound
+
+    public var errorDescription: String? {
+        switch self {
+        case .ragieNotEnabled:
+            return "Ragie is not enabled. Please configure it with enableRagie(configuration:) first."
         case .documentNotFound:
             return "The specified document was not found."
         }

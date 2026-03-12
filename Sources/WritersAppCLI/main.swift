@@ -270,6 +270,15 @@ struct WritersAppCLI {
             print("ⓘ gui.new visual export available (set GUI_NEW_API_KEY for Pro)")
         }
 
+        // Initialize Ragie if API key is present
+        if let ragieKey = ProcessInfo.processInfo.environment["RAGIE_API_KEY"], !ragieKey.isEmpty {
+            let ragieConfig = RagieConfiguration(apiKey: ragieKey)
+            app.enableRagie(configuration: ragieConfig)
+            print("✓ Ragie document retrieval enabled")
+        } else {
+            print("ⓘ Ragie disabled (set RAGIE_API_KEY to enable document retrieval)")
+        }
+
         // Initialize Claude Memory plugin
         do {
             try await app.enableMemoryPlugin()
@@ -367,6 +376,14 @@ struct WritersAppCLI {
             print("90. Export Statistics Dashboard to gui.new")
             print("91. Export Document to gui.new")
             print("92. Export Kanban Board to gui.new")
+
+            if app.isRagieEnabled {
+                print("\nRagie Document Retrieval:")
+                print("95. Ingest Document into Ragie")
+                print("96. Retrieve Context from Ragie")
+                print("97. List Ragie Documents")
+                print("98. Check Ragie Document Status")
+            }
 
             print("\n0. Exit")
             print()
@@ -494,6 +511,14 @@ struct WritersAppCLI {
                 await exportDocumentToGuiInteractive(app: app)
             case 92:
                 await exportKanbanBoardToGuiInteractive(app: app)
+            case 95:
+                await ingestDocumentToRagie(app: app)
+            case 96:
+                await retrieveContextFromRagie(app: app)
+            case 97:
+                await listRagieDocuments(app: app)
+            case 98:
+                await checkRagieDocumentStatus(app: app)
             case 0:
                 await app.shutdownPlugins()
                 running = false
@@ -3540,6 +3565,130 @@ func exportKanbanBoardToGuiInteractive(app: WritersApp) async {
         print("  Expires: \(canvas.expiresAt)")
     } catch {
         print("✗ Export failed: \(error.localizedDescription)")
+    }
+}
+
+// MARK: - Ragie Document Retrieval
+
+func ingestDocumentToRagie(app: WritersApp) async {
+    guard app.isRagieEnabled else {
+        print("Ragie is not enabled. Set RAGIE_API_KEY to use this feature.")
+        return
+    }
+
+    let documents = app.documentManager.getAllDocuments()
+    guard !documents.isEmpty else {
+        print("No documents available to ingest.")
+        return
+    }
+
+    print("\n=== Ingest Document into Ragie ===\n")
+    for (index, doc) in documents.enumerated() {
+        print("\(index + 1). \(doc.title) (\(doc.wordCount) words)")
+    }
+    print("\nEnter document number: ", terminator: "")
+
+    guard let input = readLine(), let idx = Int(input), idx > 0, idx <= documents.count else {
+        print("Invalid selection.")
+        return
+    }
+
+    let document = documents[idx - 1]
+    print("Ingesting '\(document.title)' into Ragie...")
+
+    do {
+        let ragieDoc = try await app.ingestDocumentToRagie(documentId: document.id)
+        print("✓ Document ingested successfully!")
+        print("  Ragie ID: \(ragieDoc.id)")
+        print("  Status:   \(ragieDoc.status)")
+        if !ragieDoc.isReady {
+            print("  ⓘ Document is processing. Use option 98 to check when it's ready.")
+        }
+    } catch {
+        print("✗ Ingestion failed: \(error.localizedDescription)")
+    }
+}
+
+func retrieveContextFromRagie(app: WritersApp) async {
+    guard app.isRagieEnabled else {
+        print("Ragie is not enabled. Set RAGIE_API_KEY to use this feature.")
+        return
+    }
+
+    print("\n=== Retrieve Context from Ragie ===\n")
+    print("Enter your query: ", terminator: "")
+    guard let query = readLine(), !query.isEmpty else {
+        print("Query cannot be empty.")
+        return
+    }
+
+    print("Searching Ragie for: \"\(query)\"...")
+
+    do {
+        let result = try await app.retrieveFromRagie(query: query)
+        if result.chunks.isEmpty {
+            print("No relevant chunks found for this query.")
+        } else {
+            print("\nFound \(result.chunks.count) relevant chunk(s):\n")
+            for (i, chunk) in result.chunks.enumerated() {
+                let docName = chunk.documentName ?? chunk.documentId
+                print("[\(i + 1)] Score: \(String(format: "%.3f", chunk.score))  Source: \(docName)")
+                print(chunk.text)
+                print()
+            }
+        }
+    } catch {
+        print("✗ Retrieval failed: \(error.localizedDescription)")
+    }
+}
+
+func listRagieDocuments(app: WritersApp) async {
+    guard app.isRagieEnabled else {
+        print("Ragie is not enabled. Set RAGIE_API_KEY to use this feature.")
+        return
+    }
+
+    print("\n=== Ragie Documents ===\n")
+
+    do {
+        let documents = try await app.listRagieDocuments()
+        if documents.isEmpty {
+            print("No documents ingested into Ragie yet.")
+        } else {
+            for doc in documents {
+                let readyMark = doc.isReady ? "✓" : "⏳"
+                let chunkInfo = doc.chunkCount.map { " (\($0) chunks)" } ?? ""
+                let name = doc.name ?? "(unnamed)"
+                print("\(readyMark) \(name)\(chunkInfo)")
+                print("   ID: \(doc.id)  Status: \(doc.status)")
+            }
+        }
+    } catch {
+        print("✗ Failed to list Ragie documents: \(error.localizedDescription)")
+    }
+}
+
+func checkRagieDocumentStatus(app: WritersApp) async {
+    guard app.isRagieEnabled else {
+        print("Ragie is not enabled. Set RAGIE_API_KEY to use this feature.")
+        return
+    }
+
+    print("\n=== Check Ragie Document Status ===\n")
+    print("Enter Ragie document ID: ", terminator: "")
+    guard let ragieId = readLine(), !ragieId.isEmpty else {
+        print("Document ID cannot be empty.")
+        return
+    }
+
+    do {
+        let doc = try await app.getRagieDocumentStatus(ragieId: ragieId)
+        let readyMark = doc.isReady ? "✓ Ready" : "⏳ \(doc.status.capitalized)"
+        print("Status: \(readyMark)")
+        if let name = doc.name { print("Name:   \(name)") }
+        if let chunks = doc.chunkCount { print("Chunks: \(chunks)") }
+    } catch {
+        print("✗ Status check failed: \(error.localizedDescription)")
     }
 }
 
