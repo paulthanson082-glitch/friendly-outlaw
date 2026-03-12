@@ -1152,4 +1152,132 @@ final class WritersAppTests: XCTestCase {
         app.disableGui()
         XCTAssertFalse(app.isGuiEnabled, "gui.new should be disabled after disableGui()")
     }
+
+    // MARK: - Ragie Integration Tests
+
+    func testRagieConfigurationDefaults() {
+        let config = RagieConfiguration(apiKey: "test-key")
+        XCTAssertEqual(config.apiKey, "test-key")
+        XCTAssertEqual(config.topK, 8)
+        XCTAssertFalse(config.rerank)
+    }
+
+    func testRagieConfigurationCustomValues() {
+        let config = RagieConfiguration(apiKey: "sk-ragie-123", topK: 5, rerank: true)
+        XCTAssertEqual(config.apiKey, "sk-ragie-123")
+        XCTAssertEqual(config.topK, 5)
+        XCTAssertTrue(config.rerank)
+    }
+
+    func testRagieDocumentIsReady() {
+        let readyDoc = RagieDocument(id: "doc-1", status: "ready", name: "Test Doc", chunkCount: 10)
+        XCTAssertTrue(readyDoc.isReady)
+
+        let processingDoc = RagieDocument(id: "doc-2", status: "processing")
+        XCTAssertFalse(processingDoc.isReady)
+    }
+
+    func testRagieChunkDecoding() throws {
+        let json = """
+        {"text":"Hello world","score":0.95,"id":"chunk-1","document_id":"doc-1","document_name":"MyDoc"}
+        """.data(using: .utf8)!
+        let chunk = try JSONDecoder().decode(RagieChunk.self, from: json)
+        XCTAssertEqual(chunk.text, "Hello world")
+        XCTAssertEqual(chunk.score, 0.95, accuracy: 0.001)
+        XCTAssertEqual(chunk.id, "chunk-1")
+        XCTAssertEqual(chunk.documentId, "doc-1")
+        XCTAssertEqual(chunk.documentName, "MyDoc")
+    }
+
+    func testRagieRetrievalResultCombinedText() {
+        let chunks = [
+            RagieChunk(text: "First chunk", score: 0.9, id: "c1", documentId: "d1"),
+            RagieChunk(text: "Second chunk", score: 0.8, id: "c2", documentId: "d1")
+        ]
+        let result = RagieRetrievalResult(query: "test query", chunks: chunks)
+        XCTAssertEqual(result.combinedText, "First chunk\n\nSecond chunk")
+    }
+
+    func testRagieRetrievalResultEmptyChunks() {
+        let result = RagieRetrievalResult(query: "no results", chunks: [])
+        XCTAssertTrue(result.chunks.isEmpty)
+        XCTAssertEqual(result.combinedText, "")
+    }
+
+    func testWritersAppRagieEnableDisable() {
+        XCTAssertFalse(app.isRagieEnabled, "Ragie should be disabled by default")
+        let config = RagieConfiguration(apiKey: "test-key")
+        app.enableRagie(configuration: config)
+        XCTAssertTrue(app.isRagieEnabled, "Ragie should be enabled after enableRagie()")
+        app.disableRagie()
+        XCTAssertFalse(app.isRagieEnabled, "Ragie should be disabled after disableRagie()")
+    }
+
+    func testIngestDocumentToRagieRequiresRagieEnabled() async {
+        // Ragie not enabled — should throw ragieNotEnabled regardless of document existence
+        let doc = app.createBlankDocument(title: "Test", category: .article)
+        do {
+            _ = try await app.ingestDocumentToRagie(documentId: doc.id)
+            XCTFail("Should throw when Ragie is not enabled")
+        } catch let error as RagieError {
+            XCTAssertEqual(error, .ragieNotEnabled)
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+    }
+
+    func testIngestDocumentToRagieThrowsDocumentNotFoundWhenDocumentMissing() async {
+        let config = RagieConfiguration(apiKey: "test-key")
+        app.enableRagie(configuration: config)
+        defer { app.disableRagie() }
+
+        do {
+            _ = try await app.ingestDocumentToRagie(documentId: UUID())
+            XCTFail("Should throw documentNotFound for unknown document")
+        } catch let error as RagieError {
+            XCTAssertEqual(error, .documentNotFound)
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+    }
+
+    func testRetrieveFromRagieRequiresRagieEnabled() async {
+        do {
+            _ = try await app.retrieveFromRagie(query: "test")
+            XCTFail("Should throw when Ragie is not enabled")
+        } catch let error as RagieError {
+            XCTAssertEqual(error, .ragieNotEnabled)
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+    }
+
+    func testListRagieDocumentsRequiresRagieEnabled() async {
+        do {
+            _ = try await app.listRagieDocuments()
+            XCTFail("Should throw when Ragie is not enabled")
+        } catch let error as RagieError {
+            XCTAssertEqual(error, .ragieNotEnabled)
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+    }
+
+    func testRagieServiceErrorDescriptions() {
+        XCTAssertNotNil(RagieServiceError.invalidURL.errorDescription)
+        XCTAssertNotNil(RagieServiceError.invalidResponse.errorDescription)
+        XCTAssertNotNil(RagieServiceError.invalidResponseFormat.errorDescription)
+        XCTAssertNotNil(RagieServiceError.apiError(statusCode: 401, message: "Unauthorized").errorDescription)
+        XCTAssertNotNil(RagieServiceError.documentNotReady(status: "processing").errorDescription)
+    }
+
+    func testRagieDocumentCodable() throws {
+        let doc = RagieDocument(id: "doc-123", status: "ready", name: "My Doc", chunkCount: 42)
+        let encoded = try JSONEncoder().encode(doc)
+        let decoded = try JSONDecoder().decode(RagieDocument.self, from: encoded)
+        XCTAssertEqual(decoded.id, doc.id)
+        XCTAssertEqual(decoded.status, doc.status)
+        XCTAssertEqual(decoded.name, doc.name)
+        XCTAssertEqual(decoded.chunkCount, doc.chunkCount)
+    }
 }
