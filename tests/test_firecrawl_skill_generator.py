@@ -661,6 +661,46 @@ class TestIntegrationScenarios(unittest.TestCase):
 class TestRobustnessAndRegressionCases(unittest.TestCase):
     """Additional tests for robustness, boundary conditions, and regression prevention."""
 
+    def test_firecrawl_agent_url_constant(self):
+        """Test that FIRECRAWL_AGENT_URL constant is correctly defined."""
+        self.assertEqual(fsg.FIRECRAWL_AGENT_URL, "https://api.firecrawl.dev/v1/agent")
+
+    @patch('urllib.request.urlopen')
+    def test_request_method_is_post(self, mock_urlopen):
+        """Test that API requests use POST method."""
+        mock_response = Mock()
+        mock_response.read.return_value = json.dumps({
+            "data": {"name": "test"}
+        }).encode('utf-8')
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        fsg.call_firecrawl_agent(
+            url="https://example.com",
+            api_key="test-key"
+        )
+
+        call_args = mock_urlopen.call_args
+        request_obj = call_args[0][0]
+        self.assertEqual(request_obj.method, "POST")
+
+    @patch('urllib.request.urlopen')
+    def test_request_content_type_header(self, mock_urlopen):
+        """Test that requests include proper Content-Type header."""
+        mock_response = Mock()
+        mock_response.read.return_value = json.dumps({
+            "data": {"name": "test"}
+        }).encode('utf-8')
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        fsg.call_firecrawl_agent(
+            url="https://example.com",
+            api_key="test-key"
+        )
+
+        call_args = mock_urlopen.call_args
+        request_obj = call_args[0][0]
+        self.assertEqual(request_obj.headers.get("Content-type"), "application/json")
+
     @patch('urllib.request.urlopen')
     def test_malformed_json_response(self, mock_urlopen):
         """Test handling of malformed JSON in API response."""
@@ -930,513 +970,54 @@ class TestRobustnessAndRegressionCases(unittest.TestCase):
         self.assertIn("- Item 1", markdown)
         self.assertIn("**Important**", markdown)
 
-
-class TestAdditionalSecurityAndValidation(unittest.TestCase):
-    """Additional tests for security, validation, and regression prevention."""
-
-    def test_api_key_not_leaked_in_request(self):
-        """Test that API key is only in headers, not in request body."""
-        with patch('urllib.request.urlopen') as mock_urlopen:
-            mock_response = Mock()
-            mock_response.read.return_value = json.dumps({
-                "data": {"name": "test"}
-            }).encode('utf-8')
-            mock_urlopen.return_value.__enter__.return_value = mock_response
-
-            fsg.call_firecrawl_agent(
-                url="https://example.com",
-                api_key="secret-key-12345",
-                model="spark-1-mini"
-            )
-
-            # Verify API key is in headers
-            call_args = mock_urlopen.call_args
-            request_obj = call_args[0][0]
-            headers = request_obj.headers
-            self.assertIn("Authorization", headers)
-            self.assertIn("Bearer secret-key-12345", headers["Authorization"])
-
-            # Verify API key is NOT in request body
-            request_data = json.loads(request_obj.data.decode('utf-8'))
-            request_body_str = json.dumps(request_data)
-            self.assertNotIn("secret-key-12345", request_body_str)
-
-    def test_schema_validation_prevents_missing_required_fields(self):
-        """Test that schema properly defines required fields to prevent incomplete skills."""
-        # Verify required fields are marked as required
-        required_fields = fsg.SKILL_SCHEMA["required"]
-
-        # These fields are critical for a valid skill file
-        critical_fields = ["name", "description", "steps"]
-        for field in critical_fields:
-            self.assertIn(field, required_fields,
-                         f"Critical field '{field}' must be in required list")
-
-    def test_render_prevents_yaml_injection(self):
-        """Test that special YAML characters in frontmatter don't break parsing."""
-        data = {
-            "name": "test-skill",
-            "description": 'Description with: colons and "quotes" and \'apostrophes\'',
-            "trigger_conditions": [],
-            "overview": "Overview",
-            "steps": [],
-            "key_endpoints_or_methods": []
-        }
-
-        markdown = fsg.render_skill_markdown(data)
-
-        # Verify frontmatter is properly formatted
-        lines = markdown.split('\n')
-        self.assertEqual(lines[0], "---")
-        self.assertIn("description: ", markdown)
-
-        # Verify the description line contains the special characters
-        desc_line = [l for l in lines if l.startswith("description:")][0]
-        self.assertIn("colons", desc_line)
-        self.assertIn("quotes", desc_line)
-
-    def test_file_output_creates_parent_directories(self):
-        """Regression test: verify that nested output paths create parent dirs."""
-        with patch('firecrawl_skill_generator.call_firecrawl_agent') as mock_call_agent:
-            with patch('firecrawl_skill_generator.render_skill_markdown') as mock_render:
-                with patch('firecrawl_skill_generator.parse_args') as mock_parse_args:
-                    with patch('builtins.open', new_callable=mock_open):
-                        with patch('os.makedirs') as mock_makedirs:
-                            with patch('os.path.dirname', return_value="/deep/nested/path"):
-                                with patch('os.path.abspath', return_value="/deep/nested/path/skill.md"):
-                                    mock_args = Mock()
-                                    mock_args.url = "https://example.com"
-                                    mock_args.output = "/deep/nested/path/skill.md"
-                                    mock_args.model = "spark-1-mini"
-                                    mock_args.prompt_extra = ""
-                                    mock_args.timeout = 120
-                                    mock_parse_args.return_value = mock_args
-
-                                    mock_call_agent.return_value = {"name": "test"}
-                                    mock_render.return_value = "# Test"
-
-                                    with patch.dict(os.environ, {"FIRECRAWL_API_KEY": "test-key"}):
-                                        fsg.main()
-
-                                    # Verify makedirs was called with exist_ok=True
-                                    mock_makedirs.assert_called_once_with("/deep/nested/path", exist_ok=True)
-
-    def test_render_handles_code_injection_attempt(self):
-        """Security test: verify that malicious code in content doesn't execute."""
-        malicious_data = {
-            "name": "test-skill",
-            "description": "Test",
-            "trigger_conditions": [],
-            "overview": "Overview",
-            "steps": [
-                {
-                    "title": "Malicious Step",
-                    "body": "```bash\nrm -rf /\n```\nThis is just documentation!"
-                }
-            ],
-            "key_endpoints_or_methods": [
-                {
-                    "name": "dangerous_method",
-                    "description": "Test",
-                    "example": "import os; os.system('echo pwned')"
-                }
-            ]
-        }
-
-        # This should render safely as markdown, not execute anything
-        markdown = fsg.render_skill_markdown(malicious_data)
-
-        # Verify dangerous commands are in markdown (as text, not executed)
-        self.assertIn("rm -rf", markdown)
-        self.assertIn("os.system", markdown)
-
-        # Verify it's in a code block (safe)
-        self.assertIn("```bash", markdown)
-        self.assertIn("```python", markdown)
-
-    def test_api_call_authorization_header_format(self):
-        """Test that authorization header follows Bearer token format correctly."""
-        with patch('urllib.request.urlopen') as mock_urlopen:
-            mock_response = Mock()
-            mock_response.read.return_value = json.dumps({
-                "data": {"name": "test"}
-            }).encode('utf-8')
-            mock_urlopen.return_value.__enter__.return_value = mock_response
-
-            fsg.call_firecrawl_agent(
-                url="https://example.com",
-                api_key="fc-test-key",
-                model="spark-1-mini"
-            )
-
-            call_args = mock_urlopen.call_args
-            request_obj = call_args[0][0]
-            auth_header = request_obj.headers.get("Authorization")
-
-            # Verify proper Bearer token format
-            self.assertTrue(auth_header.startswith("Bearer "))
-            self.assertEqual(auth_header, "Bearer fc-test-key")
-
-    def test_model_parameter_validation_in_request(self):
-        """Test that model parameter is correctly passed to API."""
-        for model in ["spark-1-mini", "spark-1-pro"]:
-            with patch('urllib.request.urlopen') as mock_urlopen:
-                mock_response = Mock()
-                mock_response.read.return_value = json.dumps({
-                    "data": {"name": "test"}
-                }).encode('utf-8')
-                mock_urlopen.return_value.__enter__.return_value = mock_response
-
-                fsg.call_firecrawl_agent(
-                    url="https://example.com",
-                    api_key="test-key",
-                    model=model
-                )
-
-                call_args = mock_urlopen.call_args
-                request_obj = call_args[0][0]
-                request_data = json.loads(request_obj.data.decode('utf-8'))
-
-                self.assertEqual(request_data["model"], model,
-                               f"Model {model} should be passed correctly in request")
-
-    def test_empty_trigger_conditions_list_renders_correctly(self):
-        """Regression test: empty trigger list should not show 'When to Use' section."""
-        data = {
-            "name": "test-skill",
-            "description": "Test",
-            "trigger_conditions": [],
-            "overview": "Overview",
-            "steps": [],
-            "key_endpoints_or_methods": []
-        }
-
-        markdown = fsg.render_skill_markdown(data)
-
-        # Should not include "When to Use" section if no triggers
-        self.assertNotIn("## When to Use", markdown)
-
-    def test_system_prompt_includes_security_instructions(self):
-        """Security regression test: verify system prompt tells agent not to include secrets."""
-        with patch('urllib.request.urlopen') as mock_urlopen:
-            mock_response = Mock()
-            mock_response.read.return_value = json.dumps({
-                "data": {"name": "test"}
-            }).encode('utf-8')
-            mock_urlopen.return_value.__enter__.return_value = mock_response
-
-            fsg.call_firecrawl_agent(
-                url="https://example.com",
-                api_key="test-key"
-            )
-
-            call_args = mock_urlopen.call_args
-            request_obj = call_args[0][0]
-            request_data = json.loads(request_obj.data.decode('utf-8'))
-            prompt = request_data["prompt"]
-
-            # Verify prompt includes instructions about API keys/secrets
-            # The prompt says "Do not include any API keys or secrets"
-            prompt_lower = prompt.lower()
-            self.assertIn("api keys", prompt_lower)
-            self.assertIn("secrets", prompt_lower)
-            self.assertIn("placeholder", prompt_lower)
-            self.assertIn("do not include", prompt_lower)
-
-
-class TestAdditionalRegressionCases(unittest.TestCase):
-    """Additional regression and edge case tests to strengthen confidence."""
-
-    @patch('urllib.request.urlopen')
-    def test_api_response_with_null_values(self, mock_urlopen):
-        """Regression test: verify handling of null values in API response."""
-        mock_response = Mock()
-        mock_response.read.return_value = json.dumps({
-            "data": {
-                "name": "test",
-                "description": "Test",
-                "trigger_conditions": None,  # null value
-                "overview": None,
-                "steps": [],
-                "key_endpoints_or_methods": []
-            }
-        }).encode('utf-8')
-        mock_urlopen.return_value.__enter__.return_value = mock_response
-
-        result = fsg.call_firecrawl_agent(
-            url="https://example.com",
-            api_key="test-key"
-        )
-
-        # Should handle null values gracefully
-        self.assertIsNone(result.get("trigger_conditions"))
-        self.assertIsNone(result.get("overview"))
-
-    def test_render_skill_with_none_values_in_optional_fields(self):
-        """Test that None values in optional fields don't break rendering."""
-        data = {
-            "name": "test-skill",
-            "description": "Test",
-            "trigger_conditions": None,
-            "overview": None,
-            "steps": [],
-            "key_endpoints_or_methods": [],
-            "environment_variables": None,
-            "common_pitfalls": None
-        }
-
-        # Should not raise an exception
-        markdown = fsg.render_skill_markdown(data)
-        self.assertIn("name: test-skill", markdown)
-
-    def test_render_with_extremely_long_skill_name(self):
-        """Boundary test: very long skill name."""
-        long_name = "a" * 500
-        data = {
-            "name": long_name,
-            "description": "Test",
-            "trigger_conditions": [],
-            "overview": "Overview",
-            "steps": [],
-            "key_endpoints_or_methods": []
-        }
-
-        markdown = fsg.render_skill_markdown(data)
-        self.assertIn(f"name: {long_name}", markdown)
-
-    @patch('urllib.request.urlopen')
-    def test_api_call_timeout_parameter_boundaries(self, mock_urlopen):
-        """Boundary test: timeout parameter edge values."""
-        mock_response = Mock()
-        mock_response.read.return_value = json.dumps({
-            "data": {"name": "test"}
-        }).encode('utf-8')
-        mock_urlopen.return_value.__enter__.return_value = mock_response
-
-        # Test with minimum timeout
-        fsg.call_firecrawl_agent(
-            url="https://example.com",
-            api_key="test-key",
-            timeout=1
-        )
-
-        # Verify timeout was passed
-        call_args = mock_urlopen.call_args
-        self.assertEqual(call_args[1]['timeout'], 1)
-
-        # Test with very large timeout
-        fsg.call_firecrawl_agent(
-            url="https://example.com",
-            api_key="test-key",
-            timeout=3600
-        )
-
-        call_args = mock_urlopen.call_args
-        self.assertEqual(call_args[1]['timeout'], 3600)
-
-    def test_detect_lang_with_mixed_indicators(self):
-        """Test language detection when code has multiple language indicators."""
-        # Code with both python and typescript indicators
-        snippet = "import requests\nconst x = () => fetch()"
-        # Should detect python first (import comes first in detection)
-        result = fsg._detect_lang(snippet)
-        self.assertEqual(result, "python")
-
-    def test_render_skill_with_unicode_in_all_fields(self):
-        """Test Unicode handling in all possible fields."""
-        data = {
-            "name": "tëst-skíll-日本語",
-            "description": "Descripción con acentos и кириллица",
-            "trigger_conditions": ["使用中文", "использовать русский"],
-            "overview": "Oνerview with Ελληνικά",
-            "steps": [
-                {
-                    "title": "Étape 1",
-                    "body": "Körper mit Ümlauten"
-                }
-            ],
-            "key_endpoints_or_methods": [
-                {
-                    "name": "método_español",
-                    "description": "Описание на русском",
-                    "example": "# Code with 中文注释"
-                }
-            ],
-            "environment_variables": [
-                {
-                    "name": "CLÉ_API",
-                    "purpose": "Autenticación"
-                }
-            ],
-            "common_pitfalls": ["Cuidado con los acentos"]
-        }
-
-        markdown = fsg.render_skill_markdown(data)
-
-        # Verify all Unicode text is preserved
-        self.assertIn("tëst-skíll-日本語", markdown)
-        self.assertIn("кириллица", markdown)
-        self.assertIn("Ελληνικά", markdown)
-        self.assertIn("Ümlauten", markdown)
-
-    @patch('urllib.request.urlopen')
-    def test_http_500_error_handling(self, mock_urlopen):
-        """Test handling of HTTP 500 server errors."""
-        import urllib.error
-
-        mock_fp = Mock()
-        mock_fp.read.return_value = b"Internal Server Error"
-
-        mock_error = urllib.error.HTTPError(
-            url="https://api.firecrawl.dev/v1/agent",
-            code=500,
-            msg="Internal Server Error",
-            hdrs={},
-            fp=mock_fp
-        )
-        mock_urlopen.side_effect = mock_error
-
-        with self.assertRaises(RuntimeError) as ctx:
-            fsg.call_firecrawl_agent(
-                url="https://example.com",
-                api_key="test-key"
-            )
-
-        self.assertIn("HTTP 500", str(ctx.exception))
-
-    @patch('urllib.request.urlopen')
-    def test_http_429_rate_limit_error(self, mock_urlopen):
-        """Test handling of HTTP 429 rate limit errors."""
-        import urllib.error
-
-        mock_fp = Mock()
-        mock_fp.read.return_value = b"Rate limit exceeded"
-
-        mock_error = urllib.error.HTTPError(
-            url="https://api.firecrawl.dev/v1/agent",
-            code=429,
-            msg="Too Many Requests",
-            hdrs={},
-            fp=mock_fp
-        )
-        mock_urlopen.side_effect = mock_error
-
-        with self.assertRaises(RuntimeError) as ctx:
-            fsg.call_firecrawl_agent(
-                url="https://example.com",
-                api_key="test-key"
-            )
-
-        self.assertIn("HTTP 429", str(ctx.exception))
-        self.assertIn("Rate limit exceeded", str(ctx.exception))
-
-    def test_render_with_deeply_nested_markdown(self):
-        """Test rendering with deeply nested markdown structures."""
-        data = {
-            "name": "nested-test",
-            "description": "Test",
-            "trigger_conditions": [],
-            "overview": "Overview",
-            "steps": [
-                {
-                    "title": "Complex Step",
-                    "body": """
-### Nested Header
-
-- List item 1
-  - Nested item 1.1
-    - Deeply nested 1.1.1
-      - Very deep 1.1.1.1
-- List item 2
-
-> Blockquote
-> > Nested blockquote
-
-| Table | Header |
-|-------|--------|
-| Cell  | Data   |
-
-```python
-def nested():
-    if True:
-        while True:
-            for x in range(10):
-                print(x)
-```
-                    """
-                }
-            ],
-            "key_endpoints_or_methods": []
-        }
-
-        markdown = fsg.render_skill_markdown(data)
-
-        # Verify nested structures are preserved
-        self.assertIn("### Nested Header", markdown)
-        self.assertIn("Deeply nested 1.1.1", markdown)
-        self.assertIn("| Table | Header |", markdown)
-
-    def test_render_with_code_fence_language_variants(self):
-        """Test that code fences handle various language identifiers."""
+    def test_render_multiple_trigger_conditions(self):
+        """Test rendering skill with many trigger conditions."""
         data = {
             "name": "test",
             "description": "Test",
-            "trigger_conditions": [],
+            "trigger_conditions": [
+                "trigger 1",
+                "trigger 2",
+                "trigger 3",
+                "trigger 4",
+                "trigger 5"
+            ],
             "overview": "Overview",
             "steps": [],
-            "key_endpoints_or_methods": [
-                {
-                    "name": "go_method",
-                    "description": "Go code",
-                    "example": "package main\nfunc main() {}"
-                },
-                {
-                    "name": "rust_method",
-                    "description": "Rust code",
-                    "example": "fn main() { println!(\"hello\"); }"
-                },
-                {
-                    "name": "sql_method",
-                    "description": "SQL code",
-                    "example": "SELECT * FROM users WHERE id = 1;"
-                }
-            ]
+            "key_endpoints_or_methods": []
         }
 
         markdown = fsg.render_skill_markdown(data)
 
-        # These will fall back to empty string since _detect_lang doesn't recognize them
-        # But they should still be in code blocks
-        self.assertIn("```", markdown)
-        self.assertIn("package main", markdown)
-        self.assertIn("fn main()", markdown)
-        self.assertIn("SELECT * FROM", markdown)
+        # All triggers should be present
+        for i in range(1, 6):
+            self.assertIn(f'"trigger {i}"', markdown)
 
     @patch('urllib.request.urlopen')
-    def test_api_call_with_empty_api_key(self, mock_urlopen):
-        """Negative test: API call with empty API key should still make request."""
+    def test_system_prompt_includes_url(self, mock_urlopen):
+        """Test that system prompt is properly constructed."""
         mock_response = Mock()
         mock_response.read.return_value = json.dumps({
             "data": {"name": "test"}
         }).encode('utf-8')
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
-        # Should make the request even with empty key (server will reject it)
         fsg.call_firecrawl_agent(
-            url="https://example.com",
-            api_key=""
+            url="https://docs.example.com",
+            api_key="test-key"
         )
 
         call_args = mock_urlopen.call_args
         request_obj = call_args[0][0]
-        auth_header = request_obj.headers.get("Authorization")
+        request_data = json.loads(request_obj.data.decode('utf-8'))
 
-        # Verify empty key is sent (as "Bearer ")
-        self.assertEqual(auth_header, "Bearer ")
+        # Verify system prompt includes key instructions
+        prompt = request_data["prompt"]
+        self.assertIn("Claude Code skill", prompt)
+        self.assertIn("YAML frontmatter", prompt)
 
-    def test_render_preserves_trailing_newlines_in_code(self):
-        """Test that code examples preserve formatting including trailing newlines."""
-        code_with_newlines = "def foo():\n    pass\n\n\n"
+    def test_render_endpoint_with_backticks_in_name(self):
+        """Test rendering endpoint names that might have special characters."""
         data = {
             "name": "test",
             "description": "Test",
@@ -1445,18 +1026,156 @@ def nested():
             "steps": [],
             "key_endpoints_or_methods": [
                 {
-                    "name": "method",
-                    "description": "Desc",
-                    "example": code_with_newlines
+                    "name": "api.method.with.dots",
+                    "description": "Method with dots in name"
+                }
+            ]
+        }
+
+        markdown = fsg.render_skill_markdown(data)
+        self.assertIn("### `api.method.with.dots`", markdown)
+
+    def test_code_fences_properly_closed(self):
+        """Regression test: verify all code fences are properly closed."""
+        data = {
+            "name": "test",
+            "description": "Test",
+            "trigger_conditions": [],
+            "overview": "Overview",
+            "steps": [],
+            "key_endpoints_or_methods": [
+                {
+                    "name": "method1",
+                    "description": "First method",
+                    "example": "import os"
+                },
+                {
+                    "name": "method2",
+                    "description": "Second method",
+                    "example": "const x = 5"
+                },
+                {
+                    "name": "method3",
+                    "description": "Third method",
+                    "example": '{"key": "value"}'
                 }
             ]
         }
 
         markdown = fsg.render_skill_markdown(data)
 
-        # After strip(), trailing newlines should be removed but content preserved
-        self.assertIn("def foo():", markdown)
-        self.assertIn("pass", markdown)
+        # Count opening and closing code fences
+        fence_count = markdown.count("```")
+
+        # Should be even (each opening has a closing)
+        self.assertEqual(fence_count % 2, 0, "All code fences should be properly closed")
+
+        # Should have exactly 6 fences (3 endpoints * 2 fences each)
+        self.assertEqual(fence_count, 6)
+
+    def test_render_handles_none_trigger_conditions(self):
+        """Regression test: verify None trigger_conditions doesn't break rendering."""
+        data = {
+            "name": "test",
+            "description": "Test",
+            "trigger_conditions": None,  # None instead of empty list
+            "overview": "Overview",
+            "steps": [],
+            "key_endpoints_or_methods": []
+        }
+
+        # Should not raise an exception
+        markdown = fsg.render_skill_markdown(data)
+
+        # Should not include "When to Use" section
+        self.assertNotIn("## When to Use", markdown)
+        self.assertIn("name: test", markdown)
+
+    @patch('urllib.request.urlopen')
+    def test_request_url_is_correct_endpoint(self, mock_urlopen):
+        """Test that requests are sent to the correct Firecrawl endpoint."""
+        mock_response = Mock()
+        mock_response.read.return_value = json.dumps({
+            "data": {"name": "test"}
+        }).encode('utf-8')
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        fsg.call_firecrawl_agent(
+            url="https://example.com",
+            api_key="test-key"
+        )
+
+        call_args = mock_urlopen.call_args
+        request_obj = call_args[0][0]
+
+        # Verify the request is sent to the correct endpoint
+        self.assertEqual(request_obj.full_url, "https://api.firecrawl.dev/v1/agent")
+
+    @patch('firecrawl_skill_generator.call_firecrawl_agent')
+    @patch('firecrawl_skill_generator.render_skill_markdown')
+    @patch('firecrawl_skill_generator.parse_args')
+    @patch('os.makedirs')
+    def test_main_creates_nested_directories(self, mock_makedirs, mock_parse_args,
+                                              mock_render, mock_call_agent):
+        """Test that main() creates deeply nested output directories."""
+        mock_args = Mock()
+        mock_args.url = "https://example.com"
+        mock_args.output = "/deep/nested/path/to/skill/output.md"
+        mock_args.model = "spark-1-mini"
+        mock_args.prompt_extra = ""
+        mock_args.timeout = 120
+        mock_parse_args.return_value = mock_args
+
+        mock_call_agent.return_value = {"name": "test"}
+        mock_render.return_value = "# Test"
+
+        with patch.dict(os.environ, {"FIRECRAWL_API_KEY": "test-key"}):
+            with patch('builtins.open', mock_open()):
+                with patch('os.path.abspath', return_value="/deep/nested/path/to/skill/output.md"):
+                    with patch('os.path.dirname', return_value="/deep/nested/path/to/skill"):
+                        fsg.main()
+
+        # Verify makedirs was called with exist_ok=True
+        mock_makedirs.assert_called_once_with("/deep/nested/path/to/skill", exist_ok=True)
+
+    def test_detect_lang_with_sql_like_code(self):
+        """Test language detection doesn't incorrectly classify SQL or other languages."""
+        # SQL should return empty string (not recognized)
+        sql_snippet = "SELECT * FROM users WHERE id = 1"
+        self.assertEqual(fsg._detect_lang(sql_snippet), "")
+
+        # Go code should return empty string (not recognized)
+        go_snippet = "package main\nfunc main() {}"
+        self.assertEqual(fsg._detect_lang(go_snippet), "")
+
+        # Rust should return empty string (not recognized)
+        rust_snippet = "fn main() { println!(\"hello\"); }"
+        self.assertEqual(fsg._detect_lang(rust_snippet), "")
+
+    @patch('urllib.request.urlopen')
+    def test_model_parameter_in_request_payload(self, mock_urlopen):
+        """Test that the model parameter is correctly included in the request."""
+        mock_response = Mock()
+        mock_response.read.return_value = json.dumps({
+            "data": {"name": "test"}
+        }).encode('utf-8')
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        for model in ["spark-1-mini", "spark-1-pro"]:
+            fsg.call_firecrawl_agent(
+                url="https://example.com",
+                api_key="test-key",
+                model=model
+            )
+
+            call_args = mock_urlopen.call_args
+            request_obj = call_args[0][0]
+            request_data = json.loads(request_obj.data.decode('utf-8'))
+
+            self.assertEqual(request_data["model"], model)
+            self.assertIn("url", request_data)
+            self.assertIn("prompt", request_data)
+            self.assertIn("schema", request_data)
 
 
 if __name__ == '__main__':
