@@ -1076,4 +1076,80 @@ final class WritersAppTests: XCTestCase {
         XCTAssertEqual(decoded.id, session.id)
         XCTAssertEqual(decoded.context.documentTitles.count, 2)
     }
+
+    // MARK: - gui.new: GuiNewService HTML Builders
+
+    func testGuiNewDocumentHTMLContainsTitle() {
+        let doc = Document(title: "My Novel", content: "Once upon a time.", category: .novel)
+        let html = GuiNewService.documentHTML(doc)
+        XCTAssertTrue(html.contains("My Novel"), "HTML should contain document title")
+        XCTAssertTrue(html.contains("Once upon a time."), "HTML should contain document content")
+        XCTAssertTrue(html.contains("<!DOCTYPE html>"), "Should be a complete HTML document")
+    }
+
+    func testGuiNewDocumentHTMLEscapesSpecialCharacters() {
+        let doc = Document(title: "<Script> & \"Quotes\"", content: "A & B <tag>", category: .essay)
+        let html = GuiNewService.documentHTML(doc)
+        XCTAssertFalse(html.contains("<Script>"), "Should escape < in title")
+        XCTAssertTrue(html.contains("&lt;Script&gt;"), "Should HTML-encode < and >")
+        XCTAssertTrue(html.contains("&amp;"), "Should HTML-encode &")
+    }
+
+    func testGuiNewStatisticsHTMLContainsMetrics() {
+        let stats = AppStatistics(
+            totalDocuments: 5,
+            totalWordCount: 12500,
+            averageWordCount: 2500,
+            totalTemplates: 7,
+            documentsByCategory: [.novel: 3, .essay: 2]
+        )
+        let html = GuiNewService.statisticsHTML(stats, title: "My Dashboard")
+        XCTAssertTrue(html.contains("My Dashboard"), "Should include custom title")
+        XCTAssertTrue(html.contains("5"), "Should show total documents")
+        XCTAssertTrue(html.contains("7"), "Should show template count")
+        XCTAssertTrue(html.contains("<!DOCTYPE html>"), "Should be complete HTML")
+    }
+
+    func testGuiNewKanbanHTMLContainsAllColumns() {
+        let board = KanbanBoard(name: "My Sprint", description: "Sprint board")
+        let tasks = [
+            KanbanTask(title: "Write intro", description: "", column: .backlog, boardId: board.id),
+            KanbanTask(title: "Draft chapter 1", description: "First draft", column: .running, boardId: board.id),
+            KanbanTask(title: "Review", description: "", column: .done, boardId: board.id)
+        ]
+        let html = GuiNewService.kanbanHTML(board: board, tasks: tasks)
+        XCTAssertTrue(html.contains("My Sprint"), "Should include board name")
+        XCTAssertTrue(html.contains("Backlog"), "Should show Backlog column")
+        XCTAssertTrue(html.contains("Running"), "Should show Running column")
+        XCTAssertTrue(html.contains("Done"), "Should show Done column")
+        XCTAssertTrue(html.contains("Write intro"), "Should include task title")
+        XCTAssertTrue(html.contains("First draft"), "Should include task description")
+    }
+
+    func testGuiNewKanbanHTMLShowsEmptyState() {
+        let board = KanbanBoard(name: "Empty Board", description: "")
+        let html = GuiNewService.kanbanHTML(board: board, tasks: [])
+        XCTAssertTrue(html.contains("No tasks"), "Empty columns should show empty state message")
+    }
+
+    func testGuiNewEscapeHTMLFunction() {
+        XCTAssertEqual(GuiNewService.escapeHTML("hello"), "hello")
+        XCTAssertEqual(GuiNewService.escapeHTML("<b>bold</b>"), "&lt;b&gt;bold&lt;/b&gt;")
+        XCTAssertEqual(GuiNewService.escapeHTML("A & B"), "A &amp; B")
+        XCTAssertEqual(GuiNewService.escapeHTML("\"quoted\""), "&quot;quoted&quot;")
+        XCTAssertEqual(GuiNewService.escapeHTML("it's"), "it&#39;s")
+    }
+
+    func testGuiNewServiceInitialisesWithoutAPIKey() {
+        let svc = GuiNewService()
+        XCTAssertNotNil(svc, "GuiNewService should initialise without an API key")
+    }
+
+    func testWritersAppGuiEnableDisable() {
+        XCTAssertFalse(app.isGuiEnabled, "gui.new should be disabled by default")
+        app.enableGui()
+        XCTAssertTrue(app.isGuiEnabled, "gui.new should be enabled after enableGui()")
+        app.disableGui()
+        XCTAssertFalse(app.isGuiEnabled, "gui.new should be disabled after disableGui()")
+    }
 }

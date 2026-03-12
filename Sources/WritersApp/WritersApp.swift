@@ -11,47 +11,13 @@ public class WritersApp {
     public let pluginManager: PluginManager
     public let encouragementService: EncouragementService
     public let versionControl: DoltVersionControlService
+    public private(set) var guiService: GuiNewService?
     public private(set) var aiService: AIService?
     public private(set) var chatbotService: ChatbotService?
     public private(set) var currentUserId: UUID?
     private var currentSessionId: UUID?
     private var memoryPlugin: ClaudeMemoryPlugin?
 
-    public init() {
-        self.templateManager = TemplateManager()
-        self.documentManager = DocumentManager()
-        self.issueManager = IssueManager()
-        self.kanbanManager = KanbanManager()
-        self.hardwareManager = HardwareManager()
-        let db = DatabaseManager()
-        self.databaseManager = db
-        self.pluginManager = PluginManager.shared
-        self.encouragementService = EncouragementService()
-        self.versionControl = DoltVersionControlService(databaseManager: db)
-        self.chatbotService = nil
-        try? db.initialize()
-    }
-
-    /// Initialize with AI capabilities
-    public init(aiConfiguration: AIConfiguration) {
-        self.templateManager = TemplateManager()
-        self.documentManager = DocumentManager()
-        self.issueManager = IssueManager()
-        self.kanbanManager = KanbanManager()
-        self.hardwareManager = HardwareManager()
-        let db = DatabaseManager()
-        self.databaseManager = db
-        self.pluginManager = PluginManager.shared
-        self.encouragementService = EncouragementService()
-        self.versionControl = DoltVersionControlService(databaseManager: db)
-        try? db.initialize()
-        let aiSvc = AIService(configuration: aiConfiguration)
-        self.aiService = aiSvc
-        self.chatbotService = ChatbotService(
-            aiService: aiSvc,
-            documentManager: self.documentManager,
-            templateManager: self.templateManager
-        )
     public convenience init() {
         self.init(databaseManager: DatabaseManager(), aiConfiguration: nil)
     }
@@ -75,11 +41,19 @@ public class WritersApp {
         self.databaseManager = databaseManager
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
-        self.versionControl = DoltVersionControlService(databaseManager: db)
-        self.chatbotService = nil
-        try? db.initialize()
         self.versionControl = DoltVersionControlService(databaseManager: databaseManager)
-        self.aiService = aiConfiguration.map { AIService(configuration: $0) }
+        self.guiService = nil
+        let aiSvc = aiConfiguration.map { AIService(configuration: $0) }
+        self.aiService = aiSvc
+        if let svc = aiSvc {
+            self.chatbotService = ChatbotService(
+                aiService: svc,
+                documentManager: self.documentManager,
+                templateManager: self.templateManager
+            )
+        } else {
+            self.chatbotService = nil
+        }
         try? databaseManager.initialize()
     }
 
@@ -875,6 +849,46 @@ public class WritersApp {
         let byTypeStrings = Dictionary(uniqueKeysWithValues:
             stats.byType.map { ($0.key.rawValue, $0.value) })
         return (stats.totalBoards, byTypeStrings, stats.activeCount)
+    }
+
+    // MARK: - gui.new Visual Export
+
+    /// Configure the gui.new client. Omit `apiKey` to use the `GUI_NEW_API_KEY` env variable.
+    public func enableGui(apiKey: String? = nil) {
+        guiService = GuiNewService(apiKey: apiKey)
+    }
+
+    /// Remove the gui.new client.
+    public func disableGui() {
+        guiService = nil
+    }
+
+    /// Whether the gui.new client is configured.
+    public var isGuiEnabled: Bool { guiService != nil }
+
+    /// Export a document as a shareable gui.new canvas.
+    /// - Returns: A `GuiCanvas` containing the shareable URL.
+    public func exportDocumentToGui(id: UUID) async throws -> GuiCanvas {
+        guard let svc = guiService else { throw GuiNewError.notConfigured }
+        guard let document = documentManager.getDocument(id: id) else { throw AIError.documentNotFound }
+        return try await svc.createDocumentCanvas(document: document)
+    }
+
+    /// Export the current writing statistics as a shareable gui.new dashboard.
+    public func exportStatisticsToGui(title: String = "Writing Statistics") async throws -> GuiCanvas {
+        guard let svc = guiService else { throw GuiNewError.notConfigured }
+        let stats = getStatistics()
+        return try await svc.createStatisticsCanvas(statistics: stats, title: title)
+    }
+
+    /// Export a Kanban board as a shareable gui.new canvas.
+    public func exportKanbanBoardToGui(boardId: UUID) async throws -> GuiCanvas {
+        guard let svc = guiService else { throw GuiNewError.notConfigured }
+        guard let board = kanbanManager.getBoard(id: boardId) else {
+            throw GuiNewError.notConfigured
+        }
+        let tasks = kanbanManager.getTasks(forBoard: boardId)
+        return try await svc.createKanbanCanvas(board: board, tasks: tasks)
     }
 }
 
