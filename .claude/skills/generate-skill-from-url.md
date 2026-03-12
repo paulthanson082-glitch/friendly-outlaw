@@ -29,6 +29,14 @@ FIRECRAWL_API_KEY="fc-..." python3 examples/firecrawl_skill_generator.py \
   --output ".claude/skills/<skill-name>.md"
 ```
 
+For example, to generate a skill for the Stripe API:
+
+```bash
+FIRECRAWL_API_KEY="fc-..." python3 examples/firecrawl_skill_generator.py \
+  --url "https://docs.stripe.com/api" \
+  --output ".claude/skills/stripe-payments.md"
+```
+
 The script calls Firecrawl's `/agent` endpoint, which autonomously:
 1. Maps the site to find relevant documentation pages
 2. Crawls and extracts content from those pages

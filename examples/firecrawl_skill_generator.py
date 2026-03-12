@@ -287,7 +287,13 @@ def render_skill_markdown(data: dict) -> str:
 
 
 def _detect_lang(snippet: str) -> str:
-    """Heuristically pick a code-fence language for a snippet."""
+    """Heuristically pick a code-fence language for a snippet.
+    
+    Note: This is a best-effort heuristic based on common patterns.
+    It may produce false positives (e.g., 'def ' in a string literal).
+    Returns empty string for unrecognized snippets, which produces
+    a valid code fence without syntax highlighting.
+    """
     s = snippet.strip()
     if s.startswith("import ") or s.startswith("from ") or "def " in s:
         return "python"
@@ -381,7 +387,9 @@ def main() -> None:
 
     if args.output:
         output_path = os.path.abspath(args.output)
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        output_dir = os.path.dirname(output_path)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as fh:
             fh.write(markdown)
         print(f"Skill written to {output_path}", file=sys.stderr)
