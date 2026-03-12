@@ -36,6 +36,11 @@ fi
 cd "$CLAUDE_PROJECT_DIR"
 swift build 2>&1
 
+# Install Firecrawl CLI for web scraping, searching, and browsing
+if ! command -v firecrawl &>/dev/null; then
+  npm install -g firecrawl-cli 2>&1 || true
+fi
+
 # Install Claude plugins
 claude plugin install context7@claude-plugins-official 2>&1 || true
 claude plugin install frontend-design@claude-plugins-official 2>&1 || true
