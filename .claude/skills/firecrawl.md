@@ -28,12 +28,12 @@ npx -y firecrawl-cli@latest <command>
 Authenticate once with your Firecrawl API key (get one at firecrawl.dev):
 
 ```bash
-firecrawl auth --api-key fc-YOUR_KEY
+firecrawl login --api-key fc-YOUR_KEY
 ```
 
 The key is stored in `~/.firecrawl/config.json` and reused for all subsequent commands.
 
-If a `FIRECRAWL_API_KEY` environment variable is set it is used automatically — no explicit auth step needed.
+If a `FIRECRAWL_API_KEY` environment variable is set it is used automatically — no explicit login step needed.
 
 ## Core Commands
 
@@ -46,8 +46,8 @@ firecrawl scrape https://example.com
 # Save as markdown to a file
 firecrawl scrape https://example.com --format markdown -o page.md
 
-# Save as plain text
-firecrawl scrape https://example.com --format text -o page.txt
+# Save as HTML
+firecrawl scrape https://example.com --format html -o page.html
 ```
 
 Use `scrape` when you need the content of a known URL. Output is clean, structured markdown — no noisy HTML.
@@ -161,6 +161,6 @@ firecrawl crawl https://docs.example.com/api --wait --limit 30 -o api-docs.json
 ## Error Handling
 
 - If `scrape` returns empty or minimal content, try `browser` instead — the page likely requires JavaScript.
-- If authentication fails, re-run `firecrawl auth --api-key <key>` or export `FIRECRAWL_API_KEY`.
+- If authentication fails, re-run `firecrawl login --api-key <key>` or export `FIRECRAWL_API_KEY`.
 - If a crawl times out, re-run with a smaller `--limit` value.
 - Rate limit errors (429): wait a few seconds and retry, or reduce `--limit`.
