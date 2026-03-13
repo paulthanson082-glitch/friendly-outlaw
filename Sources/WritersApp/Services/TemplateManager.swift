@@ -51,7 +51,9 @@ public class TemplateManager {
         templates.removeValue(forKey: id)
     }
 
-    // MARK: - Default Templates
+    /// Loads and registers the built-in set of default templates into the manager.
+    /// 
+    /// The catalog includes fiction, nonfiction, script, business, scheduled-task, and content-profile templates such as Novel Chapter, Short Story, Screenplay Scene, Blog Post, Article, Poetry, Business Letter, Morning Inbox Summary, Competitor News Roundup, Weekly Status Report, Email Follow-Up Tracker, Monthly Expense Report, Daily Sales Dashboard, Weekly Content Calendar, and global instruction profiles for Project Manager and Content Writer.
 
     private func loadDefaultTemplates() {
         // Novel Chapter Template
