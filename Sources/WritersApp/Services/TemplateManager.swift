@@ -51,7 +51,12 @@ public class TemplateManager {
         templates.removeValue(forKey: id)
     }
 
-    // MARK: - Default Templates
+    /// Register a collection of built-in templates into the manager's registry.
+    /// 
+    /// Creates and adds a set of predefined templates covering fiction (novel, short story, screenplay, poetry),
+    /// non-fiction and editorial (blog post, article), business documents (business letter), scheduled tasks
+    /// (daily/weekly/monthly reports, dashboards, trackers, content calendar), and content/profile instructions
+    /// (project manager and content writer profiles). These templates become available in the manager's storage.
 
     private func loadDefaultTemplates() {
         // Novel Chapter Template
