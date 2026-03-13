@@ -62,6 +62,8 @@ public enum TemplateCategory: String, Codable, CaseIterable {
     case businessLetter = "Business Letter"
     case proposal = "Proposal"
     case resume = "Resume"
+    case scheduledTask = "Scheduled Task"
+    case contentProfile = "Content Profile"
     case other = "Other"
 }
 
