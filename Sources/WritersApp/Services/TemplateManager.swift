@@ -660,6 +660,74 @@ public class TemplateManager {
             metadata: TemplateMetadata(tags: ["scheduled", "content", "weekly", "calendar"])
         )
 
+        // Global Instructions — Project Manager Profile Template
+        let projectManagerProfileTemplate = Template(
+            name: "Global Instructions — Project Manager Profile",
+            category: .contentProfile,
+            description: "AI system instructions for a project or program manager — defines role, communication preferences, PM rules, meeting support, and file structure",
+            content: """
+            # About Me
+            - Role: {{role}} at {{company}}
+            - Timezone: {{timezone}}
+            - Work style: Structured, action-oriented, always thinking about deadlines and blockers
+
+            # Communication Preferences
+            - Use bullet points and headers for readability
+            - Keep status updates concise — executives skim
+            - Rank items by priority (P0 = critical, P1 = high, P2 = medium, P3 = low)
+            - When presenting options, include trade-offs for each
+
+            # Project Management Rules
+            - For any status report, use this structure: Accomplishments / Planned / Blockers / Asks
+            - Always include owners and due dates when listing action items
+            - Flag risks early — I'd rather know about a potential problem than be surprised
+            - Track decisions with: what was decided, who decided, when, and why
+
+            # Meeting Support
+            - When prepping for meetings, include: agenda, attendee context, talking points, and desired outcomes
+            - After meetings, help me create structured notes with action items
+            - Time-box agenda items (suggest durations based on importance)
+
+            # Default Behaviors
+            - For any document, include a TL;DR at the top
+            - Use YYYY-MM-DD format for all dates
+            - When creating project documents, follow this file structure:
+              - {{docs_folder}} for documentation
+              - {{status_folder}} for status reports
+              - {{meetings_folder}} for meeting notes
+              - {{decisions_folder}} for decision logs
+
+            # Never Do
+            - Don't commit to timelines on my behalf
+            - Don't send communications to stakeholders without my review
+            - Don't delete project files without confirmation
+            - Don't assume project context — ask if you're missing background
+            """,
+            placeholders: [
+                Placeholder(key: "role", label: "Your Role",
+                            description: "Your job title, e.g. Project Manager, Product Manager, Program Manager",
+                            defaultValue: "Project Manager"),
+                Placeholder(key: "company", label: "Company Name",
+                            description: "Name of the company or organisation"),
+                Placeholder(key: "timezone", label: "Timezone",
+                            description: "Your timezone for scheduling references, e.g. US Eastern, US Pacific",
+                            defaultValue: "US Eastern"),
+                Placeholder(key: "docs_folder", label: "Docs Folder",
+                            description: "Folder path for project documentation",
+                            defaultValue: "/docs/"),
+                Placeholder(key: "status_folder", label: "Status Reports Folder",
+                            description: "Folder path for status reports",
+                            defaultValue: "/status/"),
+                Placeholder(key: "meetings_folder", label: "Meeting Notes Folder",
+                            description: "Folder path for meeting notes",
+                            defaultValue: "/meeting-notes/"),
+                Placeholder(key: "decisions_folder", label: "Decisions Folder",
+                            description: "Folder path for decision logs",
+                            defaultValue: "/decisions/")
+            ],
+            metadata: TemplateMetadata(tags: ["project-management", "profile", "instructions", "pm", "meetings"])
+        )
+
         // Global Instructions — Content Writer Profile Template
         let contentWriterProfileTemplate = Template(
             name: "Global Instructions — Content Writer Profile",
@@ -742,5 +810,6 @@ public class TemplateManager {
         addTemplate(salesDashboardTemplate)
         addTemplate(contentCalendarTemplate)
         addTemplate(contentWriterProfileTemplate)
+        addTemplate(projectManagerProfileTemplate)
     }
 }
