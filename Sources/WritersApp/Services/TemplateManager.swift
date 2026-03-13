@@ -660,6 +660,72 @@ public class TemplateManager {
             metadata: TemplateMetadata(tags: ["scheduled", "content", "weekly", "calendar"])
         )
 
+        // Global Instructions — Content Writer Profile Template
+        let contentWriterProfileTemplate = Template(
+            name: "Global Instructions — Content Writer Profile",
+            category: .contentProfile,
+            description: "AI system instructions for a content writer or marketer — defines role, audience, style, SEO rules, and content guardrails",
+            content: """
+            # About Me
+            - Role: {{role}} at {{company}}
+            - Audience: {{audience}}
+            - Timezone: {{timezone}}
+
+            # Writing Style
+            - Tone: conversational, friendly, occasionally witty
+            - Sentence length: mix of short and medium (avoid long complex sentences)
+            - Paragraph length: 2–3 sentences max
+            - Use subheadings every 200–300 words
+            - Include examples and analogies to explain concepts
+            - Use active voice, not passive
+
+            # Content Rules
+            - Start every piece with a hook (question, stat, bold claim, or story)
+            - Include a clear CTA at the end of every piece
+            - Optimize for scannability: headers, bold key phrases, bullet points
+            - When repurposing content, adjust tone for the platform:
+              - Blog: educational, longer form
+              - Twitter/X: punchy, direct, numbered lists
+              - LinkedIn: professional but personable, include a takeaway
+              - Email: conversational, personal, short paragraphs
+
+            # SEO Guidelines
+            - Include target keyword in the first 100 words
+            - Use H2 and H3 headers with keyword variations
+            - Write meta descriptions under 160 characters
+            - Internal link to related content when relevant
+
+            # Default Behaviors
+            - For any content piece, show me an outline before writing the full draft
+            - Include word count at the end of every draft
+            - Save outputs to {{output_folder}}
+
+            # Never Do
+            - Don't publish or post anything without my review
+            - Don't use clickbait or misleading headlines
+            - Don't plagiarize — always create original content
+            - Don't use corporate jargon: "leverage," "synergize," "circle back"
+            - Don't include emojis unless I specifically ask for them
+            """,
+            placeholders: [
+                Placeholder(key: "role", label: "Your Role",
+                            description: "Your job title, e.g. Content Writer, Marketing Manager, Content Strategist",
+                            defaultValue: "Content Writer"),
+                Placeholder(key: "company", label: "Company Name",
+                            description: "Name of the company or brand you write for"),
+                Placeholder(key: "audience", label: "Target Audience",
+                            description: "Who you are writing for, e.g. B2C non-technical, B2B decision-makers, developers",
+                            defaultValue: "B2C non-technical readers"),
+                Placeholder(key: "timezone", label: "Timezone",
+                            description: "Your timezone for scheduling references, e.g. US Eastern, US Pacific",
+                            defaultValue: "US Eastern"),
+                Placeholder(key: "output_folder", label: "Output Folder",
+                            description: "Base folder path where drafts are saved, organised by platform",
+                            defaultValue: "~/Content/[platform]/YYYY-MM-DD-[topic].md")
+            ],
+            metadata: TemplateMetadata(tags: ["content", "marketing", "profile", "instructions", "seo"])
+        )
+
         // Add all templates
         addTemplate(novelTemplate)
         addTemplate(shortStoryTemplate)
@@ -675,5 +741,6 @@ public class TemplateManager {
         addTemplate(expenseReportTemplate)
         addTemplate(salesDashboardTemplate)
         addTemplate(contentCalendarTemplate)
+        addTemplate(contentWriterProfileTemplate)
     }
 }

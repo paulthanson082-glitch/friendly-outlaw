@@ -63,6 +63,7 @@ public enum TemplateCategory: String, Codable, CaseIterable {
     case proposal = "Proposal"
     case resume = "Resume"
     case scheduledTask = "Scheduled Task"
+    case contentProfile = "Content Profile"
     case other = "Other"
 }
 
