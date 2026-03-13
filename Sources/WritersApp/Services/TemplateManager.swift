@@ -717,6 +717,119 @@ public class TemplateManager {
             metadata: TemplateMetadata(tags: ["sales", "profile", "instructions", "outreach", "crm"])
         )
 
+        // Cowork Plugin Starter Kit Template
+        let coworkPluginStarterTemplate = Template(
+            name: "Cowork Plugin Starter Kit",
+            category: .pluginTemplate,
+            description: "Scaffold for a custom Cowork plugin — includes plugin.yaml, instructions.md, a slash command, and a reusable skill",
+            content: """
+            # {{plugin_name}} — Cowork Plugin
+
+            ## plugin.yaml
+
+            ```yaml
+            name: {{plugin_name}}
+            version: 1.0.0
+            description: {{plugin_description}}
+            author: {{author_name}}
+
+            commands:
+              - name: {{primary_command}}
+                description: {{primary_command_description}}
+
+            skills:
+              - {{skill_name}}
+            ```
+
+            ---
+
+            ## instructions.md
+
+            # {{plugin_name}}
+
+            ## Purpose
+            This plugin helps with {{plugin_purpose}}.
+
+            ## Behavior Rules
+            - Always {{behavior_rule}}
+            - Never send or post anything without user review
+            - When asked to perform a task, show a draft or summary first
+
+            ## Output Format
+            When generating output, use this structure:
+            - Summary: key findings or result
+            - Detail: supporting information
+            - Next Steps: suggested actions
+
+            ## Tools Used
+            - Web search for research tasks
+            - File system for reading and writing outputs
+
+            ---
+
+            ## commands/{{primary_command}}.yaml
+
+            ```yaml
+            name: {{primary_command}}
+            description: {{primary_command_description}}
+
+            inputs:
+              - name: topic
+                type: text
+                required: true
+                label: Topic or subject
+              - name: context
+                type: text
+                required: false
+                label: Additional context
+
+            instructions: |
+              1. Research the topic thoroughly using available tools
+              2. Identify key insights and relevant details
+              3. Draft a structured output following the plugin format
+              4. Present the draft for review before saving or sending
+            ```
+
+            ---
+
+            ## skills/{{skill_name}}.md
+
+            # {{skill_name}}
+
+            When performing this skill:
+
+            1. Gather all relevant source material
+            2. Identify key patterns and themes
+            3. Organise findings by importance
+            4. Present results with supporting evidence
+            5. Distinguish between observed facts and interpretation
+
+            Always ask for clarification if context is missing.
+            """,
+            placeholders: [
+                Placeholder(key: "plugin_name", label: "Plugin Name",
+                            description: "Slug-style name for the plugin, e.g. my-custom-plugin",
+                            defaultValue: "my-plugin"),
+                Placeholder(key: "plugin_description", label: "Plugin Description",
+                            description: "One-sentence description of what the plugin does"),
+                Placeholder(key: "author_name", label: "Author Name",
+                            description: "Your name or organisation name"),
+                Placeholder(key: "plugin_purpose", label: "Plugin Purpose",
+                            description: "The specific workflow this plugin assists with, e.g. prospect research and outreach"),
+                Placeholder(key: "primary_command", label: "Primary Command",
+                            description: "Slug for the main slash command, e.g. prospect, brief, summarise",
+                            defaultValue: "run"),
+                Placeholder(key: "primary_command_description", label: "Primary Command Description",
+                            description: "What the slash command does when invoked"),
+                Placeholder(key: "skill_name", label: "Skill Name",
+                            description: "Slug for the reusable skill file, e.g. qualitative-analysis, competitor-research",
+                            defaultValue: "core-skill"),
+                Placeholder(key: "behavior_rule", label: "Key Behavior Rule",
+                            description: "The most important always-do rule for this plugin, e.g. cite sources for every claim")
+            ],
+            metadata: TemplateMetadata(tags: ["plugin", "cowork", "starter-kit", "slash-command", "skill"])
+        )
+
         // Global Instructions — Data Analyst Profile Template
         let dataAnalystProfileTemplate = Template(
             name: "Global Instructions — Data Analyst Profile",
@@ -931,5 +1044,6 @@ public class TemplateManager {
         addTemplate(projectManagerProfileTemplate)
         addTemplate(dataAnalystProfileTemplate)
         addTemplate(salesRepProfileTemplate)
+        addTemplate(coworkPluginStarterTemplate)
     }
 }
