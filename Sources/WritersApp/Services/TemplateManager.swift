@@ -662,6 +662,67 @@ public class TemplateManager {
             metadata: TemplateMetadata(tags: ["scheduled", "content", "weekly", "calendar"])
         )
 
+        // Global Instructions — Data Analyst Profile Template
+        let dataAnalystProfileTemplate = Template(
+            name: "Global Instructions — Data Analyst Profile",
+            category: .contentProfile,
+            description: "AI system instructions for a data or business analyst — defines role, tools, analysis rules, data quality standards, and file organisation",
+            content: """
+            # About Me
+            - Role: {{role}} at {{company}}
+            - Timezone: {{timezone}}
+            - Primary tools: {{primary_tools}}
+
+            # Communication Preferences
+            - Show me summary statistics before diving into analysis
+            - Use clean, minimal visualizations (no chartjunk)
+            - Always include axis labels and titles on plots
+            - Explain methodology before showing results
+
+            # Analysis Rules
+            - Use descriptive variable names, not abbreviations
+            - For visualizations, save as both .png (for sharing) and .svg (for editing)
+            - Always check for: nulls, duplicates, outliers before analysis
+            - Include sample sizes and confidence intervals where relevant
+            - When comparing groups, run appropriate statistical tests
+            - Round numbers to 2 decimal places unless more precision is needed
+
+            # Default Behaviors
+            - Start every analysis with data quality summary (rows, columns, nulls, types)
+            - Include a TL;DR with key findings at the top of every report
+            - Save intermediate outputs so I can verify each step
+            - Use consistent date formats: YYYY-MM-DD
+
+            # File Organisation
+            - Save outputs to {{output_folder}}
+            - Name files: analysis-YYYY-MM-DD-[description].ext
+            - Keep raw data separate from processed data
+
+            # Never Do
+            - Don't delete or overwrite source data files
+            - Don't make causal claims from correlational data without flagging
+            - Don't round numbers in intermediate calculations
+            - Don't skip data validation steps
+            """,
+            placeholders: [
+                Placeholder(key: "role", label: "Your Role",
+                            description: "Your job title, e.g. Data Analyst, Business Analyst, Analytics Manager",
+                            defaultValue: "Data Analyst"),
+                Placeholder(key: "company", label: "Company Name",
+                            description: "Name of the company or organisation"),
+                Placeholder(key: "timezone", label: "Timezone",
+                            description: "Your timezone for scheduling references, e.g. US Eastern, US Pacific",
+                            defaultValue: "US Eastern"),
+                Placeholder(key: "primary_tools", label: "Primary Tools",
+                            description: "Languages and libraries you work with, e.g. Python (pandas, matplotlib), SQL, Excel",
+                            defaultValue: "Python (pandas, matplotlib, seaborn), SQL, Excel"),
+                Placeholder(key: "output_folder", label: "Output Folder",
+                            description: "Base folder path where analysis outputs are saved",
+                            defaultValue: "~/Analysis/[project-name]/")
+            ],
+            metadata: TemplateMetadata(tags: ["data", "analytics", "profile", "instructions", "python", "sql"])
+        )
+
         // Global Instructions — Project Manager Profile Template
         let projectManagerProfileTemplate = Template(
             name: "Global Instructions — Project Manager Profile",
@@ -813,5 +874,6 @@ public class TemplateManager {
         addTemplate(contentCalendarTemplate)
         addTemplate(contentWriterProfileTemplate)
         addTemplate(projectManagerProfileTemplate)
+        addTemplate(dataAnalystProfileTemplate)
     }
 }
