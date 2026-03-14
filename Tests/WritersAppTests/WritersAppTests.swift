@@ -19,6 +19,13 @@ final class WritersAppTests: XCTestCase {
         XCTAssertGreaterThan(templates.count, 0, "Should have default templates")
     }
 
+    func testTemplateManagerIncludesSalesRepProfileTemplate() {
+        let templates = app.templateManager.getAllTemplates()
+        let template = templates.first { $0.name == "Global Instructions — Sales Rep Profile" }
+        XCTAssertNotNil(template, "Should load the sales rep profile template")
+        XCTAssertEqual(template?.category, .contentProfile)
+    }
+
     func testCreateDocumentFromTemplate() {
         let templates = app.templateManager.getAllTemplates()
         guard let template = templates.first else {

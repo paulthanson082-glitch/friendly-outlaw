@@ -660,6 +660,61 @@ public class TemplateManager {
             metadata: TemplateMetadata(tags: ["scheduled", "content", "weekly", "calendar"])
         )
 
+        // Global Instructions — Sales Rep Profile Template
+        let salesRepProfileTemplate = Template(
+            name: "Global Instructions — Sales Rep Profile",
+            category: .contentProfile,
+            description: "AI system instructions for a sales rep or account executive — defines role, industry, outreach rules, and prospect research defaults",
+            content: """
+            # About Me
+            - Role: {{role}} at {{company}}
+            - Industry: {{industry}}
+            - Timezone: {{timezone}}
+            - Work style: Direct, concise, no corporate jargon
+
+            # Communication Preferences
+            - Use bullet points for lists (not numbered unless specifically asked)
+            - Keep explanations brief — I'll ask follow-up questions if needed
+            - When suggesting multiple options, rank them by recommendation
+
+            # Sales-Specific Rules
+            - When drafting outreach, keep emails under 100 words
+            - Always research prospects before writing (company news, LinkedIn, recent events)
+            - Default email tone: conversational, not corporate
+            - For follow-ups, wait 3 business days between touches
+            - Include a clear CTA in every outreach email — usually a meeting request
+            - Never use buzzwords: "synergy," "leverage," "innovative solution," "game-changer"
+            - Lead with outcomes, not features
+
+            # Default Behaviors
+            - For any report or document, include a TL;DR at the top
+            - Always show me a draft before sending emails or messages
+            - If you're unsure about something, ask rather than guess
+            - When I ask you to research a prospect, include: company overview, recent news, key people, and potential pain points
+
+            # Never Do
+            - Don't send emails on my behalf unless I explicitly say "send it"
+            - Don't access my personal Documents folder without permission
+            - Don't delete files without confirmation
+            - Don't guess pricing — ask me first
+            - Don't make promises about timelines or deliverables
+            """,
+            placeholders: [
+                Placeholder(key: "role", label: "Your Role",
+                            description: "Your job title, e.g. Sales Rep, Account Executive, SDR",
+                            defaultValue: "Account Executive"),
+                Placeholder(key: "company", label: "Company Name",
+                            description: "Name of the company you sell for"),
+                Placeholder(key: "industry", label: "Industry",
+                            description: "Your industry vertical, e.g. B2B SaaS, Construction, Staffing",
+                            defaultValue: "B2B SaaS"),
+                Placeholder(key: "timezone", label: "Timezone",
+                            description: "Your timezone for scheduling references, e.g. US Eastern, US Pacific",
+                            defaultValue: "US Eastern")
+            ],
+            metadata: TemplateMetadata(tags: ["sales", "profile", "instructions", "outreach", "crm"])
+        )
+
         // Global Instructions — Project Manager Profile Template
         let projectManagerProfileTemplate = Template(
             name: "Global Instructions — Project Manager Profile",
@@ -811,5 +866,6 @@ public class TemplateManager {
         addTemplate(contentCalendarTemplate)
         addTemplate(contentWriterProfileTemplate)
         addTemplate(projectManagerProfileTemplate)
+        addTemplate(salesRepProfileTemplate)
     }
 }
