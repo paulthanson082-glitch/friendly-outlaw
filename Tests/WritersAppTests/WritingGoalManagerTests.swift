@@ -515,21 +515,24 @@ final class WritingGoalManagerTests: XCTestCase {
 
     func testGetGoalsNeedingAttention() {
         let calendar = Calendar.current
-        let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date())!
+        let tenDaysAgo = calendar.date(byAdding: .day, value: -10, to: Date())!
+        let twoDaysFromNow = calendar.date(byAdding: .day, value: 2, to: Date())!
 
         let goal1 = manager.createGoal(
             name: "Behind Schedule",
             type: .custom,
             target: 1000,
-            endDate: tomorrow
+            startDate: tenDaysAgo,
+            endDate: twoDaysFromNow
         )
-        manager.recordProgress(goalId: goal1.id, amount: 100) // 10% progress with 1 day left
+        manager.recordProgress(goalId: goal1.id, amount: 100) // 10% progress with 10/12 days elapsed
 
         let goal2 = manager.createGoal(
             name: "On Track",
             type: .custom,
             target: 100,
-            endDate: tomorrow
+            startDate: tenDaysAgo,
+            endDate: twoDaysFromNow
         )
         manager.recordProgress(goalId: goal2.id, amount: 90) // 90% progress
 
