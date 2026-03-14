@@ -30,6 +30,12 @@ Tools for analyzing and measuring website performance:
 - [Lighthouse](https://developer.chrome.com/docs/lighthouse/overview/) - open-source automated auditing tool for performance, accessibility, SEO, and best practices (built into Chrome DevTools)
 - [PageGuard](https://pageguard.org) - free website health scanner covering performance (Core Web Vitals), SEO, accessibility (WCAG 2.1), and security headers — no install or account required
 
+### Developer Tools
+
+Browser-based developer utilities and productivity tools:
+
+- [ZapTools](https://zaptools.web.app) - 114+ free browser-based developer tools including JSON formatter, CSS generators, hash generators, encoders/decoders, and converters — 100% client-side execution, no signup or tracking required
+
 ## Additional Resources
 
 For more technical tips and secrets, check out [The Book of Secret Knowledge](https://github.com/trimstray/the-book-of-secret-knowledge).
