@@ -31,7 +31,13 @@ public class RagieService {
     ///   - text: The raw text content to ingest.
     ///   - name: An optional display name for the document.
     ///   - metadata: Optional key-value metadata for filtering retrievals.
-    /// - Returns: A `RagieDocument` with the new document's id and initial status.
+    /// Ingests raw text as a Ragie document.
+    /// - Parameters:
+    ///   - text: The raw text content to ingest.
+    ///   - name: An optional human-readable name for the document.
+    ///   - metadata: Optional key/value metadata to attach to the document.
+    /// - Returns: A `RagieDocument` containing the created document's `id`, `status`, optional `name`, and optional `chunkCount`.
+    /// - Throws: `RagieServiceError.invalidURL` if the service URL cannot be constructed; `RagieServiceError.invalidResponseFormat` if the API response is missing expected fields; `RagieServiceError.networkError` for underlying networking failures; `RagieServiceError.apiError` for non-2xx API responses.
     public func ingestRawText(
         _ text: String,
         name: String? = nil,
@@ -72,7 +78,13 @@ public class RagieService {
     ///   - documentURL: The URL of the document to ingest.
     ///   - name: An optional display name for the document.
     ///   - metadata: Optional key-value metadata for filtering retrievals.
-    /// - Returns: A `RagieDocument` with the new document's id and initial status.
+    /// Ingests a document from the specified public URL into Ragie and returns its ingestion record.
+    /// - Parameters:
+    ///   - documentURL: The publicly accessible URL of the document to ingest.
+    ///   - name: An optional display name to assign to the ingested document.
+    ///   - metadata: Optional key/value metadata to attach to the document.
+    /// - Returns: A `RagieDocument` containing the document `id`, current `status`, optional `name`, and optional `chunkCount`.
+    /// - Throws: `RagieServiceError.invalidURL` if the service endpoint URL cannot be constructed; `RagieServiceError.invalidResponseFormat` if the API response is missing expected fields; `RagieServiceError.networkError(_)` for transport errors; or `RagieServiceError.apiError(statusCode:message:)` for non-2xx API responses.
     public func ingestURL(
         _ documentURL: String,
         name: String? = nil,
@@ -113,7 +125,11 @@ public class RagieService {
     ///
     /// - Parameter id: The document id returned by `ingestRawText` or `ingestURL`.
     /// - Returns: A `RagieDocument` with the current status. `isReady` is true when
-    ///            the document has been fully processed and is available for retrieval.
+    /// Fetches the current status and metadata for a Ragie document by its identifier.
+    /// - Parameters:
+    ///   - id: The Ragie document identifier.
+    /// - Returns: A `RagieDocument` containing the document's `id`, `status`, optional `name`, and optional `chunkCount`.
+    /// - Throws: `RagieServiceError.invalidURL` if the request URL cannot be constructed; `RagieServiceError.invalidResponseFormat` if the API response JSON is missing expected fields; `RagieServiceError.networkError` for underlying networking failures; `RagieServiceError.apiError(statusCode:message:)` for non-2xx API responses.
     public func getDocument(id: String) async throws -> RagieDocument {
         guard let url = URL(string: "\(baseURL)/documents/\(id)") else {
             throw RagieServiceError.invalidURL
@@ -145,7 +161,14 @@ public class RagieService {
     ///   - topK: Override the number of chunks to return (defaults to `configuration.topK`).
     ///   - rerank: Override reranking behavior (defaults to `configuration.rerank`).
     ///   - filter: Optional metadata filter expression to restrict which documents are searched.
-    /// - Returns: A `RagieRetrievalResult` containing the matching chunks.
+    /// Retrieves semantically relevant document chunks for the given query.
+    /// - Parameters:
+    ///   - query: The natural-language query used to find relevant chunks.
+    ///   - topK: Maximum number of chunks to return; defaults to the service configuration's `topK` when `nil`.
+    ///   - rerank: Whether to perform reranking on candidates; defaults to the service configuration's `rerank` when `nil`.
+    ///   - filter: Optional constraints applied to the retrieval (document-level filters) represented as a JSON-like dictionary.
+    /// - Returns: A `RagieRetrievalResult` containing the original query and the array of scored `RagieChunk` items.
+    /// - Throws: `RagieServiceError.invalidURL` if the retrieval endpoint URL cannot be constructed; `RagieServiceError.invalidResponseFormat` if the API response structure is not as expected; or other `RagieServiceError` cases for network or API errors.
     public func retrieve(
         query: String,
         topK: Int? = nil,
@@ -204,7 +227,13 @@ public class RagieService {
 
     /// List all documents stored in Ragie.
     ///
-    /// - Returns: An array of `RagieDocument` representing all ingested documents.
+    /// Lists all documents previously ingested into Ragie.
+    /// - Returns: An array of `RagieDocument` objects representing each ingested document.
+    /// - Throws:
+    ///   - `RagieServiceError.invalidURL` if the service URL cannot be constructed.
+    ///   - `RagieServiceError.invalidResponseFormat` if the API response JSON does not contain the expected structure.
+    ///   - `RagieServiceError.networkError` for underlying network failures returned by the request layer.
+    ///   - `RagieServiceError.apiError` when the API responds with a non-2xx status and an error message.
     public func listDocuments() async throws -> [RagieDocument] {
         guard let url = URL(string: "\(baseURL)/documents") else {
             throw RagieServiceError.invalidURL
@@ -232,7 +261,13 @@ public class RagieService {
         }
     }
 
-    // MARK: - HTTP Helpers
+    /// Builds a URLRequest with the given HTTP method, Bearer authorization header, JSON accept/content headers, and an optional JSON-encoded body.
+    /// - Parameters:
+    ///   - url: The request URL.
+    ///   - method: The HTTP method (e.g., "GET", "POST").
+    ///   - body: An optional dictionary to encode as a JSON request body.
+    /// - Returns: A configured `URLRequest`.
+    /// - Throws: An error from `JSONSerialization.data(withJSONObject:)` if the provided `body` cannot be encoded as JSON.
 
     private func buildRequest(url: URL, method: String, body: [String: Any]?) throws -> URLRequest {
         var request = URLRequest(url: url)
@@ -248,6 +283,13 @@ public class RagieService {
         return request
     }
 
+    /// Executes the given URLRequest and returns the response body data.
+    /// 
+    /// Performs the network request, validates that the response is an HTTP response with a 2xx status code, and returns the response body.
+    /// - Returns: The response body as `Data`.
+    /// - Throws: `RagieServiceError.networkError` if the network request fails.
+    /// - Throws: `RagieServiceError.invalidResponse` if the response is not an `HTTPURLResponse`.
+    /// - Throws: `RagieServiceError.apiError` if the HTTP status code is not in the 200–299 range; the error includes the status code and any message decoded from the response body.
     private func performRequest(_ request: URLRequest) async throws -> Data {
         let (data, response): (Data, URLResponse)
         do {

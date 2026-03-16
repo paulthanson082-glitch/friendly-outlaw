@@ -86,12 +86,15 @@ public class WritersApp {
 
     // MARK: - Ragie Integration
 
-    /// Enable Ragie document retrieval by providing configuration.
+    /// Initializes and enables the Ragie integration using the provided configuration.
+    /// - Parameter configuration: Configuration parameters used to create and configure the Ragie service.
     public func enableRagie(configuration: RagieConfiguration) {
         self.ragieService = RagieService(configuration: configuration)
     }
 
-    /// Disable Ragie document retrieval.
+    /// Disables the Ragie integration for the app.
+    /// 
+    /// Clears the active `RagieService` instance so Ragie-dependent features become unavailable.
     public func disableRagie() {
         self.ragieService = nil
     }
@@ -108,7 +111,11 @@ public class WritersApp {
     /// Poll `getRagieDocumentStatus(ragieId:)` until `isReady` is true before querying.
     ///
     /// - Parameter documentId: The id of the local `Document` to ingest.
-    /// - Returns: A `RagieDocument` describing the newly created Ragie document.
+    /// Ingests the specified document's text into Ragie and returns the resulting RagieDocument.
+    /// - Parameters:
+    ///   - documentId: The UUID of the document to ingest.
+    /// - Returns: The `RagieDocument` created by Ragie for the ingested document.
+    /// - Throws: `RagieError.ragieNotEnabled` if Ragie has not been enabled; `RagieError.documentNotFound` if no document exists with the given `documentId`.
     public func ingestDocumentToRagie(documentId: UUID) async throws -> RagieDocument {
         guard let ragie = ragieService else { throw RagieError.ragieNotEnabled }
         guard let document = documentManager.getDocument(id: documentId) else {
@@ -124,7 +131,11 @@ public class WritersApp {
     /// Fetch the processing status of a Ragie document.
     ///
     /// - Parameter ragieId: The Ragie document id (from `ingestDocumentToRagie`).
-    /// - Returns: A `RagieDocument` with the current status (`isReady` when processable).
+    /// Retrieves the Ragie document and its current status for the given Ragie document identifier.
+    /// - Parameter ragieId: The Ragie-assigned identifier of the document to fetch.
+    /// - Returns: The `RagieDocument` matching `ragieId`.
+    /// - Throws: `RagieError.ragieNotEnabled` if Ragie integration is not enabled.
+    /// - Throws: Any error propagated from `RagieService` if the document cannot be retrieved.
     public func getRagieDocumentStatus(ragieId: String) async throws -> RagieDocument {
         guard let ragie = ragieService else { throw RagieError.ragieNotEnabled }
         return try await ragie.getDocument(id: ragieId)
@@ -136,7 +147,13 @@ public class WritersApp {
     ///   - query: The search query.
     ///   - topK: Number of chunks to return (overrides configuration default).
     ///   - rerank: Whether to apply reranking (overrides configuration default).
-    /// - Returns: A `RagieRetrievalResult` with matching text chunks and scores.
+    /// Retrieve documents from Ragie using a natural-language query.
+    /// - Parameters:
+    ///   - query: The text query to search the Ragie index.
+    ///   - topK: Optional maximum number of results to return; when `nil` the service default is used.
+    ///   - rerank: Optional flag to request reranking of initial results by relevance; when `nil` the service default is used.
+    /// - Returns: A `RagieRetrievalResult` containing matched documents and associated relevance metadata.
+    /// - Throws: `RagieError.ragieNotEnabled` if Ragie has not been enabled. Errors emitted by the underlying Ragie service are propagated.
     public func retrieveFromRagie(
         query: String,
         topK: Int? = nil,
@@ -148,13 +165,17 @@ public class WritersApp {
 
     /// List all documents currently stored in Ragie.
     ///
-    /// - Returns: An array of `RagieDocument` entries.
+    /// Lists documents currently indexed in Ragie.
+    /// - Returns: An array of `RagieDocument` objects representing documents stored in Ragie.
+    /// - Throws: `RagieError.ragieNotEnabled` if Ragie is not enabled; rethrows any errors produced by the underlying `RagieService`.
     public func listRagieDocuments() async throws -> [RagieDocument] {
         guard let ragie = ragieService else { throw RagieError.ragieNotEnabled }
         return try await ragie.listDocuments()
     }
 
-    /// Enable adult content mode for Jules (no content restrictions, curse words allowed)
+    /// Enable adult-content mode for the integrated "Jules" chatbot.
+    /// 
+    /// If the chatbot service is not configured, this call has no effect.
     public func enableJulesAdultMode() {
         chatbotService?.isAdultModeEnabled = true
     }
