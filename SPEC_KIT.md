@@ -40,7 +40,7 @@ Run once per project (already done — see [Constitution](#project-constitution)
 ```
 /speckit.constitution Create principles focused on Swift code quality,
 async/await patterns, SQLite persistence, no external dependencies beyond
-CSQLite, and comprehensive unit-test coverage matching the existing 88+ tests.
+CSQLite, and comprehensive unit-test coverage consistent with the existing test suite.
 ```
 
 ### Step 2 — Define What to Build (`/speckit.specify`)
@@ -109,10 +109,10 @@ The following principles govern all development on friendly-outlaw.
 - No external dependencies beyond `CSQLite` (which wraps the system `sqlite3`).
 
 ### Testing Standards
-- Every new public method requires at least one corresponding test in `Tests/WritersAppTests/WritersAppTests.swift`.
+- Every new public method requires at least one corresponding test in the appropriate feature-specific test file under `Tests/WritersAppTests/` (e.g., `AIServiceTests.swift`, `DatabaseManagerTests.swift`).
 - Use `DatabaseManager(databasePath: ":memory:")` for all database tests to ensure isolation.
 - AI-dependent tests must be skipped or mocked — do not make real API calls in the test suite.
-- Test function names follow `test<FeatureName>_<scenario>` (e.g., `testKanbanTask_advanceFromBacklogToPlanning`).
+- Test function names use descriptive camelCase starting with `test`, without underscores (e.g., `testAdvanceKanbanTaskMovesForwardInWorkflow`, `testCreateGoalWithDocumentId`).
 
 ### Architecture Rules
 - New features that manage domain state belong in a `Manager` class under `Sources/WritersApp/Services/`.
@@ -156,14 +156,14 @@ The following principles govern all development on friendly-outlaw.
 1. Create a class conforming to `Plugin` in `Sources/WritersApp/Plugins/`
 2. Implement `initialize()`, `shutdown()`, `execute(action:)`
 3. Declare `capabilities`
-4. Register via `PluginManager.shared.registerPlugin(_:)` in `WritersApp.swift`
+4. Register via `PluginManager.shared.register(plugin: myPlugin)` in `WritersApp.swift`
 
 ---
 
 ## Running Tests
 
 ```bash
-swift test                # Run all 88+ tests
+swift test                # Run the full test suite
 swift test --verbose      # Verbose output with timing
 ```
 
