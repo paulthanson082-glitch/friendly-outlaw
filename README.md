@@ -856,7 +856,7 @@ When running as an MCP server, the following tools are available:
 
 - [SETUP_VERIFICATION.md](SETUP_VERIFICATION.md) - Detailed setup verification and system requirements
 - [RUN_VERIFICATION.md](RUN_VERIFICATION.md) - Runtime verification and test results
-- [TECH_TIPS.md](TECH_TIPS.md) - Useful technical tips and hidden browser commands
+- [TECH_TIPS.md](TECH_TIPS.md) - Useful technical tips, hidden browser commands, and web developer tools
 - [DATABASE.md](DATABASE.md) - Complete database documentation
 - [QUICK_START.md](QUICK_START.md) - Quick start guide
 - [VSCODE_SETUP.md](VSCODE_SETUP.md) - VS Code setup guide
