@@ -285,15 +285,17 @@ final class ProductivityAnalyticsTests: XCTestCase {
 
     func testGenerateInsightsForGoalsBehindSchedule() {
         let calendar = Calendar.current
-        let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date())!
+        let tenDaysAgo = calendar.date(byAdding: .day, value: -10, to: Date())!
+        let twoDaysFromNow = calendar.date(byAdding: .day, value: 2, to: Date())!
 
         let goal = goalManager.createGoal(
             name: "Behind Goal",
             type: .custom,
             target: 1000,
-            endDate: tomorrow
+            startDate: tenDaysAgo,
+            endDate: twoDaysFromNow
         )
-        goalManager.recordProgress(goalId: goal.id, amount: 100) // Only 10% done
+        goalManager.recordProgress(goalId: goal.id, amount: 100) // Only 10% done with 10/12 days elapsed
 
         let insights = analytics.generateInsights()
 

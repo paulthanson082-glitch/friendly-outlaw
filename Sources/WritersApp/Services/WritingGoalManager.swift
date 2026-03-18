@@ -21,6 +21,7 @@ public class WritingGoalManager {
         unit: GoalUnit = .words,
         target: Int,
         documentId: UUID? = nil,
+        startDate: Date = Date(),
         endDate: Date? = nil,
         reminderEnabled: Bool = false,
         reminderTime: Date? = nil
@@ -33,6 +34,7 @@ public class WritingGoalManager {
             unit: unit,
             target: target,
             documentId: documentId,
+            startDate: startDate,
             endDate: calculatedEndDate,
             reminderEnabled: reminderEnabled,
             reminderTime: reminderTime
@@ -285,12 +287,15 @@ public class WritingGoalManager {
 
     /// Gets goals needing attention (behind schedule)
     public func getGoalsNeedingAttention() -> [WritingGoal] {
+        let calendar = Calendar.current
         return goals.values.filter { goal in
             guard goal.isActive,
+                  let endDate = goal.endDate,
                   let daysRemaining = goal.daysRemaining,
                   daysRemaining > 0 else { return false }
 
-            let expectedProgress = 1.0 - (Double(daysRemaining) / Double(goal.daysRemaining ?? 1))
+            let totalDays = max(1, calendar.dateComponents([.day], from: goal.startDate, to: endDate).day ?? 1)
+            let expectedProgress = 1.0 - (Double(daysRemaining) / Double(totalDays))
             return goal.progress < expectedProgress * 0.8 // More than 20% behind
         }.sorted { $0.progress < $1.progress }
     }

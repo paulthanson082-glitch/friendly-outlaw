@@ -309,7 +309,7 @@ final class DoltVersionControlServiceTests: XCTestCase {
         try versionControl.commit(message: "Main commit", documents: [doc1])
 
         try versionControl.checkoutBranch(name: "feature", createNew: true)
-        let doc2 = Document(title: "Doc", content: "Feature content", category: .novel)
+        let doc2 = Document(id: doc1.id, title: "Doc", content: "Feature content", category: .novel)
         try versionControl.commit(message: "Feature commit", documents: [doc2])
 
         let diffs = try versionControl.diff(fromBranch: "main", toBranch: "feature")
@@ -935,7 +935,9 @@ final class DoltVersionControlServiceTests: XCTestCase {
         let docs1 = (1...50).map { Document(title: "Doc \($0)", content: "Content \($0)", category: .novel) }
         let commit1 = try versionControl.commit(message: "50 docs", documents: docs1)
 
-        let docs2 = (1...75).map { Document(title: "Doc \($0)", content: "Content \($0) updated", category: .novel) }
+        // Reuse IDs from docs1 for the first 50, add 25 new docs
+        let docs2 = docs1.map { Document(id: $0.id, title: $0.title, content: $0.content + " updated", category: .novel) }
+            + (51...75).map { Document(title: "Doc \($0)", content: "Content \($0)", category: .novel) }
         let commit2 = try versionControl.commit(message: "75 docs", documents: docs2)
 
         let diffs = try versionControl.diff(fromCommitId: commit1.id, toCommitId: commit2.id)

@@ -236,13 +236,6 @@ public class DoltVersionControlService {
                           changeType: .deleted,
                           fromContent: fromSnap.content,
                           fromWordCount: fromSnap.wordCount)
-        // Remaining unmatched from-docs are deletions
-        for id in unmatchedFromIds {
-            guard let fromSnap = fromMap[id] else { continue }
-            diffs.append(VCDiff(documentId: fromSnap.documentId, title: fromSnap.title,
-                                changeType: .deleted,
-                                fromContent: fromSnap.content,
-                                fromWordCount: fromSnap.wordCount))
         }
     }
 

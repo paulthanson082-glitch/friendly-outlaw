@@ -177,6 +177,6 @@ public class ChatbotService {
             context: nil
         )
 
-        return response.text.trimmingCharacters(in: .whitespaces)
+        return response.generatedContent.trimmingCharacters(in: .whitespaces)
     }
 }

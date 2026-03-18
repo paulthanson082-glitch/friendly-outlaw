@@ -408,11 +408,12 @@ final class FocusSessionManagerTests: XCTestCase {
     func testGetFocusTime() {
         let calendar = Calendar.current
         let startDate = calendar.startOfDay(for: Date())
-        let endDate = Date()
 
         let session1 = manager.startSession(type: .pomodoro, currentWordCount: 0)
+        Thread.sleep(forTimeInterval: 0.05)
         manager.endSession(id: session1.id, finalWordCount: 100)
 
+        let endDate = Date()
         let focusTime = manager.getFocusTime(from: startDate, to: endDate)
 
         XCTAssertGreaterThan(focusTime, 0)
