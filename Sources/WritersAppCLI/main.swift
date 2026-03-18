@@ -89,6 +89,13 @@ func displayProviderInfo() {
 
 @main
 struct WritersAppCLI {
+    /// Application CLI entry point that initializes application services, processes command-line arguments, configures optional integrations, and runs the interactive main menu.
+    /// 
+    /// Performs high-level startup and runtime tasks:
+    /// - Initializes WritersApp and global analytics.
+    /// - Parses and handles command-line flags for help, listing, opening documents, running focus sessions, GUI exports, trace analysis, and playful actions.
+    /// - Enables optional features based on environment variables (Anthropic/Clother AI, gui.new, Ragie) and attempts to initialize the Claude memory plugin.
+    /// - Enters an interactive menu loop presenting document, AI, memory, plugin, productivity, issue, hardware board, gui.new export, and Ragie operations; dispatches user choices to the appropriate handlers and shuts down plugins on exit.
     static func main() async {
         let app = WritersApp()
         analyticsService = ProductivityAnalytics(focusManager: focusManager, goalManager: goalManager)
@@ -3539,6 +3546,9 @@ func exportDocumentToGuiInteractive(app: WritersApp) async {
     }
 }
 
+/// Presents an interactive CLI list of Kanban boards, lets the user choose one, and publishes the selected board to gui.new.
+/// 
+/// If no boards exist the function prints a message and returns. After the user selects a board it attempts to export the board via the app, printing the resulting URL and expiration on success or an error message on failure.
 func exportKanbanBoardToGuiInteractive(app: WritersApp) async {
     print("\n=== Export Kanban Board to gui.new ===\n")
     let boards = app.getAllKanbanBoards()
@@ -3568,7 +3578,9 @@ func exportKanbanBoardToGuiInteractive(app: WritersApp) async {
     }
 }
 
-// MARK: - Ragie Document Retrieval
+/// Ingests a chosen document into Ragie and reports ingestion status.
+/// 
+/// Prompts the user to select a document from the app's document list, initiates ingestion into Ragie, and prints the resulting Ragie document ID and status. If Ragie is not enabled or no documents are available, prints an explanatory message and returns. On error prints the ingestion failure reason.
 
 func ingestDocumentToRagie(app: WritersApp) async {
     guard app.isRagieEnabled else {
@@ -3609,6 +3621,12 @@ func ingestDocumentToRagie(app: WritersApp) async {
     }
 }
 
+/// Retrieves contextual chunks from Ragie for a user-provided query and prints the results.
+/// 
+/// Prompts the user to enter a query, requests matching chunks from Ragie via the provided `WritersApp`,
+/// and prints each chunk's score, source (document name or ID), and text. If Ragie is not enabled,
+/// the query is empty, or no chunks are found, a user-facing message is printed instead.
+/// - Parameter app: The application instance used to perform the Ragie retrieval.
 func retrieveContextFromRagie(app: WritersApp) async {
     guard app.isRagieEnabled else {
         print("Ragie is not enabled. Set RAGIE_API_KEY to use this feature.")
@@ -3642,6 +3660,11 @@ func retrieveContextFromRagie(app: WritersApp) async {
     }
 }
 
+/// Prints a formatted list of documents ingested into Ragie to the console.
+/// 
+/// If Ragie is not enabled, prints an explanatory message and returns early.
+/// For each Ragie document it prints a readiness marker, the document name (or `"(unnamed)"`), optional chunk count, the document ID, and its status.
+/// In case of an error while retrieving the list, prints a failure message with the error description.
 func listRagieDocuments(app: WritersApp) async {
     guard app.isRagieEnabled else {
         print("Ragie is not enabled. Set RAGIE_API_KEY to use this feature.")
@@ -3668,6 +3691,13 @@ func listRagieDocuments(app: WritersApp) async {
     }
 }
 
+/// Prompt for a Ragie document ID and print the document's ingestion status and metadata.
+/// 
+/// This function verifies that Ragie integration is enabled, asks the user to enter a Ragie document ID,
+/// retrieves the document's status from the app, and prints a ready indicator along with available metadata
+/// such as the document name and chunk count. If Ragie is not enabled, the ID is empty, or the status fetch fails,
+/// a corresponding message is printed.
+/// - Parameter app: The WritersApp instance used to access Ragie state and retrieve document status.
 func checkRagieDocumentStatus(app: WritersApp) async {
     guard app.isRagieEnabled else {
         print("Ragie is not enabled. Set RAGIE_API_KEY to use this feature.")
