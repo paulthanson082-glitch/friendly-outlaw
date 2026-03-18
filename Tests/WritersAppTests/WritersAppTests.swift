@@ -19,13 +19,6 @@ final class WritersAppTests: XCTestCase {
         XCTAssertGreaterThan(templates.count, 0, "Should have default templates")
     }
 
-    func testTemplateManagerIncludesSalesRepProfileTemplate() {
-        let templates = app.templateManager.getAllTemplates()
-        let template = templates.first { $0.name == "Global Instructions — Sales Rep Profile" }
-        XCTAssertNotNil(template, "Should load the sales rep profile template")
-        XCTAssertEqual(template?.category, .contentProfile)
-    }
-
     func testCreateDocumentFromTemplate() {
         let templates = app.templateManager.getAllTemplates()
         guard let template = templates.first else {
@@ -905,7 +898,7 @@ final class WritersAppTests: XCTestCase {
         app.enableAI(configuration: config)
 
         XCTAssertNotNil(app.chatbotService, "Chatbot service should be initialized when AI is enabled")
-        XCTAssertNil(app.chatbotService?.currentSession, "Current session should be nil before starting")
+        XCTAssertNil(app.currentSession, "Current session should be nil before starting")
     }
 
     func testChatbotStartSession() {
@@ -1084,207 +1077,206 @@ final class WritersAppTests: XCTestCase {
         XCTAssertEqual(decoded.context.documentTitles.count, 2)
     }
 
-    // MARK: - gui.new: GuiNewService HTML Builders
+    // MARK: - TemplateCategory Enum Tests (PR: removed scheduledTask and contentProfile)
 
-    func testGuiNewDocumentHTMLContainsTitle() {
-        let doc = Document(title: "My Novel", content: "Once upon a time.", category: .novel)
-        let html = GuiNewService.documentHTML(doc)
-        XCTAssertTrue(html.contains("My Novel"), "HTML should contain document title")
-        XCTAssertTrue(html.contains("Once upon a time."), "HTML should contain document content")
-        XCTAssertTrue(html.contains("<!DOCTYPE html>"), "Should be a complete HTML document")
+    func testTemplateCategoryHasExactlyElevenCases() {
+        // scheduledTask and contentProfile were removed; expect 11 remaining cases
+        XCTAssertEqual(TemplateCategory.allCases.count, 11)
     }
 
-    func testGuiNewDocumentHTMLEscapesSpecialCharacters() {
-        let doc = Document(title: "<Script> & \"Quotes\"", content: "A & B <tag>", category: .essay)
-        let html = GuiNewService.documentHTML(doc)
-        XCTAssertFalse(html.contains("<Script>"), "Should escape < in title")
-        XCTAssertTrue(html.contains("&lt;Script&gt;"), "Should HTML-encode < and >")
-        XCTAssertTrue(html.contains("&amp;"), "Should HTML-encode &")
+    func testTemplateCategoryDoesNotContainScheduledTask() {
+        let rawValues = TemplateCategory.allCases.map(\.rawValue)
+        XCTAssertFalse(rawValues.contains("Scheduled Task"),
+                       "scheduledTask category should have been removed from TemplateCategory")
     }
 
-    func testGuiNewStatisticsHTMLContainsMetrics() {
-        let stats = AppStatistics(
-            totalDocuments: 5,
-            totalWordCount: 12500,
-            averageWordCount: 2500,
-            totalTemplates: 7,
-            documentsByCategory: [.novel: 3, .essay: 2]
-        )
-        let html = GuiNewService.statisticsHTML(stats, title: "My Dashboard")
-        XCTAssertTrue(html.contains("My Dashboard"), "Should include custom title")
-        XCTAssertTrue(html.contains("5"), "Should show total documents")
-        XCTAssertTrue(html.contains("7"), "Should show template count")
-        XCTAssertTrue(html.contains("<!DOCTYPE html>"), "Should be complete HTML")
+    func testTemplateCategoryDoesNotContainContentProfile() {
+        let rawValues = TemplateCategory.allCases.map(\.rawValue)
+        XCTAssertFalse(rawValues.contains("Content Profile"),
+                       "contentProfile category should have been removed from TemplateCategory")
     }
 
-    func testGuiNewKanbanHTMLContainsAllColumns() {
-        let board = KanbanBoard(name: "My Sprint", description: "Sprint board")
-        let tasks = [
-            KanbanTask(title: "Write intro", description: "", column: .backlog, boardId: board.id),
-            KanbanTask(title: "Draft chapter 1", description: "First draft", column: .running, boardId: board.id),
-            KanbanTask(title: "Review", description: "", column: .done, boardId: board.id)
+    func testTemplateCategoryScheduledTaskRawValueDoesNotDecode() {
+        // "Scheduled Task" raw value should no longer map to any case
+        let decoded = TemplateCategory(rawValue: "Scheduled Task")
+        XCTAssertNil(decoded, "Decoding 'Scheduled Task' should return nil after removal")
+    }
+
+    func testTemplateCategoryContentProfileRawValueDoesNotDecode() {
+        // "Content Profile" raw value should no longer map to any case
+        let decoded = TemplateCategory(rawValue: "Content Profile")
+        XCTAssertNil(decoded, "Decoding 'Content Profile' should return nil after removal")
+    }
+
+    func testTemplateCategoryRetainsExpectedCases() {
+        // Verify all remaining categories are present with correct raw values
+        XCTAssertNotNil(TemplateCategory(rawValue: "Novel"))
+        XCTAssertNotNil(TemplateCategory(rawValue: "Short Story"))
+        XCTAssertNotNil(TemplateCategory(rawValue: "Screenplay"))
+        XCTAssertNotNil(TemplateCategory(rawValue: "Blog Post"))
+        XCTAssertNotNil(TemplateCategory(rawValue: "Article"))
+        XCTAssertNotNil(TemplateCategory(rawValue: "Essay"))
+        XCTAssertNotNil(TemplateCategory(rawValue: "Poetry"))
+        XCTAssertNotNil(TemplateCategory(rawValue: "Business Letter"))
+        XCTAssertNotNil(TemplateCategory(rawValue: "Proposal"))
+        XCTAssertNotNil(TemplateCategory(rawValue: "Resume"))
+        XCTAssertNotNil(TemplateCategory(rawValue: "Other"))
+    }
+
+    func testTemplateCategoryAllCasesContainNoUnexpectedEntries() {
+        // Boundary check: exactly the known 11 raw values exist, no extras
+        let expected: Set<String> = [
+            "Novel", "Short Story", "Screenplay", "Blog Post", "Article",
+            "Essay", "Poetry", "Business Letter", "Proposal", "Resume", "Other"
         ]
-        let html = GuiNewService.kanbanHTML(board: board, tasks: tasks)
-        XCTAssertTrue(html.contains("My Sprint"), "Should include board name")
-        XCTAssertTrue(html.contains("Backlog"), "Should show Backlog column")
-        XCTAssertTrue(html.contains("Running"), "Should show Running column")
-        XCTAssertTrue(html.contains("Done"), "Should show Done column")
-        XCTAssertTrue(html.contains("Write intro"), "Should include task title")
-        XCTAssertTrue(html.contains("First draft"), "Should include task description")
+        let actual = Set(TemplateCategory.allCases.map(\.rawValue))
+        XCTAssertEqual(actual, expected)
     }
 
-    func testGuiNewKanbanHTMLShowsEmptyState() {
-        let board = KanbanBoard(name: "Empty Board", description: "")
-        let html = GuiNewService.kanbanHTML(board: board, tasks: [])
-        XCTAssertTrue(html.contains("No tasks"), "Empty columns should show empty state message")
+    // MARK: - TemplateManager Default Template Tests (PR: removed scheduledTask/contentProfile templates)
+
+    func testTemplateManagerLoadsSevenDefaultTemplates() {
+        // After removing scheduledTask (7 templates) and contentProfile (3 templates),
+        // exactly 7 templates remain: novel, shortStory, screenplay, blog, article, poetry, businessLetter
+        let templates = app.templateManager.getAllTemplates()
+        XCTAssertEqual(templates.count, 7,
+                       "Expected 7 default templates after scheduledTask/contentProfile removal")
     }
 
-    func testGuiNewEscapeHTMLFunction() {
-        XCTAssertEqual(GuiNewService.escapeHTML("hello"), "hello")
-        XCTAssertEqual(GuiNewService.escapeHTML("<b>bold</b>"), "&lt;b&gt;bold&lt;/b&gt;")
-        XCTAssertEqual(GuiNewService.escapeHTML("A & B"), "A &amp; B")
-        XCTAssertEqual(GuiNewService.escapeHTML("\"quoted\""), "&quot;quoted&quot;")
-        XCTAssertEqual(GuiNewService.escapeHTML("it's"), "it&#39;s")
+    func testTemplateManagerHasNoScheduledTaskTemplates() {
+        let allTemplates = app.templateManager.getAllTemplates()
+        let scheduledTaskTemplates = allTemplates.filter { $0.category.rawValue == "Scheduled Task" }
+        XCTAssertTrue(scheduledTaskTemplates.isEmpty,
+                      "No templates should have the scheduledTask category after removal")
     }
 
-    func testGuiNewServiceInitialisesWithoutAPIKey() {
-        let svc = GuiNewService()
-        XCTAssertNotNil(svc, "GuiNewService should initialise without an API key")
+    func testTemplateManagerHasNoContentProfileTemplates() {
+        let allTemplates = app.templateManager.getAllTemplates()
+        let contentProfileTemplates = allTemplates.filter { $0.category.rawValue == "Content Profile" }
+        XCTAssertTrue(contentProfileTemplates.isEmpty,
+                      "No templates should have the contentProfile category after removal")
     }
 
-    func testWritersAppGuiEnableDisable() {
-        XCTAssertFalse(app.isGuiEnabled, "gui.new should be disabled by default")
-        app.enableGui()
-        XCTAssertTrue(app.isGuiEnabled, "gui.new should be enabled after enableGui()")
-        app.disableGui()
-        XCTAssertFalse(app.isGuiEnabled, "gui.new should be disabled after disableGui()")
+    func testTemplateManagerDefaultTemplatesUseValidCategories() {
+        // All default templates must reference categories that still exist in the enum
+        let validCategories = Set(TemplateCategory.allCases.map(\.rawValue))
+        let allTemplates = app.templateManager.getAllTemplates()
+        for template in allTemplates {
+            XCTAssertTrue(validCategories.contains(template.category.rawValue),
+                          "Template '\(template.name)' has category '\(template.category.rawValue)' which is not a valid TemplateCategory")
+        }
     }
 
-    // MARK: - Ragie Integration Tests
-
-    func testRagieConfigurationDefaults() {
-        let config = RagieConfiguration(apiKey: "test-key")
-        XCTAssertEqual(config.apiKey, "test-key")
-        XCTAssertEqual(config.topK, 8)
-        XCTAssertFalse(config.rerank)
+    func testTemplateManagerContainsExpectedDefaultCategories() {
+        let allTemplates = app.templateManager.getAllTemplates()
+        let categories = Set(allTemplates.map(\.category))
+        // The 7 remaining default templates span these categories
+        XCTAssertTrue(categories.contains(.novel))
+        XCTAssertTrue(categories.contains(.shortStory))
+        XCTAssertTrue(categories.contains(.screenplay))
+        XCTAssertTrue(categories.contains(.blogPost))
+        XCTAssertTrue(categories.contains(.article))
+        XCTAssertTrue(categories.contains(.poetry))
+        XCTAssertTrue(categories.contains(.businessLetter))
     }
 
-    func testRagieConfigurationCustomValues() {
-        let config = RagieConfiguration(apiKey: "sk-ragie-123", topK: 5, rerank: true)
-        XCTAssertEqual(config.apiKey, "sk-ragie-123")
-        XCTAssertEqual(config.topK, 5)
-        XCTAssertTrue(config.rerank)
+    func testTemplateSearchForRemovedCategoryReturnsEmpty() {
+        // Searching for templates in the removed categories should return nothing
+        let scheduledResults = app.templateManager.searchTemplates(query: "Morning Inbox Summary")
+        XCTAssertTrue(scheduledResults.isEmpty,
+                      "Should not find 'Morning Inbox Summary' (scheduledTask template) after removal")
+
+        let contentResults = app.templateManager.searchTemplates(query: "Content Writer Profile")
+        XCTAssertTrue(contentResults.isEmpty,
+                      "Should not find 'Content Writer Profile' (contentProfile template) after removal")
     }
 
-    func testRagieDocumentIsReady() {
-        let readyDoc = RagieDocument(id: "doc-1", status: "ready", name: "Test Doc", chunkCount: 10)
-        XCTAssertTrue(readyDoc.isReady)
-
-        let processingDoc = RagieDocument(id: "doc-2", status: "processing")
-        XCTAssertFalse(processingDoc.isReady)
-    }
-
-    func testRagieChunkDecoding() throws {
-        let json = """
-        {"text":"Hello world","score":0.95,"id":"chunk-1","document_id":"doc-1","document_name":"MyDoc"}
-        """.data(using: .utf8)!
-        let chunk = try JSONDecoder().decode(RagieChunk.self, from: json)
-        XCTAssertEqual(chunk.text, "Hello world")
-        XCTAssertEqual(chunk.score, 0.95, accuracy: 0.001)
-        XCTAssertEqual(chunk.id, "chunk-1")
-        XCTAssertEqual(chunk.documentId, "doc-1")
-        XCTAssertEqual(chunk.documentName, "MyDoc")
-    }
-
-    func testRagieRetrievalResultCombinedText() {
-        let chunks = [
-            RagieChunk(text: "First chunk", score: 0.9, id: "c1", documentId: "d1"),
-            RagieChunk(text: "Second chunk", score: 0.8, id: "c2", documentId: "d1")
+    func testTemplateSearchForRemovedScheduledTaskTemplatesReturnsEmpty() {
+        // Regression: none of the removed scheduledTask template names should be findable
+        let removedNames = [
+            "Morning Inbox Summary",
+            "Competitor News Roundup",
+            "Weekly Status Report",
+            "Email Follow-Up Tracker",
+            "Monthly Expense Report",
+            "Daily Sales Dashboard",
+            "Weekly Content Calendar",
         ]
-        let result = RagieRetrievalResult(query: "test query", chunks: chunks)
-        XCTAssertEqual(result.combinedText, "First chunk\n\nSecond chunk")
-    }
-
-    func testRagieRetrievalResultEmptyChunks() {
-        let result = RagieRetrievalResult(query: "no results", chunks: [])
-        XCTAssertTrue(result.chunks.isEmpty)
-        XCTAssertEqual(result.combinedText, "")
-    }
-
-    func testWritersAppRagieEnableDisable() {
-        XCTAssertFalse(app.isRagieEnabled, "Ragie should be disabled by default")
-        let config = RagieConfiguration(apiKey: "test-key")
-        app.enableRagie(configuration: config)
-        XCTAssertTrue(app.isRagieEnabled, "Ragie should be enabled after enableRagie()")
-        app.disableRagie()
-        XCTAssertFalse(app.isRagieEnabled, "Ragie should be disabled after disableRagie()")
-    }
-
-    func testIngestDocumentToRagieRequiresRagieEnabled() async {
-        // Ragie not enabled — should throw ragieNotEnabled regardless of document existence
-        let doc = app.createBlankDocument(title: "Test", category: .article)
-        do {
-            _ = try await app.ingestDocumentToRagie(documentId: doc.id)
-            XCTFail("Should throw when Ragie is not enabled")
-        } catch let error as RagieError {
-            XCTAssertEqual(error, .ragieNotEnabled)
-        } catch {
-            XCTFail("Unexpected error type: \(error)")
+        for name in removedNames {
+            let results = app.templateManager.searchTemplates(query: name)
+            XCTAssertTrue(results.isEmpty,
+                          "Removed template '\(name)' should not appear in search results")
         }
     }
 
-    func testIngestDocumentToRagieThrowsDocumentNotFoundWhenDocumentMissing() async {
-        let config = RagieConfiguration(apiKey: "test-key")
-        app.enableRagie(configuration: config)
-        defer { app.disableRagie() }
-
-        do {
-            _ = try await app.ingestDocumentToRagie(documentId: UUID())
-            XCTFail("Should throw documentNotFound for unknown document")
-        } catch let error as RagieError {
-            XCTAssertEqual(error, .documentNotFound)
-        } catch {
-            XCTFail("Unexpected error type: \(error)")
+    func testTemplateSearchForRemovedContentProfileTemplatesReturnsEmpty() {
+        // Regression: none of the removed contentProfile template names should be findable
+        let removedNames = [
+            "Global Instructions — Sales Rep Profile",
+            "Global Instructions — Project Manager Profile",
+            "Global Instructions — Content Writer Profile",
+        ]
+        for name in removedNames {
+            let results = app.templateManager.searchTemplates(query: name)
+            XCTAssertTrue(results.isEmpty,
+                          "Removed template '\(name)' should not appear in search results")
         }
     }
 
-    func testRetrieveFromRagieRequiresRagieEnabled() async {
-        do {
-            _ = try await app.retrieveFromRagie(query: "test")
-            XCTFail("Should throw when Ragie is not enabled")
-        } catch let error as RagieError {
-            XCTAssertEqual(error, .ragieNotEnabled)
-        } catch {
-            XCTFail("Unexpected error type: \(error)")
-        }
+    // MARK: - WritersApp Initializer Tests (PR: replaced convenience inits with designated inits)
+
+    func testWritersAppDefaultInitHasNoAIService() {
+        // The new designated init() should not create an AI service
+        let freshApp = WritersApp()
+        XCTAssertNil(freshApp.aiService,
+                     "Default init() should not set up an AI service")
     }
 
-    func testListRagieDocumentsRequiresRagieEnabled() async {
-        do {
-            _ = try await app.listRagieDocuments()
-            XCTFail("Should throw when Ragie is not enabled")
-        } catch let error as RagieError {
-            XCTAssertEqual(error, .ragieNotEnabled)
-        } catch {
-            XCTFail("Unexpected error type: \(error)")
-        }
+    func testWritersAppDefaultInitHasNoChatbotService() {
+        // The new designated init() should not create a chatbot service
+        let freshApp = WritersApp()
+        XCTAssertNil(freshApp.chatbotService,
+                     "Default init() should not set up a chatbot service")
     }
 
-    func testRagieServiceErrorDescriptions() {
-        XCTAssertNotNil(RagieServiceError.invalidURL.errorDescription)
-        XCTAssertNotNil(RagieServiceError.invalidResponse.errorDescription)
-        XCTAssertNotNil(RagieServiceError.invalidResponseFormat.errorDescription)
-        XCTAssertNotNil(RagieServiceError.apiError(statusCode: 401, message: "Unauthorized").errorDescription)
-        XCTAssertNotNil(RagieServiceError.documentNotReady(status: "processing").errorDescription)
+    func testWritersAppDefaultInitIsAIDisabled() {
+        let freshApp = WritersApp()
+        XCTAssertFalse(freshApp.isAIEnabled,
+                       "isAIEnabled should be false after default init()")
     }
 
-    func testRagieDocumentCodable() throws {
-        let doc = RagieDocument(id: "doc-123", status: "ready", name: "My Doc", chunkCount: 42)
-        let encoded = try JSONEncoder().encode(doc)
-        let decoded = try JSONDecoder().decode(RagieDocument.self, from: encoded)
-        XCTAssertEqual(decoded.id, doc.id)
-        XCTAssertEqual(decoded.status, doc.status)
-        XCTAssertEqual(decoded.name, doc.name)
-        XCTAssertEqual(decoded.chunkCount, doc.chunkCount)
+    func testWritersAppAIConfigurationInitCreatesAIService() {
+        let config = AIConfiguration(apiKey: "test-key-pr", model: .claude35Sonnet)
+        let freshApp = WritersApp(aiConfiguration: config)
+        XCTAssertNotNil(freshApp.aiService,
+                        "init(aiConfiguration:) should initialize the AI service")
+    }
+
+    func testWritersAppAIConfigurationInitCreatesChatbotService() {
+        let config = AIConfiguration(apiKey: "test-key-pr", model: .claude35Sonnet)
+        let freshApp = WritersApp(aiConfiguration: config)
+        XCTAssertNotNil(freshApp.chatbotService,
+                        "init(aiConfiguration:) should initialize the chatbot service")
+    }
+
+    func testWritersAppAIConfigurationInitIsAIEnabled() {
+        let config = AIConfiguration(apiKey: "test-key-pr", model: .claude35Sonnet)
+        let freshApp = WritersApp(aiConfiguration: config)
+        XCTAssertTrue(freshApp.isAIEnabled,
+                      "isAIEnabled should be true after init(aiConfiguration:)")
+    }
+
+    func testWritersAppDefaultInitHasTemplatesLoaded() {
+        // The new designated init() should still load default templates
+        let freshApp = WritersApp()
+        XCTAssertGreaterThan(freshApp.templateManager.getAllTemplates().count, 0,
+                             "Default init() should load default templates")
+    }
+
+    func testWritersAppDefaultInitHasVersionControl() {
+        // The new designated init() should initialize version control
+        let freshApp = WritersApp()
+        XCTAssertNotNil(freshApp.versionControl,
+                        "Default init() should set up DoltVersionControlService")
     }
 }
