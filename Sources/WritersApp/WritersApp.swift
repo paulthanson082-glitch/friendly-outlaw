@@ -17,6 +17,8 @@ public class WritersApp {
     public private(set) var ragieService: RagieService?
     public private(set) var currentUserId: UUID?
     private var currentSessionId: UUID?
+    /// The ID of the currently active session, or `nil` if no session is in progress.
+    public var currentSession: UUID? { currentSessionId }
     private var memoryPlugin: ClaudeMemoryPlugin?
 
     public convenience init() {
