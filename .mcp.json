@@ -1,5 +1,9 @@
 {
   "mcpServers": {
+    "amplitude": {
+      "type": "http",
+      "url": "https://mcp.amplitude.com/mcp"
+    },
     "openbrowser": {
       "command": "uvx",
       "args": ["openbrowser-ai[mcp]", "--mcp"]
