@@ -787,6 +787,17 @@ For detailed setup verification steps and system requirements, see [SETUP_VERIFI
 
 ## Quick Setup
 
+**📘 For detailed setup instructions, see [SETUP_AND_RUN.md](SETUP_AND_RUN.md)**
+
+**🚀 Automated Setup (Swift CLI):**
+```bash
+# Clone and run the setup script
+git clone https://github.com/paulthanson082-glitch/friendly-outlaw.git
+cd friendly-outlaw
+./setup.sh
+```
+
+**Manual Setup:**
 After cloning the repository:
 
 ```bash
