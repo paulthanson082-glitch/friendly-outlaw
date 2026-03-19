@@ -1,5 +1,9 @@
 {
   "mcpServers": {
+    "asana": {
+      "type": "sse",
+      "url": "https://mcp.asana.com/sse"
+    },
     "openbrowser": {
       "command": "uvx",
       "args": ["openbrowser-ai[mcp]", "--mcp"]
