@@ -118,8 +118,10 @@ Install required system packages before building:
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y libsqlite3-dev
+sudo apt-get install -y libsqlite3-dev pkg-config
 ```
+
+`pkg-config` is used by `setup.sh` to detect the SQLite3 dev libraries. Without it, the script skips pre-verification and relies on the build step to catch any missing dependencies.
 
 Then follow the Quick Start steps above.
 

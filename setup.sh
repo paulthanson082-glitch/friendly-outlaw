@@ -33,16 +33,25 @@ fi
 
 # ── 2. SQLite3 ────────────────────────────
 info "Checking SQLite3..."
-if pkg-config --exists sqlite3 2>/dev/null; then
-    SQLITE_VERSION=$(pkg-config --modversion sqlite3 2>/dev/null || echo "unknown")
-    ok "SQLite3 found (version $SQLITE_VERSION)"
-elif command -v sqlite3 &> /dev/null; then
-    ok "sqlite3 CLI found"
+if command -v pkg-config &> /dev/null; then
+    if pkg-config --exists sqlite3 2>/dev/null; then
+        SQLITE_VERSION=$(pkg-config --modversion sqlite3 2>/dev/null || echo "unknown")
+        ok "SQLite3 found via pkg-config (version $SQLITE_VERSION)"
+    elif command -v sqlite3 &> /dev/null; then
+        ok "sqlite3 CLI found"
+    else
+        fail "SQLite3 development libraries not found."
+        echo "  macOS: sqlite3 is included with Xcode Command Line Tools."
+        echo "  Linux: sudo apt-get install libsqlite3-dev"
+        exit 1
+    fi
 else
-    fail "SQLite3 development libraries not found."
-    echo "  macOS: sqlite3 is included with Xcode Command Line Tools."
-    echo "  Linux: sudo apt-get install libsqlite3-dev"
-    exit 1
+    info "pkg-config not found; will rely on build step to verify SQLite3."
+    if command -v sqlite3 &> /dev/null; then
+        ok "sqlite3 CLI found"
+    else
+        info "Could not pre-verify SQLite3 via pkg-config or sqlite3 CLI; proceeding to build (which will fail if SQLite3 dev libraries are missing)."
+    fi
 fi
 
 # ── 3. Build ──────────────────────────────
@@ -58,8 +67,13 @@ fi
 BINARY=".build/debug/WritersAppCLI"
 info "Checking binary..."
 if [ -f "$BINARY" ]; then
-    SIZE=$(du -sh "$BINARY" | cut -f1)
-    ok "Binary present: $BINARY ($SIZE)"
+    if [ -x "$BINARY" ]; then
+        SIZE=$(du -sh "$BINARY" | cut -f1)
+        ok "Binary present: $BINARY ($SIZE)"
+    else
+        fail "Binary found at $BINARY but it is not executable. Check file permissions (e.g. chmod +x \"$BINARY\")."
+        exit 1
+    fi
 else
     fail "Binary not found at $BINARY"
     exit 1
