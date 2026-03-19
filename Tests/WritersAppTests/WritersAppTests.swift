@@ -898,7 +898,7 @@ final class WritersAppTests: XCTestCase {
         app.enableAI(configuration: config)
 
         XCTAssertNotNil(app.chatbotService, "Chatbot service should be initialized when AI is enabled")
-        XCTAssertNil(app.currentSession, "Current session should be nil before starting")
+        XCTAssertNil(app.chatbotService?.currentSession, "Current session should be nil before starting")
     }
 
     func testChatbotStartSession() {
