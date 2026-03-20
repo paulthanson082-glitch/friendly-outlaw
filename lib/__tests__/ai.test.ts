@@ -1,18 +1,23 @@
 import { generateBotResponse, generateMemory, ConversationMessage, Memory } from '../ai';
 import { getCharacterByHandle } from '../characters';
 
-// Create mock before using it
-const mockCreate = jest.fn().mockResolvedValue({
-  content: [
-    {
-      type: 'text',
-      text: 'This is a test response from Claude.',
-    },
-  ],
-});
+// var is used (not const/let) so the declaration is hoisted without TDZ,
+// allowing the jest.mock factory (also hoisted) to assign it before the test
+// file body runs.
+// eslint-disable-next-line no-var
+var mockCreate: jest.Mock;
 
-// Mock the Anthropic SDK
+// Mock the Anthropic SDK.  The factory runs during module import, assigning
+// mockCreate so it can be used in the mockImplementation closure.
 jest.mock('@anthropic-ai/sdk', () => {
+  mockCreate = jest.fn().mockResolvedValue({
+    content: [
+      {
+        type: 'text',
+        text: 'This is a test response from Claude.',
+      },
+    ],
+  });
   return jest.fn().mockImplementation(() => ({
     messages: {
       create: mockCreate,
@@ -29,6 +34,17 @@ describe('ai module', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.ANTHROPIC_API_KEY = 'test-api-key';
+
+    // Reset mockCreate to the default text response so tests that override it
+    // (e.g. setting type:'image') don't bleed into subsequent tests.
+    mockCreate.mockResolvedValue({
+      content: [
+        {
+          type: 'text',
+          text: 'This is a test response from Claude.',
+        },
+      ],
+    });
 
     mockGetCharacterByHandle.mockImplementation((handle: string) => {
       if (handle === 'pixel') {
