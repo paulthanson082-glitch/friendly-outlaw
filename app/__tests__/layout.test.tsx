@@ -13,25 +13,24 @@ describe('RootLayout', () => {
   });
 
   it('should render html element with lang="en"', () => {
-    const { container } = render(
+    render(
       <RootLayout>
         <div>Test</div>
       </RootLayout>
     );
 
-    const html = container.querySelector('html');
+    const html = document.querySelector('html');
     expect(html).toHaveAttribute('lang', 'en');
   });
 
   it('should render body element', () => {
-    const { container } = render(
+    render(
       <RootLayout>
         <div>Test</div>
       </RootLayout>
     );
 
-    const body = container.querySelector('body');
-    expect(body).toBeInTheDocument();
+    expect(document.querySelector('body')).toBeInTheDocument();
   });
 
   it('should wrap children in body element', () => {
@@ -60,14 +59,14 @@ describe('RootLayout', () => {
   });
 
   it('should handle empty children', () => {
-    const { container } = render(
+    render(
       <RootLayout>
         <></>
       </RootLayout>
     );
 
-    expect(container.querySelector('html')).toBeInTheDocument();
-    expect(container.querySelector('body')).toBeInTheDocument();
+    expect(document.querySelector('html')).toBeInTheDocument();
+    expect(document.querySelector('body')).toBeInTheDocument();
   });
 
   it('should handle complex nested children', () => {

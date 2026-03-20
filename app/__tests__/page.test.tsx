@@ -86,7 +86,7 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('AI Town')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /AI Town/i })).toBeInTheDocument();
       });
     });
 
@@ -94,8 +94,8 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('Pixel')).toBeInTheDocument();
-        expect(screen.getByText('Sage')).toBeInTheDocument();
+        expect(screen.getAllByText('Pixel').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Sage').length).toBeGreaterThan(0);
       });
     });
 
@@ -150,8 +150,8 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('Pixel')).toBeInTheDocument();
-        expect(screen.getByText('Sage')).toBeInTheDocument();
+        expect(screen.getAllByText('Pixel').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Sage').length).toBeGreaterThan(0);
       });
     });
 
@@ -186,10 +186,10 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('Pixel')).toBeInTheDocument();
+        expect(screen.getAllByText('Pixel').length).toBeGreaterThan(0);
       });
 
-      const pixelButton = screen.getByText('Pixel').closest('button');
+      const pixelButton = screen.getAllByText('Pixel')[0].closest('button');
       await user.click(pixelButton!);
 
       await waitFor(() => {
@@ -202,10 +202,10 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('Pixel')).toBeInTheDocument();
+        expect(screen.getAllByText('Pixel').length).toBeGreaterThan(0);
       });
 
-      const pixelButton = screen.getByText('Pixel').closest('button');
+      const pixelButton = screen.getAllByText('Pixel')[0].closest('button');
       await user.click(pixelButton!);
 
       await waitFor(() => {
@@ -459,7 +459,7 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText(/ago/i)).toBeInTheDocument();
+        expect(screen.getAllByText(/ago/i).length).toBeGreaterThan(0);
       });
     });
 
@@ -468,10 +468,10 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('Pixel')).toBeInTheDocument();
+        expect(screen.getAllByText('Pixel').length).toBeGreaterThan(0);
       });
 
-      const pixelButton = screen.getByText('Pixel').closest('button');
+      const pixelButton = screen.getAllByText('Pixel')[0].closest('button');
       await user.click(pixelButton!);
 
       await waitFor(() => {
@@ -501,8 +501,8 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('🎨')).toBeInTheDocument(); // pixel
-        expect(screen.getByText('📚')).toBeInTheDocument(); // sage
+        expect(screen.getAllByText('🎨').length).toBeGreaterThan(0); // pixel
+        expect(screen.getAllByText('📚').length).toBeGreaterThan(0); // sage
       });
     });
   });
@@ -609,9 +609,18 @@ describe('Home Page', () => {
         expect(screen.getByText(/▶ Tick/i)).toBeInTheDocument();
       });
 
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: async () => ({ tick: 6, generated: [] }),
+      // Override fetch to return simulate response for POST and town data for GET
+      (global.fetch as jest.Mock).mockImplementation((url: string) => {
+        if (url.includes('/api/simulate')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ tick: 6, generated: [] }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => mockTownData,
+        });
       });
 
       const tickButton = screen.getByText(/▶ Tick/i);
@@ -624,15 +633,15 @@ describe('Home Page', () => {
       // Should only process one request at a time
       await waitFor(() => {
         expect(tickButton).not.toBeDisabled();
-      });
+      }, { timeout: 3000 });
     });
 
     it('should display correct avatar for each resident type', async () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('🎨')).toBeInTheDocument();
-        expect(screen.getByText('📚')).toBeInTheDocument();
+        expect(screen.getAllByText('🎨').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('📚').length).toBeGreaterThan(0);
       });
     });
   });

@@ -31,8 +31,30 @@ jest.mock('../characters', () => ({
 }));
 
 describe('seed module', () => {
+  const defaultCharacters = [
+    {
+      handle: 'pixel',
+      name: 'Pixel',
+      description: 'A curious artist',
+      personality: 'Whimsical',
+      interests: ['art'],
+      initialPlan: 'Paint',
+    },
+    {
+      handle: 'sage',
+      name: 'Sage',
+      description: 'A wise librarian',
+      personality: 'Calm',
+      interests: ['books'],
+      initialPlan: 'Read',
+    },
+  ];
+
   beforeEach(() => {
+    jest.resetModules();
     jest.clearAllMocks();
+    // Re-register default characters mock to undo any per-test overrides
+    jest.mock('../characters', () => ({ characters: defaultCharacters }));
     jest.spyOn(console, 'log').mockImplementation();
     jest.spyOn(console, 'error').mockImplementation();
   });
@@ -55,8 +77,6 @@ describe('seed module', () => {
     it('should insert all characters into database', async () => {
       const { getDb } = require('../db');
 
-      // Re-import seed to trigger execution
-      delete require.cache[require.resolve('../seed')];
       await import('../seed');
       await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -71,7 +91,6 @@ describe('seed module', () => {
     it('should use ON CONFLICT clause for upsert behavior', async () => {
       const { getDb } = require('../db');
 
-      delete require.cache[require.resolve('../seed')];
       await import('../seed');
       await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -84,17 +103,16 @@ describe('seed module', () => {
     });
 
     it('should log success message after seeding', async () => {
-      delete require.cache[require.resolve('../seed')];
       await import('../seed');
       await new Promise(resolve => setTimeout(resolve, 100));
 
       expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining('Seeded AI Town residents')
+        expect.stringContaining('Seeded AI Town residents'),
+        expect.any(String)
       );
     });
 
     it('should include character handles in success message', async () => {
-      delete require.cache[require.resolve('../seed')];
       await import('../seed');
       await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -104,15 +122,14 @@ describe('seed module', () => {
       );
 
       expect(seedMessage).toBeDefined();
-      expect(seedMessage[0]).toContain('@pixel');
-      expect(seedMessage[0]).toContain('@sage');
+      // The second argument contains the character handles
+      expect(seedMessage[1]).toContain('@pixel');
+      expect(seedMessage[1]).toContain('@sage');
     });
 
     it('should handle database errors', async () => {
-      const { getDb, initDb } = require('../db');
       mockInitDb.mockRejectedValueOnce(new Error('DB Connection Error'));
 
-      delete require.cache[require.resolve('../seed')];
       await import('../seed');
       await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -122,10 +139,8 @@ describe('seed module', () => {
     });
 
     it('should handle insert errors', async () => {
-      const { getDb } = require('../db');
       mockSql.mockRejectedValueOnce(new Error('Insert Error'));
 
-      delete require.cache[require.resolve('../seed')];
       await import('../seed');
       await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -137,7 +152,6 @@ describe('seed module', () => {
     it('should insert correct character data', async () => {
       const { getDb } = require('../db');
 
-      delete require.cache[require.resolve('../seed')];
       await import('../seed');
       await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -154,7 +168,6 @@ describe('seed module', () => {
     it('should update existing characters on conflict', async () => {
       const { getDb } = require('../db');
 
-      delete require.cache[require.resolve('../seed')];
       await import('../seed');
       await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -170,15 +183,15 @@ describe('seed module', () => {
 
   describe('idempotency', () => {
     it('should be safe to run multiple times', async () => {
-      const { initDb } = require('../db');
-
-      delete require.cache[require.resolve('../seed')];
       await import('../seed');
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      const firstCallCount = mockInitDb.mock.calls.length;
+      // Reset and run again
+      jest.resetModules();
+      jest.clearAllMocks();
+      jest.spyOn(console, 'log').mockImplementation();
+      jest.spyOn(console, 'error').mockImplementation();
 
-      delete require.cache[require.resolve('../seed')];
       await import('../seed');
       await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -188,7 +201,6 @@ describe('seed module', () => {
     it('should handle duplicate handles gracefully', async () => {
       const { getDb } = require('../db');
 
-      delete require.cache[require.resolve('../seed')];
       await import('../seed');
       await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -206,8 +218,8 @@ describe('seed module', () => {
       jest.mock('../characters', () => ({
         characters: [],
       }));
+      jest.resetModules();
 
-      delete require.cache[require.resolve('../seed')];
       await import('../seed');
       await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -217,7 +229,6 @@ describe('seed module', () => {
     it('should handle characters with special characters in names', async () => {
       const { getDb } = require('../db');
 
-      delete require.cache[require.resolve('../seed')];
       await import('../seed');
       await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -232,7 +243,6 @@ describe('seed module', () => {
       const { getDb } = require('../db');
 
       // Just verify that seed runs without errors
-      delete require.cache[require.resolve('../seed')];
       await import('../seed');
       await new Promise(resolve => setTimeout(resolve, 100));
 
