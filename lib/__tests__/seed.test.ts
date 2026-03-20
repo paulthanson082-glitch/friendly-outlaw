@@ -108,7 +108,7 @@ describe('seed module', () => {
 
       expect(console.log).toHaveBeenCalledWith(
         expect.stringContaining('Seeded AI Town residents'),
-        expect.any(String)
+        expect.stringContaining('@pixel')
       );
     });
 

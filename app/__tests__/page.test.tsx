@@ -633,7 +633,7 @@ describe('Home Page', () => {
       // Should only process one request at a time
       await waitFor(() => {
         expect(tickButton).not.toBeDisabled();
-      }, { timeout: 3000 });
+      });
     });
 
     it('should display correct avatar for each resident type', async () => {
