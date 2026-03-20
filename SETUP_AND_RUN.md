@@ -118,10 +118,10 @@ Install required system packages before building:
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y libsqlite3-dev
+sudo apt-get install -y libsqlite3-dev pkg-config
 ```
 
-Then follow the Quick Start steps above.
+The `pkg-config` package is needed by the setup script for prerequisite detection. Then follow the Quick Start steps above.
 
 ---
 
