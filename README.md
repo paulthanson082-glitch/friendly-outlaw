@@ -177,34 +177,79 @@ WritersApp/
 │   │   └── module.modulemap          # C module map for SQLite
 │   ├── WritersApp/
 │   │   ├── Models/
-│   │   │   ├── Template.swift        # Template data structures
-│   │   │   ├── Document.swift        # Document data structures
-│   │   │   ├── AIModels.swift        # AI configuration & types
-│   │   │   ├── AISuggestion.swift    # AI suggestion & session models
-│   │   │   └── iPadProModels.swift   # iPad-specific models
+│   │   │   ├── Template.swift        # Template, TemplateCategory, Placeholder
+│   │   │   ├── Document.swift        # Document, DocumentMetadata
+│   │   │   ├── AIModels.swift        # AI config, AIAssistanceType, tool loop types
+│   │   │   ├── AISuggestion.swift    # AISuggestion, UserSession, AIToolUsageStats
+│   │   │   ├── ChatbotModels.swift   # ConversationSession, ChatMessage, ConversationContext
+│   │   │   ├── FocusSession.swift    # FocusSession, FocusMode, SessionStatus
+│   │   │   ├── GuiNewModels.swift    # GuiCanvas, GuiNewError
+│   │   │   ├── HardwareModels.swift  # HardwareBoard, BoardType, PinAlias, Peripheral
+│   │   │   ├── Issue.swift           # Issue, IssueStatus, IssuePriority, IssueMetadata
+│   │   │   ├── KanbanModels.swift    # KanbanBoard, KanbanTask, KanbanColumn
+│   │   │   ├── RagieModels.swift     # RagieDocument, RagieChunk, RagieRetrievalResult
+│   │   │   ├── TraceModels.swift     # Trace, TraceEvent, TraceSpan (analytics)
+│   │   │   ├── VersionControl.swift  # VCBranch, VCCommit, VCDiff, VCMergeResult
+│   │   │   ├── WritingGoal.swift     # WritingGoal, GoalType, GoalUnit, WritingStreak
+│   │   │   └── iPadProModels.swift   # iPad Pro-specific UI models
 │   │   ├── Services/
-│   │   │   ├── TemplateManager.swift     # Template CRUD operations
-│   │   │   ├── DocumentManager.swift     # Document CRUD operations
-│   │   │   ├── AIService.swift           # AI-powered assistance
-│   │   │   ├── DatabaseManager.swift     # SQLite database operations
-│   │   │   ├── MultitaskingManager.swift # iPad multitasking support
-│   │   │   ├── ApplePencilManager.swift  # Apple Pencil integration
-│   │   │   └── KeyboardShortcutManager.swift # Keyboard shortcuts
+│   │   │   ├── AIService.swift               # Claude API integration + tool loop
+│   │   │   ├── ApplePencilManager.swift      # Apple Pencil input handling
+│   │   │   ├── ChatbotService.swift          # Conversational chatbot with session management
+│   │   │   ├── DatabaseManager.swift         # SQLite persistence
+│   │   │   ├── DocumentManager.swift         # Document CRUD + search
+│   │   │   ├── DoltVersionControlService.swift # Branch/commit/diff/merge/time-travel
+│   │   │   ├── EncouragementService.swift    # Motivational messages + milestones
+│   │   │   ├── FocusSessionManager.swift     # Focus session lifecycle
+│   │   │   ├── GuiNewService.swift           # gui.new visual export client
+│   │   │   ├── HardwareManager.swift         # Hardware board and peripheral management
+│   │   │   ├── IssueManager.swift            # Issue CRUD + status/priority transitions
+│   │   │   ├── KanbanManager.swift           # Kanban boards and task workflow
+│   │   │   ├── KeyboardShortcutManager.swift # Keyboard shortcut registration
+│   │   │   ├── MultitaskingManager.swift     # iPadOS multitasking/split view
+│   │   │   ├── ProductivityAnalytics.swift   # Writing analytics aggregation
+│   │   │   ├── RagieService.swift            # Ragie semantic retrieval API client
+│   │   │   ├── StageManagerSupport.swift     # Stage Manager window management
+│   │   │   ├── TemplateManager.swift         # Template CRUD + 7 default templates
+│   │   │   ├── TraceAnalysisService.swift    # Distributed trace analysis
+│   │   │   ├── WritingGoalManager.swift      # Goal tracking + streaks
+│   │   │   └── WritingToolExecutor.swift     # AI tool loop executor (5 built-in tools)
+│   │   ├── Plugins/
+│   │   │   ├── Plugin.swift              # Plugin protocol, PluginCapability, PluginAction
+│   │   │   ├── PluginManager.swift       # Plugin registry and lifecycle (singleton)
+│   │   │   ├── ClaudeMemoryPlugin.swift  # Memory storage via plugin protocol
+│   │   │   └── MCPClient.swift           # Model Context Protocol client
 │   │   ├── Views/
-│   │   │   ├── iPadProViews.swift        # SwiftUI views for iPad Pro
-│   │   │   ├── MetalDashboardView.swift  # Metal Dashboard UI
+│   │   │   ├── iPadProViews.swift            # SwiftUI views for iPad Pro
+│   │   │   ├── MetalDashboardView.swift      # Metal Dashboard UI
 │   │   │   ├── MetalDashboardViewModel.swift # Dashboard state management
-│   │   │   └── MetalTheme.swift          # Metal color scheme and styling
+│   │   │   └── MetalTheme.swift              # Metal color scheme and styling
 │   │   ├── Previews/
-│   │   │   └── MetalDashboardPreview.swift # SwiftUI preview provider
+│   │   │   └── MetalDashboardPreview.swift   # SwiftUI preview provider
 │   │   ├── Extensions/
-│   │   │   └── String+Extensions.swift   # String utilities
-│   │   └── WritersApp.swift         # Main app class
+│   │   │   ├── String+Extensions.swift       # Placeholder substitution utilities
+│   │   │   └── CoreGraphics+Codable.swift    # CGFloat/CGSize/CGPoint Codable support
+│   │   └── WritersApp.swift                  # Main entry point / facade class
 │   └── WritersAppCLI/
-│       └── main.swift               # CLI interface
+│       └── main.swift                        # Interactive CLI
 └── Tests/
     └── WritersAppTests/
-        └── WritersAppTests.swift    # Unit tests
+        ├── WritersAppTests.swift             # Core template/document/tool loop tests
+        ├── AIServiceTests.swift              # AIService unit tests
+        ├── DatabaseManagerTests.swift        # DatabaseManager persistence tests
+        ├── DocumentManagerTests.swift        # DocumentManager CRUD tests
+        ├── DoltVersionControlServiceTests.swift # Version control tests
+        ├── EncouragementServiceTests.swift   # Encouragement message tests
+        ├── ErrorPathTests.swift              # Error handling edge cases
+        ├── ExportTests.swift                 # Export format tests
+        ├── FocusSessionManagerTests.swift    # Focus session lifecycle tests
+        ├── IssueManagementTests.swift        # Issue CRUD and status tests
+        ├── MetalDashboardTests.swift         # Metal Dashboard model tests
+        ├── PerformanceTests.swift            # Performance benchmarks
+        ├── PluginTests.swift                 # Plugin system tests
+        ├── ProductivityAnalyticsTests.swift  # Analytics aggregation tests
+        ├── WritingGoalManagerTests.swift     # Goal tracking tests
+        └── iPadProFeaturesTests.swift        # iPad Pro feature tests
 ```
 
 ## Usage
@@ -657,13 +702,24 @@ Professional business correspondence format with proper addressing and structure
 ### WritersApp
 - `createDocumentFromTemplate(templateId:values:)` - Create document from template
 - `createBlankDocument(title:category:)` - Create blank document
-- `exportDocument(id:format:)` - Export document to format
+- `exportDocument(id:format:)` - Export document to format (`.markdown`, `.plainText`, `.html`)
 - `getStatistics()` - Get app statistics
 
+**Session Tracking:**
+- `startSession(userId:multitaskingMode:)` - Begin a writing session
+- `endSession()` - End the current writing session
+- `updateSessionStats(wordsWritten:aiInteractions:)` - Update session metrics
+- `getAIToolUsageStats(userId:)` - Retrieve AI tool usage statistics
+- `getSessionStats(userId:)` - Retrieve aggregated session statistics
+- `getAISuggestions(userId:limit:offset:)` - Retrieve stored AI suggestions
+- `getUserSessions(userId:sortByDuration:)` - Retrieve past writing sessions
+
 **AI Features:**
-- `enableAI(configuration:)` - Enable AI features
+- `enableAI(configuration:userId:)` - Enable AI features
 - `disableAI()` - Disable AI features
+- `isAIEnabled` - Check if AI is available
 - `getAIAssistance(documentId:type:context:)` - Get AI assistance
+- `getAIAssistanceWithTools(documentId:type:context:maxIterations:)` - AI assistance with built-in tool loop
 - `continueDocument(documentId:context:appendToDocument:)` - Continue writing
 - `improveDocument(documentId:context:replaceContent:)` - Improve document
 - `generateDocumentTitles(documentId:context:)` - Generate title suggestions
@@ -680,6 +736,64 @@ Professional business correspondence format with proper addressing and structure
 - `getGeneralEncouragement()` - Get a motivational message
 - `isEncouragementEnabled` - Check if encouragement is enabled
 - `setEncouragementEnabled(_:)` - Enable or disable encouragement
+
+**Ragie Semantic Retrieval:**
+- `enableRagie(configuration:)` - Enable the Ragie integration
+- `disableRagie()` - Disable the Ragie integration
+- `isRagieEnabled` - Check if Ragie is configured
+- `ingestDocumentToRagie(documentId:)` - Ingest a local document into Ragie
+- `getRagieDocumentStatus(ragieId:)` - Poll processing status of a Ragie document
+- `retrieveFromRagie(query:topK:rerank:)` - Retrieve semantically relevant chunks
+- `listRagieDocuments()` - List all documents stored in Ragie
+
+**Issue Management:**
+- `createIssue(documentId:title:description:status:priority:)` - Create a new issue
+- `getIssue(id:)` - Retrieve an issue by ID
+- `getIssues(forDocument:)` - Get all issues for a document
+- `getIssues(withStatus:)` - Filter issues by status
+- `getIssues(withPriority:)` - Filter issues by priority
+- `searchIssues(query:)` - Full-text search across issues
+- `updateIssue(_:)` - Update an existing issue
+- `deleteIssue(id:)` - Remove an issue
+- `updateIssueStatus(id:status:)` - Change issue status
+- `reopenIssue(id:)` - Reopen a resolved/closed issue
+- `updateIssuePriority(id:priority:)` - Change issue priority
+- `getIssueStatistics()` - Count issues by status and priority
+- `getOpenIssues(forDocument:)` - Get open issues for a document
+- `getCriticalIssues()` - Get all critical-priority issues
+
+**Kanban Board Management:**
+- `createKanbanBoard(name:description:)` - Create a new Kanban board
+- `getKanbanBoard(id:)` - Retrieve a board by ID
+- `getAllKanbanBoards()` - List all Kanban boards
+- `deleteKanbanBoard(id:)` - Delete a board and its tasks
+- `createKanbanTask(boardId:title:description:column:)` - Create a task on a board
+- `getKanbanTask(id:)` - Retrieve a task by ID
+- `getKanbanTasks(forBoard:)` - List all tasks on a board
+- `getKanbanTasks(forBoard:inColumn:)` - List tasks in a specific column
+- `searchKanbanTasks(query:)` - Search tasks by title/description
+- `deleteKanbanTask(id:)` - Remove a task
+- `moveKanbanTask(id:toColumn:)` - Move a task to a specific column
+- `advanceKanbanTask(id:)` - Move a task forward one column (`backlog` → `done`)
+- `regressKanbanTask(id:)` - Move a task backward one column
+- `getKanbanTaskCounts(forBoard:)` - Count tasks per column on a board
+
+**Hardware Board Management:**
+- `createHardwareBoard(name:type:description:serialPort:baudRate:)` - Register a hardware board
+- `getHardwareStatistics()` - Get counts and active status of all boards
+
+**gui.new Visual Export:**
+- `enableGui(apiKey:)` - Configure the gui.new client
+- `disableGui()` - Remove the gui.new client
+- `isGuiEnabled` - Check if gui.new is configured
+- `exportDocumentToGui(id:)` - Export a document as a shareable canvas
+- `exportStatisticsToGui(title:)` - Export writing statistics as a dashboard canvas
+- `exportKanbanBoardToGui(boardId:)` - Export a Kanban board as a canvas
+
+**Jules Chatbot:**
+- `enableJulesAdultMode()` - Enable adult-content mode for the chatbot
+- `disableJulesAdultMode()` - Disable adult-content mode
+- `isJulesAdultModeEnabled` - Check if adult mode is active
 
 ### EncouragementService
 - `getWordCountEncouragement(wordCount:previousCount:)` - Get encouragement based on words written
@@ -741,6 +855,92 @@ Professional business correspondence format with proper addressing and structure
 - `getEnabledPlugins()` - Get enabled plugins
 - `shutdownPlugins()` - Shutdown all plugins
 
+### IssueManager
+- `createIssue(_:)` - Persist a new issue
+- `getIssue(id:)` - Retrieve issue by ID
+- `getAllIssues()` - Get all issues
+- `getIssues(forDocument:)` - Get issues linked to a document
+- `getIssues(withStatus:)` - Filter by status (`.open`, `.inProgress`, `.resolved`, `.closed`)
+- `getIssues(withPriority:)` - Filter by priority (`.low`, `.medium`, `.high`, `.critical`)
+- `searchIssues(query:)` - Full-text search
+- `updateIssue(_:)` - Update an issue
+- `deleteIssue(id:)` - Delete an issue
+- `updateIssueStatus(id:status:)` - Set issue status
+- `reopenIssue(id:)` - Set status to `.open` and clear `resolvedAt`
+- `updateIssuePriority(id:priority:)` - Set issue priority
+- `getIssueStatistics()` - Returns counts keyed by status and priority
+- `getOpenIssues(forDocument:)` - Open issues for a document
+- `getCriticalIssues()` - All issues with `.critical` priority
+
+### KanbanManager
+- `createBoard(_:)` - Persist a new board
+- `getBoard(id:)` - Retrieve board by ID
+- `getAllBoards()` - Get all boards
+- `deleteBoard(id:)` - Delete a board and all its tasks
+- `createTask(_:)` - Persist a new task
+- `getTask(id:)` - Retrieve task by ID
+- `getTasks(forBoard:)` - List all tasks on a board
+- `getTasks(forBoard:inColumn:)` - List tasks in a specific column
+- `searchTasks(query:)` - Search tasks by title or description
+- `updateTask(_:)` - Update a task
+- `deleteTask(id:)` - Delete a task
+- `moveTask(id:toColumn:)` - Move task to a column directly
+- `advanceTask(id:)` - Move task forward one column; returns the new column or `nil` if already `.done`
+- `regressTask(id:)` - Move task backward one column; returns the new column or `nil` if already `.backlog`
+- `getTaskCounts(forBoard:)` - Count tasks per column (`[KanbanColumn: Int]`)
+
+### HardwareManager
+- `createBoard(_:)` - Register a new hardware board
+- `getBoard(id:)` - Retrieve a board by ID
+- `getAllBoards()` - List all boards
+- `getBoards(byType:)` - Filter boards by `BoardType`
+- `searchBoards(query:)` - Search boards by name or description
+- `updateBoard(_:)` - Update board metadata
+- `deleteBoard(id:)` - Remove a board
+- `markBoardConnected(id:)` - Mark a board as connected
+- `markBoardDisconnected(id:)` - Mark a board as disconnected
+- `getConnectionStatus(boardId:)` - Get current connection status string
+- `addPinAlias(to:alias:)` - Add a pin alias to a board
+- `getPinAlias(boardId:aliasName:)` - Retrieve a named pin alias
+- `removePinAlias(from:aliasId:)` - Remove a pin alias
+- `createPeripheral(_:)` - Register a peripheral device
+- `getPeripheral(id:)` - Retrieve a peripheral by ID
+- `getPeripherals(forBoard:)` - List peripherals for a board
+- `getPeripherals(byType:)` - Filter peripherals by type string
+- `updatePeripheral(_:)` - Update peripheral metadata
+- `deletePeripheral(id:)` - Remove a peripheral
+- `getBoardStatistics()` - Returns `(totalBoards, byType, activeCount)`
+- `getActiveBoards()` - List only connected boards
+
+### DoltVersionControlService
+- `listBranches()` - List all branches
+- `currentBranch()` - Get the currently checked-out branch
+- `checkoutBranch(name:createNew:)` - Switch to (or create) a branch
+- `initializeDefaultBranch()` - Create the initial `main` branch
+- `commit(message:snapshots:)` - Commit document snapshots to the current branch
+- `log(branch:)` - Get the commit history for a branch
+- `diff(fromBranch:toBranch:)` - Diff two branches by their latest commits
+- `diff(fromCommitId:toCommitId:)` - Diff two specific commits
+- `query(asOf:)` - Time-travel: retrieve document state at a past date
+- `history(of:)` - Get all snapshots for a specific document ID
+- `merge(fromBranch:into:)` - Merge one branch into another (fast-forward or three-way)
+
+### ChatbotService
+- `startSession(context:)` - Start a new conversation session
+- `sendMessage(_:in:)` - Send a message and receive an AI response
+- `getConversationHistory(from:)` - Retrieve all messages in a session
+- `clearHistory(for:)` - Clear messages from a session
+- `endSession()` - End the current session
+- `currentSession` - The active `ConversationSession`, if any
+- `isAdultModeEnabled` - Whether adult-content mode is active
+
+### RagieService
+- `ingestRawText(_:name:metadata:)` - Ingest raw text content as a Ragie document
+- `ingestURL(_:name:metadata:)` - Ingest a document from a public URL
+- `getDocument(id:)` - Fetch the current status of a Ragie document
+- `retrieve(query:topK:rerank:filter:)` - Retrieve semantically relevant chunks
+- `listDocuments()` - List all documents stored in Ragie
+
 ## Testing
 
 Run the test suite:
@@ -751,13 +951,21 @@ swift test
 
 Tests cover:
 - Template creation and management
-- Document creation from templates
+- Document creation from templates and blank
 - Word count calculations
-- Search functionality
-- Export functionality
-- Statistics generation
-
-For detailed runtime verification and test results, see [RUN_VERIFICATION.md](RUN_VERIFICATION.md).
+- AI tool loop (`ToolDefinition`, `ToolUseBlock`, `ToolResult`, `WritingToolExecutor`)
+- Issue management (CRUD, status/priority transitions, reopen)
+- Kanban board and task workflow (`advanceKanbanTask`, `regressKanbanTask`)
+- Dolt version control (branches, commits, diff, merge, time-travel)
+- Encouragement service messages and milestones
+- Export formats (Markdown, plain text, HTML)
+- Focus session lifecycle
+- Writing goals and streaks
+- Plugin system and MCP integration
+- Database persistence
+- Performance benchmarks
+- iPad Pro feature models
+- Error path handling
 
 ## Requirements
 
