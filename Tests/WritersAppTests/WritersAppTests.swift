@@ -1500,7 +1500,7 @@ final class WritersAppTests: XCTestCase {
         }
     }
 
-    func testHallucinationReductionMethodsRequireAI() {
+    func testHallucinationReductionMethodsRequireAI() async {
         let app = WritersApp()  // No AI enabled
         let document = app.createBlankDocument(title: "Test", category: .novel)
 
@@ -1513,7 +1513,7 @@ final class WritersAppTests: XCTestCase {
         }
     }
 
-    func testHallucinationReductionMethodsRequireDocument() {
+    func testHallucinationReductionMethodsRequireDocument() async {
         let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
         let app = WritersApp(aiConfiguration: config)
 
@@ -1527,7 +1527,7 @@ final class WritersAppTests: XCTestCase {
         }
     }
 
-    func testTextBasedHallucinationReductionMethods() {
+    func testTextBasedHallucinationReductionMethods() async {
         let app = WritersApp()  // No AI enabled
         let text = "Sample text for analysis"
 
