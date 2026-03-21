@@ -833,6 +833,104 @@ public class WritersApp {
         return try await ai.developCharacter(characterConcept: characterConcept, context: context)
     }
 
+    // MARK: - Hallucination Reduction Methods
+
+    /// Extract relevant quotes from a document for fact-grounding
+    ///
+    /// Uses the "direct quotes for factual grounding" technique to reduce hallucinations.
+    /// Claude extracts word-for-word quotes before performing analysis.
+    public func extractQuotesFromDocument(
+        documentId: UUID,
+        context: AIContext? = nil
+    ) async throws -> [QuoteBlock] {
+        guard let ai = aiService else { throw AIError.aiNotEnabled }
+        guard let document = documentManager.getDocument(id: documentId) else {
+            throw AIError.documentNotFound
+        }
+        return try await ai.extractQuotesFromDocument(text: document.content, context: context)
+    }
+
+    /// Verify document claims with citations from source material
+    ///
+    /// Uses the "verify with citations" technique. Claude must find supporting quotes
+    /// for each claim or explicitly acknowledge it cannot be verified.
+    public func verifyDocumentWithCitations(
+        documentId: UUID,
+        context: AIContext? = nil
+    ) async throws -> [VerifiedClaim] {
+        guard let ai = aiService else { throw AIError.aiNotEnabled }
+        guard let document = documentManager.getDocument(id: documentId) else {
+            throw AIError.documentNotFound
+        }
+        return try await ai.verifyWithCitations(text: document.content, context: context)
+    }
+
+    /// Analyze document while allowing Claude to admit uncertainty
+    ///
+    /// Uses the "allow Claude to say 'I don't know'" technique. Explicitly permits
+    /// uncertainty acknowledgment and information gap identification.
+    public func analyzeDocumentWithUncertainty(
+        documentId: UUID,
+        context: AIContext? = nil
+    ) async throws -> UncertaintyAwareAnalysis {
+        guard let ai = aiService else { throw AIError.aiNotEnabled }
+        guard let document = documentManager.getDocument(id: documentId) else {
+            throw AIError.documentNotFound
+        }
+        return try await ai.analyzeWithUncertainty(text: document.content, context: context)
+    }
+
+    /// Perform chain-of-thought analysis with explicit verification
+    ///
+    /// Uses the "chain-of-thought verification" technique. Claude explains its
+    /// reasoning step-by-step, identifying assumptions and uncertainties.
+    public func chainOfThoughtAnalysis(
+        documentId: UUID,
+        context: AIContext? = nil
+    ) async throws -> ChainOfThoughtAnalysis {
+        guard let ai = aiService else { throw AIError.aiNotEnabled }
+        guard let document = documentManager.getDocument(id: documentId) else {
+            throw AIError.documentNotFound
+        }
+        return try await ai.chainOfThoughtVerification(text: document.content, context: context)
+    }
+
+    /// Extract relevant quotes from arbitrary text (non-document)
+    public func extractQuotesFromText(
+        text: String,
+        context: AIContext? = nil
+    ) async throws -> [QuoteBlock] {
+        guard let ai = aiService else { throw AIError.aiNotEnabled }
+        return try await ai.extractQuotesFromDocument(text: text, context: context)
+    }
+
+    /// Verify arbitrary text with citations
+    public func verifyTextWithCitations(
+        text: String,
+        context: AIContext? = nil
+    ) async throws -> [VerifiedClaim] {
+        guard let ai = aiService else { throw AIError.aiNotEnabled }
+        return try await ai.verifyWithCitations(text: text, context: context)
+    }
+
+    /// Analyze arbitrary text with uncertainty acknowledgment
+    public func analyzeTextWithUncertainty(
+        text: String,
+        context: AIContext? = nil
+    ) async throws -> UncertaintyAwareAnalysis {
+        guard let ai = aiService else { throw AIError.aiNotEnabled }
+        return try await ai.analyzeWithUncertainty(text: text, context: context)
+    }
+
+    /// Perform chain-of-thought analysis on arbitrary text
+    public func chainOfThoughtAnalysisForText(
+        text: String,
+        context: AIContext? = nil
+    ) async throws -> ChainOfThoughtAnalysis {
+        guard let ai = aiService else { throw AIError.aiNotEnabled }
+        return try await ai.chainOfThoughtVerification(text: text, context: context)
+    }
+
     // MARK: - Statistics
     
     /// Gets AI tool usage statistics
