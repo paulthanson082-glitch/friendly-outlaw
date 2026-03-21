@@ -1279,4 +1279,182 @@ final class WritersAppTests: XCTestCase {
         XCTAssertNotNil(freshApp.versionControl,
                         "Default init() should set up DoltVersionControlService")
     }
+
+    // MARK: - Channel Tests
+
+    func testChannelManagerIsAvailableOnWritersApp() {
+        XCTAssertNotNil(app.channelManager, "WritersApp should expose a ChannelManager")
+    }
+
+    func testFakechatChannelStartAndStop() async throws {
+        let channel = FakechatChannel()
+        XCTAssertFalse(channel.isActive)
+        try await channel.start()
+        XCTAssertTrue(channel.isActive)
+        await channel.stop()
+        XCTAssertFalse(channel.isActive)
+    }
+
+    func testFakechatChannelSimulateMessage() async throws {
+        let channel = FakechatChannel()
+        try await channel.start()
+
+        var receivedText: String?
+        let expectation = XCTestExpectation(description: "event received")
+
+        class TestDelegate: ChannelDelegate {
+            var onEvent: ((ChannelEvent) -> Void)?
+            func channel(_ channel: Channel, didReceive event: ChannelEvent) { onEvent?(event) }
+            func channel(_ channel: Channel, didEncounterError error: Error) {}
+        }
+        let delegate = TestDelegate()
+        delegate.onEvent = { event in
+            receivedText = event.message.text
+            expectation.fulfill()
+        }
+        channel.delegate = delegate
+
+        channel.simulateIncomingMessage("hello from fakechat")
+        await fulfillment(of: [expectation], timeout: 1)
+        XCTAssertEqual(receivedText, "hello from fakechat")
+    }
+
+    func testFakechatChannelSendReply() async throws {
+        let channel = FakechatChannel()
+        try await channel.start()
+
+        let event = channel.simulateIncomingMessage("ping")
+        let reply = ChannelReply(eventId: event.id, channelId: channel.id, text: "pong")
+        try await channel.send(reply: reply)
+
+        XCTAssertEqual(channel.lastReply?.text, "pong")
+        XCTAssertEqual(channel.sentReplies.count, 1)
+    }
+
+    func testSenderAllowlistAllowAll() {
+        var allowlist = SenderAllowlist(policy: .allowAll)
+        let sender = ChannelSender(id: "any-user", displayName: "User", platform: .fakechat)
+        XCTAssertTrue(allowlist.allows(sender: sender))
+        // Add to allowlist should not affect allow-all
+        allowlist.add(senderId: "other")
+        XCTAssertTrue(allowlist.allows(sender: sender))
+    }
+
+    func testSenderAllowlistDenyAll() {
+        var allowlist = SenderAllowlist(policy: .denyAll)
+        let sender = ChannelSender(id: "any-user", displayName: "User", platform: .fakechat)
+        allowlist.add(senderId: sender.id)
+        XCTAssertFalse(allowlist.allows(sender: sender))
+    }
+
+    func testSenderAllowlistAllowlistPolicy() {
+        var allowlist = SenderAllowlist(policy: .allowlist)
+        let sender = ChannelSender(id: "approved-user", displayName: "User", platform: .fakechat)
+        let stranger = ChannelSender(id: "stranger", displayName: "Stranger", platform: .fakechat)
+
+        XCTAssertFalse(allowlist.allows(sender: sender))
+        allowlist.add(senderId: sender.id)
+        XCTAssertTrue(allowlist.allows(sender: sender))
+        XCTAssertFalse(allowlist.allows(sender: stranger))
+
+        allowlist.remove(senderId: sender.id)
+        XCTAssertFalse(allowlist.allows(sender: sender))
+    }
+
+    func testChannelPairingFlow() throws {
+        let channel = FakechatChannel()
+        let sender = ChannelSender(id: "new-user", displayName: "New User", platform: .fakechat)
+
+        // Switch to allowlist-only mode
+        channel.allowlist.policy = .allowlist
+        XCTAssertFalse(channel.allowlist.allows(sender: sender))
+
+        // Generate pairing code
+        let pairingRequest = channel.generatePairingCode(for: sender)
+        XCTAssertFalse(pairingRequest.isExpired)
+
+        // Approve the code
+        try channel.approvePairing(code: pairingRequest.code)
+        XCTAssertTrue(channel.allowlist.allows(sender: sender))
+    }
+
+    func testChannelPairingInvalidCode() {
+        let channel = FakechatChannel()
+        XCTAssertThrowsError(try channel.approvePairing(code: "000000")) { error in
+            if case ChannelError.pairingCodeNotFound = error {} else {
+                XCTFail("Expected pairingCodeNotFound")
+            }
+        }
+    }
+
+    func testChannelManagerRegisterAndRetrieve() {
+        let manager = ChannelManager()
+        let channel = FakechatChannel()
+        manager.register(channel: channel)
+
+        XCTAssertNotNil(manager.channel(id: "fakechat"))
+        XCTAssertEqual(manager.allChannels().count, 1)
+    }
+
+    func testChannelManagerEventHandlerReceivesReply() async throws {
+        let manager = ChannelManager()
+        let channel = FakechatChannel()
+        manager.register(channel: channel)
+        try await manager.start(channelId: channel.id)
+
+        let expectation = XCTestExpectation(description: "handler called")
+        manager.onEvent(channelId: channel.id) { event in
+            expectation.fulfill()
+            return "handled: \(event.message.text)"
+        }
+
+        channel.simulateIncomingMessage("test input")
+        await fulfillment(of: [expectation], timeout: 1)
+
+        // Give the async reply task a moment to complete
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(channel.lastReply?.text, "handled: test input")
+    }
+
+    func testWritersAppEnableFakechatChannel() async throws {
+        let channel = try await app.enableFakechatChannel()
+        XCTAssertTrue(channel.isActive)
+        XCTAssertNotNil(app.channelManager.channel(id: "fakechat"))
+
+        await app.disableChannel(id: "fakechat")
+        XCTAssertFalse(channel.isActive)
+    }
+
+    func testChannelEventHasCorrectFields() {
+        let sender = ChannelSender(id: "u1", displayName: "Alice", platform: .fakechat)
+        let msg = ChannelMessage(text: "hello", metadata: ["key": "value"])
+        let event = ChannelEvent(channelId: "fakechat", sender: sender, message: msg)
+
+        XCTAssertEqual(event.channelId, "fakechat")
+        XCTAssertEqual(event.sender.id, "u1")
+        XCTAssertEqual(event.message.text, "hello")
+        XCTAssertEqual(event.message.metadata["key"], "value")
+    }
+
+    func testChannelManagerAllowlistFiltersEvents() async throws {
+        let manager = ChannelManager()
+        let channel = FakechatChannel()
+        channel.allowlist = SenderAllowlist(policy: .allowlist, initialIds: ["allowed-user"])
+        manager.register(channel: channel)
+        try await manager.start(channelId: channel.id)
+
+        var handlerCallCount = 0
+        manager.onEvent(channelId: channel.id) { _ in
+            handlerCallCount += 1
+            return nil
+        }
+
+        // This message should be dropped (stranger not in allowlist)
+        channel.simulateIncomingMessage("from stranger", senderId: "stranger")
+        // This message should be delivered (allowed-user is in allowlist)
+        channel.simulateIncomingMessage("from allowed", senderId: "allowed-user")
+
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(handlerCallCount, 1)
+    }
 }

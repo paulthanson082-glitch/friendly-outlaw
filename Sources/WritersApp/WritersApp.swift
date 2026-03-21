@@ -9,6 +9,7 @@ public class WritersApp {
     public let hardwareManager: HardwareManager
     public let databaseManager: DatabaseManager
     public let pluginManager: PluginManager
+    public let channelManager: ChannelManager
     public let encouragementService: EncouragementService
     public let versionControl: DoltVersionControlService
     public private(set) var guiService: GuiNewService?
@@ -41,6 +42,7 @@ public class WritersApp {
         self.hardwareManager = HardwareManager()
         self.databaseManager = databaseManager
         self.pluginManager = PluginManager.shared
+        self.channelManager = ChannelManager()
         self.encouragementService = EncouragementService()
         self.versionControl = DoltVersionControlService(databaseManager: databaseManager)
         self.guiService = nil
@@ -334,6 +336,59 @@ public class WritersApp {
     /// Shutdown all plugins
     public func shutdownPlugins() async {
         await pluginManager.shutdownAll()
+    }
+
+    // MARK: - Channel Management
+
+    /// Register and start the Fakechat demo channel.
+    /// Returns the channel so callers can simulate messages.
+    @discardableResult
+    public func enableFakechatChannel() async throws -> FakechatChannel {
+        let channel = FakechatChannel()
+        channelManager.register(channel: channel)
+        try await channelManager.start(channelId: channel.id)
+        return channel
+    }
+
+    /// Register and start any channel.
+    public func enableChannel(_ channel: Channel) async throws {
+        channelManager.register(channel: channel)
+        try await channelManager.start(channelId: channel.id)
+    }
+
+    /// Stop and unregister a channel by id.
+    /// `unregister` already stops the channel, so there is no need to call stop separately.
+    public func disableChannel(id: String) async {
+        await channelManager.unregister(channelId: id)
+    }
+
+    /// Stop all active channels.
+    public func disableAllChannels() async {
+        await channelManager.stopAll()
+    }
+
+    /// Register a handler that is called whenever a message arrives on the given channel.
+    /// The handler returns an optional reply string; non-nil values are sent back automatically.
+    public func onChannelMessage(
+        channelId: String,
+        handler: @escaping (ChannelEvent) async -> String?
+    ) {
+        channelManager.onEvent(channelId: channelId, handler: handler)
+    }
+
+    /// Send a reply through a channel.
+    public func sendChannelReply(_ reply: ChannelReply) async throws {
+        try await channelManager.send(reply: reply)
+    }
+
+    /// Approve a pairing code for a given channel, adding the sender to the allowlist.
+    public func approveChannelPairing(code: String, channelId: String) throws {
+        try channelManager.approvePairing(code: code, channelId: channelId)
+    }
+
+    /// Set the allowlist policy for a channel.
+    public func setChannelPolicy(_ policy: AllowlistPolicy, channelId: String) throws {
+        try channelManager.setPolicy(policy, channelId: channelId)
     }
 
     // MARK: - Document Creation from Templates
