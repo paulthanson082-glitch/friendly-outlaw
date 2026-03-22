@@ -778,6 +778,26 @@ public class WritersApp {
         return try await ai.getWritingInsights(document: document)
     }
 
+    // MARK: - Hallucination Reduction
+
+    /// Extract direct quotations from a document's content
+    public func extractQuotesFromDocument(documentId: UUID) async throws -> [String] {
+        let (ai, document) = try requireAIAndDocument(documentId: documentId)
+        return try await ai.extractQuotes(from: document.content)
+    }
+
+    /// Verify the internal factual consistency of a document
+    public func verifyDocumentConsistency(documentId: UUID) async throws -> String {
+        let (ai, document) = try requireAIAndDocument(documentId: documentId)
+        return try await ai.verifyFactualConsistency(of: document.content)
+    }
+
+    /// Extract direct quotations from a text string
+    public func extractQuotesFromText(_ text: String) async throws -> [String] {
+        guard let ai = aiService else { throw AIError.aiNotEnabled }
+        return try await ai.extractQuotes(from: text)
+    }
+
     /// Get AI assistance with tool support (implements the tool loop pattern).
     ///
     /// This enables Claude to use built-in writing tools (word count, document search,

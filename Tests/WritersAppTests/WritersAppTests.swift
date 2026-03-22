@@ -1279,4 +1279,67 @@ final class WritersAppTests: XCTestCase {
         XCTAssertNotNil(freshApp.versionControl,
                         "Default init() should set up DoltVersionControlService")
     }
+
+    // MARK: - Hallucination Reduction
+
+    func testHallucinationReductionMethodsRequireAI() async {
+        let freshApp = WritersApp()
+        let doc = freshApp.createBlankDocument(title: "Test", category: .novel)
+
+        do {
+            _ = try await freshApp.extractQuotesFromDocument(documentId: doc.id)
+            XCTFail("Should throw aiNotEnabled when AI is not configured")
+        } catch AIError.aiNotEnabled {
+            // Expected
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+
+        do {
+            _ = try await freshApp.verifyDocumentConsistency(documentId: doc.id)
+            XCTFail("Should throw aiNotEnabled when AI is not configured")
+        } catch AIError.aiNotEnabled {
+            // Expected
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+    }
+
+    func testHallucinationReductionMethodsRequireDocument() async {
+        let freshApp = WritersApp()
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        freshApp.enableAI(configuration: config)
+        let bogusId = UUID()
+
+        do {
+            _ = try await freshApp.extractQuotesFromDocument(documentId: bogusId)
+            XCTFail("Should throw documentNotFound for unknown document")
+        } catch AIError.documentNotFound {
+            // Expected
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+
+        do {
+            _ = try await freshApp.verifyDocumentConsistency(documentId: bogusId)
+            XCTFail("Should throw documentNotFound for unknown document")
+        } catch AIError.documentNotFound {
+            // Expected
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+    }
+
+    func testTextBasedHallucinationReductionMethods() async {
+        let freshApp = WritersApp()
+
+        do {
+            _ = try await freshApp.extractQuotesFromText("He said, \"Hello world.\"")
+            XCTFail("Should throw aiNotEnabled when AI is not configured")
+        } catch AIError.aiNotEnabled {
+            // Expected
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+    }
 }

@@ -438,6 +438,23 @@ public class AIService {
         return toolResults
     }
 
+    // MARK: - Hallucination Reduction
+
+    /// Extract direct quotations from the given text
+    public func extractQuotes(from text: String) async throws -> [String] {
+        let response = try await getAssistance(text: text, type: .extractQuotes)
+        return response.generatedContent
+            .components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    /// Verify the internal factual consistency of the given text
+    public func verifyFactualConsistency(of text: String, context: AIContext? = nil) async throws -> String {
+        let response = try await getAssistance(text: text, type: .verifyFactualConsistency, context: context)
+        return response.generatedContent
+    }
+
     // MARK: - Batch Operations
 
     /// Process multiple requests in batch

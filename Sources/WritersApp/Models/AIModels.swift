@@ -59,6 +59,8 @@ public enum AIAssistanceType {
     case simplifyText
     case changetone(WritingTone)
     case custom(String)
+    case extractQuotes
+    case verifyFactualConsistency
 
     public var displayName: String {
         switch self {
@@ -78,6 +80,8 @@ public enum AIAssistanceType {
         case .simplifyText: return "Simplify Text"
         case .changetone(let tone): return "Change Tone to \(tone.displayName)"
         case .custom: return "Custom Request"
+        case .extractQuotes: return "Extract Quotes"
+        case .verifyFactualConsistency: return "Verify Factual Consistency"
         }
     }
 
@@ -256,6 +260,27 @@ public enum AIAssistanceType {
             \(text)
 
             Result:
+            """
+
+        case .extractQuotes:
+            return """
+            Extract all direct quotations and attributed statements from the following text. List each quote on its own line, exactly as it appears in the text. Do not paraphrase or add quotes that are not present.
+
+            Text:
+            \(text)
+
+            Quotes (one per line):
+            """
+
+        case .verifyFactualConsistency:
+            return """
+            \(contextInfo)
+            Review the following text for internal factual consistency. Identify any contradictions, inconsistent details, or statements that conflict with other parts of the same text. Report only issues found within the text itself — do not introduce external knowledge.
+
+            Text:
+            \(text)
+
+            Consistency report:
             """
         }
     }
