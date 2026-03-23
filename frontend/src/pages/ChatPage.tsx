@@ -12,7 +12,7 @@ interface Message {
 
 export const ChatPage: React.FC = () => {
   const { user } = useAuth();
-  const { session, messages, isLoading, error, createSession, loadSession, sendMessage } =
+  const { session, messages, isLoading, error, createSession, sendMessage } =
     useChat();
 
   const [inputValue, setInputValue] = useState('');
