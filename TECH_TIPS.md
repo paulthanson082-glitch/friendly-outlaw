@@ -35,6 +35,7 @@ Tools for analyzing and measuring website performance:
 Browser-based developer utilities and productivity tools:
 
 - [ZapTools](https://zaptools.web.app) - 114+ free browser-based developer tools including JSON formatter, CSS generators, hash generators, encoders/decoders, and converters — 100% client-side execution, no signup or tracking required
+- [ToolSparkr](https://toolsparkr.com) - 35+ free online developer tools including JSON formatter, URL encoder, password generator, Base64 encoder, hash generators, QR code generator, and DNS lookup — privacy-first with all processing in the browser, no signup or tracking required
 
 ## Additional Resources
 
