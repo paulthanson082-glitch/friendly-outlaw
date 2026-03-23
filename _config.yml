@@ -1,0 +1,19 @@
+remote_theme: just-the-docs/just-the-docs
+
+title: friendly-outlaw
+description: A Swift application for writers featuring template management, AI-powered writing assistance, and more.
+
+# Fallback supported theme (used if remote_theme is unavailable)
+# theme: jekyll-theme-minimal
+
+plugins:
+  - jekyll-remote-theme
+
+# Just the Docs configuration
+color_scheme: dark
+
+# Navigation
+nav_sort: order  # use nav_order values defined in front matter
+
+# Footer
+footer_content: "friendly-outlaw &copy; 2026"
