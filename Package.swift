@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "WritersApp",
     platforms: [
-        .macOS(.v13),
+        .macOS(.v14),
         .iOS(.v16)
     ],
     products: [
@@ -13,9 +13,20 @@ let package = Package(
             targets: ["WritersApp"]),
         .executable(
             name: "WritersAppCLI",
-            targets: ["WritersAppCLI"])
+            targets: ["WritersAppCLI"]),
+        .library(
+            name: "MockerKit",
+            targets: ["MockerKit"]),
+        .executable(
+            name: "mocker",
+            targets: ["Mocker"])
+    ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
+        .package(url: "https://github.com/jpsim/Yams.git", from: "5.0.0")
     ],
     targets: [
+        // WritersApp targets
         .systemLibrary(
             name: "CSQLite",
             pkgConfig: "sqlite3"),
@@ -27,6 +38,22 @@ let package = Package(
             dependencies: ["WritersApp"]),
         .testTarget(
             name: "WritersAppTests",
-            dependencies: ["WritersApp"])
+            dependencies: ["WritersApp"]),
+
+        // Mocker targets
+        .target(
+            name: "MockerKit",
+            dependencies: [
+                .product(name: "Yams", package: "Yams")
+            ]),
+        .executableTarget(
+            name: "Mocker",
+            dependencies: [
+                "MockerKit",
+                .product(name: "ArgumentParser", package: "swift-argument-parser")
+            ]),
+        .testTarget(
+            name: "MockerKitTests",
+            dependencies: ["MockerKit"])
     ]
 )
