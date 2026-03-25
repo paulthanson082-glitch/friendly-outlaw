@@ -1273,6 +1273,158 @@ final class WritersAppTests: XCTestCase {
                              "Default init() should load default templates")
     }
 
+    // MARK: - RegexSearchIndex Tests
+
+    func testRegexSearchIndexBasicLiteralMatch() {
+        let index = RegexSearchIndex()
+        let id1 = UUID()
+        let id2 = UUID()
+        index.indexDocument(id: id1, text: "The quick brown fox jumps over the lazy dog")
+        index.indexDocument(id: id2, text: "A cat sat on the mat")
+
+        let results = index.search(pattern: "fox")
+        XCTAssertTrue(results.contains(id1), "Should find document containing 'fox'")
+        XCTAssertFalse(results.contains(id2), "Should not find document without 'fox'")
+    }
+
+    func testRegexSearchIndexCaseInsensitive() {
+        let index = RegexSearchIndex()
+        let id = UUID()
+        index.indexDocument(id: id, text: "Hello World")
+
+        XCTAssertTrue(index.search(pattern: "hello").contains(id))
+        XCTAssertTrue(index.search(pattern: "WORLD").contains(id))
+        XCTAssertTrue(index.search(pattern: "Hello World").contains(id))
+    }
+
+    func testRegexSearchIndexRegexPattern() {
+        let index = RegexSearchIndex()
+        let id1 = UUID()
+        let id2 = UUID()
+        index.indexDocument(id: id1, text: "The colour is grey")
+        index.indexDocument(id: id2, text: "The color is gray")
+
+        let results = index.search(pattern: "colou?r")
+        XCTAssertTrue(results.contains(id1), "Should match British spelling via regex")
+        XCTAssertTrue(results.contains(id2), "Should match American spelling via regex")
+    }
+
+    func testRegexSearchIndexNoFalseNegatives() {
+        let index = RegexSearchIndex()
+        var ids: [UUID] = []
+        let words = ["apple", "banana", "cherry", "date", "elderberry",
+                     "fig", "grape", "honeydew", "kiwi", "lemon"]
+        for word in words {
+            let id = UUID()
+            ids.append(id)
+            index.indexDocument(id: id, text: "I enjoy eating \(word) every day")
+        }
+
+        for (i, word) in words.enumerated() {
+            let results = index.search(pattern: word)
+            XCTAssertTrue(results.contains(ids[i]),
+                          "Should always find document containing literal '\(word)'")
+        }
+    }
+
+    func testRegexSearchIndexRemoveDocument() {
+        let index = RegexSearchIndex()
+        let id = UUID()
+        index.indexDocument(id: id, text: "Temporary content about dragons")
+        XCTAssertTrue(index.search(pattern: "dragons").contains(id))
+
+        index.removeDocument(id: id)
+        XCTAssertFalse(index.search(pattern: "dragons").contains(id))
+        XCTAssertEqual(index.documentCount, 0)
+    }
+
+    func testRegexSearchIndexReindex() {
+        let index = RegexSearchIndex()
+        let id = UUID()
+        index.indexDocument(id: id, text: "Original content with unicorn")
+        XCTAssertTrue(index.search(pattern: "unicorn").contains(id))
+
+        index.indexDocument(id: id, text: "Updated content about dragons")
+        XCTAssertFalse(index.search(pattern: "unicorn").contains(id),
+                       "Old trigrams should be removed on re-index")
+        XCTAssertTrue(index.search(pattern: "dragons").contains(id),
+                      "New trigrams should be present after re-index")
+        XCTAssertEqual(index.documentCount, 1)
+    }
+
+    func testRegexSearchIndexShortPattern() {
+        let index = RegexSearchIndex()
+        let id = UUID()
+        index.indexDocument(id: id, text: "ab matches short query")
+
+        // Pattern shorter than 3 chars falls back to full scan — no false negatives
+        let results = index.search(pattern: "ab")
+        XCTAssertTrue(results.contains(id))
+    }
+
+    func testRegexSearchIndexTrigramCount() {
+        let index = RegexSearchIndex()
+        XCTAssertEqual(index.trigramCount, 0)
+        XCTAssertEqual(index.documentCount, 0)
+
+        index.indexDocument(id: UUID(), text: "hello world")
+        XCTAssertGreaterThan(index.trigramCount, 0)
+        XCTAssertEqual(index.documentCount, 1)
+    }
+
+    func testDocumentManagerSearchWithRegex() {
+        let dm = DocumentManager()
+        let d1 = Document(title: "Swift Basics", content: "Variables and constants in Swift", category: .article)
+        let d2 = Document(title: "Python Guide", content: "Functions and classes in Python", category: .article)
+        let d3 = Document(title: "Regex Tutorial", content: "Patterns for matching text", category: .blogPost)
+        dm.createDocument(d1)
+        dm.createDocument(d2)
+        dm.createDocument(d3)
+
+        let swiftResults = dm.searchDocumentsWithRegex(pattern: "Swift")
+        XCTAssertTrue(swiftResults.contains(where: { $0.id == d1.id }))
+        XCTAssertFalse(swiftResults.contains(where: { $0.id == d2.id }))
+
+        let regexResults = dm.searchDocumentsWithRegex(pattern: "(Swift|Python)")
+        XCTAssertTrue(regexResults.contains(where: { $0.id == d1.id }))
+        XCTAssertTrue(regexResults.contains(where: { $0.id == d2.id }))
+        XCTAssertFalse(regexResults.contains(where: { $0.id == d3.id }))
+    }
+
+    func testDocumentManagerSearchWithRegexEmptyPattern() {
+        let dm = DocumentManager()
+        dm.createDocument(Document(title: "Doc A", content: "Content A", category: .article))
+        dm.createDocument(Document(title: "Doc B", content: "Content B", category: .blogPost))
+
+        let results = dm.searchDocumentsWithRegex(pattern: "")
+        XCTAssertEqual(results.count, 2, "Empty pattern should return all documents")
+    }
+
+    func testDocumentManagerIndexSyncOnDelete() {
+        let dm = DocumentManager()
+        let doc = Document(title: "Ephemeral", content: "This document will be deleted", category: .other)
+        dm.createDocument(doc)
+        XCTAssertFalse(dm.searchDocumentsWithRegex(pattern: "Ephemeral").isEmpty)
+
+        dm.deleteDocument(id: doc.id)
+        XCTAssertTrue(dm.searchDocumentsWithRegex(pattern: "Ephemeral").isEmpty,
+                      "Index should not return deleted documents")
+    }
+
+    func testDocumentManagerIndexSyncOnUpdate() {
+        let dm = DocumentManager()
+        var doc = Document(title: "Original", content: "Before update", category: .article)
+        dm.createDocument(doc)
+
+        doc.content = "After update with new keyword: nebula"
+        dm.updateDocument(doc)
+
+        XCTAssertFalse(dm.searchDocumentsWithRegex(pattern: "nebula").isEmpty,
+                       "Index should reflect updated content")
+        XCTAssertTrue(dm.searchDocumentsWithRegex(pattern: "Before update").isEmpty,
+                      "Old content should no longer match")
+    }
+
     func testWritersAppDefaultInitHasVersionControl() {
         // The new designated init() should initialize version control
         let freshApp = WritersApp()

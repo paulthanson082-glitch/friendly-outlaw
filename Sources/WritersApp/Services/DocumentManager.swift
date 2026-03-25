@@ -4,6 +4,9 @@ import Foundation
 public class DocumentManager {
     private var documents: [UUID: Document]
 
+    /// Trigram-based index for fast regex search over document content.
+    private let searchIndex = RegexSearchIndex()
+
     public init() {
         self.documents = [:]
     }
@@ -13,6 +16,7 @@ public class DocumentManager {
     /// Creates a new document
     public func createDocument(_ document: Document) {
         documents[document.id] = document
+        searchIndex.indexDocument(id: document.id, text: document.title + " " + document.content)
     }
 
     /// Retrieves a document by ID
@@ -51,11 +55,13 @@ public class DocumentManager {
         var updatedDoc = document
         updatedDoc.metadata.modified = Date()
         documents[document.id] = updatedDoc
+        searchIndex.indexDocument(id: updatedDoc.id, text: updatedDoc.title + " " + updatedDoc.content)
     }
 
     /// Deletes a document
     public func deleteDocument(id: UUID) {
         documents.removeValue(forKey: id)
+        searchIndex.removeDocument(id: id)
     }
 
     /// Marks a document as opened
@@ -63,6 +69,25 @@ public class DocumentManager {
         guard var document = documents[id] else { return }
         document.metadata.lastOpened = Date()
         documents[id] = document
+    }
+
+    /// Searches documents using a regex pattern, accelerated by the trigram index.
+    ///
+    /// The index is used to prune candidate documents before running the full
+    /// regular expression engine, so performance scales sub-linearly with corpus
+    /// size for selective patterns.
+    ///
+    /// - Parameter pattern: An `NSRegularExpression`-compatible pattern.
+    ///   Case-insensitive matching is applied automatically.
+    /// - Returns: Documents whose title or content match the pattern, sorted
+    ///   by most-recently modified.
+    public func searchDocumentsWithRegex(pattern: String) -> [Document] {
+        guard !pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return getAllDocuments()
+        }
+        let matchingIds = searchIndex.search(pattern: pattern)
+        return matchingIds.compactMap { documents[$0] }
+            .sorted { $0.metadata.modified > $1.metadata.modified }
     }
 
     // MARK: - Statistics
