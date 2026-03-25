@@ -371,6 +371,14 @@ struct WritersAppCLI {
             print("69. View Issue Statistics")
             print("70. Reopen Issue")
 
+            print("\nKanban Board Management:")
+            print("71. Create Kanban Board")
+            print("72. List Kanban Boards")
+            print("73. View Kanban Board")
+            print("74. Add Kanban Task")
+            print("75. Move Kanban Task")
+            print("76. Delete Kanban Board")
+
             print("\nHardware Board Management:")
             print("80. Add Hardware Board")
             print("81. List Hardware Boards")
@@ -500,6 +508,18 @@ struct WritersAppCLI {
                 viewIssueStatistics(app: app)
             case 70:
                 reopenIssue(app: app)
+            case 71:
+                createKanbanBoardCLI(app: app)
+            case 72:
+                listKanbanBoardsCLI(app: app)
+            case 73:
+                viewKanbanBoardCLI(app: app)
+            case 74:
+                addKanbanTaskCLI(app: app)
+            case 75:
+                moveKanbanTaskCLI(app: app)
+            case 76:
+                deleteKanbanBoardCLI(app: app)
             case 80:
                 await addHardwareBoard(app: app)
             case 81:
@@ -3722,3 +3742,186 @@ func checkRagieDocumentStatus(app: WritersApp) async {
     }
 }
 
+
+// MARK: - Kanban Board Management
+
+/// Creates a new Kanban board interactively.
+func createKanbanBoardCLI(app: WritersApp) {
+    print("\n=== Create Kanban Board ===\n")
+    print("Board name: ", terminator: "")
+    guard let name = readLine(), !name.isEmpty else {
+        print("Board name cannot be empty.")
+        return
+    }
+    print("Description (optional): ", terminator: "")
+    let description = readLine() ?? ""
+    let board = app.createKanbanBoard(name: name, description: description)
+    print("\n✓ Kanban board created: \(board.name) [\(board.id.uuidString.prefix(8))]")
+}
+
+/// Lists all Kanban boards.
+func listKanbanBoardsCLI(app: WritersApp) {
+    print("\n=== Kanban Boards ===\n")
+    let boards = app.getAllKanbanBoards()
+    if boards.isEmpty {
+        print("No Kanban boards found. Create one with option 71.")
+        return
+    }
+    for board in boards {
+        let taskCount = app.getKanbanTasks(forBoard: board.id).count
+        print("[\(board.id.uuidString.prefix(8))] \(board.name) — \(taskCount) task(s)")
+        if !board.description.isEmpty {
+            print("  \(board.description)")
+        }
+    }
+}
+
+/// Displays detailed view of a specific Kanban board.
+func viewKanbanBoardCLI(app: WritersApp) {
+    print("\n=== View Kanban Board ===\n")
+    let boards = app.getAllKanbanBoards()
+    if boards.isEmpty {
+        print("No Kanban boards found. Create one with option 71.")
+        return
+    }
+    for (index, board) in boards.enumerated() {
+        print("\(index + 1). \(board.name)")
+    }
+    print("\nSelect board (1-\(boards.count)): ", terminator: "")
+    guard let input = readLine(), let choice = Int(input), choice >= 1, choice <= boards.count else {
+        print("Invalid selection.")
+        return
+    }
+    let board = boards[choice - 1]
+    print("\n\(board.name)")
+    if !board.description.isEmpty { print("Description: \(board.description)") }
+    print(String(repeating: "-", count: 40))
+    // KanbanColumn.allCases preserves declaration order: backlog → planning → running → review → done
+    for column in KanbanColumn.allCases {
+        let tasks = app.getKanbanTasks(forBoard: board.id, inColumn: column)
+        print("\n[\(column.displayName)] (\(tasks.count))")
+        for task in tasks {
+            print("  • [\(task.id.uuidString.prefix(8))] \(task.title)")
+            if !task.description.isEmpty { print("    \(task.description)") }
+        }
+    }
+}
+
+/// Adds a new task to a Kanban board.
+func addKanbanTaskCLI(app: WritersApp) {
+    print("\n=== Add Kanban Task ===\n")
+    let boards = app.getAllKanbanBoards()
+    if boards.isEmpty {
+        print("No Kanban boards found. Create one with option 71.")
+        return
+    }
+    for (index, board) in boards.enumerated() {
+        print("\(index + 1). \(board.name)")
+    }
+    print("\nSelect board (1-\(boards.count)): ", terminator: "")
+    guard let boardInput = readLine(), let boardChoice = Int(boardInput),
+          boardChoice >= 1, boardChoice <= boards.count else {
+        print("Invalid selection.")
+        return
+    }
+    let board = boards[boardChoice - 1]
+    print("Task title: ", terminator: "")
+    guard let title = readLine(), !title.isEmpty else {
+        print("Task title cannot be empty.")
+        return
+    }
+    print("Description (optional): ", terminator: "")
+    let description = readLine() ?? ""
+    // Prompt for initial column (KanbanColumn.allCases preserves workflow order: backlog → done)
+    print("\nSelect initial column:")
+    let columns = KanbanColumn.allCases
+    for (index, column) in columns.enumerated() {
+        let marker = index == 0 ? " (default)" : ""
+        print("\(index + 1). \(column.displayName)\(marker)")
+    }
+    print("Choice (1-\(columns.count), default 1): ", terminator: "")
+    var initialColumn: KanbanColumn = .backlog
+    if let colInput = readLine(), let colChoice = Int(colInput), colChoice >= 1, colChoice <= columns.count {
+        initialColumn = columns[colChoice - 1]
+    }
+    let task = app.createKanbanTask(boardId: board.id, title: title, description: description, column: initialColumn)
+    print("\n✓ Task added to \(board.name): \(task.title) [\(task.id.uuidString.prefix(8))]")
+    print("  Column: \(task.column.displayName)")
+}
+
+/// Moves a Kanban task to a different column.
+func moveKanbanTaskCLI(app: WritersApp) {
+    print("\n=== Move Kanban Task ===\n")
+    let boards = app.getAllKanbanBoards()
+    if boards.isEmpty {
+        print("No Kanban boards found. Create one with option 71.")
+        return
+    }
+    for (index, board) in boards.enumerated() {
+        print("\(index + 1). \(board.name)")
+    }
+    print("\nSelect board (1-\(boards.count)): ", terminator: "")
+    guard let boardInput = readLine(), let boardChoice = Int(boardInput),
+          boardChoice >= 1, boardChoice <= boards.count else {
+        print("Invalid selection.")
+        return
+    }
+    let board = boards[boardChoice - 1]
+    let tasks = app.getKanbanTasks(forBoard: board.id)
+    if tasks.isEmpty {
+        print("No tasks on this board.")
+        return
+    }
+    for (index, task) in tasks.enumerated() {
+        print("\(index + 1). [\(task.column.displayName)] \(task.title)")
+    }
+    print("\nSelect task (1-\(tasks.count)): ", terminator: "")
+    guard let taskInput = readLine(), let taskChoice = Int(taskInput),
+          taskChoice >= 1, taskChoice <= tasks.count else {
+        print("Invalid selection.")
+        return
+    }
+    let task = tasks[taskChoice - 1]
+    let columns = KanbanColumn.allCases
+    print("\nSelect target column:")
+    for (index, column) in columns.enumerated() {
+        let marker = column == task.column ? " (current)" : ""
+        print("\(index + 1). \(column.displayName)\(marker)")
+    }
+    print("Choice (1-\(columns.count)): ", terminator: "")
+    guard let colInput = readLine(), let colChoice = Int(colInput),
+          colChoice >= 1, colChoice <= columns.count else {
+        print("Invalid selection.")
+        return
+    }
+    let targetColumn = columns[colChoice - 1]
+    app.moveKanbanTask(id: task.id, toColumn: targetColumn)
+    print("\n✓ Task '\(task.title)' moved to \(targetColumn.displayName)")
+}
+
+/// Deletes a Kanban board and all its tasks.
+func deleteKanbanBoardCLI(app: WritersApp) {
+    print("\n=== Delete Kanban Board ===\n")
+    let boards = app.getAllKanbanBoards()
+    if boards.isEmpty {
+        print("No Kanban boards found.")
+        return
+    }
+    for (index, board) in boards.enumerated() {
+        let taskCount = app.getKanbanTasks(forBoard: board.id).count
+        print("\(index + 1). \(board.name) (\(taskCount) task(s))")
+    }
+    print("\nSelect board to delete (1-\(boards.count)): ", terminator: "")
+    guard let input = readLine(), let choice = Int(input), choice >= 1, choice <= boards.count else {
+        print("Invalid selection.")
+        return
+    }
+    let board = boards[choice - 1]
+    print("Delete '\(board.name)' and all its tasks? (y/N): ", terminator: "")
+    guard let confirm = readLine(), confirm.lowercased() == "y" else {
+        print("Deletion cancelled.")
+        return
+    }
+    app.deleteKanbanBoard(id: board.id)
+    print("\n✓ Kanban board '\(board.name)' deleted.")
+}
