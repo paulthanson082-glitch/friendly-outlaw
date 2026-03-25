@@ -863,6 +863,16 @@ When running as an MCP server, the following tools are available:
 - [CLOTHER.md](CLOTHER.md) - Using 100+ LLM providers with Clother
 - [CLOTHER_SETUP.md](CLOTHER_SETUP.md) - Contributor guide for Clother development
 
+## Containers/Orchestration
+
+### CLI Tools
+
+<p>
+&nbsp;&nbsp; <a href="https://github.com/google/gvisor"><b>gvisor</b></a> - container runtime sandbox.<br>
+&nbsp;&nbsp; <a href="https://github.com/bcicen/ctop"><b>ctop</b></a> - top-like interface for container metrics.<br>
+&nbsp;&nbsp; <a href="https://github.com/us/mocker"><b>Mocker</b></a> - docker-compatible container CLI for macOS, built on Apple's Containerization framework.<br>
+</p>
+
 ## License
 
 MIT License - See LICENSE file for details
