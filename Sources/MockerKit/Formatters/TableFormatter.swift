@@ -1,5 +1,4 @@
 import Foundation
-import MockerKit
 
 // MARK: - TableFormatter
 
@@ -29,12 +28,12 @@ public enum TableFormatter {
 
     public static func formatImages(_ images: [ImageInfo], quiet: Bool, noTrunc: Bool) -> String {
         if quiet {
-            return images.map { noTrunc ? $0.id : $0.shortId }.joined(separator: "\n")
+            return images.map { noTrunc ? $0.id : String($0.id.prefix(12)) }.joined(separator: "\n")
         }
         let header = ["REPOSITORY", "TAG", "IMAGE ID", "CREATED", "SIZE"]
         var rows: [[String]] = []
         for img in images {
-            let id = noTrunc ? img.id : img.shortId
+            let id = noTrunc ? img.id : String(img.id.prefix(12))
             let created = relativeTime(img.createdAt)
             rows.append([img.repository, img.tag, id, created, img.sizeDescription])
         }
