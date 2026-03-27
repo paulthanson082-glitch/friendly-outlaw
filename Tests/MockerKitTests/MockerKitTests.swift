@@ -225,7 +225,12 @@ final class MockerKitTests: XCTestCase {
     func testNetworkManager_removeDefaultFails() async throws {
         let manager = NetworkManager()
         try await manager.load()
-        XCTAssertThrowsError(try manager.remove("bridge"))
+        do {
+            _ = try await manager.remove("bridge")
+            XCTFail("Expected remove of default network to throw")
+        } catch {
+            // Expected: default networks cannot be removed
+        }
     }
 
     // MARK: - VolumeManager Tests (sync subset)
