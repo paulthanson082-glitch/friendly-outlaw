@@ -1,18 +1,30 @@
 # Build Instructions for Mac Pro
 
 **Project**: friendly-outlaw (WritersApp + AIMS platform)
-**Target**: macOS (Mac Pro)
-**Branch**: `claude/research-mythos-leak-zqUkX`
+**Target**: macOS 14+ (Mac Pro — Intel & Apple Silicon M-series)
 **Last Updated**: March 27, 2026
+
+---
+
+## Supported Mac Pro Hardware
+
+| Mac Pro Model | Chip | macOS Min | Status |
+|---------------|------|-----------|--------|
+| Mac Pro (2023) | Apple M2 Ultra | macOS 14 Sonoma | ✅ Supported |
+| Mac Pro (2019) | Intel Xeon W | macOS 14 Sonoma | ✅ Supported |
+| Mac Pro (2013) | Intel Xeon E5 | macOS 14 Sonoma | ✅ Supported |
+
+> **Note:** Apple Silicon (M2 Ultra) Mac Pros build natively for arm64. Intel Mac Pros build for x86_64. Universal binaries are built automatically by Swift Package Manager.
 
 ---
 
 ## Pre-Build Checklist
 
-- [ ] Mac Pro with macOS 13+ (Ventura or later recommended)
-- [ ] Xcode 15+ installed (`xcode-select --install` if needed)
+- [ ] Mac Pro with **macOS 14 Sonoma** or later
+- [ ] **Xcode 16+** installed from the App Store
 - [ ] Swift 5.9+ available (`swift --version`)
-- [ ] SQLite3 development files installed
+- [ ] Xcode Command Line Tools installed (`xcode-select --install`)
+- [ ] SQLite3 development files (included with Xcode CLT)
 - [ ] Node.js 18+ for AIMS web app (optional)
 - [ ] Git installed and configured
 
@@ -26,11 +38,17 @@ swift --version
 xcode-select -p
 # Should output: /Applications/Xcode.app/Contents/Developer
 
-# Check SQLite3
+# Check Xcode Command Line Tools
+xcode-select --version
+
+# Check SQLite3 (included with Xcode CLT)
 sqlite3 --version
 
 # Verify git
 git --version
+
+# Check macOS version
+sw_vers
 ```
 
 ---
@@ -39,9 +57,6 @@ git --version
 
 ```bash
 cd /path/to/friendly-outlaw
-
-# Clone the development branch if needed
-git checkout claude/research-mythos-leak-zqUkX
 
 # Build for Mac (debug)
 swift build
@@ -84,7 +99,7 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 
 ## Test Suite
 
-Run all 88+ tests:
+Run all 621+ tests:
 
 ```bash
 # Standard test run
@@ -94,20 +109,21 @@ swift test
 swift test --verbose
 
 # Specific test class
-swift test WritersAppTests
+swift test --filter WritersAppTests
 
 # Show timing information
-swift test --stats
+swift test --parallel
 ```
 
 **Test Coverage:**
-- ✅ Core: Templates, documents, word count, statistics (8 tests)
-- ✅ Tool loop: Tool definitions, execution, results (7 tests)
-- ✅ WritingToolExecutor: 5 built-in writing tools (9 tests)
-- ✅ Issue management: CRUD, reopening, status transitions (3 tests)
-- ✅ Kanban: Boards, tasks, workflow columns (18 tests)
-- ✅ Version control: Branches, commits, diffs, merges, time-travel (17 tests)
-- ✅ AI Service: Messaging, tool loops, analysis (26+ tests)
+- ✅ Core: Templates, documents, word count, statistics
+- ✅ Tool loop: Tool definitions, execution, results
+- ✅ WritingToolExecutor: 5 built-in writing tools
+- ✅ Issue management: CRUD, reopening, status transitions
+- ✅ Kanban: Boards, tasks, workflow columns
+- ✅ Version control: Branches, commits, diffs, merges, time-travel
+- ✅ AI Service: Messaging, tool loops, analysis
+- ✅ Chatbot, Hardware, Goals, Focus Sessions, and more
 
 ---
 
@@ -202,7 +218,7 @@ npm run dev
 ### Performance Issues
 
 - Use release build for testing: `swift build -c release`
-- Mac Pro should handle builds quickly (2-5 minutes depending on M1/M2/Intel)
+- Mac Pro handles builds very quickly (see Build Profile section for times by chip)
 
 ### Database Issues
 
@@ -214,7 +230,7 @@ npm run dev
 
 ## Next Steps After Build
 
-1. **Run Tests**: `swift test` (should pass all 88+ tests)
+1. **Run Tests**: `swift test` (should pass 600+ tests)
 2. **Try CLI**: `./run.sh` and explore the interactive menu
 3. **Check AI Features**: Set `ANTHROPIC_API_KEY` for Claude integration
 4. **Explore Web App**: `npm run dev` for the AIMS platform
@@ -226,10 +242,11 @@ npm run dev
 | File | Purpose |
 |------|---------|
 | `Package.swift` | SPM manifest (dependencies, targets) |
-| `Sources/WritersApp/` | Main Swift library (70 Swift files, 1.1MB) |
+| `Sources/WritersApp/` | Main Swift library (~70 Swift files) |
 | `Sources/WritersAppCLI/main.swift` | CLI entry point |
-| `Tests/WritersAppTests/` | Test suite (1541 lines, 88+ tests) |
+| `Tests/WritersAppTests/` | Test suite (621+ tests) |
 | `run.sh` | Convenient build/run script |
+| `setup.sh` | Prerequisite verification script |
 
 ---
 
@@ -245,10 +262,14 @@ npm run dev
 ## Build Profile
 
 **Estimated Build Times (Mac Pro):**
-- First build (M1/M2): ~2-3 minutes
-- Incremental build: ~30-60 seconds
-- Release build: ~3-5 minutes
-- Test suite: ~1-2 minutes
+- First build (M2 Ultra): ~30–60 seconds
+- First build (Intel Xeon): ~2–3 minutes
+- Incremental build: ~5–15 seconds
+- Release build (M2 Ultra): ~1–2 minutes
+- Release build (Intel Xeon): ~3–5 minutes
+- Test suite: ~30–90 seconds
+
+> **Apple Silicon advantage:** The M2 Ultra in the 2023 Mac Pro provides significantly faster build times than Intel equivalents due to the unified memory architecture and Neural Engine acceleration for Swift compilation.
 
 ---
 
