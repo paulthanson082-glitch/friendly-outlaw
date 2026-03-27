@@ -35,9 +35,10 @@ public struct ImageInfo: Codable, Sendable, Identifiable {
         self.os = os
     }
 
-    /// Short 12-character ID
+    /// Short 14-character ID, matching the display format for SHA256 image IDs
+    /// (e.g., "sha256abc..." → "sha256abcdef12"). Use prefix(12) for standard Docker CLI short IDs.
     public var shortId: String {
-        String(id.prefix(12))
+        String(id.prefix(14))
     }
 
     /// Full image reference e.g. "nginx:1.25"
