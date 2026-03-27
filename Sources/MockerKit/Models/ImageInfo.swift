@@ -35,9 +35,9 @@ public struct ImageInfo: Codable, Sendable, Identifiable {
         self.os = os
     }
 
-    /// Short 12-character ID
+    /// Short ID (14-character prefix for sha256-prefixed IDs, 12 otherwise)
     public var shortId: String {
-        String(id.prefix(12))
+        String(id.prefix(id.hasPrefix("sha256") ? 14 : 12))
     }
 
     /// Full image reference e.g. "nginx:1.25"

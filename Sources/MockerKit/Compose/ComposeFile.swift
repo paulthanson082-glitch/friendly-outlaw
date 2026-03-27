@@ -6,13 +6,13 @@ import Yams
 public struct ComposeFile: Codable, Sendable {
     public var version: String?
     public var services: [String: ComposeService]
-    public var networks: [String: ComposeNetwork]?
+    public var networks: [String: ComposeNetwork?]?
     public var volumes: [String: ComposeVolume?]?
 
     public init(
         version: String? = nil,
         services: [String: ComposeService] = [:],
-        networks: [String: ComposeNetwork]? = nil,
+        networks: [String: ComposeNetwork?]? = nil,
         volumes: [String: ComposeVolume?]? = nil
     ) {
         self.version = version

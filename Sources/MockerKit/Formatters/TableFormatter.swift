@@ -1,5 +1,4 @@
 import Foundation
-import MockerKit
 
 // MARK: - TableFormatter
 
@@ -92,7 +91,7 @@ public enum TableFormatter {
     // MARK: - Generic table
 
     public static func formatTable(header: [String], rows: [[String]]) -> String {
-        var allRows = [header] + rows
+        let allRows = [header] + rows
         let colCount = header.count
         var widths = [Int](repeating: 0, count: colCount)
         for row in allRows {
