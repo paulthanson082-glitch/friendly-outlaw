@@ -28,11 +28,13 @@ public actor ContainerStore {
     // MARK: - CRUD
 
     public func add(_ container: ContainerInfo) throws {
+        try MockerConfig.ensureDirectories()
         containers[container.id] = container
         try save(container)
     }
 
     public func update(_ container: ContainerInfo) throws {
+        try MockerConfig.ensureDirectories()
         containers[container.id] = container
         try save(container)
     }
