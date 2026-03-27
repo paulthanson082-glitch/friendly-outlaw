@@ -44,6 +44,37 @@ final class iPadProFeaturesTests: XCTestCase {
         XCTAssertEqual(iPadProM4_13.supportsApplePencil, .pro)
     }
 
+    func testiPadProM5ScreenSizes() {
+        let m5_11 = iPadProModel.iPadProM5_11.screenSize
+        let m5_13 = iPadProModel.iPadProM5_13.screenSize
+
+        XCTAssertEqual(m5_11.ppi, 264)
+        XCTAssertTrue(m5_11.supportsProMotion)
+        XCTAssertTrue(m5_11.supportsFaceID)
+        XCTAssertEqual(m5_11.supportsApplePencil, .pro)
+
+        XCTAssertGreaterThan(m5_13.widthInches, m5_11.widthInches)
+        XCTAssertEqual(m5_13.supportsApplePencil, .pro)
+        XCTAssertTrue(m5_13.supportsProMotion)
+    }
+
+    func testiPadProM5ModelProperties() {
+        XCTAssertEqual(iPadProModel.iPadProM5_11.displayName, "iPad Pro 11-inch (M5)")
+        XCTAssertEqual(iPadProModel.iPadProM5_13.displayName, "iPad Pro 13-inch (M5)")
+        XCTAssertTrue(iPadProModel.allCases.contains(.iPadProM5_11))
+        XCTAssertTrue(iPadProModel.allCases.contains(.iPadProM5_13))
+    }
+
+    func testiPadProM5EditorLayout() {
+        let m5_11 = iPadProModel.iPadProM5_11.screenSize
+        let m5_13 = iPadProModel.iPadProM5_13.screenSize
+
+        XCTAssertEqual(m5_11.recommendedEditorWidth, 680)
+        XCTAssertEqual(m5_13.recommendedEditorWidth, 780)
+        XCTAssertEqual(m5_11.recommendedBodyFontSize, 18)
+        XCTAssertEqual(m5_13.recommendedBodyFontSize, 18)
+    }
+
     func testEditorLayoutConfiguration() {
         let defaultLayout = EditorLayoutConfiguration()
 
