@@ -1,5 +1,4 @@
 import Foundation
-import MockerKit
 
 // MARK: - TableFormatter
 
