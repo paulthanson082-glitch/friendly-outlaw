@@ -3,6 +3,15 @@ Its a name let me and my dad used to use all the time so it's in remembrance of 
 
 ---
 
+## 🚀 Quick Access
+
+**📍 Application Now Running!**
+
+- **AIMS Web App**: http://localhost:3000
+- **Documentation**: See [APPLICATION_ACCESS.md](APPLICATION_ACCESS.md) for complete access instructions
+
+---
+
 # Writers App with Templates - Swift
 
 A comprehensive Swift application for writers featuring template management, document creation, and writing tools.
