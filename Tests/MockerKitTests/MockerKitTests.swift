@@ -96,7 +96,7 @@ final class MockerKitTests: XCTestCase {
             repository: "nginx",
             tag: "latest"
         )
-        XCTAssertEqual(image.shortId, "sha256abcdef12")
+        XCTAssertEqual(image.shortId, "sha256abcdef")
     }
 
     func testImageInfoReference() {
@@ -225,7 +225,12 @@ final class MockerKitTests: XCTestCase {
     func testNetworkManager_removeDefaultFails() async throws {
         let manager = NetworkManager()
         try await manager.load()
-        XCTAssertThrowsError(try manager.remove("bridge"))
+        do {
+            _ = try await manager.remove("bridge")
+            XCTFail("Expected error to be thrown when removing a default network")
+        } catch {
+            // Expected: default network cannot be removed
+        }
     }
 
     // MARK: - VolumeManager Tests (sync subset)

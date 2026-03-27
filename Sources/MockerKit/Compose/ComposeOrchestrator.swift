@@ -35,12 +35,12 @@ public actor ComposeOrchestrator {
         // Create networks
         if let networks = file.networks {
             for (name, config) in networks {
-                let networkName = config?.name ?? "\(projectName)_\(name)"
-                let external = config?.external ?? false
+                let networkName = config.name ?? "\(projectName)_\(name)"
+                let external = config.external ?? false
                 if !external {
                     try? await networkManager.create(
                         name: networkName,
-                        driver: config?.driver ?? "bridge"
+                        driver: config.driver ?? "bridge"
                     )
                 }
             }
@@ -148,8 +148,8 @@ public actor ComposeOrchestrator {
         // Remove networks
         if let networks = file.networks {
             for (name, config) in networks {
-                let networkName = config?.name ?? "\(projectName)_\(name)"
-                let external = config?.external ?? false
+                let networkName = config.name ?? "\(projectName)_\(name)"
+                let external = config.external ?? false
                 if !external {
                     try? await networkManager.remove(networkName)
                 }

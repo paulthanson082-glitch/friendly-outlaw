@@ -109,12 +109,12 @@ public enum ContainerStatus: String, Codable, Sendable {
 public struct PortMapping: Codable, Sendable {
     public let hostPort: Int
     public let containerPort: Int
-    public let protocol: String
+    public let `protocol`: String
 
-    public init(hostPort: Int, containerPort: Int, protocol: String = "tcp") {
+    public init(hostPort: Int, containerPort: Int, networkProtocol: String = "tcp") {
         self.hostPort = hostPort
         self.containerPort = containerPort
-        self.protocol = `protocol`
+        self.`protocol` = networkProtocol
     }
 
     public var description: String {
@@ -131,7 +131,8 @@ public struct PortMapping: Codable, Sendable {
         let proto = containerParts.count > 1 ? String(containerParts[1]) : "tcp"
         guard let hostPort = Int(hostStr),
               let containerPort = Int(String(containerParts[0])) else { return nil }
-        return PortMapping(hostPort: hostPort, containerPort: containerPort, protocol: proto)
+        return PortMapping(hostPort: hostPort, containerPort: containerPort, networkProtocol: proto)
+
     }
 }
 
