@@ -24,11 +24,13 @@ public actor ImageStore {
     }
 
     public func add(_ image: ImageInfo) throws {
+        try MockerConfig.ensureDirectories()
         images[image.id] = image
         try save(image)
     }
 
     public func update(_ image: ImageInfo) throws {
+        try MockerConfig.ensureDirectories()
         images[image.id] = image
         try save(image)
     }
