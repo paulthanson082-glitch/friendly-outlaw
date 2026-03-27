@@ -59,6 +59,11 @@ public enum AIAssistanceType {
     case simplifyText
     case changetone(WritingTone)
     case custom(String)
+    // Hallucination-reducing techniques
+    case extractQuotes
+    case verifyWithCitations
+    case analyzeWithUncertainty
+    case chainOfThoughtVerification
 
     public var displayName: String {
         switch self {
@@ -78,6 +83,10 @@ public enum AIAssistanceType {
         case .simplifyText: return "Simplify Text"
         case .changetone(let tone): return "Change Tone to \(tone.displayName)"
         case .custom: return "Custom Request"
+        case .extractQuotes: return "Extract Quotes"
+        case .verifyWithCitations: return "Verify with Citations"
+        case .analyzeWithUncertainty: return "Analyze with Uncertainty"
+        case .chainOfThoughtVerification: return "Chain of Thought Verification"
         }
     }
 
@@ -100,6 +109,8 @@ public enum AIAssistanceType {
             return """
             \(contextInfo)
             Improve this text while maintaining its core message and style. Focus on clarity, flow, and impact.
+
+            Important: Only suggest improvements that you're confident about. If you're unsure about any change, note your uncertainty.
 
             Original text:
             \(text)
@@ -143,6 +154,8 @@ public enum AIAssistanceType {
             return """
             \(contextInfo)
             Brainstorm creative ideas related to this topic or concept. Provide diverse, interesting angles and approaches.
+
+            Important: Only suggest ideas that are feasible and well-grounded. If you're proposing something speculative, mark it as such.
 
             Topic:
             \(text)
@@ -256,6 +269,69 @@ public enum AIAssistanceType {
             \(text)
 
             Result:
+            """
+
+        case .extractQuotes:
+            return """
+            Extract the most relevant and important quotes from this text. For each quote:
+            1. Provide the exact text in quotation marks
+            2. Provide the page or section reference if available
+            3. Explain why this quote is relevant
+
+            If there are fewer than 3 significant quotes, list what you found. If you cannot find relevant quotes, state "No significant quotes found."
+
+            Text:
+            \(text)
+
+            Relevant quotes:
+            """
+
+        case .verifyWithCitations:
+            return """
+            Analyze this document and provide citations for each claim. For each major claim:
+            1. State the claim
+            2. Find supporting evidence from the provided material
+            3. Quote the exact passage that supports it
+            4. If you cannot find supporting evidence, state "No supporting evidence found for this claim"
+
+            Do not include claims that you cannot verify from the material. If unsure about any claim, acknowledge the uncertainty.
+
+            Document:
+            \(text)
+
+            Verified claims with citations:
+            """
+
+        case .analyzeWithUncertainty:
+            return """
+            Analyze this text, but importantly: you are permitted and encouraged to say "I don't have enough information to assess this" or "I'm uncertain about X" when appropriate.
+
+            Provide your analysis below, being clear about:
+            - What you can confidently assess based on the information provided
+            - What you are uncertain about
+            - What information would be needed for a more complete analysis
+
+            Text:
+            \(text)
+
+            Analysis:
+            """
+
+        case .chainOfThoughtVerification:
+            return """
+            Analyze this document using step-by-step reasoning. For each major point:
+            1. State the claim or observation
+            2. Show your reasoning step-by-step
+            3. Identify what assumptions you're making
+            4. Note any uncertainties in your analysis
+            5. State your conclusion
+
+            If at any point you realize a claim may not be well-supported, explicitly note this.
+
+            Document:
+            \(text)
+
+            Step-by-step analysis:
             """
         }
     }
@@ -436,5 +512,106 @@ public struct AIResponse {
         self.model = model
         self.tokensUsed = tokensUsed
         self.timestamp = timestamp
+    }
+}
+
+// MARK: - Hallucination Reduction Types
+
+/// A quote extracted from source material with citation information
+public struct QuoteBlock: Codable {
+    public let text: String
+    public let reference: String?
+    public let relevanceExplanation: String
+
+    public init(text: String, reference: String? = nil, relevanceExplanation: String) {
+        self.text = text
+        self.reference = reference
+        self.relevanceExplanation = relevanceExplanation
+    }
+}
+
+/// A claim with supporting evidence and citations
+public struct VerifiedClaim: Codable {
+    public let claim: String
+    public let supportingQuote: String?
+    public let evidence: String
+    public let isVerified: Bool
+    public let uncertaintyNote: String?
+
+    public init(
+        claim: String,
+        supportingQuote: String? = nil,
+        evidence: String,
+        isVerified: Bool,
+        uncertaintyNote: String? = nil
+    ) {
+        self.claim = claim
+        self.supportingQuote = supportingQuote
+        self.evidence = evidence
+        self.isVerified = isVerified
+        self.uncertaintyNote = uncertaintyNote
+    }
+}
+
+/// Analysis with explicit uncertainty acknowledgment
+public struct UncertaintyAwareAnalysis: Codable {
+    public let analysis: String
+    public let confidenceAreas: [String]
+    public let uncertainAreas: [String]
+    public let informationGaps: [String]
+
+    public init(
+        analysis: String,
+        confidenceAreas: [String] = [],
+        uncertainAreas: [String] = [],
+        informationGaps: [String] = []
+    ) {
+        self.analysis = analysis
+        self.confidenceAreas = confidenceAreas
+        self.uncertainAreas = uncertainAreas
+        self.informationGaps = informationGaps
+    }
+}
+
+/// Step-by-step reasoning with explicit assumptions and uncertainties
+public struct ChainOfThoughtAnalysis: Codable {
+    public let reasoning: String
+    public let steps: [ReasoningStep]
+    public let assumptions: [String]
+    public let uncertainties: [String]
+    public let conclusion: String
+
+    public init(
+        reasoning: String,
+        steps: [ReasoningStep] = [],
+        assumptions: [String] = [],
+        uncertainties: [String] = [],
+        conclusion: String
+    ) {
+        self.reasoning = reasoning
+        self.steps = steps
+        self.assumptions = assumptions
+        self.uncertainties = uncertainties
+        self.conclusion = conclusion
+    }
+}
+
+/// A single step in chain-of-thought reasoning
+public struct ReasoningStep: Codable {
+    public let claim: String
+    public let reasoning: String
+    public let assumptions: [String]
+    public let uncertainty: String?
+
+    public init(
+        claim: String,
+        reasoning: String,
+        assumptions: [String] = [],
+        uncertainty: String? = nil
+    ) {
+        self.claim = claim
+        self.reasoning = reasoning
+        self.assumptions = assumptions
+        self.uncertainty = uncertainty
     }
 }
