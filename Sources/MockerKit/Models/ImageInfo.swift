@@ -35,9 +35,12 @@ public struct ImageInfo: Codable, Sendable, Identifiable {
         self.os = os
     }
 
-    /// Short 12-character ID
+    /// Short ID matching Docker's format (12 chars, or 14 if sha256-prefixed)
     public var shortId: String {
-        String(id.prefix(12))
+        if id.hasPrefix("sha256") {
+            return String(id.prefix(14))
+        }
+        return String(id.prefix(12))
     }
 
     /// Full image reference e.g. "nginx:1.25"

@@ -225,7 +225,12 @@ final class MockerKitTests: XCTestCase {
     func testNetworkManager_removeDefaultFails() async throws {
         let manager = NetworkManager()
         try await manager.load()
-        XCTAssertThrowsError(try manager.remove("bridge"))
+        do {
+            _ = try await manager.remove("bridge")
+            XCTFail("Expected error to be thrown")
+        } catch {
+            // Expected
+        }
     }
 
     // MARK: - VolumeManager Tests (sync subset)
