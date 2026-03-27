@@ -20,10 +20,11 @@ export interface ChatMessage {
 }
 
 // In-memory storage (replace with database in phase 2)
-const sessions = new Map<string, ChatSession>();
-const messages = new Map<string, ChatMessage[]>();
 
 export class ChatService {
+  private sessions = new Map<string, ChatSession>();
+  private messages = new Map<string, ChatMessage[]>();
+
   /**
    * Create a new chat session
    */
@@ -35,8 +36,8 @@ export class ChatService {
       lastMessageAt: new Date(),
       context,
     };
-    sessions.set(session.id, session);
-    messages.set(session.id, []);
+    this.sessions.set(session.id, session);
+    this.messages.set(session.id, []);
     return session;
   }
 
@@ -44,14 +45,14 @@ export class ChatService {
    * Get session by ID
    */
   getSession(sessionId: string): ChatSession | undefined {
-    return sessions.get(sessionId);
+    return this.sessions.get(sessionId);
   }
 
   /**
    * Get all sessions for a user
    */
   getUserSessions(userId: string): ChatSession[] {
-    return Array.from(sessions.values()).filter((s) => s.userId === userId);
+    return Array.from(this.sessions.values()).filter((s) => s.userId === userId);
   }
 
   /**
@@ -62,7 +63,7 @@ export class ChatService {
     role: 'user' | 'assistant',
     content: string
   ): ChatMessage {
-    const session = sessions.get(sessionId);
+    const session = this.sessions.get(sessionId);
     if (!session) {
       throw new NotFoundError('Chat session');
     }
@@ -75,10 +76,10 @@ export class ChatService {
       timestamp: new Date(),
     };
 
-    if (!messages.has(sessionId)) {
-      messages.set(sessionId, []);
+    if (!this.messages.has(sessionId)) {
+      this.messages.set(sessionId, []);
     }
-    messages.get(sessionId)!.push(message);
+    this.messages.get(sessionId)!.push(message);
 
     // Update last message time
     session.lastMessageAt = new Date();
@@ -90,7 +91,7 @@ export class ChatService {
    * Get chat history for a session
    */
   getHistory(sessionId: string): ChatMessage[] {
-    return messages.get(sessionId) || [];
+    return this.messages.get(sessionId) || [];
   }
 
   /**
@@ -154,17 +155,17 @@ export class ChatService {
    * Delete a session and its messages
    */
   deleteSession(sessionId: string): boolean {
-    messages.delete(sessionId);
-    return sessions.delete(sessionId);
+    this.messages.delete(sessionId);
+    return this.sessions.delete(sessionId);
   }
 
   /**
    * Clear message history for a session
    */
   clearHistory(sessionId: string): boolean {
-    const session = sessions.get(sessionId);
+    const session = this.sessions.get(sessionId);
     if (!session) return false;
-    messages.set(sessionId, []);
+    this.messages.set(sessionId, []);
     return true;
   }
 

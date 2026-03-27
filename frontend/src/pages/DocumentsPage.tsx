@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../services/api';
-import { useAuth } from '../context/AuthContext';
 import styles from './DocumentsPage.module.css';
 
 export const DocumentsPage: React.FC = () => {
-  const { user } = useAuth();
   const [documents, setDocuments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
