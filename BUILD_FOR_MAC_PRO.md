@@ -84,7 +84,7 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 
 ## Test Suite
 
-Run all 88+ tests:
+Run all 664+ tests:
 
 ```bash
 # Standard test run
@@ -101,13 +101,22 @@ swift test --stats
 ```
 
 **Test Coverage:**
-- ✅ Core: Templates, documents, word count, statistics (8 tests)
-- ✅ Tool loop: Tool definitions, execution, results (7 tests)
-- ✅ WritingToolExecutor: 5 built-in writing tools (9 tests)
-- ✅ Issue management: CRUD, reopening, status transitions (3 tests)
-- ✅ Kanban: Boards, tasks, workflow columns (18 tests)
-- ✅ Version control: Branches, commits, diffs, merges, time-travel (17 tests)
-- ✅ AI Service: Messaging, tool loops, analysis (26+ tests)
+- ✅ Core (WritersAppTests): Templates, documents, word count, statistics (125 tests)
+- ✅ Version control (Dolt): Branches, commits, diffs, merges, time-travel (75 tests)
+- ✅ Writing goals: Goal tracking, streaks, progress (69 tests)
+- ✅ Database manager: SQLite persistence, queries (57 tests)
+- ✅ Productivity analytics: Writing analytics, stats (49 tests)
+- ✅ Focus sessions: Session lifecycle, modes (49 tests)
+- ✅ iPad Pro features: UI models, multitasking (37 tests)
+- ✅ Document manager: CRUD, search, statistics (29 tests)
+- ✅ Error paths: Error handling, edge cases (28 tests)
+- ✅ Encouragement service: Messages, milestones (28 tests)
+- ✅ Metal dashboard: GPU rendering, view models (27 tests)
+- ✅ Issue management: CRUD, status transitions (22 tests)
+- ✅ Plugins: Plugin lifecycle, memory plugin (21 tests)
+- ✅ AI Service: Messaging, tool loops, analysis (21 tests)
+- ✅ Export formats: Markdown, HTML, plain text (19 tests)
+- ✅ Performance: Load testing, benchmarks (8 tests)
 
 ---
 
@@ -214,7 +223,7 @@ npm run dev
 
 ## Next Steps After Build
 
-1. **Run Tests**: `swift test` (should pass all 88+ tests)
+1. **Run Tests**: `swift test` (should pass all 664+ tests)
 2. **Try CLI**: `./run.sh` and explore the interactive menu
 3. **Check AI Features**: Set `ANTHROPIC_API_KEY` for Claude integration
 4. **Explore Web App**: `npm run dev` for the AIMS platform
@@ -228,7 +237,7 @@ npm run dev
 | `Package.swift` | SPM manifest (dependencies, targets) |
 | `Sources/WritersApp/` | Main Swift library (70 Swift files, 1.1MB) |
 | `Sources/WritersAppCLI/main.swift` | CLI entry point |
-| `Tests/WritersAppTests/` | Test suite (1541 lines, 88+ tests) |
+| `Tests/WritersAppTests/` | Test suite (16 test files, 664+ tests) |
 | `run.sh` | Convenient build/run script |
 
 ---
