@@ -217,7 +217,7 @@ struct WritersAppCLI {
             
             // Handle --run alone
             if let runSessionArg = runArg {
-                startFocusSessionDirect(
+                await startFocusSessionDirect(
                     app: app,
                     sessionTypeName: runSessionArg.isEmpty ? nil : runSessionArg
                 )
@@ -1778,7 +1778,7 @@ func startFocusSession(app: WritersApp) {
     print("\nHappy writing! Use option 42 to end your session.\n")
 }
 
-func startFocusSessionDirect(app: WritersApp, sessionTypeName: String?) {
+func startFocusSessionDirect(app: WritersApp, sessionTypeName: String?) async {
     // Check if session is already active
     if focusManager.getCurrentSession() != nil {
         print("Error: A focus session is already active.")
@@ -1818,11 +1818,56 @@ func startFocusSessionDirect(app: WritersApp, sessionTypeName: String?) {
     
     print("\n✓ Focus session started!")
     print("  Type: \(session.type.displayName)")
+    
     if session.targetDuration > 0 {
+        // Timed session: run a live countdown timer
+        let totalSeconds = Int(session.targetDuration)
         print("  Duration: \(FocusSessionManager.formatTimeRemaining(session.targetDuration))")
+        print("\nPress Ctrl+C to stop early.\n")
+        print("  ⏱  Time remaining: \(formatCountdown(totalSeconds))", terminator: "")
+        fflush(stdout)
+        for elapsed in 1...totalSeconds {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            let remaining = totalSeconds - elapsed
+            print("\r  ⏱  Time remaining: \(formatCountdown(remaining))\u{1B}[K", terminator: "")
+            fflush(stdout)
+        }
+        print("\r  ✅ Time's up!\u{1B}[K")
+    } else {
+        // Free write: show elapsed time; pressing Enter ends the session
+        print("\n  Free write — no time limit.")
+        print("  Press Enter when you're done writing.\n")
+        _ = readLine()
     }
-    print("\nHappy writing! The session is now running in the background.")
-    print("Run 'WritersAppCLI' in interactive mode to view or end your session.\n")
+    
+    // End the session and show a brief summary.
+    // Ask for final word count so writing progress is tracked correctly.
+    print("Words written during this session (press Enter to skip): ", terminator: "")
+    fflush(stdout)
+    let finalWordCount: Int
+    if let input = readLine(), let count = Int(input.trimmingCharacters(in: .whitespaces)) {
+        finalWordCount = max(0, count)
+    } else {
+        finalWordCount = 0
+    }
+    let sessionId = session.id
+    let ended = focusManager.endSession(id: sessionId, finalWordCount: finalWordCount, completed: session.targetDuration > 0)
+    print()
+    print("╔═══════════════════════════════════════╗")
+    print("║         Session Complete! ✍️           ║")
+    print("╚═══════════════════════════════════════╝")
+    if let s = ended {
+        print("  Type     : \(s.type.displayName)")
+        print("  Duration : \(FocusSessionManager.formatDuration(s.actualDuration))")
+    }
+    print()
+}
+
+/// Format a number of seconds as MM:SS for the countdown display.
+func formatCountdown(_ seconds: Int) -> String {
+    let m = seconds / 60
+    let s = seconds % 60
+    return String(format: "%02d:%02d", m, s)
 }
 
 func openDocumentAndStartSession(app: WritersApp, searchTerm: String, sessionTypeName: String?) async {
