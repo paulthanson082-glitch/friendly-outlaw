@@ -226,7 +226,13 @@ const STORAGE_KEY = "s24-tools-checked";
 
 // ---------------------------------------------------------------------------
 // Component
-// ---------------------------------------------------------------------------
+/**
+ * Render the S24 Tools page: a multi-tab checklist for Speed & Performance, Productivity, Email Management, and File Cleaning with per-task toggles and per-section progress.
+ *
+ * The component persists task completion state to localStorage under STORAGE_KEY and provides controls to toggle individual tasks and reset the active section.
+ *
+ * @returns The React element for the S24 Tools page.
+ */
 
 export default function S24ToolsPage() {
   const [activeTab, setActiveTab] = useState<string>(SECTIONS[0].id);
