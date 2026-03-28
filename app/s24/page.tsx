@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 // ---------------------------------------------------------------------------
 // Data
@@ -237,19 +237,31 @@ const STORAGE_KEY = "s24-tools-checked";
 export default function S24ToolsPage() {
   const [activeTab, setActiveTab] = useState<string>(SECTIONS[0].id);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const hasLoaded = useRef(false);
 
   // Load saved state from localStorage
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) setChecked(JSON.parse(saved));
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (
+          parsed !== null &&
+          typeof parsed === "object" &&
+          !Array.isArray(parsed)
+        ) {
+          setChecked(parsed);
+        }
+      }
     } catch {
       // ignore parse errors
     }
+    hasLoaded.current = true;
   }, []);
 
-  // Persist state
+  // Persist state (only after initial load)
   useEffect(() => {
+    if (!hasLoaded.current) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(checked));
     } catch {
@@ -393,7 +405,12 @@ export default function S24ToolsPage() {
                       : {}),
                   }}
                   onClick={() => toggle(task.id)}
-                  aria-label={done ? "Mark incomplete" : "Mark complete"}
+                  aria-label={
+                    done
+                      ? `Mark "${task.label}" as incomplete`
+                      : `Mark "${task.label}" as complete`
+                  }
+                  aria-pressed={done}
                 >
                   {done && <span style={s.checkmark}>✓</span>}
                 </button>
