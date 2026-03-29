@@ -379,7 +379,8 @@ public class AIService {
     private func buildAPIURLRequest(
         url: URL,
         messages: [[String: Any]],
-        toolDefinitions: [[String: Any]]
+        toolDefinitions: [[String: Any]],
+        systemPrompt: String? = nil
     ) throws -> URLRequest {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -398,8 +399,57 @@ public class AIService {
             requestBody["tools"] = toolDefinitions
         }
 
+        if let system = systemPrompt, !system.isEmpty {
+            requestBody["system"] = system
+        }
+
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         return request
+    }
+
+    // MARK: - Agent Task (Multi-Agent Harness)
+
+    /// Send a request with an explicit system prompt and user prompt.
+    ///
+    /// Used by `MultiAgentHarness` to give each agent (planner, generator, evaluator)
+    /// its own specialised system prompt without affecting the general-purpose assistance
+    /// methods. All network I/O still flows through `AIService`.
+    public func performAgentTask(
+        systemPrompt: String,
+        userPrompt: String
+    ) async throws -> String {
+        guard let url = URL(string: apiURL) else {
+            throw AIServiceError.invalidURL
+        }
+
+        let messages: [[String: Any]] = [["role": "user", "content": userPrompt]]
+        let request = try buildAPIURLRequest(
+            url: url,
+            messages: messages,
+            toolDefinitions: [],
+            systemPrompt: systemPrompt
+        )
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AIServiceError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw AIServiceError.apiError(statusCode: httpResponse.statusCode, message: errorMessage)
+        }
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let content = json["content"] as? [[String: Any]] else {
+            throw AIServiceError.invalidResponseFormat
+        }
+
+        guard let text = extractText(from: content) else {
+            throw AIServiceError.invalidResponseFormat
+        }
+
+        return text
     }
 
     /// Extracts joined text from a list of content blocks.

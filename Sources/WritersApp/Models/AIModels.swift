@@ -23,7 +23,7 @@ public struct AIConfiguration {
 }
 
 /// Available AI models
-public enum AIModel: String {
+public enum AIModel: String, Codable {
     case claude35Sonnet = "claude-3-5-sonnet-20241022"
     case claude3Opus = "claude-3-opus-20240229"
     case claude3Sonnet = "claude-3-sonnet-20240229"
