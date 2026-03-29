@@ -717,8 +717,8 @@ public class AIService {
                 currentEvidence = String(trimmed.dropFirst("evidence:".count)).trimmingCharacters(in: .whitespaces)
             } else if trimmed.lowercased().starts(with: "quote:") {
                 currentQuote = String(trimmed.dropFirst("quote:".count)).trimmingCharacters(in: .whitespaces)
-            } else if let claim = currentClaim, let evidence = currentEvidence {
-                currentEvidence = (currentEvidence ?? "") + " " + trimmed
+            } else if currentClaim != nil, let evidence = currentEvidence {
+                currentEvidence = evidence + " " + trimmed
             }
         }
 

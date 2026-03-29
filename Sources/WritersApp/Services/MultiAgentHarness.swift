@@ -200,6 +200,13 @@ public class MultiAgentHarness {
         plan: WritingPlan,
         previousContext: String
     ) async throws -> SectionResult {
+        guard configuration.maxRevisionsPerSection >= 1 else {
+            throw HarnessError.generationFailed(
+                sectionTitle: section.title,
+                reason: "maxRevisionsPerSection must be at least 1"
+            )
+        }
+
         var bestContent = ""
         var bestEvaluation: WritingSectionEvaluation?
         var revision = 0
@@ -242,10 +249,15 @@ public class MultiAgentHarness {
             lastFeedback = evaluation.overallFeedback
         }
 
-        guard let finalEvaluation = bestEvaluation else {
-            throw HarnessError.generationFailed(
+        // bestEvaluation is guaranteed non-nil: the loop runs at least once (guard above)
+        // and always assigns bestEvaluation on the first iteration.
+        let finalEvaluation = bestEvaluation!  // safe: loop body always executes at least once
+
+        // Throw if the section never reached the quality bar after all revisions.
+        if !finalEvaluation.overallPassed(threshold: configuration.qualityThreshold) {
+            throw HarnessError.maxRevisionsExceeded(
                 sectionTitle: section.title,
-                reason: "No evaluation was produced"
+                revisions: revision
             )
         }
 

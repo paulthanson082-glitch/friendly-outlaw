@@ -20,7 +20,8 @@ public struct HarnessConfiguration: Codable {
         model: AIModel = .claude35Sonnet
     ) {
         self.maxRevisionsPerSection = maxRevisionsPerSection
-        self.qualityThreshold = qualityThreshold
+        // Clamp to valid criterion score range so the evaluator loop behaves correctly.
+        self.qualityThreshold = max(1, min(10, qualityThreshold))
         self.maxSections = maxSections
         self.model = model
     }
