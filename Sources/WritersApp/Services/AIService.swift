@@ -375,7 +375,14 @@ public class AIService {
         throw AIServiceError.toolLoopExhausted(iterations: maxIterations)
     }
 
-    /// Builds a configured URLRequest for the Anthropic Messages API.
+    /// Builds a POST `URLRequest` configured for the Anthropic messages endpoint, including headers and a JSON body with model and request parameters.
+    /// - Parameters:
+    ///   - url: The endpoint `URL` to send the request to.
+    ///   - messages: An array of message dictionaries to include under the `messages` key in the request body.
+    ///   - toolDefinitions: Tool definition dictionaries to include under the `tools` key when non-empty.
+    ///   - systemPrompt: An optional system-level prompt to include under the `system` key when non-empty.
+    /// - Returns: A `URLRequest` with appropriate headers and a serialized JSON body containing `model`, `max_tokens`, `temperature`, `messages`, and any provided `tools` or `system`.
+    /// - Throws: An error from JSON serialization if the request body cannot be encoded.
     private func buildAPIURLRequest(
         url: URL,
         messages: [[String: Any]],
@@ -413,7 +420,16 @@ public class AIService {
     ///
     /// Used by `MultiAgentHarness` to give each agent (planner, generator, evaluator)
     /// its own specialised system prompt without affecting the general-purpose assistance
-    /// methods. All network I/O still flows through `AIService`.
+    /// Sends a single-message request to the API using the provided system prompt and user prompt, and returns the assistant's text reply.
+    /// - Parameters:
+    ///   - systemPrompt: A system-level instruction that guides the assistant's behavior for this request.
+    ///   - userPrompt: The user's message to be sent as the single content message in the request.
+    /// - Returns: The assistant-generated text extracted from the API response.
+    /// - Throws:
+    ///   - `AIServiceError.invalidURL` if the service API URL is invalid.
+    ///   - `AIServiceError.invalidResponse` if the HTTP response is not a valid HTTPURLResponse.
+    ///   - `AIServiceError.apiError(statusCode:message:)` if the API returns a non-200 status code (includes the status code and the server message).
+    ///   - `AIServiceError.invalidResponseFormat` if the response JSON is missing the expected content or text.
     public func performAgentTask(
         systemPrompt: String,
         userPrompt: String
@@ -453,7 +469,10 @@ public class AIService {
     }
 
     /// Extracts joined text from a list of content blocks.
-    /// Returns nil if no text blocks are present.
+    /// Extracts and concatenates all text blocks from a content array.
+    /// - Parameters:
+    ///   - content: An array of dictionaries representing message blocks; blocks with `"type"` equal to `"text"` may contain a `"text"` string.
+    /// - Returns: A single string formed by joining all found text block values, or `nil` if no text blocks are present.
     private func extractText(from content: [[String: Any]]) -> String? {
         let textParts = content.compactMap { block -> String? in
             guard block["type"] as? String == "text" else { return nil }
@@ -689,6 +708,11 @@ public class AIService {
         return quotes
     }
 
+    /// Parses a raw verifier response into structured verified claims.
+    /// 
+    /// Recognizes lines prefixed with `Claim:`/`Statement:`, `Evidence:`, and `Quote:` (case-insensitive). Evidence lines that follow a claim without a prefix are appended to the current evidence. A claim is marked verified unless its accumulated evidence contains the phrase "no supporting evidence" (case-insensitive).
+    /// - Parameter response: The raw multiline string produced by the verifier.
+    /// - Returns: An array of `VerifiedClaim` objects assembled from the parsed claims in the response.
     private func parseVerifiedClaimsFromResponse(_ response: String) -> [VerifiedClaim] {
         var claims: [VerifiedClaim] = []
         let lines = response.components(separatedBy: "\n")

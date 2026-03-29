@@ -84,7 +84,9 @@ public struct CriterionScore: Codable {
     /// Returns true when the score meets the default threshold (7).
     public var passedDefault: Bool { score >= 7 }
 
-    /// Returns true when the score meets a caller-supplied threshold.
+    /// Determines whether this score meets or exceeds a specified threshold.
+/// - Parameter threshold: The minimum score required to be considered passing.
+/// - Returns: `true` if the score is greater than or equal to `threshold`, `false` otherwise.
     public func passed(threshold: Int) -> Bool { score >= threshold }
 }
 
@@ -257,7 +259,9 @@ public struct WritingSectionEvaluation: Codable, Identifiable {
         scores.allSatisfy { $0.passedDefault }
     }
 
-    /// True when every criterion score meets the supplied threshold.
+    /// Checks whether every criterion score meets or exceeds the given threshold.
+    /// - Parameter threshold: Minimum score required for a criterion to be considered passing.
+    /// - Returns: `true` if all criterion scores are greater than or equal to `threshold`, `false` otherwise.
     public func overallPassed(threshold: Int) -> Bool {
         scores.allSatisfy { $0.passed(threshold: threshold) }
     }

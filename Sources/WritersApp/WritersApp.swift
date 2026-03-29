@@ -1071,7 +1071,10 @@ public class WritersApp {
         return try await svc.createStatisticsCanvas(statistics: stats, title: title)
     }
 
-    /// Export a Kanban board as a shareable gui.new canvas.
+    /// Create a GUI canvas representation of a kanban board and its tasks.
+    /// - Parameter boardId: The UUID of the kanban board to export.
+    /// - Returns: A `GuiCanvas` containing the board and its tasks.
+    /// - Throws: `GuiNewError.notConfigured` if the GUI service is not configured or the board with `boardId` cannot be found.
     public func exportKanbanBoardToGui(boardId: UUID) async throws -> GuiCanvas {
         guard let svc = guiService else { throw GuiNewError.notConfigured }
         guard let board = kanbanManager.getBoard(id: boardId) else {
@@ -1086,7 +1089,10 @@ public class WritersApp {
     /// Create a `MultiAgentHarness` wired to the active AI service.
     ///
     /// - Parameter configuration: Harness settings (revision budget, quality threshold, model).
-    /// - Throws: `AIError.aiNotEnabled` if AI has not been configured via `enableAI()`.
+    /// Creates a MultiAgentHarness configured with the app's active AI service.
+    /// - Parameter configuration: Harness configuration to use; defaults to `.default`.
+    /// - Returns: A configured `MultiAgentHarness`.
+    /// - Throws: `AIError.aiNotEnabled` if AI is not enabled.
     public func createMultiAgentHarness(
         configuration: HarnessConfiguration = .default
     ) throws -> MultiAgentHarness {
@@ -1101,7 +1107,10 @@ public class WritersApp {
     ///
     /// - Parameter prompt: A 1–4 sentence description of what to write.
     /// - Returns: A `WritingPlan` with sections, characters, themes, and tone.
-    /// - Throws: `AIError.aiNotEnabled`, `HarnessError.emptyPrompt`, or `HarnessError.plannerFailed`.
+    /// Generates a writing plan for the given prompt using the multi-agent harness.
+    /// - Parameter prompt: The natural-language prompt that guides plan generation; should be a non-empty description of the desired output.
+    /// - Returns: A `WritingPlan` describing the planned steps and artifacts for producing the requested writing.
+    /// - Throws: `AIError.aiNotEnabled` if AI is not enabled; or other errors propagated from the harness (for example, invalid/empty prompt or planner failures).
     public func planWriting(prompt: String) async throws -> WritingPlan {
         let harness = try createMultiAgentHarness()
         return try await harness.createPlan(prompt: prompt)
@@ -1118,7 +1127,12 @@ public class WritersApp {
     /// - Parameters:
     ///   - prompt: A 1–4 sentence writing task description.
     ///   - configuration: Harness settings controlling revision budget and quality threshold.
-    /// - Returns: A `HarnessResult` with assembled prose, quality report, and per-section data.
+    /// Runs the multi-agent harness with the given textual prompt and returns the harness execution result.
+    /// - Parameters:
+    ///   - prompt: The natural-language prompt to drive planning, generation, and evaluation by the harness.
+    ///   - configuration: Harness runtime configuration controlling planner/agent behavior; defaults to `.default`.
+    /// - Returns: A `HarnessResult` containing the outcome of the harness run, including generated artifacts and evaluation metadata.
+    /// - Throws: `AIError.aiNotEnabled` if the app's AI service is not enabled; or other errors produced by harness creation or execution.
     public func runMultiAgentHarness(
         prompt: String,
         configuration: HarnessConfiguration = .default
@@ -1127,7 +1141,12 @@ public class WritersApp {
         return try await harness.run(prompt: prompt)
     }
 
-    /// Run the generator–evaluator loop for an existing `WritingPlan` (skips the planner).
+    /// Executes a prepared writing plan using a multi-agent harness.
+    /// - Parameters:
+    ///   - plan: The `WritingPlan` to execute.
+    ///   - configuration: The `HarnessConfiguration` to apply; defaults to `.default`.
+    /// - Returns: The `HarnessResult` produced by running the plan.
+    /// - Throws: `AIError.aiNotEnabled` if AI is not enabled, or any error produced by the harness during execution.
     public func runMultiAgentHarness(
         plan: WritingPlan,
         configuration: HarnessConfiguration = .default

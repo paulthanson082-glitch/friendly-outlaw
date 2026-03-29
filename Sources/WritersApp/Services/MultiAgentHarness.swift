@@ -35,7 +35,10 @@ public class MultiAgentHarness {
     /// 5. All accepted sections are assembled into a final document.
     ///
     /// - Parameter prompt: A 1–4 sentence description of the writing task.
-    /// - Returns: A `HarnessResult` with the assembled prose, plan, and quality report.
+    /// Run the harness using a natural-language prompt to produce a multi-section writing result.
+    /// - Parameter prompt: The user-provided prompt; leading/trailing whitespace and newlines are trimmed and the prompt must not be empty.
+    /// - Throws: `HarnessError.emptyPrompt` if the trimmed prompt is empty.
+    /// - Returns: A `HarnessResult` containing the plan, per-section results, the assembled document, the quality report, and a completion timestamp.
     public func run(prompt: String) async throws -> HarnessResult {
         let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw HarnessError.emptyPrompt }
@@ -44,7 +47,10 @@ public class MultiAgentHarness {
         return try await run(plan: plan)
     }
 
-    /// Run the generator–evaluator loop using a pre-built plan (skips the planner).
+    /// Processes the given writing plan's sections in order, generating, evaluating, and assembling their content into a final result.
+    /// - Parameters:
+    ///   - plan: The `WritingPlan` whose sections will be processed. Only the first `configuration.maxSections` sections will be executed.
+    /// - Returns: A `HarnessResult` containing the original plan, per-section results, the assembled document, a quality report, and the completion timestamp.
     public func run(plan: WritingPlan) async throws -> HarnessResult {
         let sectionsToProcess = Array(plan.sections.prefix(configuration.maxSections))
         var sectionResults: [SectionResult] = []
@@ -85,7 +91,11 @@ public class MultiAgentHarness {
     /// Expand a user prompt into a structured `WritingPlan`.
     ///
     /// The planner is instructed to be ambitious about scope and to stay at the
-    /// product / narrative level rather than dictating implementation details.
+    /// Generates a structured WritingPlan from a short writing prompt by requesting a JSON-formatted plan from the planner agent and parsing its response.
+    /// - Parameters:
+    ///   - prompt: The user's short writing prompt (whitespace/newlines should be trimmed by the caller).
+    /// - Returns: A `WritingPlan` built from the planner's JSON output, containing title, synopsis, sections, and optional metadata (characters, themes, genre, targetAudience).
+    /// - Throws: `HarnessError.plannerFailed` if the planner agent call fails; any parsing errors produced by `parsePlan(from:originalPrompt:)` if the planner output cannot be converted into a valid `WritingPlan`.
     public func createPlan(prompt: String) async throws -> WritingPlan {
         let systemPrompt = """
         You are an expert writing planner. Given a short writing prompt, expand it into a \
@@ -137,7 +147,13 @@ public class MultiAgentHarness {
     /// Ask the planner/generator to propose concrete success criteria for a section.
     ///
     /// The contract mirrors the "sprint contract" from the harness design post:
-    /// both agents agree on what "done" looks like before any prose is written.
+    /// Produce a concrete SectionContract for a given section by asking the AI service to emit a JSON-only contract that specifies goals, verifiable success criteria, target word-count range, and tone notes.
+    /// - Parameters:
+    ///   - section: The WritingSection to negotiate a contract for.
+    ///   - plan: The overall WritingPlan (its handoffSummary is included in the prompt to the agent).
+    ///   - previousContext: Handoff context from prior sections; an empty string indicates this is the opening section.
+    /// - Returns: A SectionContract parsed from the agent's JSON response containing `goals`, `successCriteria`, optional `wordCountMin`/`wordCountMax`, and optional `toneNotes`.
+    /// - Throws: `HarnessError.contractNegotiationFailed(sectionTitle:)` if the AI service call fails; rethrows any parsing errors produced by `parseContract(from:sectionId:)`.
     private func negotiateContract(
         for section: WritingSection,
         plan: WritingPlan,
@@ -192,7 +208,14 @@ public class MultiAgentHarness {
         return try parseContract(from: rawResponse, sectionId: section.id)
     }
 
-    // MARK: - Section Processing (generator + evaluator loop)
+    /// Processes a single writing section by running the generator → evaluator revision loop until the section meets the configured quality threshold or the maximum revisions are exhausted.
+    /// - Parameters:
+    ///   - section: The plan section to generate content for.
+    ///   - contract: The negotiated SectionContract containing goals, success criteria, and word-count bounds used to guide generation and evaluation.
+    ///   - plan: The overall WritingPlan providing plan-level context and handoff summary.
+    ///   - previousContext: Hand-off text from prior sections (e.g., "story so far") supplied to the generator for continuity.
+    /// - Returns: A `SectionResult` containing the section, contract, the selected generated content, the final evaluation, the number of revisions performed, and the handoff context for subsequent sections.
+    /// - Throws: `HarnessError.generationFailed` if configuration prevents any revisions; `HarnessError.maxRevisionsExceeded` if the section never reaches the configured quality threshold within the allowed revisions; or other harness errors propagated from generator/evaluator agent calls.
 
     private func processSection(
         _ section: WritingSection,
@@ -277,7 +300,15 @@ public class MultiAgentHarness {
         )
     }
 
-    // MARK: - Generator Agent
+    /// Produce a draft of the specified section that conforms to the provided contract and surrounding context.
+    /// - Parameters:
+    ///   - section: The WritingSection to author (title, purpose, key elements).
+    ///   - contract: The SectionContract describing goals, success criteria, word count range, and tone notes the draft must follow.
+    ///   - plan: The overall WritingPlan used to provide plan-level context and handoff summary.
+    ///   - previousContext: Concise "story so far" or an empty string for an opening section; included verbatim for context in the prompt.
+    ///   - priorFeedback: Editor feedback from a prior revision to incorporate into this draft; may be empty.
+    /// - Returns: The generated prose for the section.
+    /// - Throws: `HarnessError.generationFailed` if the underlying AI service fails to produce the draft.
 
     private func generateSection(
         _ section: WritingSection,
@@ -329,7 +360,15 @@ public class MultiAgentHarness {
         }
     }
 
-    // MARK: - Evaluator Agent
+    /// Evaluates a draft section against the provided contract and returns a parsed, structured editor evaluation.
+    /// - Parameters:
+    ///   - content: The draft text to be evaluated.
+    ///   - contract: The negotiated SectionContract describing goals, success criteria, and word count targets.
+    ///   - section: The WritingSection metadata (used for error context and identifiers).
+    ///   - plan: The WritingPlan providing surrounding context and handoff summary for the evaluator.
+    ///   - revision: The current revision number for this draft (used in the evaluator prompt and returned evaluation).
+    /// - Returns: A `WritingSectionEvaluation` containing per-criterion scores and feedback plus `overallFeedback`.
+    /// - Throws: `HarnessError.evaluationFailed` if the evaluator agent call fails; `HarnessError.invalidEvaluationJSON` if the agent response cannot be parsed into a valid evaluation.
 
     private func evaluateSection(
         content: String,
@@ -397,7 +436,8 @@ public class MultiAgentHarness {
 
     // MARK: - JSON Parsing
 
-    /// Extracts a JSON object from a response that may be wrapped in markdown fences.
+    /// Extracts JSON content from a text blob, preferring fenced code blocks or a raw JSON object when present.
+    /// - Returns: A trimmed substring containing the JSON object or the inner contents of a fenced code block; if no JSON is detected, returns the trimmed original text.
     private func extractJSON(from text: String) -> String {
         // Strip ```json ... ``` fences
         if let fenceStart = text.range(of: "```json\n") ?? text.range(of: "```json\r\n") {
@@ -424,6 +464,12 @@ public class MultiAgentHarness {
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Parses the planner agent's response and constructs a `WritingPlan`.
+    /// - Parameters:
+    ///   - rawResponse: Raw text returned by the planner agent; may include fenced code blocks around the JSON.
+    ///   - originalPrompt: The original user prompt used to generate the plan (provided for context in error handling or logging).
+    /// - Returns: A `WritingPlan` populated from the parsed JSON, with `sections` sorted by `sequenceNumber`.
+    /// - Throws: `HarnessError.invalidPlanJSON` if the planner response cannot be extracted or parsed as JSON, or if required top-level fields (`title`, `tone`, `synopsis`, `sections`) or required section fields (`sequenceNumber`, `title`, `purpose`) are missing or invalid.
     private func parsePlan(from rawResponse: String, originalPrompt: String) throws -> WritingPlan {
         let jsonString = extractJSON(from: rawResponse)
         guard let data = jsonString.data(using: .utf8),
@@ -476,6 +522,11 @@ public class MultiAgentHarness {
         )
     }
 
+    /// Parses a SectionContract from an AI model response, tolerant of fenced code blocks and malformed JSON; returns a minimal default contract if parsing fails.
+    /// - Parameters:
+    ///   - rawResponse: The raw text returned by the AI evaluator/negotiator (may include markdown fences or other surrounding text).
+    ///   - sectionId: The UUID to assign to the produced SectionContract.
+    /// - Returns: A SectionContract populated from the parsed JSON fields (`goals`, `successCriteria`, `wordCountMin`, `wordCountMax`, `toneNotes`). If parsing fails or expected fields are missing, returns a minimal default contract with conservative goals, success criteria, and a 300–700 word count range.
     private func parseContract(from rawResponse: String, sectionId: UUID) throws -> SectionContract {
         let jsonString = extractJSON(from: rawResponse)
         guard let data = jsonString.data(using: .utf8),
@@ -507,6 +558,13 @@ public class MultiAgentHarness {
         )
     }
 
+    /// Parses an evaluator agent response and produces a `WritingSectionEvaluation`.
+    /// - Parameters:
+    ///   - rawResponse: The evaluator agent's text response; expected to contain JSON with a top-level `scores` object and optional `overallFeedback`.
+    ///   - sectionId: The UUID of the section being evaluated.
+    ///   - revision: The revision number associated with this evaluation.
+    /// - Returns: A `WritingSectionEvaluation` containing a `CriterionScore` for each `WritingCriterion`, `overallFeedback`, and the `revision`.
+    /// - Throws: `HarnessError.invalidEvaluationJSON` if the response cannot be parsed as JSON or if the required `scores` object is missing. Missing individual criterion entries are assigned a default score of `7` and feedback `"Score not provided by evaluator."`.
     private func parseEvaluation(
         from rawResponse: String,
         sectionId: UUID,
@@ -552,7 +610,13 @@ public class MultiAgentHarness {
         )
     }
 
-    // MARK: - Handoff & Assembly
+    /// Builds a compact handoff summary for the given section to provide as previousContext to the next generator call.
+    /// Includes the section sequence and title, a comma-separated list of criterion scores formatted as `Name: X/10`, and a content excerpt truncated to about 600 characters with an ellipsis if truncated.
+    /// - Parameters:
+    ///   - section: The section metadata (sequenceNumber and title).
+    ///   - content: The generated prose to summarize; may be trimmed to ~600 characters.
+    ///   - evaluation: The evaluation whose per-criterion scores are included in the summary.
+    /// - Returns: A plain-text block containing the section header, quality scores, and content excerpt.
 
     private func buildHandoffContext(
         section: WritingSection,
@@ -580,6 +644,8 @@ public class MultiAgentHarness {
         """
     }
 
+    /// Builds a markdown document from the provided section results and plan.
+    /// - Returns: A single markdown string starting with a level-1 header for `plan.title`, followed by each section as a level-2 header and its generated content, separated by `\n\n---\n\n`.
     private func assembleDocument(from results: [SectionResult], plan: WritingPlan) -> String {
         let header = "# \(plan.title)\n\n"
         let body = results
@@ -591,6 +657,14 @@ public class MultiAgentHarness {
         return header + body
     }
 
+    /// Builds a quality report aggregating evaluation scores and revision metrics from completed sections.
+    /// - Parameters:
+    ///   - results: The per-section results to aggregate.
+    /// - Returns: A `HarnessQualityReport` containing:
+    ///   - `averageScoresByCriterion`: average numeric score for each `WritingCriterion` (0 if no scores),
+    ///   - `sectionsPassedFirstAttempt`: count of sections with `totalRevisions == 1`,
+    ///   - `totalSections`: number of sections processed,
+    ///   - `totalRevisions`: sum of all section revision counts.
     private func buildQualityReport(from results: [SectionResult]) -> HarnessQualityReport {
         var totalsByCriterion: [String: Int] = [:]
         var countsByCriterion: [String: Int] = [:]
