@@ -1080,6 +1080,61 @@ public class WritersApp {
         let tasks = kanbanManager.getTasks(forBoard: boardId)
         return try await svc.createKanbanCanvas(board: board, tasks: tasks)
     }
+
+    // MARK: - Multi-Agent Harness
+
+    /// Create a `MultiAgentHarness` wired to the active AI service.
+    ///
+    /// - Parameter configuration: Harness settings (revision budget, quality threshold, model).
+    /// - Throws: `AIError.aiNotEnabled` if AI has not been configured via `enableAI()`.
+    public func createMultiAgentHarness(
+        configuration: HarnessConfiguration = .default
+    ) throws -> MultiAgentHarness {
+        guard let ai = aiService else { throw AIError.aiNotEnabled }
+        return MultiAgentHarness(aiService: ai, configuration: configuration)
+    }
+
+    /// Expand a short writing prompt into a structured `WritingPlan` using the planner agent.
+    ///
+    /// This is a convenience wrapper around `MultiAgentHarness.createPlan(prompt:)`.
+    /// Use it when you want only the plan without running the full generator–evaluator loop.
+    ///
+    /// - Parameter prompt: A 1–4 sentence description of what to write.
+    /// - Returns: A `WritingPlan` with sections, characters, themes, and tone.
+    /// - Throws: `AIError.aiNotEnabled`, `HarnessError.emptyPrompt`, or `HarnessError.plannerFailed`.
+    public func planWriting(prompt: String) async throws -> WritingPlan {
+        let harness = try createMultiAgentHarness()
+        return try await harness.createPlan(prompt: prompt)
+    }
+
+    /// Run the full three-agent harness (planner → generator → evaluator) for a writing prompt.
+    ///
+    /// The harness:
+    /// 1. Expands `prompt` into a `WritingPlan`.
+    /// 2. For each section, negotiates a `SectionContract`, generates prose, and evaluates it.
+    /// 3. Revises sections that fail the quality threshold (up to `configuration.maxRevisionsPerSection`).
+    /// 4. Assembles all sections into a final document.
+    ///
+    /// - Parameters:
+    ///   - prompt: A 1–4 sentence writing task description.
+    ///   - configuration: Harness settings controlling revision budget and quality threshold.
+    /// - Returns: A `HarnessResult` with assembled prose, quality report, and per-section data.
+    public func runMultiAgentHarness(
+        prompt: String,
+        configuration: HarnessConfiguration = .default
+    ) async throws -> HarnessResult {
+        let harness = try createMultiAgentHarness(configuration: configuration)
+        return try await harness.run(prompt: prompt)
+    }
+
+    /// Run the generator–evaluator loop for an existing `WritingPlan` (skips the planner).
+    public func runMultiAgentHarness(
+        plan: WritingPlan,
+        configuration: HarnessConfiguration = .default
+    ) async throws -> HarnessResult {
+        let harness = try createMultiAgentHarness(configuration: configuration)
+        return try await harness.run(plan: plan)
+    }
 }
 
 // MARK: - Supporting Types

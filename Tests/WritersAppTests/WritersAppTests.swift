@@ -1539,4 +1539,356 @@ final class WritersAppTests: XCTestCase {
             XCTAssertTrue(error is AIError)
         }
     }
+
+    // MARK: - Multi-Agent Harness Model Tests
+
+    func testHarnessConfigurationDefaults() {
+        let config = HarnessConfiguration.default
+        XCTAssertEqual(config.maxRevisionsPerSection, 3)
+        XCTAssertEqual(config.qualityThreshold, 7)
+        XCTAssertEqual(config.maxSections, 20)
+        XCTAssertEqual(config.model, .claude35Sonnet)
+    }
+
+    func testHarnessConfigurationCustomValues() {
+        let config = HarnessConfiguration(
+            maxRevisionsPerSection: 5,
+            qualityThreshold: 8,
+            maxSections: 10,
+            model: .claude3Haiku
+        )
+        XCTAssertEqual(config.maxRevisionsPerSection, 5)
+        XCTAssertEqual(config.qualityThreshold, 8)
+        XCTAssertEqual(config.maxSections, 10)
+        XCTAssertEqual(config.model, .claude3Haiku)
+    }
+
+    func testWritingCriterionAllCasesCount() {
+        XCTAssertEqual(WritingCriterion.allCases.count, 4)
+    }
+
+    func testWritingCriterionRawValues() {
+        XCTAssertEqual(WritingCriterion.narrativeCoherence.rawValue, "narrativeCoherence")
+        XCTAssertEqual(WritingCriterion.originality.rawValue, "originality")
+        XCTAssertEqual(WritingCriterion.craft.rawValue, "craft")
+        XCTAssertEqual(WritingCriterion.planConsistency.rawValue, "planConsistency")
+    }
+
+    func testWritingCriterionDisplayNames() {
+        XCTAssertFalse(WritingCriterion.narrativeCoherence.displayName.isEmpty)
+        XCTAssertFalse(WritingCriterion.originality.displayName.isEmpty)
+        XCTAssertFalse(WritingCriterion.craft.displayName.isEmpty)
+        XCTAssertFalse(WritingCriterion.planConsistency.displayName.isEmpty)
+    }
+
+    func testWritingCriterionRubricsAreNonEmpty() {
+        for criterion in WritingCriterion.allCases {
+            XCTAssertFalse(criterion.rubric.isEmpty, "\(criterion.displayName) rubric must not be empty")
+        }
+    }
+
+    func testCriterionScoreClampedAtInit() {
+        let tooLow  = CriterionScore(criterion: .craft, score: -5, feedback: "bad")
+        let tooHigh = CriterionScore(criterion: .craft, score: 99, feedback: "great")
+        XCTAssertEqual(tooLow.score, 1)
+        XCTAssertEqual(tooHigh.score, 10)
+    }
+
+    func testCriterionScorePassedDefault() {
+        let failing = CriterionScore(criterion: .originality, score: 6, feedback: "needs work")
+        let passing = CriterionScore(criterion: .originality, score: 7, feedback: "good")
+        XCTAssertFalse(failing.passedDefault)
+        XCTAssertTrue(passing.passedDefault)
+    }
+
+    func testCriterionScorePassedCustomThreshold() {
+        let score = CriterionScore(criterion: .craft, score: 7, feedback: "ok")
+        XCTAssertTrue(score.passed(threshold: 7))
+        XCTAssertFalse(score.passed(threshold: 8))
+        XCTAssertTrue(score.passed(threshold: 6))
+    }
+
+    func testWritingSectionIdentifiable() {
+        let section = WritingSection(
+            sequenceNumber: 1,
+            title: "Opening",
+            purpose: "Establish the setting",
+            keyElements: ["the old house", "the smell of rain"]
+        )
+        XCTAssertNotEqual(section.id, UUID())
+        XCTAssertEqual(section.sequenceNumber, 1)
+        XCTAssertEqual(section.title, "Opening")
+        XCTAssertEqual(section.keyElements.count, 2)
+    }
+
+    func testWritingPlanHandoffSummaryContainsKeyFields() {
+        let section = WritingSection(
+            sequenceNumber: 1,
+            title: "Act One",
+            purpose: "Introduce protagonist",
+            keyElements: ["the call to adventure"]
+        )
+        let plan = WritingPlan(
+            title: "Hero's Journey",
+            genre: "fantasy",
+            tone: "epic",
+            synopsis: "A hero rises.",
+            sections: [section],
+            characters: ["Aldric — the reluctant hero"],
+            themes: ["courage", "sacrifice"]
+        )
+        let summary = plan.handoffSummary
+        XCTAssertTrue(summary.contains("Hero's Journey"))
+        XCTAssertTrue(summary.contains("fantasy"))
+        XCTAssertTrue(summary.contains("epic"))
+        XCTAssertTrue(summary.contains("Act One"))
+    }
+
+    func testWritingPlanCodableRoundTrip() throws {
+        let section = WritingSection(
+            sequenceNumber: 1,
+            title: "Chapter 1",
+            purpose: "Open story",
+            keyElements: ["first element"]
+        )
+        let plan = WritingPlan(
+            title: "Test Story",
+            genre: "sci-fi",
+            tone: "tense",
+            synopsis: "A test synopsis.",
+            sections: [section]
+        )
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+        let data = try encoder.encode(plan)
+        let decoded = try decoder.decode(WritingPlan.self, from: data)
+        XCTAssertEqual(decoded.id, plan.id)
+        XCTAssertEqual(decoded.title, plan.title)
+        XCTAssertEqual(decoded.sections.count, 1)
+        XCTAssertEqual(decoded.sections[0].title, "Chapter 1")
+    }
+
+    func testSectionContractDescriptionContractsFields() {
+        let sectionId = UUID()
+        let contract = SectionContract(
+            sectionId: sectionId,
+            goals: ["Establish hero"],
+            successCriteria: ["Hero introduced by name"],
+            wordCountMin: 300,
+            wordCountMax: 500,
+            toneNotes: "Keep it tense"
+        )
+        let desc = contract.description
+        XCTAssertTrue(desc.contains("Establish hero"))
+        XCTAssertTrue(desc.contains("Hero introduced by name"))
+        XCTAssertTrue(desc.contains("300"))
+        XCTAssertTrue(desc.contains("500"))
+        XCTAssertTrue(desc.contains("Keep it tense"))
+    }
+
+    func testSectionContractCodableRoundTrip() throws {
+        let contract = SectionContract(
+            sectionId: UUID(),
+            goals: ["Goal 1"],
+            successCriteria: ["Criterion 1"],
+            wordCountMin: 200,
+            wordCountMax: 400
+        )
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+        let data = try encoder.encode(contract)
+        let decoded = try decoder.decode(SectionContract.self, from: data)
+        XCTAssertEqual(decoded.id, contract.id)
+        XCTAssertEqual(decoded.goals, ["Goal 1"])
+        XCTAssertEqual(decoded.wordCountMin, 200)
+    }
+
+    func testWritingSectionEvaluationAverageScore() {
+        let sectionId = UUID()
+        let scores: [CriterionScore] = WritingCriterion.allCases.enumerated().map { idx, criterion in
+            CriterionScore(criterion: criterion, score: 6 + idx, feedback: "ok")
+        }
+        let eval = WritingSectionEvaluation(
+            sectionId: sectionId,
+            scores: scores,
+            overallFeedback: "Good attempt.",
+            revision: 1
+        )
+        // Scores are 6, 7, 8, 9 → average = 7.5
+        XCTAssertEqual(eval.averageScore, 7.5, accuracy: 0.01)
+    }
+
+    func testWritingSectionEvaluationOverallPassedThreshold() {
+        let sectionId = UUID()
+        let passingScores = WritingCriterion.allCases.map {
+            CriterionScore(criterion: $0, score: 8, feedback: "good")
+        }
+        let failingScores = WritingCriterion.allCases.map {
+            CriterionScore(criterion: $0, score: 5, feedback: "needs work")
+        }
+        let passingEval = WritingSectionEvaluation(
+            sectionId: sectionId, scores: passingScores, overallFeedback: "", revision: 1
+        )
+        let failingEval = WritingSectionEvaluation(
+            sectionId: sectionId, scores: failingScores, overallFeedback: "", revision: 1
+        )
+        XCTAssertTrue(passingEval.overallPassed(threshold: 7))
+        XCTAssertFalse(failingEval.overallPassed(threshold: 7))
+    }
+
+    func testWritingSectionEvaluationScoresByName() {
+        let sectionId = UUID()
+        let scores = [CriterionScore(criterion: .craft, score: 9, feedback: "excellent")]
+        let eval = WritingSectionEvaluation(
+            sectionId: sectionId, scores: scores, overallFeedback: "", revision: 1
+        )
+        XCTAssertEqual(eval.scoresByName["Craft"], 9)
+    }
+
+    func testHarnessQualityReportPassRate() {
+        let report = HarnessQualityReport(
+            averageScoresByCriterion: [:],
+            sectionsPassedFirstAttempt: 3,
+            totalSections: 4,
+            totalRevisions: 5
+        )
+        XCTAssertEqual(report.passRate, 0.75, accuracy: 0.01)
+    }
+
+    func testHarnessQualityReportPassRateZeroSections() {
+        let report = HarnessQualityReport(
+            averageScoresByCriterion: [:],
+            sectionsPassedFirstAttempt: 0,
+            totalSections: 0,
+            totalRevisions: 0
+        )
+        XCTAssertEqual(report.passRate, 0.0)
+    }
+
+    func testHarnessResultCodableRoundTrip() throws {
+        let section = WritingSection(
+            sequenceNumber: 1, title: "S1", purpose: "Open", keyElements: []
+        )
+        let plan = WritingPlan(
+            title: "T", tone: "dark", synopsis: "Synopsis.", sections: [section]
+        )
+        let contract = SectionContract(
+            sectionId: section.id, goals: ["G"], successCriteria: ["C"]
+        )
+        let evalScores = WritingCriterion.allCases.map {
+            CriterionScore(criterion: $0, score: 8, feedback: "fine")
+        }
+        let evaluation = WritingSectionEvaluation(
+            sectionId: section.id, scores: evalScores, overallFeedback: "Ok", revision: 1
+        )
+        let sectionResult = SectionResult(
+            section: section,
+            contract: contract,
+            generatedContent: "Once upon a time...",
+            evaluation: evaluation,
+            totalRevisions: 1,
+            handoffContext: "Section 1 written"
+        )
+        let report = HarnessQualityReport(
+            averageScoresByCriterion: ["craft": 8.0],
+            sectionsPassedFirstAttempt: 1,
+            totalSections: 1,
+            totalRevisions: 1
+        )
+        let result = HarnessResult(
+            plan: plan,
+            sectionResults: [sectionResult],
+            assembledDocument: "# T\n\nOnce upon a time...",
+            qualityReport: report
+        )
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+        let data = try encoder.encode(result)
+        let decoded = try decoder.decode(HarnessResult.self, from: data)
+        XCTAssertEqual(decoded.id, result.id)
+        XCTAssertEqual(decoded.plan.title, "T")
+        XCTAssertEqual(decoded.sectionResults.count, 1)
+        XCTAssertEqual(decoded.qualityReport.totalSections, 1)
+    }
+
+    func testHarnessErrorDescriptions() {
+        let errors: [HarnessError] = [
+            .emptyPrompt,
+            .plannerFailed("network error"),
+            .invalidPlanJSON("missing title"),
+            .contractNegotiationFailed(sectionTitle: "Act One"),
+            .generationFailed(sectionTitle: "Act One", reason: "timeout"),
+            .evaluationFailed(sectionTitle: "Act One", reason: "bad JSON"),
+            .invalidEvaluationJSON("no scores"),
+            .maxRevisionsExceeded(sectionTitle: "Act One", revisions: 3)
+        ]
+        for error in errors {
+            XCTAssertNotNil(error.errorDescription, "\(error) should have a description")
+            XCTAssertFalse(error.errorDescription!.isEmpty)
+        }
+    }
+
+    func testCreateMultiAgentHarnessRequiresAI() {
+        let app = WritersApp()  // No AI enabled
+        XCTAssertThrowsError(try app.createMultiAgentHarness()) { error in
+            XCTAssertTrue(error is AIError)
+        }
+    }
+
+    func testCreateMultiAgentHarnessWithAIEnabled() throws {
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        let app = WritersApp(aiConfiguration: config)
+        let harness = try app.createMultiAgentHarness()
+        XCTAssertEqual(harness.configuration.qualityThreshold, 7)
+    }
+
+    func testCreateMultiAgentHarnessWithCustomConfiguration() throws {
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        let app = WritersApp(aiConfiguration: config)
+        let customConfig = HarnessConfiguration(
+            maxRevisionsPerSection: 5,
+            qualityThreshold: 9,
+            maxSections: 5
+        )
+        let harness = try app.createMultiAgentHarness(configuration: customConfig)
+        XCTAssertEqual(harness.configuration.maxRevisionsPerSection, 5)
+        XCTAssertEqual(harness.configuration.qualityThreshold, 9)
+        XCTAssertEqual(harness.configuration.maxSections, 5)
+    }
+
+    func testPlanWritingRequiresAI() async {
+        let app = WritersApp()  // No AI enabled
+        do {
+            _ = try await app.planWriting(prompt: "Write a short story")
+            XCTFail("Should throw AIError.aiNotEnabled")
+        } catch {
+            XCTAssertTrue(error is AIError)
+        }
+    }
+
+    func testRunMultiAgentHarnessRequiresAI() async {
+        let app = WritersApp()  // No AI enabled
+        do {
+            _ = try await app.runMultiAgentHarness(prompt: "Write a poem")
+            XCTFail("Should throw AIError.aiNotEnabled")
+        } catch {
+            XCTAssertTrue(error is AIError)
+        }
+    }
+
+    func testRunMultiAgentHarnessWithPlanRequiresAI() async {
+        let app = WritersApp()  // No AI enabled
+        let section = WritingSection(
+            sequenceNumber: 1, title: "S1", purpose: "Open", keyElements: []
+        )
+        let plan = WritingPlan(
+            title: "Test", tone: "neutral", synopsis: "A test.", sections: [section]
+        )
+        do {
+            _ = try await app.runMultiAgentHarness(plan: plan)
+            XCTFail("Should throw AIError.aiNotEnabled")
+        } catch {
+            XCTAssertTrue(error is AIError)
+        }
+    }
 }
