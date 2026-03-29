@@ -1891,4 +1891,366 @@ final class WritersAppTests: XCTestCase {
             XCTAssertTrue(error is AIError)
         }
     }
+
+    // MARK: - Additional Harness Tests
+
+    // AIModel gained Codable conformance in this PR; verify encode/decode round-trips correctly.
+    func testAIModelCodableRoundTrip() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+        for model in [AIModel.claude35Sonnet, .claude3Opus, .claude3Sonnet, .claude3Haiku] {
+            let data = try encoder.encode(model)
+            let decoded = try decoder.decode(AIModel.self, from: data)
+            XCTAssertEqual(decoded, model, "AIModel \(model.rawValue) should survive a Codable round-trip")
+        }
+    }
+
+    func testAIModelCodablePreservesRawValue() throws {
+        // Verify the encoded JSON contains the raw string value, not an integer index.
+        let data = try JSONEncoder().encode(AIModel.claude35Sonnet)
+        let jsonString = String(data: data, encoding: .utf8)!
+        XCTAssertTrue(jsonString.contains("claude-3-5-sonnet-20241022"))
+    }
+
+    // qualityThreshold is clamped to 1–10 at init; test the out-of-range cases.
+    func testHarnessConfigurationQualityThresholdClampedBelow() {
+        let config = HarnessConfiguration(qualityThreshold: 0)
+        XCTAssertEqual(config.qualityThreshold, 1)
+    }
+
+    func testHarnessConfigurationQualityThresholdClampedAbove() {
+        let config = HarnessConfiguration(qualityThreshold: 11)
+        XCTAssertEqual(config.qualityThreshold, 10)
+    }
+
+    func testHarnessConfigurationQualityThresholdBoundaryValues() {
+        let minConfig = HarnessConfiguration(qualityThreshold: 1)
+        let maxConfig = HarnessConfiguration(qualityThreshold: 10)
+        XCTAssertEqual(minConfig.qualityThreshold, 1)
+        XCTAssertEqual(maxConfig.qualityThreshold, 10)
+    }
+
+    func testHarnessConfigurationCodableRoundTrip() throws {
+        let original = HarnessConfiguration(
+            maxRevisionsPerSection: 4,
+            qualityThreshold: 8,
+            maxSections: 12,
+            model: .claude3Opus
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(HarnessConfiguration.self, from: data)
+        XCTAssertEqual(decoded.maxRevisionsPerSection, original.maxRevisionsPerSection)
+        XCTAssertEqual(decoded.qualityThreshold, original.qualityThreshold)
+        XCTAssertEqual(decoded.maxSections, original.maxSections)
+        XCTAssertEqual(decoded.model, original.model)
+    }
+
+    // CriterionScore scores at the valid boundary (1 and 10) should not be altered.
+    func testCriterionScoreNotClampedAtBoundary() {
+        let minScore = CriterionScore(criterion: .narrativeCoherence, score: 1, feedback: "poor")
+        let maxScore = CriterionScore(criterion: .narrativeCoherence, score: 10, feedback: "perfect")
+        XCTAssertEqual(minScore.score, 1)
+        XCTAssertEqual(maxScore.score, 10)
+    }
+
+    func testCriterionScoreCodableRoundTrip() throws {
+        let original = CriterionScore(criterion: .planConsistency, score: 8, feedback: "section delivered all elements")
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(CriterionScore.self, from: data)
+        XCTAssertEqual(decoded.criterion, original.criterion)
+        XCTAssertEqual(decoded.score, original.score)
+        XCTAssertEqual(decoded.feedback, original.feedback)
+    }
+
+    // WritingCriterion should survive Codable encoding using its raw string value.
+    func testWritingCriterionCodableRoundTrip() throws {
+        for criterion in WritingCriterion.allCases {
+            let data = try JSONEncoder().encode(criterion)
+            let decoded = try JSONDecoder().decode(WritingCriterion.self, from: data)
+            XCTAssertEqual(decoded, criterion)
+        }
+    }
+
+    // WritingSection with an explicit UUID should retain that UUID.
+    func testWritingSectionExplicitUUIDPreserved() {
+        let fixedId = UUID()
+        let section = WritingSection(
+            id: fixedId,
+            sequenceNumber: 3,
+            title: "Climax",
+            purpose: "The final confrontation",
+            keyElements: ["sword", "betrayal"]
+        )
+        XCTAssertEqual(section.id, fixedId)
+    }
+
+    func testWritingSectionCodableRoundTrip() throws {
+        let original = WritingSection(
+            sequenceNumber: 2,
+            title: "Rising Action",
+            purpose: "Introduce conflict",
+            keyElements: ["storm", "the map"]
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(WritingSection.self, from: data)
+        XCTAssertEqual(decoded.id, original.id)
+        XCTAssertEqual(decoded.sequenceNumber, original.sequenceNumber)
+        XCTAssertEqual(decoded.title, original.title)
+        XCTAssertEqual(decoded.keyElements, original.keyElements)
+    }
+
+    // WritingPlan.handoffSummary must show "unspecified" when genre is nil.
+    func testWritingPlanHandoffSummaryWithNilGenreShowsUnspecified() {
+        let section = WritingSection(
+            sequenceNumber: 1, title: "Open", purpose: "Begin", keyElements: []
+        )
+        let plan = WritingPlan(
+            title: "Untitled",
+            genre: nil,
+            tone: "somber",
+            synopsis: "A lonely journey.",
+            sections: [section]
+        )
+        XCTAssertTrue(plan.handoffSummary.contains("unspecified"))
+    }
+
+    // handoffSummary with multiple sections should list all of them.
+    func testWritingPlanHandoffSummaryListsAllSections() {
+        let sections = (1...3).map {
+            WritingSection(sequenceNumber: $0, title: "Section \($0)", purpose: "Purpose \($0)", keyElements: [])
+        }
+        let plan = WritingPlan(
+            title: "Multi",
+            tone: "neutral",
+            synopsis: "Three parts.",
+            sections: sections
+        )
+        let summary = plan.handoffSummary
+        XCTAssertTrue(summary.contains("Section 1"))
+        XCTAssertTrue(summary.contains("Section 2"))
+        XCTAssertTrue(summary.contains("Section 3"))
+    }
+
+    // SectionContract.description should omit word-count line when either bound is nil.
+    func testSectionContractDescriptionOmitsWordCountWhenNil() {
+        let contract = SectionContract(
+            sectionId: UUID(),
+            goals: ["Do something"],
+            successCriteria: ["Something done"],
+            wordCountMin: nil,
+            wordCountMax: nil,
+            toneNotes: nil
+        )
+        let desc = contract.description
+        XCTAssertFalse(desc.contains("Word Count"))
+        XCTAssertFalse(desc.contains("Tone Notes"))
+    }
+
+    // Word count line should NOT appear when only one bound is provided.
+    func testSectionContractDescriptionOmitsWordCountWithOnlyOneBound() {
+        let contractMinOnly = SectionContract(
+            sectionId: UUID(),
+            goals: ["G"],
+            successCriteria: ["C"],
+            wordCountMin: 200,
+            wordCountMax: nil
+        )
+        let contractMaxOnly = SectionContract(
+            sectionId: UUID(),
+            goals: ["G"],
+            successCriteria: ["C"],
+            wordCountMin: nil,
+            wordCountMax: 600
+        )
+        XCTAssertFalse(contractMinOnly.description.contains("Word Count"))
+        XCTAssertFalse(contractMaxOnly.description.contains("Word Count"))
+    }
+
+    // WritingSectionEvaluation.averageScore should be 0 when scores array is empty.
+    func testWritingSectionEvaluationAverageScoreEmptyScores() {
+        let eval = WritingSectionEvaluation(
+            sectionId: UUID(),
+            scores: [],
+            overallFeedback: "N/A",
+            revision: 1
+        )
+        XCTAssertEqual(eval.averageScore, 0.0)
+    }
+
+    // overallPassedDefault uses the fixed threshold of 7.
+    func testWritingSectionEvaluationOverallPassedDefault() {
+        let sectionId = UUID()
+        let passingScores = WritingCriterion.allCases.map {
+            CriterionScore(criterion: $0, score: 7, feedback: "meets bar")
+        }
+        let mixedScores = WritingCriterion.allCases.enumerated().map { idx, criterion in
+            CriterionScore(criterion: criterion, score: idx == 0 ? 6 : 8, feedback: "ok")
+        }
+        let passingEval = WritingSectionEvaluation(
+            sectionId: sectionId, scores: passingScores, overallFeedback: "", revision: 1
+        )
+        let mixedEval = WritingSectionEvaluation(
+            sectionId: sectionId, scores: mixedScores, overallFeedback: "", revision: 1
+        )
+        XCTAssertTrue(passingEval.overallPassedDefault)
+        XCTAssertFalse(mixedEval.overallPassedDefault)
+    }
+
+    func testWritingSectionEvaluationCodableRoundTrip() throws {
+        let scores = WritingCriterion.allCases.map {
+            CriterionScore(criterion: $0, score: 7, feedback: "ok")
+        }
+        let original = WritingSectionEvaluation(
+            sectionId: UUID(),
+            scores: scores,
+            overallFeedback: "Solid work",
+            revision: 2
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(WritingSectionEvaluation.self, from: data)
+        XCTAssertEqual(decoded.id, original.id)
+        XCTAssertEqual(decoded.revision, 2)
+        XCTAssertEqual(decoded.scores.count, WritingCriterion.allCases.count)
+        XCTAssertEqual(decoded.overallFeedback, "Solid work")
+    }
+
+    func testSectionResultCodableRoundTrip() throws {
+        let section = WritingSection(
+            sequenceNumber: 1, title: "Opening", purpose: "Establish setting", keyElements: ["foggy bay"]
+        )
+        let contract = SectionContract(
+            sectionId: section.id,
+            goals: ["Set scene"],
+            successCriteria: ["Fog mentioned"],
+            wordCountMin: 300,
+            wordCountMax: 500
+        )
+        let scores = WritingCriterion.allCases.map {
+            CriterionScore(criterion: $0, score: 8, feedback: "good")
+        }
+        let evaluation = WritingSectionEvaluation(
+            sectionId: section.id, scores: scores, overallFeedback: "Well done", revision: 1
+        )
+        let original = SectionResult(
+            section: section,
+            contract: contract,
+            generatedContent: "The fog rolled in from the bay.",
+            evaluation: evaluation,
+            totalRevisions: 1,
+            handoffContext: "Section 1: Opening – foggy bay established."
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(SectionResult.self, from: data)
+        XCTAssertEqual(decoded.id, original.id)
+        XCTAssertEqual(decoded.generatedContent, "The fog rolled in from the bay.")
+        XCTAssertEqual(decoded.totalRevisions, 1)
+        XCTAssertEqual(decoded.handoffContext, "Section 1: Opening – foggy bay established.")
+    }
+
+    func testHarnessQualityReportCodableRoundTrip() throws {
+        let original = HarnessQualityReport(
+            averageScoresByCriterion: ["craft": 7.5, "originality": 8.0],
+            sectionsPassedFirstAttempt: 2,
+            totalSections: 3,
+            totalRevisions: 5
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(HarnessQualityReport.self, from: data)
+        XCTAssertEqual(decoded.totalSections, 3)
+        XCTAssertEqual(decoded.sectionsPassedFirstAttempt, 2)
+        XCTAssertEqual(decoded.totalRevisions, 5)
+        XCTAssertEqual(decoded.averageScoresByCriterion["craft"], 7.5, accuracy: 0.001)
+    }
+
+    // HarnessError descriptions should embed their associated values.
+    func testHarnessErrorDescriptionEmbedsSectionTitle() {
+        let title = "The Gathering Storm"
+        let contractErr = HarnessError.contractNegotiationFailed(sectionTitle: title)
+        XCTAssertTrue(contractErr.errorDescription!.contains(title))
+
+        let genErr = HarnessError.generationFailed(sectionTitle: title, reason: "timeout")
+        XCTAssertTrue(genErr.errorDescription!.contains(title))
+        XCTAssertTrue(genErr.errorDescription!.contains("timeout"))
+
+        let evalErr = HarnessError.evaluationFailed(sectionTitle: title, reason: "bad JSON")
+        XCTAssertTrue(evalErr.errorDescription!.contains(title))
+        XCTAssertTrue(evalErr.errorDescription!.contains("bad JSON"))
+    }
+
+    func testHarnessErrorMaxRevisionsExceededEmbedsSectionTitleAndCount() {
+        let err = HarnessError.maxRevisionsExceeded(sectionTitle: "Act Three", revisions: 5)
+        let desc = err.errorDescription!
+        XCTAssertTrue(desc.contains("Act Three"))
+        XCTAssertTrue(desc.contains("5"))
+    }
+
+    func testHarnessErrorPlannerFailedEmbedsReason() {
+        let err = HarnessError.plannerFailed("connection reset by peer")
+        XCTAssertTrue(err.errorDescription!.contains("connection reset by peer"))
+    }
+
+    func testHarnessErrorInvalidPlanJSONEmbedsDetail() {
+        let err = HarnessError.invalidPlanJSON("missing 'tone' field")
+        XCTAssertTrue(err.errorDescription!.contains("missing 'tone' field"))
+    }
+
+    // MultiAgentHarness should expose its configuration after construction.
+    func testMultiAgentHarnessExposesConfiguration() throws {
+        let aiConfig = AIConfiguration(apiKey: "key", model: .claude35Sonnet)
+        let app = WritersApp(aiConfiguration: aiConfig)
+        let harnessConfig = HarnessConfiguration(
+            maxRevisionsPerSection: 2,
+            qualityThreshold: 6,
+            maxSections: 8,
+            model: .claude3Haiku
+        )
+        let harness = try app.createMultiAgentHarness(configuration: harnessConfig)
+        XCTAssertEqual(harness.configuration.maxRevisionsPerSection, 2)
+        XCTAssertEqual(harness.configuration.qualityThreshold, 6)
+        XCTAssertEqual(harness.configuration.maxSections, 8)
+        XCTAssertEqual(harness.configuration.model, .claude3Haiku)
+    }
+
+    // Regression: qualityThreshold passed as 0 via createMultiAgentHarness is silently clamped to 1.
+    func testCreateMultiAgentHarnessClampsTooLowQualityThreshold() throws {
+        let aiConfig = AIConfiguration(apiKey: "key", model: .claude35Sonnet)
+        let app = WritersApp(aiConfiguration: aiConfig)
+        let harness = try app.createMultiAgentHarness(
+            configuration: HarnessConfiguration(qualityThreshold: 0)
+        )
+        XCTAssertEqual(harness.configuration.qualityThreshold, 1)
+    }
+
+    // WritingPlan.targetAudience round-trips through Codable.
+    func testWritingPlanTargetAudienceCodableRoundTrip() throws {
+        let section = WritingSection(
+            sequenceNumber: 1, title: "Intro", purpose: "Hook reader", keyElements: []
+        )
+        let original = WritingPlan(
+            title: "Young Adult Tale",
+            tone: "hopeful",
+            targetAudience: "Young adults 14–18",
+            synopsis: "Coming of age.",
+            sections: [section]
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(WritingPlan.self, from: data)
+        XCTAssertEqual(decoded.targetAudience, "Young adults 14–18")
+    }
+
+    func testWritingPlanNilTargetAudienceCodable() throws {
+        let section = WritingSection(
+            sequenceNumber: 1, title: "S", purpose: "P", keyElements: []
+        )
+        let original = WritingPlan(
+            title: "General",
+            tone: "neutral",
+            targetAudience: nil,
+            synopsis: "Broad appeal.",
+            sections: [section]
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(WritingPlan.self, from: data)
+        XCTAssertNil(decoded.targetAudience)
+    }
 }
