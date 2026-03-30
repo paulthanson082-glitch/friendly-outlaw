@@ -6,6 +6,7 @@ public class WritersApp {
     public let documentManager: DocumentManager
     public let issueManager: IssueManager
     public let kanbanManager: KanbanManager
+    public let crmManager: CRMManager
     public let hardwareManager: HardwareManager
     public let databaseManager: DatabaseManager
     public let pluginManager: PluginManager
@@ -38,6 +39,7 @@ public class WritersApp {
         self.documentManager = DocumentManager()
         self.issueManager = IssueManager()
         self.kanbanManager = KanbanManager()
+        self.crmManager = CRMManager()
         self.hardwareManager = HardwareManager()
         self.databaseManager = databaseManager
         self.pluginManager = PluginManager.shared
