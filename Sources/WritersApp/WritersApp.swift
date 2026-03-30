@@ -1135,6 +1135,20 @@ public class WritersApp {
         let harness = try createMultiAgentHarness(configuration: configuration)
         return try await harness.run(plan: plan)
     }
+
+    // MARK: - Computer Use
+
+    /// Create a computer use service backed by this app's AI configuration.
+    /// - Parameter executor: Platform-specific executor that handles screenshots and input.
+    /// - Parameter configuration: Display and iteration settings.
+    /// - Returns: A ready-to-use `ComputerUseService`, or `nil` if AI is not enabled.
+    public func makeComputerUseService(
+        executor: ComputerUseExecutor,
+        configuration: ComputerUseConfiguration = ComputerUseConfiguration()
+    ) -> ComputerUseService? {
+        guard let ai = aiService else { return nil }
+        return ComputerUseService(aiService: ai, executor: executor, configuration: configuration)
+    }
 }
 
 // MARK: - Supporting Types

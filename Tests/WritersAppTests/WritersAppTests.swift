@@ -1891,4 +1891,116 @@ final class WritersAppTests: XCTestCase {
             XCTAssertTrue(error is AIError)
         }
     }
+
+    // MARK: - Computer Use Tests
+
+    func testComputerUseActionCodable() throws {
+        let action = ComputerUseAction(
+            action: .leftClick,
+            coordinate: [100, 200]
+        )
+        let data = try JSONEncoder().encode(action)
+        let decoded = try JSONDecoder().decode(ComputerUseAction.self, from: data)
+        XCTAssertEqual(decoded.action, .leftClick)
+        XCTAssertEqual(decoded.coordinate, [100, 200])
+    }
+
+    func testComputerUseActionTypeRawValues() {
+        XCTAssertEqual(ComputerUseActionType.screenshot.rawValue, "screenshot")
+        XCTAssertEqual(ComputerUseActionType.leftClick.rawValue, "left_click")
+        XCTAssertEqual(ComputerUseActionType.type.rawValue, "type")
+        XCTAssertEqual(ComputerUseActionType.keypress.rawValue, "keypress")
+        XCTAssertEqual(ComputerUseActionType.scroll.rawValue, "scroll")
+    }
+
+    func testComputerUseConfigurationDefaults() {
+        let config = ComputerUseConfiguration()
+        XCTAssertEqual(config.displayWidth, 1024)
+        XCTAssertEqual(config.displayHeight, 768)
+        XCTAssertEqual(config.maxIterations, 20)
+        XCTAssertEqual(config.screenshotDelay, 0.5)
+    }
+
+    func testComputerUseConfigurationCustom() {
+        let config = ComputerUseConfiguration(
+            displayWidth: 1920,
+            displayHeight: 1080,
+            maxIterations: 10,
+            screenshotDelay: 1.0
+        )
+        XCTAssertEqual(config.displayWidth, 1920)
+        XCTAssertEqual(config.displayHeight, 1080)
+        XCTAssertEqual(config.maxIterations, 10)
+        XCTAssertEqual(config.screenshotDelay, 1.0)
+    }
+
+    func testComputerUseSessionResultSummary() {
+        let actions = [
+            ComputerUseAction(action: .screenshot),
+            ComputerUseAction(action: .leftClick, coordinate: [50, 50])
+        ]
+        let result = ComputerUseSessionResult(
+            task: "Open browser",
+            finalResponse: "Done",
+            actions: actions,
+            iterationCount: 3,
+            wasExhausted: false
+        )
+        XCTAssertTrue(result.summary.contains("Open browser"))
+        XCTAssertTrue(result.summary.contains("2 actions"))
+        XCTAssertFalse(result.wasExhausted)
+    }
+
+    func testComputerUseResultProperties() {
+        let action = ComputerUseAction(action: .screenshot)
+        let result = ComputerUseResult(
+            action: action,
+            screenshotBase64: "abc123",
+            error: nil
+        )
+        XCTAssertEqual(result.screenshotBase64, "abc123")
+        XCTAssertNil(result.error)
+    }
+
+    func testComputerUseErrorDescriptions() {
+        XCTAssertNotNil(ComputerUseError.invalidRequest.errorDescription)
+        XCTAssertNotNil(ComputerUseError.invalidResponse.errorDescription)
+        XCTAssertNotNil(ComputerUseError.apiError("test").errorDescription)
+        XCTAssertNotNil(ComputerUseError.executorError("test").errorDescription)
+    }
+
+    func testMakeComputerUseServiceWithoutAI() {
+        let app = WritersApp()
+        // Without AI enabled, makeComputerUseService should return nil
+        let executor = MockComputerUseExecutor()
+        let service = app.makeComputerUseService(executor: executor)
+        XCTAssertNil(service)
+    }
+
+    func testMakeComputerUseServiceWithAI() {
+        let config = AIConfiguration(
+            apiKey: "sk-ant-test",
+            model: .claude35Sonnet,
+            maxTokens: 1024,
+            temperature: 0.7
+        )
+        let app = WritersApp(aiConfiguration: config)
+        let userId = UUID()
+        app.enableAI(configuration: config, userId: userId)
+        let executor = MockComputerUseExecutor()
+        let service = app.makeComputerUseService(executor: executor)
+        XCTAssertNotNil(service)
+    }
+}
+
+// MARK: - Test Helpers
+
+private class MockComputerUseExecutor: ComputerUseExecutor {
+    func takeScreenshot() async throws -> String {
+        return "mockScreenshotBase64Data"
+    }
+
+    func execute(action: ComputerUseAction) async throws -> ComputerUseResult {
+        return ComputerUseResult(action: action, screenshotBase64: "mockResultScreenshot")
+    }
 }

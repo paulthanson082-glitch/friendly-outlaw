@@ -615,3 +615,76 @@ public struct ReasoningStep: Codable {
         self.uncertainty = uncertainty
     }
 }
+
+// MARK: - Computer Use
+
+/// Represents a computer use action type that Claude can request
+public enum ComputerUseActionType: String, Codable {
+    case screenshot
+    case leftClick = "left_click"
+    case rightClick = "right_click"
+    case doubleClick = "double_click"
+    case middleClick = "middle_click"
+    case leftClickDrag = "left_click_drag"
+    case mouseMoveAction = "mouse_move"
+    case keypress
+    case type
+    case scroll
+    case wait
+    case cursorPosition = "cursor_position"
+}
+
+/// A computer use action requested by Claude
+public struct ComputerUseAction: Codable {
+    public let action: ComputerUseActionType
+    public let coordinate: [Int]?      // [x, y] for mouse actions
+    public let startCoordinate: [Int]? // [x, y] for drag start
+    public let text: String?           // for type/keypress actions
+    public let key: String?            // for keypress (e.g. "Return", "ctrl+c")
+    public let direction: String?      // "up" | "down" | "left" | "right" for scroll
+    public let amount: Int?            // scroll amount
+    public let duration: Int?          // wait duration in ms
+
+    public init(action: ComputerUseActionType, coordinate: [Int]? = nil,
+                startCoordinate: [Int]? = nil, text: String? = nil,
+                key: String? = nil, direction: String? = nil,
+                amount: Int? = nil, duration: Int? = nil) {
+        self.action = action
+        self.coordinate = coordinate
+        self.startCoordinate = startCoordinate
+        self.text = text
+        self.key = key
+        self.direction = direction
+        self.amount = amount
+        self.duration = duration
+    }
+}
+
+/// Result of executing a computer use action
+public struct ComputerUseResult {
+    public let action: ComputerUseAction
+    public let screenshotBase64: String? // PNG screenshot after action (base64)
+    public let error: String?
+
+    public init(action: ComputerUseAction, screenshotBase64: String? = nil, error: String? = nil) {
+        self.action = action
+        self.screenshotBase64 = screenshotBase64
+        self.error = error
+    }
+}
+
+/// Configuration for computer use sessions
+public struct ComputerUseConfiguration {
+    public let displayWidth: Int
+    public let displayHeight: Int
+    public let maxIterations: Int
+    public let screenshotDelay: Double // seconds to wait after action before screenshot
+
+    public init(displayWidth: Int = 1024, displayHeight: Int = 768,
+                maxIterations: Int = 20, screenshotDelay: Double = 0.5) {
+        self.displayWidth = displayWidth
+        self.displayHeight = displayHeight
+        self.maxIterations = maxIterations
+        self.screenshotDelay = screenshotDelay
+    }
+}

@@ -8,6 +8,11 @@ public class AIService {
     private let configuration: AIConfiguration
     private let apiURL = "https://api.anthropic.com/v1/messages"
 
+    /// The model identifier string used for API calls (used by ComputerUseService)
+    internal var currentModel: String { configuration.model.rawValue }
+    /// The API key used for requests (used by ComputerUseService)
+    internal var apiKey: String { configuration.apiKey }
+
     public init(configuration: AIConfiguration) {
         self.configuration = configuration
     }
