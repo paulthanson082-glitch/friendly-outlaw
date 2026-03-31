@@ -1167,6 +1167,59 @@ public struct AppStatistics {
     }
 }
 
+// MARK: - Document Safety Guardrails
+
+extension WritersApp {
+
+    /// Updates a document only if it is not write-protected, and creates a backup first.
+    ///
+    /// - Returns: The `DocumentBackup` created before the update.
+    /// - Throws: `DocumentSafetyError.writeProtected` or `DocumentSafetyError.documentNotFound`.
+    @discardableResult
+    public func updateDocumentSafely(_ document: Document) throws -> DocumentBackup {
+        return try documentManager.updateDocumentSafely(document)
+    }
+
+    /// Deletes a document only if it is not write-protected, and creates a backup first.
+    ///
+    /// - Returns: The `DocumentBackup` created before deletion.
+    /// - Throws: `DocumentSafetyError.writeProtected` or `DocumentSafetyError.documentNotFound`.
+    @discardableResult
+    public func deleteDocumentSafely(id: UUID) throws -> DocumentBackup {
+        return try documentManager.deleteDocumentSafely(id: id)
+    }
+
+    /// Restores a document's content from a previously created backup.
+    ///
+    /// - Returns: The restored `Document`.
+    /// - Throws: `DocumentSafetyError.backupNotFound`.
+    @discardableResult
+    public func restoreDocumentFromBackup(backupId: UUID) throws -> Document {
+        return try documentManager.restoreFromBackup(backupId: backupId)
+    }
+
+    /// Returns all backups for a document, newest first.
+    public func getDocumentBackups(documentId: UUID) -> [DocumentBackup] {
+        return documentManager.getBackups(forDocument: documentId)
+    }
+
+    /// Marks a document as write-protected. Any attempt to update or delete it via the safe
+    /// methods will throw `DocumentSafetyError.writeProtected` until protection is lifted.
+    public func enableDocumentWriteProtection(documentId: UUID) {
+        documentManager.enableWriteProtection(for: documentId)
+    }
+
+    /// Removes write protection from a document.
+    public func disableDocumentWriteProtection(documentId: UUID) {
+        documentManager.disableWriteProtection(for: documentId)
+    }
+
+    /// Returns `true` if the document is currently write-protected.
+    public func isDocumentWriteProtected(documentId: UUID) -> Bool {
+        return documentManager.isWriteProtected(id: documentId)
+    }
+}
+
 public enum AIError: LocalizedError {
     case aiNotEnabled
     case documentNotFound

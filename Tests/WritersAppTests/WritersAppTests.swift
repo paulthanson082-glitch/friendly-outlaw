@@ -1891,4 +1891,138 @@ final class WritersAppTests: XCTestCase {
             XCTAssertTrue(error is AIError)
         }
     }
+
+    // MARK: - Document Safety Guardrails Tests
+
+    func testUpdateDocumentSafelyCreatesBackup() throws {
+        let doc = app.createBlankDocument(title: "Safety Test", category: .article)
+        app.documentManager.updateDocument(Document(id: doc.id, title: doc.title, content: "Original content", category: doc.category))
+
+        var modified = doc
+        modified.content = "Updated content"
+
+        let backup = try app.updateDocumentSafely(modified)
+
+        XCTAssertEqual(backup.documentId, doc.id)
+        XCTAssertEqual(backup.contentSnapshot, "Original content")
+        XCTAssertEqual(backup.reason, "before update")
+
+        let updatedDoc = app.documentManager.getDocument(id: doc.id)
+        XCTAssertEqual(updatedDoc?.content, "Updated content")
+    }
+
+    func testUpdateDocumentSafelyThrowsForWriteProtectedDocument() throws {
+        let doc = app.createBlankDocument(title: "Protected Doc", category: .essay)
+        app.enableDocumentWriteProtection(documentId: doc.id)
+
+        var modified = doc
+        modified.content = "Attempted overwrite"
+
+        XCTAssertThrowsError(try app.updateDocumentSafely(modified)) { error in
+            guard case DocumentSafetyError.writeProtected(let id) = error else {
+                XCTFail("Expected writeProtected error, got \(error)")
+                return
+            }
+            XCTAssertEqual(id, doc.id)
+        }
+
+        // Content must be unchanged
+        let unchanged = app.documentManager.getDocument(id: doc.id)
+        XCTAssertNotEqual(unchanged?.content, "Attempted overwrite")
+    }
+
+    func testUpdateDocumentSafelyThrowsForMissingDocument() {
+        let phantom = Document(id: UUID(), title: "Ghost", content: "…", category: .other)
+        XCTAssertThrowsError(try app.updateDocumentSafely(phantom)) { error in
+            guard case DocumentSafetyError.documentNotFound = error else {
+                XCTFail("Expected documentNotFound error, got \(error)")
+                return
+            }
+        }
+    }
+
+    func testDeleteDocumentSafelyCreatesBackupAndRemovesDocument() throws {
+        var doc = app.createBlankDocument(title: "To Delete", category: .blogPost)
+        doc.content = "Content to preserve in backup"
+        app.documentManager.updateDocument(doc)
+
+        let backup = try app.deleteDocumentSafely(id: doc.id)
+
+        XCTAssertEqual(backup.documentId, doc.id)
+        XCTAssertEqual(backup.contentSnapshot, "Content to preserve in backup")
+        XCTAssertEqual(backup.reason, "before delete")
+        XCTAssertNil(app.documentManager.getDocument(id: doc.id), "Document should be gone after safe delete")
+    }
+
+    func testDeleteDocumentSafelyThrowsForWriteProtectedDocument() throws {
+        let doc = app.createBlankDocument(title: "No Delete", category: .novel)
+        app.enableDocumentWriteProtection(documentId: doc.id)
+
+        XCTAssertThrowsError(try app.deleteDocumentSafely(id: doc.id)) { error in
+            guard case DocumentSafetyError.writeProtected(let id) = error else {
+                XCTFail("Expected writeProtected error, got \(error)")
+                return
+            }
+            XCTAssertEqual(id, doc.id)
+        }
+
+        XCTAssertNotNil(app.documentManager.getDocument(id: doc.id), "Document must still exist")
+    }
+
+    func testRestoreFromBackupRestoresContent() throws {
+        var doc = app.createBlankDocument(title: "Restore Me", category: .shortStory)
+        doc.content = "Original content"
+        app.documentManager.updateDocument(doc)
+
+        var overwritten = doc
+        overwritten.content = "Overwritten content"
+        let backup = try app.updateDocumentSafely(overwritten)
+
+        let restored = try app.restoreDocumentFromBackup(backupId: backup.id)
+
+        XCTAssertEqual(restored.id, doc.id)
+        XCTAssertEqual(restored.content, "Original content")
+        XCTAssertEqual(app.documentManager.getDocument(id: doc.id)?.content, "Original content")
+    }
+
+    func testRestoreFromBackupThrowsForUnknownBackupId() {
+        XCTAssertThrowsError(try app.restoreDocumentFromBackup(backupId: UUID())) { error in
+            guard case DocumentSafetyError.backupNotFound = error else {
+                XCTFail("Expected backupNotFound error, got \(error)")
+                return
+            }
+        }
+    }
+
+    func testGetDocumentBackupsReturnsAllBackups() throws {
+        var doc = app.createBlankDocument(title: "Multi Backup", category: .article)
+        doc.content = "v1"
+        app.documentManager.updateDocument(doc)
+
+        var v2 = doc; v2.content = "v2"
+        try app.updateDocumentSafely(v2)
+
+        var v3 = doc; v3.content = "v3"
+        try app.updateDocumentSafely(v3)
+
+        let backups = app.getDocumentBackups(documentId: doc.id)
+        XCTAssertEqual(backups.count, 2)
+        let snapshots = Set(backups.map { $0.contentSnapshot })
+        XCTAssertTrue(snapshots.contains("v1"), "Should have backup of v1")
+        XCTAssertTrue(snapshots.contains("v2"), "Should have backup of v2")
+        // All backups belong to this document
+        XCTAssertTrue(backups.allSatisfy { $0.documentId == doc.id })
+    }
+
+    func testWriteProtectionToggle() {
+        let doc = app.createBlankDocument(title: "Toggle Test", category: .poetry)
+
+        XCTAssertFalse(app.isDocumentWriteProtected(documentId: doc.id))
+
+        app.enableDocumentWriteProtection(documentId: doc.id)
+        XCTAssertTrue(app.isDocumentWriteProtected(documentId: doc.id))
+
+        app.disableDocumentWriteProtection(documentId: doc.id)
+        XCTAssertFalse(app.isDocumentWriteProtected(documentId: doc.id))
+    }
 }
