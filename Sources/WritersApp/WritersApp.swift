@@ -6,16 +6,12 @@ public class WritersApp {
     public let documentManager: DocumentManager
     public let issueManager: IssueManager
     public let kanbanManager: KanbanManager
-    public let crmManager: CRMManager
     public let hardwareManager: HardwareManager
     public let databaseManager: DatabaseManager
     public let pluginManager: PluginManager
     public let encouragementService: EncouragementService
     public let versionControl: DoltVersionControlService
-    public private(set) var guiService: GuiNewService?
     public private(set) var aiService: AIService?
-    public private(set) var chatbotService: ChatbotService?
-    public private(set) var ragieService: RagieService?
     public private(set) var currentUserId: UUID?
     private var currentSessionId: UUID?
     private var memoryPlugin: ClaudeMemoryPlugin?
@@ -39,36 +35,18 @@ public class WritersApp {
         self.documentManager = DocumentManager()
         self.issueManager = IssueManager()
         self.kanbanManager = KanbanManager()
-        self.crmManager = CRMManager()
         self.hardwareManager = HardwareManager()
         self.databaseManager = databaseManager
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
         self.versionControl = DoltVersionControlService(databaseManager: databaseManager)
-        self.guiService = nil
-        let aiSvc = aiConfiguration.map { AIService(configuration: $0) }
-        self.aiService = aiSvc
-        if let svc = aiSvc {
-            self.chatbotService = ChatbotService(
-                aiService: svc,
-                documentManager: self.documentManager,
-                templateManager: self.templateManager
-            )
-        } else {
-            self.chatbotService = nil
-        }
+        self.aiService = aiConfiguration.map { AIService(configuration: $0) }
         try? databaseManager.initialize()
     }
 
     /// Enable AI features by providing configuration
     public func enableAI(configuration: AIConfiguration, userId: UUID? = nil) {
-        let aiSvc = AIService(configuration: configuration)
-        self.aiService = aiSvc
-        self.chatbotService = ChatbotService(
-            aiService: aiSvc,
-            documentManager: self.documentManager,
-            templateManager: self.templateManager
-        )
+        self.aiService = AIService(configuration: configuration)
         if let uid = userId {
             self.currentUserId = uid
             try? self.databaseManager.saveAIConfiguration(userId: uid, configuration: configuration)
@@ -78,118 +56,11 @@ public class WritersApp {
     /// Disable AI features
     public func disableAI() {
         self.aiService = nil
-        self.chatbotService = nil
     }
 
     /// Check if AI is available
     public var isAIEnabled: Bool {
         return aiService != nil
-    }
-
-    // MARK: - Ragie Integration
-
-    /// Initializes and enables the Ragie integration using the provided configuration.
-    /// - Parameter configuration: Configuration parameters used to create and configure the Ragie service.
-    public func enableRagie(configuration: RagieConfiguration) {
-        self.ragieService = RagieService(configuration: configuration)
-    }
-
-    /// Disables the Ragie integration for the app.
-    /// 
-    /// Clears the active `RagieService` instance so Ragie-dependent features become unavailable.
-    public func disableRagie() {
-        self.ragieService = nil
-    }
-
-    /// Whether the Ragie service is configured and available.
-    public var isRagieEnabled: Bool {
-        return ragieService != nil
-    }
-
-    /// Ingest a local document into Ragie for semantic retrieval.
-    ///
-    /// The document's content is sent to Ragie as raw text. The returned
-    /// `RagieDocument` includes the Ragie document id and initial processing status.
-    /// Poll `getRagieDocumentStatus(ragieId:)` until `isReady` is true before querying.
-    ///
-    /// - Parameter documentId: The id of the local `Document` to ingest.
-    /// Ingests the specified document's text into Ragie and returns the resulting RagieDocument.
-    /// - Parameters:
-    ///   - documentId: The UUID of the document to ingest.
-    /// - Returns: The `RagieDocument` created by Ragie for the ingested document.
-    /// - Throws: `RagieError.ragieNotEnabled` if Ragie has not been enabled; `RagieError.documentNotFound` if no document exists with the given `documentId`.
-    public func ingestDocumentToRagie(documentId: UUID) async throws -> RagieDocument {
-        guard let ragie = ragieService else { throw RagieError.ragieNotEnabled }
-        guard let document = documentManager.getDocument(id: documentId) else {
-            throw RagieError.documentNotFound
-        }
-        return try await ragie.ingestRawText(
-            document.content,
-            name: document.title,
-            metadata: ["document_id": documentId.uuidString, "category": document.category.rawValue]
-        )
-    }
-
-    /// Fetch the processing status of a Ragie document.
-    ///
-    /// - Parameter ragieId: The Ragie document id (from `ingestDocumentToRagie`).
-    /// Retrieves the Ragie document and its current status for the given Ragie document identifier.
-    /// - Parameter ragieId: The Ragie-assigned identifier of the document to fetch.
-    /// - Returns: The `RagieDocument` matching `ragieId`.
-    /// - Throws: `RagieError.ragieNotEnabled` if Ragie integration is not enabled.
-    /// - Throws: Any error propagated from `RagieService` if the document cannot be retrieved.
-    public func getRagieDocumentStatus(ragieId: String) async throws -> RagieDocument {
-        guard let ragie = ragieService else { throw RagieError.ragieNotEnabled }
-        return try await ragie.getDocument(id: ragieId)
-    }
-
-    /// Retrieve semantically relevant chunks from Ragie for a natural-language query.
-    ///
-    /// - Parameters:
-    ///   - query: The search query.
-    ///   - topK: Number of chunks to return (overrides configuration default).
-    ///   - rerank: Whether to apply reranking (overrides configuration default).
-    /// Retrieve documents from Ragie using a natural-language query.
-    /// - Parameters:
-    ///   - query: The text query to search the Ragie index.
-    ///   - topK: Optional maximum number of results to return; when `nil` the service default is used.
-    ///   - rerank: Optional flag to request reranking of initial results by relevance; when `nil` the service default is used.
-    /// - Returns: A `RagieRetrievalResult` containing matched documents and associated relevance metadata.
-    /// - Throws: `RagieError.ragieNotEnabled` if Ragie has not been enabled. Errors emitted by the underlying Ragie service are propagated.
-    public func retrieveFromRagie(
-        query: String,
-        topK: Int? = nil,
-        rerank: Bool? = nil
-    ) async throws -> RagieRetrievalResult {
-        guard let ragie = ragieService else { throw RagieError.ragieNotEnabled }
-        return try await ragie.retrieve(query: query, topK: topK, rerank: rerank)
-    }
-
-    /// List all documents currently stored in Ragie.
-    ///
-    /// Lists documents currently indexed in Ragie.
-    /// - Returns: An array of `RagieDocument` objects representing documents stored in Ragie.
-    /// - Throws: `RagieError.ragieNotEnabled` if Ragie is not enabled; rethrows any errors produced by the underlying `RagieService`.
-    public func listRagieDocuments() async throws -> [RagieDocument] {
-        guard let ragie = ragieService else { throw RagieError.ragieNotEnabled }
-        return try await ragie.listDocuments()
-    }
-
-    /// Enable adult-content mode for the integrated "Jules" chatbot.
-    /// 
-    /// If the chatbot service is not configured, this call has no effect.
-    public func enableJulesAdultMode() {
-        chatbotService?.isAdultModeEnabled = true
-    }
-
-    /// Disable adult content mode for Jules
-    public func disableJulesAdultMode() {
-        chatbotService?.isAdultModeEnabled = false
-    }
-
-    /// Check if Jules is in adult mode
-    public var isJulesAdultModeEnabled: Bool {
-        return chatbotService?.isAdultModeEnabled ?? false
     }
 
     // MARK: - Plugin Management
@@ -241,7 +112,13 @@ public class WritersApp {
         return nil
     }
 
-    /// Search memories
+    /// Searches stored memories matching `query` and returns matching memory entries.
+    /// - Parameters:
+    ///   - query: Text to match against stored memories.
+    ///   - category: Optional category to restrict the search.
+    ///   - limit: Maximum number of results to return.
+    /// - Returns: An array of memory records as dictionaries (`[[String: Any]]`); empty if no matches are found.
+    /// - Throws: `PluginError.notInitialized` if the memory plugin is not installed or enabled; forwards any errors thrown while executing the plugin action.
     public func searchMemories(query: String, category: String? = nil, limit: Int = 10) async throws -> [[String: Any]] {
         guard let plugin = memoryPlugin, plugin.isEnabled else {
             throw PluginError.notInitialized
@@ -262,7 +139,13 @@ public class WritersApp {
         return []
     }
 
-    /// List all memories
+    /// Lists stored memories, optionally filtered by category, limited, and sorted.
+    /// - Parameters:
+    ///   - category: Optional category to filter memories.
+    ///   - limit: Maximum number of memory entries to return.
+    ///   - sortBy: Field name to sort results by (e.g., `"created"`).
+    /// - Throws: `PluginError.notInitialized` if the memory plugin is not enabled; propagates errors thrown by the plugin during execution.
+    /// - Returns: An array of memory records as dictionaries; returns an empty array if the plugin reports no results.
     public func listMemories(category: String? = nil, limit: Int = 100, sortBy: String = "created") async throws -> [[String: Any]] {
         guard let plugin = memoryPlugin, plugin.isEnabled else {
             throw PluginError.notInitialized
@@ -283,7 +166,12 @@ public class WritersApp {
         return []
     }
 
-    /// Clear a specific memory or all memories
+    /// Clears stored memory entries matching an optional key and/or category.
+    /// - Parameters:
+    ///   - key: An optional memory key to clear; when omitted, entries are not filtered by key.
+    ///   - category: An optional category to restrict which memories are cleared; when omitted, entries are not filtered by category.
+    /// - Returns: The number of memory entries that were cleared.
+    /// - Throws: `PluginError.notInitialized` if the memory plugin is not available or enabled. Propagates errors thrown by the plugin execution.
     public func clearMemory(key: String? = nil, category: String? = nil) async throws -> Int {
         guard let plugin = memoryPlugin, plugin.isEnabled else {
             throw PluginError.notInitialized
@@ -447,7 +335,12 @@ public class WritersApp {
         try? databaseManager.insertUserSession(session)
     }
     
-    /// Ends the current session
+    /// Ends the currently active user session and records its completion.
+    /// 
+    /// If a session is active for the current user, sets the session's `endTime` to now,
+    /// updates `durationSeconds` to the number of seconds between `startTime` and `endTime`,
+    /// and attempts to persist the updated session (errors are suppressed). Clears the in-memory
+    /// `currentSessionId` whether or not persistence succeeded.
     public func endSession() {
         guard let sessionId = currentSessionId, let userId = currentUserId else { return }
 
@@ -670,7 +563,10 @@ public class WritersApp {
 
     // MARK: - AI-Powered Features
 
-    /// Returns the active AI service and the document for `documentId`, throwing if either is unavailable.
+    /// Ensures AI is enabled and retrieves the document with the given identifier.
+    /// - Parameter documentId: The UUID of the document to load.
+    /// - Returns: The active `AIService` and the corresponding `Document`.
+    /// - Throws: `AIError.aiNotEnabled` if AI is not enabled, `AIError.documentNotFound` if no document exists for the given ID.
     private func requireAIAndDocument(documentId: UUID) throws -> (AIService, Document) {
         guard let ai = aiService else {
             throw AIError.aiNotEnabled
@@ -681,7 +577,13 @@ public class WritersApp {
         return (ai, document)
     }
 
-    /// Get AI assistance for a document
+    /// Request AI assistance for the specified document.
+    /// - Parameters:
+    ///   - documentId: The identifier of the document to analyze and assist with.
+    ///   - type: The kind of assistance to request.
+    ///   - context: Optional additional context to guide the AI's response.
+    /// - Returns: An `AIResponse` containing the AI's suggestions or generated content for the document.
+    /// - Throws: `AIError.aiNotEnabled` if AI is disabled, `AIError.documentNotFound` if the document does not exist, or other errors propagated from the AI service.
     public func getAIAssistance(
         documentId: UUID,
         type: AIAssistanceType,
@@ -691,7 +593,13 @@ public class WritersApp {
         return try await ai.getAssistance(text: document.content, type: type, context: context)
     }
 
-    /// Continue writing a document with AI
+    /// Generate a continuation for the specified document using the enabled AI service.
+    /// - Parameters:
+    ///   - documentId: The identifier of the document to continue.
+    ///   - context: Optional AI context to guide the continuation.
+    ///   - appendToDocument: If `true`, append the generated continuation to the document's content and persist the update.
+    /// - Returns: The generated continuation text.
+    /// - Throws: `AIError.aiNotEnabled` if AI is not enabled, `AIError.documentNotFound` if the document cannot be found, or any error produced by the AI service.
     public func continueDocument(
         documentId: UUID,
         context: AIContext? = nil,
@@ -725,7 +633,13 @@ public class WritersApp {
         return continuation
     }
 
-    /// Improve document content with AI
+    /// Produces an improved version of a document's text using the configured AI.
+    /// - Parameters:
+    ///   - documentId: The identifier of the document to improve.
+    ///   - context: Optional AIContext providing additional instructions or guidance for the improvement.
+    ///   - replaceContent: If `true`, replaces the stored document content with the improved text; otherwise leaves the document unchanged.
+    /// - Returns: The improved document text.
+    /// - Throws: `AIError.aiNotEnabled` if AI is not enabled; `AIError.documentNotFound` if the document cannot be found. Propagates errors thrown by the AI service or underlying persistence operations.
     public func improveDocument(
         documentId: UUID,
         context: AIContext? = nil,
@@ -759,7 +673,12 @@ public class WritersApp {
         return improved
     }
 
-    /// Generate title suggestions for a document
+    /// Generate candidate titles for a document using the configured AI service.
+    /// - Parameters:
+    ///   - documentId: The identifier of the document to analyze.
+    ///   - context: Optional contextual hints to guide title generation.
+    /// - Returns: Suggested titles for the document.
+    /// - Throws: `AIError.aiNotEnabled` if AI is disabled, `AIError.documentNotFound` if the document cannot be found, or other AI-related errors encountered while generating titles.
     public func generateDocumentTitles(
         documentId: UUID,
         context: AIContext? = nil
@@ -768,13 +687,20 @@ public class WritersApp {
         return try await ai.generateTitles(content: document.content, context: context)
     }
 
-    /// Analyze a document comprehensively
+    /// Performs an AI-powered analysis of the specified document.
+    /// - Parameter documentId: The UUID of the document to analyze.
+    /// - Returns: A `DocumentAnalysis` containing the analysis results for the document.
+    /// - Throws: `AIError.aiNotEnabled` if AI is not enabled.
+    /// - Throws: `AIError.documentNotFound` if no document exists with the given `documentId`.
+    /// - Throws: Any error produced by the AI service while performing the analysis.
     public func analyzeDocument(documentId: UUID) async throws -> DocumentAnalysis {
         let (ai, document) = try requireAIAndDocument(documentId: documentId)
         return try await ai.analyzeDocument(document: document)
     }
 
-    /// Get writing insights for a document
+    /// Fetches writing insights for the specified document using the enabled AI service.
+    /// - Returns: `WritingInsights` containing analysis and recommendations derived from the document's content.
+    /// - Throws: `AIError.aiNotEnabled` if AI is disabled; `AIError.documentNotFound` if no document exists for the given `documentId`.
     public func getDocumentInsights(documentId: UUID) async throws -> WritingInsights {
         let (ai, document) = try requireAIAndDocument(documentId: documentId)
         return try await ai.getWritingInsights(document: document)
@@ -784,7 +710,14 @@ public class WritersApp {
     ///
     /// This enables Claude to use built-in writing tools (word count, document search,
     /// template listing, reading time) during its response generation. The tool loop
-    /// continues until Claude produces a final text response.
+    /// Request AI assistance for a document using the available writing tools.
+    /// - Parameters:
+    ///   - documentId: The identifier of the document to analyze and operate on.
+    ///   - type: The kind of assistance to request.
+    ///   - context: Optional contextual information to guide the AI.
+    ///   - maxIterations: The maximum number of tool-invocation iterations the AI may perform (default 10).
+    /// - Returns: An `AIResponse` containing the assistant's result and any tool execution details.
+    /// - Throws: An error if the AI is not enabled, the document cannot be found, or the AI/tool execution fails.
     public func getAIAssistanceWithTools(
         documentId: UUID,
         type: AIAssistanceType,
@@ -808,7 +741,12 @@ public class WritersApp {
         )
     }
 
-    /// Brainstorm ideas for a topic
+    /// Generate creative brainstorming ideas for a topic using the configured AI service.
+    /// - Parameters:
+    ///   - topic: The subject or prompt to brainstorm ideas about.
+    ///   - context: Optional additional context or constraints to guide the AI's suggestions.
+    /// - Returns: A string containing generated ideas or suggestions related to `topic`.
+    /// - Throws: `AIError.aiNotEnabled` if AI is not enabled; errors from the underlying AI service are propagated.
     public func brainstormIdeas(
         topic: String,
         context: AIContext? = nil
@@ -817,7 +755,12 @@ public class WritersApp {
         return try await ai.brainstormIdeas(topic: topic, context: context)
     }
 
-    /// Generate outline from concept
+    /// Generate an outline for the provided concept using the configured AI service.
+    /// - Parameters:
+    ///   - concept: The topic or idea to generate an outline for.
+    ///   - context: Optional AIContext providing additional guidance or constraints for generation.
+    /// - Throws: `AIError.aiNotEnabled` if the AI service is not enabled.
+    /// - Returns: The generated outline as a `String`.
     public func generateOutline(
         concept: String,
         context: AIContext? = nil
@@ -826,7 +769,12 @@ public class WritersApp {
         return try await ai.generateOutline(concept: concept, context: context)
     }
 
-    /// Develop a character concept
+    /// Generates a developed character profile from a brief character concept.
+    /// - Parameters:
+    ///   - characterConcept: A short description or prompt that defines the character idea to expand.
+    ///   - context: Optional AIContext supplying additional instructions, constraints, or stylistic guidance.
+    /// - Returns: A string containing the developed character profile, including traits, background, and suggestions.
+    /// - Throws: `AIError.aiNotEnabled` if AI is not enabled.
     public func developCharacter(
         characterConcept: String,
         context: AIContext? = nil
@@ -835,125 +783,44 @@ public class WritersApp {
         return try await ai.developCharacter(characterConcept: characterConcept, context: context)
     }
 
-    // MARK: - Hallucination Reduction Methods
-
-    /// Extract relevant quotes from a document for fact-grounding
-    ///
-    /// Uses the "direct quotes for factual grounding" technique to reduce hallucinations.
-    /// Claude extracts word-for-word quotes before performing analysis.
-    public func extractQuotesFromDocument(
-        documentId: UUID,
-        context: AIContext? = nil
-    ) async throws -> [QuoteBlock] {
-        guard let ai = aiService else { throw AIError.aiNotEnabled }
-        guard let document = documentManager.getDocument(id: documentId) else {
-            throw AIError.documentNotFound
-        }
-        return try await ai.extractQuotesFromDocument(text: document.content, context: context)
-    }
-
-    /// Verify document claims with citations from source material
-    ///
-    /// Uses the "verify with citations" technique. Claude must find supporting quotes
-    /// for each claim or explicitly acknowledge it cannot be verified.
-    public func verifyDocumentWithCitations(
-        documentId: UUID,
-        context: AIContext? = nil
-    ) async throws -> [VerifiedClaim] {
-        guard let ai = aiService else { throw AIError.aiNotEnabled }
-        guard let document = documentManager.getDocument(id: documentId) else {
-            throw AIError.documentNotFound
-        }
-        return try await ai.verifyWithCitations(text: document.content, context: context)
-    }
-
-    /// Analyze document while allowing Claude to admit uncertainty
-    ///
-    /// Uses the "allow Claude to say 'I don't know'" technique. Explicitly permits
-    /// uncertainty acknowledgment and information gap identification.
-    public func analyzeDocumentWithUncertainty(
-        documentId: UUID,
-        context: AIContext? = nil
-    ) async throws -> UncertaintyAwareAnalysis {
-        guard let ai = aiService else { throw AIError.aiNotEnabled }
-        guard let document = documentManager.getDocument(id: documentId) else {
-            throw AIError.documentNotFound
-        }
-        return try await ai.analyzeWithUncertainty(text: document.content, context: context)
-    }
-
-    /// Perform chain-of-thought analysis with explicit verification
-    ///
-    /// Uses the "chain-of-thought verification" technique. Claude explains its
-    /// reasoning step-by-step, identifying assumptions and uncertainties.
-    public func chainOfThoughtAnalysis(
-        documentId: UUID,
-        context: AIContext? = nil
-    ) async throws -> ChainOfThoughtAnalysis {
-        guard let ai = aiService else { throw AIError.aiNotEnabled }
-        guard let document = documentManager.getDocument(id: documentId) else {
-            throw AIError.documentNotFound
-        }
-        return try await ai.chainOfThoughtVerification(text: document.content, context: context)
-    }
-
-    /// Extract relevant quotes from arbitrary text (non-document)
-    public func extractQuotesFromText(
-        text: String,
-        context: AIContext? = nil
-    ) async throws -> [QuoteBlock] {
-        guard let ai = aiService else { throw AIError.aiNotEnabled }
-        return try await ai.extractQuotesFromDocument(text: text, context: context)
-    }
-
-    /// Verify arbitrary text with citations
-    public func verifyTextWithCitations(
-        text: String,
-        context: AIContext? = nil
-    ) async throws -> [VerifiedClaim] {
-        guard let ai = aiService else { throw AIError.aiNotEnabled }
-        return try await ai.verifyWithCitations(text: text, context: context)
-    }
-
-    /// Analyze arbitrary text with uncertainty acknowledgment
-    public func analyzeTextWithUncertainty(
-        text: String,
-        context: AIContext? = nil
-    ) async throws -> UncertaintyAwareAnalysis {
-        guard let ai = aiService else { throw AIError.aiNotEnabled }
-        return try await ai.analyzeWithUncertainty(text: text, context: context)
-    }
-
-    /// Perform chain-of-thought analysis on arbitrary text
-    public func chainOfThoughtAnalysisForText(
-        text: String,
-        context: AIContext? = nil
-    ) async throws -> ChainOfThoughtAnalysis {
-        guard let ai = aiService else { throw AIError.aiNotEnabled }
-        return try await ai.chainOfThoughtVerification(text: text, context: context)
-    }
-
     // MARK: - Statistics
     
-    /// Gets AI tool usage statistics
+    /// Fetches AI tool usage statistics for the resolved user.
+    /// - Parameter userId: Optional user UUID to query. If `nil`, the method uses `currentUserId` if available; otherwise a new UUID is used for resolution.
+    /// - Returns: An array of `AIToolUsageStats` for the resolved user.
+    /// - Throws: Any error propagated from the database manager while retrieving statistics.
     public func getAIToolUsageStats(userId: UUID? = nil) throws -> [AIToolUsageStats] {
         let resolvedUserId = userId ?? currentUserId ?? UUID()
         return try databaseManager.getAIToolUsageStats(userId: resolvedUserId)
     }
 
-    /// Gets session statistics
+    /// Fetches session statistics for a user, resolving to the current user when `userId` is nil.
+    /// - Parameter userId: The user ID to fetch stats for. If `nil`, `currentUserId` is used; if that is also `nil`, a new UUID is generated and used.
+    /// - Returns: `SessionStats` for the resolved user.
+    /// - Throws: If the database manager fails to retrieve the session statistics.
     public func getSessionStats(userId: UUID? = nil) throws -> SessionStats {
         let resolvedUserId = userId ?? currentUserId ?? UUID()
         return try databaseManager.getSessionStats(userId: resolvedUserId)
     }
 
-    /// Gets AI suggestions with pagination
+    /// Fetches AI suggestions scoped to a resolved user.
+    /// - Parameters:
+    ///   - userId: The user ID to query. If `nil`, `currentUserId` is used when available; otherwise a newly generated UUID is used to resolve the query scope.
+    ///   - limit: Maximum number of suggestions to return.
+    ///   - offset: Number of suggestions to skip before collecting results.
+    /// - Returns: An array of `AISuggestion` objects matching the resolved user, constrained by `limit` and `offset`.
+    /// - Throws: Any error thrown by the database manager when retrieving suggestions.
     public func getAISuggestions(userId: UUID? = nil, limit: Int = 50, offset: Int = 0) throws -> [AISuggestion] {
         let resolvedUserId = userId ?? currentUserId ?? UUID()
         return try databaseManager.getAISuggestions(userId: resolvedUserId, limit: limit, offset: offset)
     }
 
-    /// Gets user sessions sorted by duration
+    /// Fetches sessions for a resolved user identifier.
+    /// - Parameters:
+    ///   - userId: The user UUID to query. If `nil`, the method uses `currentUserId` if available; otherwise a new UUID is generated and used to query (which may yield no sessions).
+    ///   - sortByDuration: If `true`, returned sessions are sorted by duration; otherwise they are returned in the database's default order.
+    /// - Throws: Any error thrown by the underlying database manager when retrieving sessions.
+    /// - Returns: An array of `UserSession` objects for the resolved user.
     public func getUserSessions(userId: UUID? = nil, sortByDuration: Bool = false) throws -> [UserSession] {
         let resolvedUserId = userId ?? currentUserId ?? UUID()
         return try databaseManager.getUserSessions(userId: resolvedUserId, sortByDuration: sortByDuration)
@@ -1042,101 +909,6 @@ public class WritersApp {
             stats.byType.map { ($0.key.rawValue, $0.value) })
         return (stats.totalBoards, byTypeStrings, stats.activeCount)
     }
-
-    // MARK: - gui.new Visual Export
-
-    /// Configure the gui.new client. Omit `apiKey` to use the `GUI_NEW_API_KEY` env variable.
-    public func enableGui(apiKey: String? = nil) {
-        guiService = GuiNewService(apiKey: apiKey)
-    }
-
-    /// Remove the gui.new client.
-    public func disableGui() {
-        guiService = nil
-    }
-
-    /// Whether the gui.new client is configured.
-    public var isGuiEnabled: Bool { guiService != nil }
-
-    /// Export a document as a shareable gui.new canvas.
-    /// - Returns: A `GuiCanvas` containing the shareable URL.
-    public func exportDocumentToGui(id: UUID) async throws -> GuiCanvas {
-        guard let svc = guiService else { throw GuiNewError.notConfigured }
-        guard let document = documentManager.getDocument(id: id) else { throw AIError.documentNotFound }
-        return try await svc.createDocumentCanvas(document: document)
-    }
-
-    /// Export the current writing statistics as a shareable gui.new dashboard.
-    public func exportStatisticsToGui(title: String = "Writing Statistics") async throws -> GuiCanvas {
-        guard let svc = guiService else { throw GuiNewError.notConfigured }
-        let stats = getStatistics()
-        return try await svc.createStatisticsCanvas(statistics: stats, title: title)
-    }
-
-    /// Export a Kanban board as a shareable gui.new canvas.
-    public func exportKanbanBoardToGui(boardId: UUID) async throws -> GuiCanvas {
-        guard let svc = guiService else { throw GuiNewError.notConfigured }
-        guard let board = kanbanManager.getBoard(id: boardId) else {
-            throw GuiNewError.notConfigured
-        }
-        let tasks = kanbanManager.getTasks(forBoard: boardId)
-        return try await svc.createKanbanCanvas(board: board, tasks: tasks)
-    }
-
-    // MARK: - Multi-Agent Harness
-
-    /// Create a `MultiAgentHarness` wired to the active AI service.
-    ///
-    /// - Parameter configuration: Harness settings (revision budget, quality threshold, model).
-    /// - Throws: `AIError.aiNotEnabled` if AI has not been configured via `enableAI()`.
-    public func createMultiAgentHarness(
-        configuration: HarnessConfiguration = .default
-    ) throws -> MultiAgentHarness {
-        guard let ai = aiService else { throw AIError.aiNotEnabled }
-        return MultiAgentHarness(aiService: ai, configuration: configuration)
-    }
-
-    /// Expand a short writing prompt into a structured `WritingPlan` using the planner agent.
-    ///
-    /// This is a convenience wrapper around `MultiAgentHarness.createPlan(prompt:)`.
-    /// Use it when you want only the plan without running the full generator–evaluator loop.
-    ///
-    /// - Parameter prompt: A 1–4 sentence description of what to write.
-    /// - Returns: A `WritingPlan` with sections, characters, themes, and tone.
-    /// - Throws: `AIError.aiNotEnabled`, `HarnessError.emptyPrompt`, or `HarnessError.plannerFailed`.
-    public func planWriting(prompt: String) async throws -> WritingPlan {
-        let harness = try createMultiAgentHarness()
-        return try await harness.createPlan(prompt: prompt)
-    }
-
-    /// Run the full three-agent harness (planner → generator → evaluator) for a writing prompt.
-    ///
-    /// The harness:
-    /// 1. Expands `prompt` into a `WritingPlan`.
-    /// 2. For each section, negotiates a `SectionContract`, generates prose, and evaluates it.
-    /// 3. Revises sections that fail the quality threshold (up to `configuration.maxRevisionsPerSection`).
-    /// 4. Assembles all sections into a final document.
-    ///
-    /// - Parameters:
-    ///   - prompt: A 1–4 sentence writing task description.
-    ///   - configuration: Harness settings controlling revision budget and quality threshold.
-    /// - Returns: A `HarnessResult` with assembled prose, quality report, and per-section data.
-    public func runMultiAgentHarness(
-        prompt: String,
-        configuration: HarnessConfiguration = .default
-    ) async throws -> HarnessResult {
-        let harness = try createMultiAgentHarness(configuration: configuration)
-        return try await harness.run(prompt: prompt)
-    }
-
-    /// Run the generator–evaluator loop for an existing `WritingPlan` (skips the planner).
-    public func runMultiAgentHarness(
-        plan: WritingPlan,
-        configuration: HarnessConfiguration = .default
-    ) async throws -> HarnessResult {
-        let harness = try createMultiAgentHarness(configuration: configuration)
-        return try await harness.run(plan: plan)
-    }
 }
 
 // MARK: - Supporting Types
@@ -1177,20 +949,6 @@ public enum AIError: LocalizedError {
         switch self {
         case .aiNotEnabled:
             return "AI features are not enabled. Please configure AI with enableAI(configuration:) first."
-        case .documentNotFound:
-            return "The specified document was not found."
-        }
-    }
-}
-
-public enum RagieError: LocalizedError, Equatable {
-    case ragieNotEnabled
-    case documentNotFound
-
-    public var errorDescription: String? {
-        switch self {
-        case .ragieNotEnabled:
-            return "Ragie is not enabled. Please configure it with enableRagie(configuration:) first."
         case .documentNotFound:
             return "The specified document was not found."
         }

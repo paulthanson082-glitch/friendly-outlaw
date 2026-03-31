@@ -237,7 +237,12 @@ public class AIService {
         return response.generatedContent
     }
 
-    // MARK: - API Communication
+    /// Sends the given prompt to the Anthropic messages API and returns the assistant's combined text response.
+    /// - Returns: The assistant's extracted text response.
+    /// - Throws: `AIServiceError.invalidURL` if the service URL is invalid.
+    ///           `AIServiceError.invalidResponse` if the network response is not an HTTP response.
+    ///           `AIServiceError.apiError(statusCode:message:)` if the API returns a non-200 status (message contains the response body or "Unknown error").
+    ///           `AIServiceError.invalidResponseFormat` if the response JSON or expected content text cannot be parsed.
 
     private func sendRequest(prompt: String) async throws -> String {
         guard let url = URL(string: apiURL) else {
@@ -309,7 +314,19 @@ public class AIService {
     /// while response.stop_reason == "tool_use":
     ///     result = your_tool_executor(response.tool_use)
     ///     response = client.messages.create(tool_result=result, **params)
-    /// ```
+    /// Sends the prompt to the Anthropic messages API and iteratively handles potential tool-invocation cycles until the model returns final text or the iteration limit is reached.
+    /// - Parameters:
+    ///   - prompt: The user-facing prompt to send as the initial message.
+    ///   - tools: Tool definitions made available to the model for tool-use responses.
+    ///   - toolExecutor: Executor used to run requested tools and produce tool results to feed back into the conversation.
+    ///   - maxIterations: Maximum number of tool-request/response iterations to perform before aborting.
+    /// - Returns: The assistant's final extracted text response (empty string if extraction yields no text).
+    /// - Throws:
+    ///   - `AIServiceError.invalidURL` if the service URL is invalid.
+    ///   - `AIServiceError.invalidResponse` if the HTTP response is not an HTTPURLResponse.
+    ///   - `AIServiceError.apiError(statusCode:message:)` if the API returns a non-200 status.
+    ///   - `AIServiceError.invalidResponseFormat` if expected fields are missing or malformed in the API response.
+    ///   - `AIServiceError.toolLoopExhausted(iterations:)` if the loop exceeds `maxIterations` without producing a final response.
     private func sendRequestWithToolLoop(
         prompt: String,
         tools: [ToolDefinition],
@@ -375,12 +392,17 @@ public class AIService {
         throw AIServiceError.toolLoopExhausted(iterations: maxIterations)
     }
 
-    /// Builds a configured URLRequest for the Anthropic Messages API.
+    /// Builds a POST URLRequest for the Anthropic messages API including model configuration, messages, and optional tool definitions.
+    /// - Parameters:
+    ///   - url: The endpoint URL to send the request to.
+    ///   - messages: An array of message dictionaries to include in the request body (each message should follow the API's message format).
+    ///   - toolDefinitions: An optional array of tool definition dictionaries to include when tools are used; omitted from the body if empty.
+    /// - Returns: A configured `URLRequest` ready for sending to the API.
+    /// - Throws: An error from `JSONSerialization` if the request body cannot be encoded as JSON.
     private func buildAPIURLRequest(
         url: URL,
         messages: [[String: Any]],
-        toolDefinitions: [[String: Any]],
-        systemPrompt: String? = nil
+        toolDefinitions: [[String: Any]]
     ) throws -> URLRequest {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -399,61 +421,14 @@ public class AIService {
             requestBody["tools"] = toolDefinitions
         }
 
-        if let system = systemPrompt, !system.isEmpty {
-            requestBody["system"] = system
-        }
-
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         return request
     }
 
-    // MARK: - Agent Task (Multi-Agent Harness)
-
-    /// Send a request with an explicit system prompt and user prompt.
-    ///
-    /// Used by `MultiAgentHarness` to give each agent (planner, generator, evaluator)
-    /// its own specialised system prompt without affecting the general-purpose assistance
-    /// methods. All network I/O still flows through `AIService`.
-    public func performAgentTask(
-        systemPrompt: String,
-        userPrompt: String
-    ) async throws -> String {
-        guard let url = URL(string: apiURL) else {
-            throw AIServiceError.invalidURL
-        }
-
-        let messages: [[String: Any]] = [["role": "user", "content": userPrompt]]
-        let request = try buildAPIURLRequest(
-            url: url,
-            messages: messages,
-            toolDefinitions: [],
-            systemPrompt: systemPrompt
-        )
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw AIServiceError.invalidResponse
-        }
-
-        guard httpResponse.statusCode == 200 else {
-            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw AIServiceError.apiError(statusCode: httpResponse.statusCode, message: errorMessage)
-        }
-
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let content = json["content"] as? [[String: Any]] else {
-            throw AIServiceError.invalidResponseFormat
-        }
-
-        guard let text = extractText(from: content) else {
-            throw AIServiceError.invalidResponseFormat
-        }
-
-        return text
-    }
-
     /// Extracts joined text from a list of content blocks.
-    /// Returns nil if no text blocks are present.
+    /// Extracts and concatenates the "text" fields from content blocks marked with type "text".
+    /// - Parameter content: An array of dictionaries representing content blocks returned by the API.
+    /// - Returns: The concatenated string of all `text` block values, or `nil` if no text blocks are present.
     private func extractText(from content: [[String: Any]]) -> String? {
         let textParts = content.compactMap { block -> String? in
             guard block["type"] as? String == "text" else { return nil }
@@ -462,7 +437,11 @@ public class AIService {
         return textParts.isEmpty ? nil : textParts.joined()
     }
 
-    /// Executes all tool_use blocks found in an assistant response and returns their results.
+    /// Executes all tool-use blocks found in the provided content and returns their results as dictionaries.
+    /// - Parameters:
+    ///   - content: An array of content blocks potentially containing tool-use instructions.
+    ///   - toolExecutor: The executor used to run each identified tool.
+    /// - Returns: An array of dictionaries representing tool results, one entry per tool-use block. Failed tool executions are included as result dictionaries marked as errors with an error message.
     private func executeToolUseBlocks(
         in content: [[String: Any]],
         using toolExecutor: AIToolExecutor
@@ -520,8 +499,6 @@ public class AIService {
         4. Specific suggestions for enhancement
         5. Target audience suitability
 
-        Important: Only include observations you can directly support from the document. If you're uncertain about any point, acknowledge this. Do not speculate beyond what the text shows.
-
         Document Title: \(document.title)
         Category: \(document.category.rawValue)
         Word Count: \(document.wordCount)
@@ -551,8 +528,6 @@ public class AIService {
         4. Vocabulary richness
         5. Sentence structure variety
 
-        Important: For metrics like reading level, provide your best estimate. If you cannot reliably assess something, say so explicitly rather than guessing.
-
         Text:
         \(document.content)
 
@@ -565,269 +540,6 @@ public class AIService {
             documentId: document.id,
             insights: response,
             timestamp: Date()
-        )
-    }
-
-    // MARK: - Hallucination Reduction Methods
-
-    /// Extract and verify relevant quotes from source material
-    ///
-    /// This method implements the "direct quotes for factual grounding" technique.
-    /// It asks Claude to extract word-for-word quotes before analysis, reducing hallucinations.
-    public func extractQuotesFromDocument(
-        text: String,
-        context: AIContext? = nil
-    ) async throws -> [QuoteBlock] {
-        let response = try await getAssistance(
-            text: text,
-            type: .extractQuotes,
-            context: context
-        )
-
-        // Parse the response to extract quote blocks
-        // In a production system, you might parse structured output
-        let quotes = parseQuotesFromResponse(response.generatedContent)
-        return quotes
-    }
-
-    /// Verify claims with citations from source material
-    ///
-    /// This method implements the "verify with citations" technique.
-    /// Claude must find supporting quotes for each claim or acknowledge they can't be verified.
-    public func verifyWithCitations(
-        text: String,
-        context: AIContext? = nil
-    ) async throws -> [VerifiedClaim] {
-        let response = try await getAssistance(
-            text: text,
-            type: .verifyWithCitations,
-            context: context
-        )
-
-        // Parse the response to extract verified claims
-        let claims = parseVerifiedClaimsFromResponse(response.generatedContent)
-        return claims
-    }
-
-    /// Analyze text while explicitly allowing Claude to admit uncertainty
-    ///
-    /// This method implements the "allow Claude to say 'I don't know'" technique.
-    /// It explicitly permits uncertainty acknowledgment and information gaps.
-    public func analyzeWithUncertainty(
-        text: String,
-        context: AIContext? = nil
-    ) async throws -> UncertaintyAwareAnalysis {
-        let response = try await getAssistance(
-            text: text,
-            type: .analyzeWithUncertainty,
-            context: context
-        )
-
-        // Parse the response to identify confidence areas and uncertainties
-        let analysis = parseUncertaintyAnalysisFromResponse(
-            response.generatedContent,
-            originalText: text
-        )
-        return analysis
-    }
-
-    /// Perform analysis with explicit chain-of-thought verification
-    ///
-    /// This method implements the "chain-of-thought verification" technique.
-    /// Claude explains its reasoning step-by-step, identifying assumptions and uncertainties.
-    public func chainOfThoughtVerification(
-        text: String,
-        context: AIContext? = nil
-    ) async throws -> ChainOfThoughtAnalysis {
-        let response = try await getAssistance(
-            text: text,
-            type: .chainOfThoughtVerification,
-            context: context
-        )
-
-        // Parse the response to extract reasoning steps and conclusions
-        let analysis = parseChainOfThoughtFromResponse(
-            response.generatedContent,
-            originalText: text
-        )
-        return analysis
-    }
-
-    // MARK: - Parsing Helpers for Hallucination Reduction
-
-    private func parseQuotesFromResponse(_ response: String) -> [QuoteBlock] {
-        var quotes: [QuoteBlock] = []
-        let lines = response.components(separatedBy: "\n")
-
-        var currentQuote: String?
-        var currentReference: String?
-        var currentExplanation: String?
-
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.isEmpty { continue }
-
-            // Look for quoted text patterns
-            if trimmed.contains("\"") {
-                currentQuote = trimmed
-                    .replacingOccurrences(of: "^[0-9]+[.):\\s]*", with: "", options: .regularExpression)
-                    .trimmingCharacters(in: .whitespaces)
-            } else if let quote = currentQuote, !trimmed.isEmpty {
-                // Use the next line as explanation
-                currentExplanation = trimmed
-                quotes.append(QuoteBlock(
-                    text: quote,
-                    reference: currentReference,
-                    relevanceExplanation: currentExplanation ?? ""
-                ))
-                currentQuote = nil
-                currentReference = nil
-                currentExplanation = nil
-            }
-        }
-
-        return quotes
-    }
-
-    private func parseVerifiedClaimsFromResponse(_ response: String) -> [VerifiedClaim] {
-        var claims: [VerifiedClaim] = []
-        let lines = response.components(separatedBy: "\n")
-
-        var currentClaim: String?
-        var currentEvidence: String?
-        var currentQuote: String?
-
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.isEmpty { continue }
-
-            // Look for claim patterns
-            if trimmed.lowercased().starts(with: "claim:") || trimmed.lowercased().starts(with: "statement:") {
-                if let claim = currentClaim, let evidence = currentEvidence {
-                    let isVerified = !evidence.lowercased().contains("no supporting evidence")
-                    claims.append(VerifiedClaim(
-                        claim: claim,
-                        supportingQuote: currentQuote,
-                        evidence: evidence,
-                        isVerified: isVerified
-                    ))
-                }
-                currentClaim = String(trimmed.dropFirst("claim:".count)).trimmingCharacters(in: .whitespaces)
-            } else if trimmed.lowercased().starts(with: "evidence:") {
-                currentEvidence = String(trimmed.dropFirst("evidence:".count)).trimmingCharacters(in: .whitespaces)
-            } else if trimmed.lowercased().starts(with: "quote:") {
-                currentQuote = String(trimmed.dropFirst("quote:".count)).trimmingCharacters(in: .whitespaces)
-            } else if currentClaim != nil, let evidence = currentEvidence {
-                currentEvidence = evidence + " " + trimmed
-            }
-        }
-
-        // Add last claim if present
-        if let claim = currentClaim, let evidence = currentEvidence {
-            let isVerified = !evidence.lowercased().contains("no supporting evidence")
-            claims.append(VerifiedClaim(
-                claim: claim,
-                supportingQuote: currentQuote,
-                evidence: evidence,
-                isVerified: isVerified
-            ))
-        }
-
-        return claims
-    }
-
-    private func parseUncertaintyAnalysisFromResponse(
-        _ response: String,
-        originalText: String
-    ) -> UncertaintyAwareAnalysis {
-        let lines = response.components(separatedBy: "\n")
-
-        var analysis = response
-        var confidenceAreas: [String] = []
-        var uncertainAreas: [String] = []
-        var informationGaps: [String] = []
-
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.lowercased().contains("confident") || trimmed.lowercased().contains("certain") {
-                confidenceAreas.append(trimmed)
-            } else if trimmed.lowercased().contains("uncertain") || trimmed.lowercased().contains("unsure") {
-                uncertainAreas.append(trimmed)
-            } else if trimmed.lowercased().contains("don't have") || trimmed.lowercased().contains("insufficient") {
-                informationGaps.append(trimmed)
-            }
-        }
-
-        return UncertaintyAwareAnalysis(
-            analysis: analysis,
-            confidenceAreas: confidenceAreas,
-            uncertainAreas: uncertainAreas,
-            informationGaps: informationGaps
-        )
-    }
-
-    private func parseChainOfThoughtFromResponse(
-        _ response: String,
-        originalText: String
-    ) -> ChainOfThoughtAnalysis {
-        let lines = response.components(separatedBy: "\n")
-
-        var steps: [ReasoningStep] = []
-        var assumptions: [String] = []
-        var uncertainties: [String] = []
-        var reasoning = ""
-        var conclusion = ""
-
-        var currentStep: String?
-        var currentReasoning: String?
-        var stepNumber = 0
-
-        for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.isEmpty { continue }
-
-            // Look for step markers
-            if trimmed.lowercased().starts(with: "step") || trimmed.first?.isNumber == true && trimmed.contains(".") {
-                if let step = currentStep, let reason = currentReasoning {
-                    steps.append(ReasoningStep(
-                        claim: step,
-                        reasoning: reason,
-                        assumptions: [],
-                        uncertainty: nil
-                    ))
-                }
-                currentStep = trimmed
-                currentReasoning = nil
-                stepNumber += 1
-            } else if trimmed.lowercased().starts(with: "assume") {
-                assumptions.append(trimmed)
-            } else if trimmed.lowercased().starts(with: "uncertain") || trimmed.lowercased().starts(with: "unsure") {
-                uncertainties.append(trimmed)
-            } else if trimmed.lowercased().starts(with: "conclusion") {
-                conclusion = String(trimmed.dropFirst("conclusion:".count)).trimmingCharacters(in: .whitespaces)
-            } else if currentStep != nil {
-                currentReasoning = (currentReasoning ?? "") + " " + trimmed
-            } else {
-                reasoning += trimmed + "\n"
-            }
-        }
-
-        // Add last step
-        if let step = currentStep, let reason = currentReasoning {
-            steps.append(ReasoningStep(
-                claim: step,
-                reasoning: reason,
-                assumptions: [],
-                uncertainty: nil
-            ))
-        }
-
-        return ChainOfThoughtAnalysis(
-            reasoning: reasoning,
-            steps: steps,
-            assumptions: assumptions,
-            uncertainties: uncertainties,
-            conclusion: conclusion.isEmpty ? "See steps above." : conclusion
         )
     }
 }
