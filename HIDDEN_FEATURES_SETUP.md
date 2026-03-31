@@ -24,24 +24,23 @@ let app = WritersApp()
 // Configure Ragie
 let ragieConfig = RagieConfiguration(
     apiKey: "your-ragie-api-key",
-    apiUrl: "https://api.ragie.ai",
-    chunkSize: 1024,
-    overlapSize: 200
+    topK: 8,
+    rerank: false
 )
 app.enableRagie(configuration: ragieConfig)
 
 // Ingest a document
 let ragieDoc = try await app.ingestDocumentToRagie(documentId: docUUID)
-print("Ingested with Ragie ID: \(ragieDoc.ragieId)")
+print("Ingested with Ragie ID: \(ragieDoc.id)")
 
 // Check processing status
-let status = try await app.getRagieDocumentStatus(ragieId: ragieDoc.ragieId)
+let status = try await app.getRagieDocumentStatus(ragieId: ragieDoc.id)
 print("Ready: \(status.isReady)")
 
 // Query semantically
-let results = try await app.queryRagie(query: "writing techniques", topK: 5)
-results.forEach { chunk in
-    print("• \(chunk.content)")
+let results = try await app.retrieveFromRagie(query: "writing techniques", topK: 5)
+results.chunks.forEach { chunk in
+    print("• \(chunk.text)")
 }
 ```
 
@@ -56,11 +55,13 @@ app.enableAI(configuration: config, userId: userId)
 // The chatbot service is now active
 guard let chatbot = app.chatbotService else { return }
 
-// Have a conversation
-let response = try await chatbot.chat(
-    message: "Help me improve this character",
-    documentId: docUUID,
-    conversationContext: previousMessages
+// Start a conversation session
+var session = chatbot.startSession()
+
+// Send a message
+let response = try await chatbot.sendMessage(
+    "Help me improve this character",
+    in: &session
 )
 print(response)
 ```
@@ -106,26 +107,22 @@ Track and manage focused writing sessions:
 ```swift
 let focusManager = FocusSessionManager()
 
-// Start a focus session
-var session = focusManager.startFocusSession(
+// Start a focus session (Pomodoro = 25 min)
+let session = focusManager.startSession(
+    type: .pomodoro,
     documentId: docUUID,
-    targetWords: 1000,
-    mode: .timeBased(durationMinutes: 25)
+    currentWordCount: 0
 )
 print("Focus session started: \(session.id)")
 
-// Update session as you write
-focusManager.updateSessionProgress(
-    sessionId: session.id,
-    currentWordCount: 250
-)
-
-// End session
-focusManager.endFocusSession(sessionId: session.id)
+// End session when done
+if let completed = focusManager.endSession(id: session.id, finalWordCount: 250) {
+    print("Session complete: \(completed.state)")
+}
 
 // Get insights
-let insights = focusManager.getSessionInsights(sessionId: session.id)
-print("Productivity: \(insights.wordsPerMinute) WPM")
+let stats = focusManager.getStats()
+print("Productivity: \(stats.averageWordsPerMinute) WPM")
 ```
 
 ### 5. **Writing Goal Manager** (Streaks & Milestones)
@@ -136,23 +133,25 @@ let goalManager = WritingGoalManager()
 
 // Create a goal
 let goal = goalManager.createGoal(
-    title: "Novel Writing",
+    name: "Novel Writing",
     type: .monthly,
-    targetValue: 50000,
-    unit: .words
+    unit: .words,
+    target: 50000
 )
 
 // Log progress
-goalManager.logProgress(goalId: goal.id, value: 5000)
+if let updated = goalManager.recordProgress(goalId: goal.id, amount: 5000) {
+    print("Progress: \(updated.current)/\(updated.target) \(updated.unit.rawValue)")
+}
 
 // Check streak
-let streak = goalManager.getCurrentStreak(userId: userUUID)
-print("Current streak: \(streak.consecutiveDays) days")
+let streak = goalManager.getStreak()
+print("Current streak: \(streak.currentStreak) days")
 
-// Get milestones
-let milestones = goalManager.getMilestones(goalId: goal.id)
-milestones.forEach { milestone in
-    print("✓ \(milestone.name) at \(milestone.targetValue) \(milestone.unit)")
+// Get progress history
+let history = goalManager.getProgressHistory(goalId: goal.id)
+history.forEach { entry in
+    print("✓ \(entry.amount) words on \(entry.date)")
 }
 ```
 
@@ -189,8 +188,8 @@ let analytics = ProductivityAnalytics()
 
 // Get comprehensive stats
 let stats = app.getStatistics()
-print("Total documents: \(stats.documentCount)")
-print("Average reading time: \(stats.averageReadingTime)")
+print("Total documents: \(stats.totalDocuments)")
+print("Average word count: \(stats.averageWordCount)")
 
 // AI tool usage (track how often you use AI)
 let toolStats = try app.databaseManager.getAIToolUsageStats(userId: userUUID)
@@ -336,7 +335,7 @@ class MyCustomPlugin: Plugin {
 }
 
 let plugin = MyCustomPlugin()
-try await app.pluginManager.registerPlugin(plugin)
+app.pluginManager.register(plugin: plugin)
 
 // MCP Client for external services
 let mcp = MCPClient(
@@ -422,33 +421,36 @@ print("Critical path: \(analysis.criticalPath)")
 print("Total duration: \(analysis.totalDuration)ms")
 ```
 
-### 15. **Hardware Manager** (Device Optimization)
-Detect and optimize for hardware:
+### 15. **Hardware Manager** (Embedded Board Management)
+Manage connected hardware boards (Arduino, STM32, Raspberry Pi, ESP32):
 
 ```swift
 let hardware = app.hardwareManager
 
-// Check hardware capabilities
-if hardware.hasGPUAcceleration() {
-    print("✓ GPU acceleration available")
-    hardware.enableGPURendering()
+// List all boards
+let boards = hardware.getAllBoards()
+boards.forEach { board in
+    print("\(board.name) (\(board.type.rawValue))")
 }
 
-// Memory-aware optimization
-let availableMemory = hardware.getAvailableMemory()
-if availableMemory < 512 * 1024 * 1024 { // < 512MB
-    hardware.enableLowMemoryMode()
-}
+// Track a new board
+let board = HardwareBoard(
+    name: "My Arduino",
+    type: .arduinoUno,
+    description: "Writing desk controller"
+)
+try hardware.createBoard(board)
 
-// CPU cores
-let cores = hardware.getCPUCoreCount()
-print("Available cores: \(cores)")
+// Mark board as connected/disconnected
+hardware.markBoardConnected(id: board.id)
 
-// Device type
-if hardware.isIPad() {
-    print("Optimizing for iPad")
-    hardware.enableIPadOptimizations()
-}
+// Get connection status
+let status = hardware.getConnectionStatus(boardId: board.id)
+print("Status: \(status ?? "unknown")")
+
+// Get statistics
+let stats = hardware.getBoardStatistics()
+print("Total boards: \(stats.totalBoards), Active: \(stats.activeCount)")
 ```
 
 ---
@@ -498,7 +500,7 @@ swift run WritersAppCLI --list
 | 12. Plugins + MCP | Extension | 5 min | ⭐⭐⭐⭐⭐ |
 | 13. Dolt VC | Version Ctrl | 2 min | ⭐⭐⭐⭐⭐ |
 | 14. Trace Analysis | Debug | 3 min | ⭐⭐⭐⭐ |
-| 15. Hardware Mgr | Optimization | 1 min | ⭐⭐⭐ |
+| 15. Hardware Mgr | Board Mgmt | 2 min | ⭐⭐⭐ |
 
 *iOS/iPad only — auto-enabled when available
 
