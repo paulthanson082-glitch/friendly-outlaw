@@ -31,10 +31,21 @@ jest.mock('../characters', () => ({
 }));
 
 describe('seed module', () => {
+  let seedFn: () => Promise<void>;
+
+  beforeAll(async () => {
+    // Import seed function once; module-level seed() call runs here
+    const mod = await import('../seed');
+    seedFn = mod.seed;
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(console, 'log').mockImplementation();
     jest.spyOn(console, 'error').mockImplementation();
+    // Reset mockSql default implementation
+    mockSql.mockImplementation(async () => []);
+    mockInitDb.mockImplementation(async () => {});
   });
 
   afterEach(() => {
@@ -43,22 +54,14 @@ describe('seed module', () => {
 
   describe('seed function', () => {
     it('should call initDb to initialize database', async () => {
-      const { getDb, initDb } = require('../db');
-
-      // Import and run seed
-      await import('../seed');
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      expect(initDb).toHaveBeenCalled();
+      await seedFn();
+      expect(mockInitDb).toHaveBeenCalled();
     });
 
     it('should insert all characters into database', async () => {
       const { getDb } = require('../db');
 
-      // Re-import seed to trigger execution
-      delete require.cache[require.resolve('../seed')];
-      await import('../seed');
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await seedFn();
 
       const sql = getDb();
       const insertCalls = (sql as jest.Mock).mock.calls.filter(call =>
@@ -71,9 +74,7 @@ describe('seed module', () => {
     it('should use ON CONFLICT clause for upsert behavior', async () => {
       const { getDb } = require('../db');
 
-      delete require.cache[require.resolve('../seed')];
-      await import('../seed');
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await seedFn();
 
       const sql = getDb();
       const insertCalls = (sql as jest.Mock).mock.calls.filter(call =>
@@ -84,9 +85,7 @@ describe('seed module', () => {
     });
 
     it('should log success message after seeding', async () => {
-      delete require.cache[require.resolve('../seed')];
-      await import('../seed');
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await seedFn();
 
       expect(console.log).toHaveBeenCalledWith(
         expect.stringContaining('Seeded AI Town residents')
@@ -94,9 +93,7 @@ describe('seed module', () => {
     });
 
     it('should include character handles in success message', async () => {
-      delete require.cache[require.resolve('../seed')];
-      await import('../seed');
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await seedFn();
 
       const logCalls = (console.log as jest.Mock).mock.calls;
       const seedMessage = logCalls.find(call =>
@@ -109,27 +106,15 @@ describe('seed module', () => {
     });
 
     it('should handle database errors', async () => {
-      const { getDb, initDb } = require('../db');
       mockInitDb.mockRejectedValueOnce(new Error('DB Connection Error'));
 
-      delete require.cache[require.resolve('../seed')];
-      await import('../seed');
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      expect(console.error).toHaveBeenCalledWith(
-        expect.objectContaining({ message: 'DB Connection Error' })
-      );
+      await expect(seedFn()).rejects.toThrow('DB Connection Error');
     });
 
     it('should handle insert errors', async () => {
-      const { getDb } = require('../db');
       mockSql.mockRejectedValueOnce(new Error('Insert Error'));
 
-      delete require.cache[require.resolve('../seed')];
-      await import('../seed');
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      expect(console.error).toHaveBeenCalled();
+      await expect(seedFn()).rejects.toThrow('Insert Error');
     });
   });
 
@@ -137,16 +122,15 @@ describe('seed module', () => {
     it('should insert correct character data', async () => {
       const { getDb } = require('../db');
 
-      delete require.cache[require.resolve('../seed')];
-      await import('../seed');
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await seedFn();
 
       const sql = getDb();
       const calls = (sql as jest.Mock).mock.calls;
 
-      // Check that pixel character data is inserted
+      // Template tag calls have strings array + interpolated values
+      // The strings array contains the SQL text parts
       const pixelCall = calls.find(call =>
-        call.includes('pixel') && call.includes('Pixel')
+        Array.isArray(call[0]) && call.includes('pixel')
       );
       expect(pixelCall).toBeDefined();
     });
@@ -154,9 +138,7 @@ describe('seed module', () => {
     it('should update existing characters on conflict', async () => {
       const { getDb } = require('../db');
 
-      delete require.cache[require.resolve('../seed')];
-      await import('../seed');
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await seedFn();
 
       const sql = getDb();
       const calls = (sql as jest.Mock).mock.calls;
@@ -170,27 +152,16 @@ describe('seed module', () => {
 
   describe('idempotency', () => {
     it('should be safe to run multiple times', async () => {
-      const { initDb } = require('../db');
+      await seedFn();
+      await seedFn();
 
-      delete require.cache[require.resolve('../seed')];
-      await import('../seed');
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      const firstCallCount = mockInitDb.mock.calls.length;
-
-      delete require.cache[require.resolve('../seed')];
-      await import('../seed');
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      expect(mockInitDb).toHaveBeenCalled();
+      expect(mockInitDb).toHaveBeenCalledTimes(2);
     });
 
     it('should handle duplicate handles gracefully', async () => {
       const { getDb } = require('../db');
 
-      delete require.cache[require.resolve('../seed')];
-      await import('../seed');
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await seedFn();
 
       const sql = getDb();
       const conflictCalls = (sql as jest.Mock).mock.calls.filter(call =>
@@ -203,23 +174,23 @@ describe('seed module', () => {
 
   describe('edge cases', () => {
     it('should handle empty characters array', async () => {
-      jest.mock('../characters', () => ({
-        characters: [],
-      }));
+      // Override character mock to empty array for this test
+      const { getDb } = require('../db');
+      const charMock = require('../characters');
+      const originalChars = charMock.characters;
+      charMock.characters = [];
 
-      delete require.cache[require.resolve('../seed')];
-      await import('../seed');
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await seedFn();
 
       expect(console.log).toHaveBeenCalled();
+
+      charMock.characters = originalChars;
     });
 
     it('should handle characters with special characters in names', async () => {
       const { getDb } = require('../db');
 
-      delete require.cache[require.resolve('../seed')];
-      await import('../seed');
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await seedFn();
 
       const sql = getDb();
       expect(sql).toHaveBeenCalled();
@@ -231,10 +202,7 @@ describe('seed module', () => {
     it('should use parameterized queries to prevent SQL injection', async () => {
       const { getDb } = require('../db');
 
-      // Just verify that seed runs without errors
-      delete require.cache[require.resolve('../seed')];
-      await import('../seed');
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await seedFn();
 
       const sql = getDb();
       // The fact that getDb() was called means seed ran
