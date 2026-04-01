@@ -19,6 +19,7 @@ public class WritersApp {
     public private(set) var currentUserId: UUID?
     private var currentSessionId: UUID?
     private var memoryPlugin: ClaudeMemoryPlugin?
+    private(set) var appSettings: AppSettings
 
     // MARK: - Cowork Mode
     public let prospectDatabase: ProspectDatabase
@@ -52,6 +53,7 @@ public class WritersApp {
         self.encouragementService = EncouragementService()
         self.versionControl = DoltVersionControlService(databaseManager: databaseManager)
         self.guiService = nil
+        self.appSettings = AppSettings()
         self.prospectDatabase = ProspectDatabase()
         self.browserService = BrowserService()
         self.gmailService = nil
@@ -200,6 +202,53 @@ public class WritersApp {
     /// Check if Jules is in adult mode
     public var isJulesAdultModeEnabled: Bool {
         return chatbotService?.isAdultModeEnabled ?? false
+    }
+
+    // MARK: - Settings Management
+
+    /// Toggle dark mode on/off
+    public func toggleDarkMode() {
+        appSettings.isDarkModeEnabled = !appSettings.isDarkModeEnabled
+    }
+
+    /// Set dark mode to specific state
+    public func setDarkMode(_ enabled: Bool) {
+        appSettings.isDarkModeEnabled = enabled
+    }
+
+    /// Get current dark mode state
+    public var isDarkModeEnabled: Bool {
+        return appSettings.isDarkModeEnabled
+    }
+
+    /// Set the app theme
+    public func setTheme(_ theme: AppTheme) {
+        appSettings.theme = theme
+    }
+
+    /// Update font size
+    public func setFontSize(_ size: Int) {
+        appSettings.fontSize = max(8, min(32, size))
+    }
+
+    /// Update default word count goal
+    public func setDefaultWordCountGoal(_ words: Int?) {
+        appSettings.defaultWordCountGoal = words
+    }
+
+    /// Enable/disable spell check
+    public func setSpellCheckEnabled(_ enabled: Bool) {
+        appSettings.spellCheckEnabled = enabled
+    }
+
+    /// Enable/disable grammar check
+    public func setGrammarCheckEnabled(_ enabled: Bool) {
+        appSettings.grammarCheckEnabled = enabled
+    }
+
+    /// Get current app settings
+    public func getAppSettings() -> AppSettings {
+        return appSettings
     }
 
     // MARK: - Plugin Management
