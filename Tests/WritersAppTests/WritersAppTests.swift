@@ -1892,190 +1892,62 @@ final class WritersAppTests: XCTestCase {
         }
     }
 
-    // MARK: - CRM Manager Tests
+    // MARK: - WritersApp After CRM Removal Tests
 
-    func testCreateCRMContact() {
-        let manager = CRMManager()
-        let contact = manager.createContact(
-            name: "Jane Agent",
-            email: "jane@literaryagency.com",
-            company: "Bloodstone Literary",
-            role: "Literary Agent"
-        )
-        XCTAssertEqual(contact.name, "Jane Agent")
-        XCTAssertEqual(contact.email, "jane@literaryagency.com")
-        XCTAssertEqual(contact.company, "Bloodstone Literary")
-        XCTAssertEqual(contact.role, "Literary Agent")
+    func testWritersAppInitializesSuccessfullyWithoutCRMManager() {
+        // Regression: WritersApp() must not crash after crmManager was removed
+        let freshApp = WritersApp()
+        // If we reach here the initializer succeeded; verify a property that was
+        // always present alongside crmManager is still accessible.
+        XCTAssertNotNil(freshApp.documentManager)
     }
 
-    func testGetCRMContactById() {
-        let manager = CRMManager()
-        let created = manager.createContact(name: "Tom Editor")
-        let fetched = manager.getContact(id: created.id)
-        XCTAssertNotNil(fetched)
-        XCTAssertEqual(fetched?.name, "Tom Editor")
+    func testWritersAppDocumentManagerFunctionalAfterCRMRemoval() {
+        // Regression: document creation should work unchanged now that crmManager
+        // is no longer initialised inside WritersApp.init().
+        let freshApp = WritersApp()
+        let doc = freshApp.createBlankDocument(title: "Regression Doc", category: .novel)
+        XCTAssertEqual(doc.title, "Regression Doc")
+        XCTAssertEqual(freshApp.documentManager.getAllDocuments().count, 1)
     }
 
-    func testGetAllCRMContactsSortedByName() {
-        let manager = CRMManager()
-        manager.createContact(name: "Zara Publisher")
-        manager.createContact(name: "Aaron Agent")
-        manager.createContact(name: "Maria Editor")
-        let all = manager.getAllContacts()
-        XCTAssertEqual(all.count, 3)
-        XCTAssertEqual(all[0].name, "Aaron Agent")
-        XCTAssertEqual(all[2].name, "Zara Publisher")
+    func testWritersAppIssueManagerFunctionalAfterCRMRemoval() {
+        // Regression: IssueManager must still be fully usable after CRM removal.
+        let freshApp = WritersApp()
+        let doc = freshApp.createBlankDocument(title: "Issue Test Doc", category: .novel)
+        let issue = freshApp.createIssue(documentId: doc.id, title: "Test Issue")
+        XCTAssertNotNil(freshApp.getIssue(id: issue.id))
+        XCTAssertEqual(freshApp.getIssues(forDocument: doc.id).count, 1)
     }
 
-    func testUpdateCRMContact() {
-        let manager = CRMManager()
-        var contact = manager.createContact(name: "Old Name")
-        contact.name = "New Name"
-        manager.updateContact(contact)
-        XCTAssertEqual(manager.getContact(id: contact.id)?.name, "New Name")
+    func testWritersAppKanbanManagerFunctionalAfterCRMRemoval() {
+        // Regression: KanbanManager must still be fully usable after CRM removal.
+        let freshApp = WritersApp()
+        let board = freshApp.createKanbanBoard(name: "Post-CRM Board")
+        let task = freshApp.createKanbanTask(boardId: board.id, title: "Task One")
+        XCTAssertNotNil(freshApp.getKanbanTask(id: task.id))
+        XCTAssertEqual(freshApp.getKanbanTasks(forBoard: board.id).count, 1)
     }
 
-    func testDeleteCRMContactAlsoRemovesDeals() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Doomed Contact")
-        manager.createDeal(title: "Doomed Deal", contactId: contact.id)
-        manager.deleteContact(id: contact.id)
-        XCTAssertNil(manager.getContact(id: contact.id))
-        XCTAssertTrue(manager.getDeals(forContact: contact.id).isEmpty)
+    func testWritersAppDefaultInitHasNoCRMRelatedState() {
+        // Boundary: the default WritersApp must not carry any implicit CRM state.
+        // Verify the known remaining public managers are present and the app reports
+        // no AI (which would have been the only service that could interact with CRM).
+        let freshApp = WritersApp()
+        XCTAssertFalse(freshApp.isAIEnabled, "Default init must not enable AI")
+        XCTAssertNotNil(freshApp.kanbanManager)
+        XCTAssertNotNil(freshApp.issueManager)
+        XCTAssertNotNil(freshApp.documentManager)
+        XCTAssertNotNil(freshApp.templateManager)
+        XCTAssertNotNil(freshApp.hardwareManager)
     }
 
-    func testSearchCRMContactsByName() {
-        let manager = CRMManager()
-        manager.createContact(name: "Alice Smith", company: "Random House")
-        manager.createContact(name: "Bob Jones", company: "Penguin Press")
-        let results = manager.searchContacts(query: "alice")
-        XCTAssertEqual(results.count, 1)
-        XCTAssertEqual(results.first?.name, "Alice Smith")
-    }
-
-    func testSearchCRMContactsByCompany() {
-        let manager = CRMManager()
-        manager.createContact(name: "Alice Smith", company: "Random House")
-        manager.createContact(name: "Bob Jones", company: "Penguin Press")
-        let results = manager.searchContacts(query: "penguin")
-        XCTAssertEqual(results.count, 1)
-        XCTAssertEqual(results.first?.name, "Bob Jones")
-    }
-
-    func testCreateCRMDeal() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Publisher One")
-        let deal = manager.createDeal(
-            title: "Debut Novel",
-            contactId: contact.id,
-            stage: .queried,
-            value: 5000
-        )
-        XCTAssertEqual(deal.title, "Debut Novel")
-        XCTAssertEqual(deal.stage, .queried)
-        XCTAssertEqual(deal.value, 5000)
-        XCTAssertEqual(deal.contactId, contact.id)
-    }
-
-    func testGetCRMDealsByStage() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Publisher X")
-        manager.createDeal(title: "Deal A", contactId: contact.id, stage: .prospect)
-        manager.createDeal(title: "Deal B", contactId: contact.id, stage: .queried)
-        manager.createDeal(title: "Deal C", contactId: contact.id, stage: .prospect)
-        let prospects = manager.getDeals(inStage: .prospect)
-        XCTAssertEqual(prospects.count, 2)
-    }
-
-    func testAdvanceCRMDeal() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Publisher Y")
-        let deal = manager.createDeal(title: "Rising Deal", contactId: contact.id, stage: .prospect)
-        let newStage = manager.advanceDeal(id: deal.id)
-        XCTAssertEqual(newStage, .queried)
-        XCTAssertEqual(manager.getDeal(id: deal.id)?.stage, .queried)
-    }
-
-    func testAdvanceCRMDealAtTerminalReturnsNil() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Publisher Z")
-        let deal = manager.createDeal(title: "Final Deal", contactId: contact.id, stage: .contracted)
-        let result = manager.advanceDeal(id: deal.id)
-        XCTAssertNil(result)
-    }
-
-    func testRejectCRMDeal() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Cold Publisher")
-        let deal = manager.createDeal(title: "Unlucky Pitch", contactId: contact.id, stage: .submitted)
-        let rejected = manager.rejectDeal(id: deal.id)
-        XCTAssertEqual(rejected?.stage, .rejected)
-        XCTAssertNotNil(rejected?.metadata.closedAt)
-    }
-
-    func testLogCRMInteractionUpdatesLastContacted() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Active Agent")
-        XCTAssertNil(manager.getContact(id: contact.id)?.metadata.lastContacted)
-        manager.logInteraction(contactId: contact.id, type: .email, summary: "Sent query letter")
-        XCTAssertNotNil(manager.getContact(id: contact.id)?.metadata.lastContacted)
-    }
-
-    func testGetCRMInteractionsForContact() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Frequent Contact")
-        manager.logInteraction(contactId: contact.id, type: .email, summary: "First touch")
-        manager.logInteraction(contactId: contact.id, type: .call, summary: "Follow-up call")
-        let interactions = manager.getInteractions(forContact: contact.id)
-        XCTAssertEqual(interactions.count, 2)
-    }
-
-    func testGetRecentCRMInteractions() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Busy Contact")
-        for i in 0..<5 {
-            manager.logInteraction(contactId: contact.id, type: .note, summary: "Note \(i)")
-        }
-        let recent = manager.getRecentInteractions(limit: 3)
-        XCTAssertEqual(recent.count, 3)
-    }
-
-    func testCRMStats() {
-        let manager = CRMManager()
-        let c1 = manager.createContact(name: "Contact 1")
-        let c2 = manager.createContact(name: "Contact 2")
-        manager.createDeal(title: "Deal 1", contactId: c1.id, stage: .queried, value: 1000)
-        manager.createDeal(title: "Deal 2", contactId: c1.id, stage: .contracted, value: 5000)
-        manager.createDeal(title: "Deal 3", contactId: c2.id, stage: .prospect)
-        manager.logInteraction(contactId: c1.id, type: .email, summary: "Recent email")
-        let stats = manager.getCRMStats()
-        XCTAssertEqual(stats.totalContacts, 2)
-        XCTAssertEqual(stats.totalDeals, 3)
-        XCTAssertEqual(stats.contractedDeals, 1)
-        XCTAssertEqual(stats.totalPipelineValue, 1000)  // Only non-terminal deal value
-        XCTAssertEqual(stats.recentInteractionCount, 1)
-    }
-
-    func testDealStageAdvanceSequence() {
-        XCTAssertEqual(DealStage.prospect.next, .queried)
-        XCTAssertEqual(DealStage.queried.next, .requested)
-        XCTAssertEqual(DealStage.requested.next, .submitted)
-        XCTAssertEqual(DealStage.submitted.next, .contracted)
-        XCTAssertNil(DealStage.contracted.next)
-        XCTAssertNil(DealStage.rejected.next)
-    }
-
-    func testDealStageIsTerminal() {
-        XCTAssertTrue(DealStage.contracted.isTerminal)
-        XCTAssertTrue(DealStage.rejected.isTerminal)
-        XCTAssertFalse(DealStage.prospect.isTerminal)
-        XCTAssertFalse(DealStage.submitted.isTerminal)
-    }
-
-    func testWritersAppExposesCRMManager() {
-        let app = WritersApp()
-        let contact = app.crmManager.createContact(name: "Test Contact via App")
-        XCTAssertEqual(app.crmManager.getAllContacts().count, 1)
-        XCTAssertEqual(contact.name, "Test Contact via App")
+    func testWritersAppStatisticsUnaffectedByCRMRemoval() {
+        // Regression: getStatistics() must still operate without crmManager.
+        let freshApp = WritersApp()
+        freshApp.createBlankDocument(title: "Stats Doc", category: .shortStory)
+        let stats = freshApp.getStatistics()
+        XCTAssertEqual(stats.totalDocuments, 1)
+        XCTAssertGreaterThanOrEqual(stats.totalTemplates, 0)
     }
 }
