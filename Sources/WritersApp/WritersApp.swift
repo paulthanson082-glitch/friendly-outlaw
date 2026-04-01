@@ -19,6 +19,12 @@ public class WritersApp {
     private var currentSessionId: UUID?
     private var memoryPlugin: ClaudeMemoryPlugin?
 
+    // MARK: - Cowork Mode
+    public let prospectDatabase: ProspectDatabase
+    public let browserService: BrowserService
+    public private(set) var gmailService: GmailService?
+    public private(set) var activeCoworkSession: CoworkSession?
+
     public convenience init() {
         self.init(databaseManager: DatabaseManager(), aiConfiguration: nil)
     }
@@ -44,6 +50,10 @@ public class WritersApp {
         self.encouragementService = EncouragementService()
         self.versionControl = DoltVersionControlService(databaseManager: databaseManager)
         self.guiService = nil
+        self.prospectDatabase = ProspectDatabase()
+        self.browserService = BrowserService()
+        self.gmailService = nil
+        self.activeCoworkSession = nil
         let aiSvc = aiConfiguration.map { AIService(configuration: $0) }
         self.aiService = aiSvc
         if let svc = aiSvc {
@@ -1134,6 +1144,140 @@ public class WritersApp {
     ) async throws -> HarnessResult {
         let harness = try createMultiAgentHarness(configuration: configuration)
         return try await harness.run(plan: plan)
+    }
+
+    // MARK: - Cowork Mode
+
+    /// Enable Gmail integration using the given OAuth 2.0 bearer token.
+    /// The token must be obtained by the caller (e.g. from the GMAIL_OAUTH_TOKEN env var).
+    public func enableGmail(oauthToken: String) {
+        self.gmailService = GmailService(oauthToken: oauthToken)
+    }
+
+    /// Disable Gmail integration.
+    public func disableGmail() {
+        self.gmailService = nil
+    }
+
+    /// Whether Gmail is available for this session.
+    public var isGmailEnabled: Bool {
+        return gmailService != nil
+    }
+
+    // MARK: Cowork session lifecycle
+
+    /// Start a new cowork session, replacing any active one.
+    @discardableResult
+    public func startCoworkSession() -> CoworkSession {
+        let session = CoworkSession()
+        self.activeCoworkSession = session
+        return session
+    }
+
+    /// End the active cowork session and return its summary.
+    @discardableResult
+    public func endCoworkSession() -> CoworkSession? {
+        guard var session = activeCoworkSession else { return nil }
+        session.endedAt = Date()
+        self.activeCoworkSession = nil
+        return session
+    }
+
+    // MARK: Prospect facade
+
+    /// Add a new prospect to the database.
+    @discardableResult
+    public func addProspect(
+        name: String,
+        email: String,
+        company: String? = nil,
+        role: String? = nil,
+        notes: String = "",
+        tags: [String] = []
+    ) -> Prospect {
+        let prospect = Prospect(
+            name: name,
+            email: email,
+            company: company,
+            role: role,
+            notes: notes,
+            tags: tags
+        )
+        prospectDatabase.addProspect(prospect)
+        activeCoworkSession?.prospectsAdded += 1
+        return prospect
+    }
+
+    public func getAllProspects() -> [Prospect] {
+        return prospectDatabase.getAllProspects()
+    }
+
+    public func getProspects(withStatus status: ProspectStatus) -> [Prospect] {
+        return prospectDatabase.getProspects(withStatus: status)
+    }
+
+    public func searchProspects(query: String) -> [Prospect] {
+        return prospectDatabase.searchProspects(query: query)
+    }
+
+    public func updateProspectStatus(id: UUID, status: ProspectStatus) throws {
+        try prospectDatabase.updateProspectStatus(id: id, status: status)
+        if status == .contacted || status == .replied || status == .meeting {
+            activeCoworkSession?.prospectsContacted += 1
+        }
+    }
+
+    public func deleteProspect(id: UUID) {
+        prospectDatabase.deleteProspect(id: id)
+    }
+
+    public func getProspectStats() -> [ProspectStatus: Int] {
+        return prospectDatabase.getStats()
+    }
+
+    // MARK: Gmail facade
+
+    /// List Gmail inbox messages.
+    /// - Throws: `CoworkError.gmailNotEnabled` if Gmail has not been enabled.
+    public func listGmailMessages(maxResults: Int = 20, query: String? = nil) async throws -> [GmailMessage] {
+        guard let gmail = gmailService else { throw CoworkError.gmailNotEnabled }
+        return try await gmail.listMessages(maxResults: maxResults, query: query)
+    }
+
+    /// Send an email via Gmail and record it in the active cowork session.
+    /// - Throws: `CoworkError.gmailNotEnabled` if Gmail has not been enabled.
+    @discardableResult
+    public func sendGmail(draft: GmailDraft) async throws -> String {
+        guard let gmail = gmailService else { throw CoworkError.gmailNotEnabled }
+        let sentId = try await gmail.sendMessage(draft: draft)
+        activeCoworkSession?.emailsSent += 1
+        return sentId
+    }
+
+    /// Mark a Gmail message as read.
+    /// - Throws: `CoworkError.gmailNotEnabled` if Gmail has not been enabled.
+    public func markGmailAsRead(id: String) async throws {
+        guard let gmail = gmailService else { throw CoworkError.gmailNotEnabled }
+        try await gmail.markAsRead(id: id)
+    }
+
+    // MARK: Browser facade
+
+    /// Fetch a URL and return its plain-text content.
+    public func browseURL(_ urlString: String) async throws -> BrowsedPage {
+        let page = try await browserService.fetch(urlString: urlString)
+        activeCoworkSession?.pagesResearched += 1
+        return page
+    }
+
+    /// Return all pages browsed in this session.
+    public func getBrowsingHistory() -> [BrowsedPage] {
+        return browserService.history
+    }
+
+    /// Clear the browsing history.
+    public func clearBrowsingHistory() {
+        browserService.clearHistory()
     }
 }
 

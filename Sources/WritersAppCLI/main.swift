@@ -286,6 +286,15 @@ struct WritersAppCLI {
             print("ⓘ Ragie disabled (set RAGIE_API_KEY to enable document retrieval)")
         }
 
+        // Initialize Gmail for Cowork Mode if OAuth token is present
+        if let gmailToken = ProcessInfo.processInfo.environment["GMAIL_OAUTH_TOKEN"], !gmailToken.isEmpty {
+            app.enableGmail(oauthToken: gmailToken)
+            print("✓ Cowork Mode: Gmail enabled")
+        } else {
+            print("ⓘ Cowork Mode: Gmail disabled (set GMAIL_OAUTH_TOKEN to enable)")
+        }
+        print("✓ Cowork Mode: Prospect database and browser research ready")
+
         // Initialize Claude Memory plugin
         do {
             try await app.enableMemoryPlugin()
@@ -399,6 +408,21 @@ struct WritersAppCLI {
                 print("97. List Ragie Documents")
                 print("98. Check Ragie Document Status")
             }
+
+            print("\nCowork Mode (Gmail + Prospects + Browser):")
+            print("100. Start Cowork Session")
+            print("101. End Cowork Session")
+            print("102. Add Prospect")
+            print("103. List Prospects")
+            print("104. Search Prospects")
+            print("105. Update Prospect Status")
+            print("106. Prospect Pipeline Stats")
+            if app.isGmailEnabled {
+                print("107. View Gmail Inbox")
+                print("108. Send Email")
+            }
+            print("109. Research URL (Browser)")
+            print("110. View Browsing History")
 
             print("\n0. Exit")
             print()
@@ -546,6 +570,28 @@ struct WritersAppCLI {
                 await listRagieDocuments(app: app)
             case 98:
                 await checkRagieDocumentStatus(app: app)
+            case 100:
+                startCoworkSession(app: app)
+            case 101:
+                endCoworkSession(app: app)
+            case 102:
+                addProspect(app: app)
+            case 103:
+                listProspects(app: app)
+            case 104:
+                searchProspects(app: app)
+            case 105:
+                updateProspectStatus(app: app)
+            case 106:
+                viewProspectPipelineStats(app: app)
+            case 107:
+                await viewGmailInbox(app: app)
+            case 108:
+                await sendGmail(app: app)
+            case 109:
+                await researchURL(app: app)
+            case 110:
+                viewBrowsingHistory(app: app)
             case 0:
                 await app.shutdownPlugins()
                 running = false
@@ -3924,4 +3970,295 @@ func deleteKanbanBoardCLI(app: WritersApp) {
     }
     app.deleteKanbanBoard(id: board.id)
     print("\n✓ Kanban board '\(board.name)' deleted.")
+}
+
+// MARK: - Cowork Mode Handlers
+
+func startCoworkSession(app: WritersApp) {
+    let session = app.startCoworkSession()
+    let formatter = DateFormatter()
+    formatter.dateStyle = .none
+    formatter.timeStyle = .short
+    print("\n=== Cowork Session Started ===")
+    print("Session ID: \(session.id.uuidString.prefix(8))...")
+    print("Started at: \(formatter.string(from: session.startedAt))")
+    print("Gmail:     \(app.isGmailEnabled ? "enabled" : "disabled")")
+    print("Prospects: ready")
+    print("Browser:   ready")
+}
+
+func endCoworkSession(app: WritersApp) {
+    guard let session = app.endCoworkSession() else {
+        print("\nNo active cowork session.")
+        return
+    }
+    print("\n=== Cowork Session Summary ===")
+    let mins = session.durationMinutes.map { String(format: "%.0f min", $0) } ?? "unknown"
+    print("Duration:            \(mins)")
+    print("Emails sent:         \(session.emailsSent)")
+    print("Prospects added:     \(session.prospectsAdded)")
+    print("Prospects contacted: \(session.prospectsContacted)")
+    print("Pages researched:    \(session.pagesResearched)")
+    print("\nSession ended. Great work!")
+}
+
+func addProspect(app: WritersApp) {
+    print("\n=== Add Prospect ===\n")
+    print("Name: ", terminator: "")
+    guard let name = readLine(), !name.isEmpty else {
+        print("Name cannot be empty.")
+        return
+    }
+    print("Email: ", terminator: "")
+    guard let email = readLine(), !email.isEmpty, email.contains("@") else {
+        print("Invalid email address.")
+        return
+    }
+    print("Company (optional): ", terminator: "")
+    let company = readLine().flatMap { $0.isEmpty ? nil : $0 }
+    print("Role (e.g. publisher, agent, client): ", terminator: "")
+    let role = readLine().flatMap { $0.isEmpty ? nil : $0 }
+    print("Notes (optional): ", terminator: "")
+    let notes = readLine() ?? ""
+    print("Tags (comma-separated, optional): ", terminator: "")
+    let tagsInput = readLine() ?? ""
+    let tags = tagsInput.isEmpty ? [] : tagsInput.components(separatedBy: ",").map {
+        $0.trimmingCharacters(in: .whitespaces)
+    }
+
+    let prospect = app.addProspect(
+        name: name, email: email, company: company, role: role, notes: notes, tags: tags
+    )
+    print("\n✓ Prospect '\(prospect.name)' added (ID: \(prospect.id.uuidString.prefix(8))...)")
+}
+
+func listProspects(app: WritersApp) {
+    print("\n=== Prospect Database ===\n")
+    let prospects = app.getAllProspects()
+    if prospects.isEmpty {
+        print("No prospects yet. Add some with option 102.")
+        return
+    }
+    for prospect in prospects {
+        let company = prospect.company.map { " @ \($0)" } ?? ""
+        let role = prospect.role.map { " [\($0)]" } ?? ""
+        print("• \(prospect.name)\(company)\(role)")
+        print("  Email:  \(prospect.email)")
+        print("  Status: \(prospect.status.displayName)")
+        if !prospect.notes.isEmpty {
+            print("  Notes:  \(prospect.notes)")
+        }
+        if !prospect.tags.isEmpty {
+            print("  Tags:   \(prospect.tags.joined(separator: ", "))")
+        }
+        if let contacted = prospect.lastContactedAt {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .short
+            formatter.timeStyle = .none
+            print("  Last contacted: \(formatter.string(from: contacted))")
+        }
+        print()
+    }
+    print("Total: \(prospects.count) prospect(s)")
+}
+
+func searchProspects(app: WritersApp) {
+    print("\n=== Search Prospects ===\n")
+    print("Search query: ", terminator: "")
+    guard let query = readLine(), !query.isEmpty else {
+        print("Query cannot be empty.")
+        return
+    }
+    let results = app.searchProspects(query: query)
+    if results.isEmpty {
+        print("No prospects match '\(query)'.")
+        return
+    }
+    print("\nFound \(results.count) result(s):\n")
+    for prospect in results {
+        let company = prospect.company.map { " @ \($0)" } ?? ""
+        print("• \(prospect.name)\(company) — \(prospect.email) [\(prospect.status.displayName)]")
+    }
+}
+
+func updateProspectStatus(app: WritersApp) {
+    print("\n=== Update Prospect Status ===\n")
+    let prospects = app.getAllProspects()
+    if prospects.isEmpty {
+        print("No prospects found.")
+        return
+    }
+    for (i, p) in prospects.enumerated() {
+        print("\(i + 1). \(p.name) [\(p.status.displayName)]")
+    }
+    print("\nSelect prospect (1-\(prospects.count)): ", terminator: "")
+    guard let input = readLine(), let choice = Int(input),
+          choice >= 1, choice <= prospects.count else {
+        print("Invalid selection.")
+        return
+    }
+    let prospect = prospects[choice - 1]
+    let statuses = ProspectStatus.allCases
+    print("\nSelect new status:")
+    for (i, status) in statuses.enumerated() {
+        let marker = status == prospect.status ? " (current)" : ""
+        print("\(i + 1). \(status.displayName)\(marker)")
+    }
+    print("Choice (1-\(statuses.count)): ", terminator: "")
+    guard let statusInput = readLine(), let statusChoice = Int(statusInput),
+          statusChoice >= 1, statusChoice <= statuses.count else {
+        print("Invalid selection.")
+        return
+    }
+    let newStatus = statuses[statusChoice - 1]
+    do {
+        try app.updateProspectStatus(id: prospect.id, status: newStatus)
+        print("\n✓ \(prospect.name) status updated to \(newStatus.displayName)")
+    } catch {
+        print("Error: \(error.localizedDescription)")
+    }
+}
+
+func viewProspectPipelineStats(app: WritersApp) {
+    print("\n=== Prospect Pipeline ===\n")
+    let stats = app.getProspectStats()
+    let total = stats.values.reduce(0, +)
+    if total == 0 {
+        print("No prospects in the pipeline yet.")
+        return
+    }
+    for status in ProspectStatus.allCases {
+        let count = stats[status] ?? 0
+        let bar = String(repeating: "█", count: count)
+        let label = status.displayName.padding(toLength: 20, withPad: " ", startingAt: 0)
+        print("\(label) \(String(format: "%3d", count))  \(bar)")
+    }
+    print("\nTotal: \(total) prospect(s)")
+}
+
+func viewGmailInbox(app: WritersApp) async {
+    print("\n=== Gmail Inbox ===\n")
+    guard app.isGmailEnabled else {
+        print("Gmail is not enabled. Set GMAIL_OAUTH_TOKEN and restart.")
+        return
+    }
+    print("Max results (default 10): ", terminator: "")
+    let maxInput = readLine() ?? ""
+    let maxResults = Int(maxInput) ?? 10
+    print("Search query (optional, e.g. 'from:agent@example.com'): ", terminator: "")
+    let query = readLine().flatMap { $0.isEmpty ? nil : $0 }
+
+    do {
+        let messages = try await app.listGmailMessages(maxResults: maxResults, query: query)
+        if messages.isEmpty {
+            print("No messages found.")
+            return
+        }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        print("\nFetched \(messages.count) message(s):\n")
+        for (i, msg) in messages.enumerated() {
+            let readMarker = msg.isRead ? "  " : "● "
+            print("\(readMarker)\(i + 1). \(msg.subject.isEmpty ? "(no subject)" : msg.subject)")
+            print("     From: \(msg.from)")
+            print("     Date: \(formatter.string(from: msg.date))")
+            if !msg.snippet.isEmpty {
+                let preview = String(msg.snippet.prefix(80))
+                print("     \(preview)…")
+            }
+            print()
+        }
+    } catch {
+        print("Error fetching inbox: \(error.localizedDescription)")
+    }
+}
+
+func sendGmail(app: WritersApp) async {
+    print("\n=== Send Email via Gmail ===\n")
+    guard app.isGmailEnabled else {
+        print("Gmail is not enabled. Set GMAIL_OAUTH_TOKEN and restart.")
+        return
+    }
+    print("To: ", terminator: "")
+    guard let to = readLine(), !to.isEmpty, to.contains("@") else {
+        print("Invalid recipient address.")
+        return
+    }
+    print("Subject: ", terminator: "")
+    guard let subject = readLine(), !subject.isEmpty else {
+        print("Subject cannot be empty.")
+        return
+    }
+    print("Body (end with a line containing only '.'): ")
+    var lines: [String] = []
+    while let line = readLine() {
+        if line == "." { break }
+        lines.append(line)
+    }
+    let body = lines.joined(separator: "\n")
+    print("\nSend to \(to) with subject '\(subject)'? (y/N): ", terminator: "")
+    guard let confirm = readLine(), confirm.lowercased() == "y" else {
+        print("Send cancelled.")
+        return
+    }
+    let draft = GmailDraft(to: to, subject: subject, body: body)
+    do {
+        let sentId = try await app.sendGmail(draft: draft)
+        print("\n✓ Email sent (ID: \(sentId.prefix(16))...)")
+    } catch {
+        print("Error sending email: \(error.localizedDescription)")
+    }
+}
+
+func researchURL(app: WritersApp) async {
+    print("\n=== Research URL ===\n")
+    print("Enter URL to fetch (https://...): ", terminator: "")
+    guard let urlString = readLine(), !urlString.isEmpty else {
+        print("URL cannot be empty.")
+        return
+    }
+    do {
+        print("Fetching \(urlString)...")
+        let page = try await app.browseURL(urlString)
+        print("\n--- \(page.title) ---")
+        print("URL: \(page.url)")
+        // Show first 40 non-empty lines
+        let lines = page.textContent.components(separatedBy: "\n").prefix(40)
+        for line in lines {
+            print(line)
+        }
+        let totalLines = page.textContent.components(separatedBy: "\n").count
+        if totalLines > 40 {
+            print("\n[... \(totalLines - 40) more lines — saved to browsing history]")
+        }
+        print("\n✓ Page saved to browsing history (\(page.textContent.count) chars)")
+    } catch {
+        print("Error: \(error.localizedDescription)")
+    }
+}
+
+func viewBrowsingHistory(app: WritersApp) {
+    print("\n=== Browsing History ===\n")
+    let history = app.getBrowsingHistory()
+    if history.isEmpty {
+        print("No pages browsed this session. Use option 109 to research a URL.")
+        return
+    }
+    let formatter = DateFormatter()
+    formatter.dateStyle = .none
+    formatter.timeStyle = .short
+    for (i, page) in history.enumerated() {
+        print("\(i + 1). \(page.title)")
+        print("   URL:     \(page.url)")
+        print("   Fetched: \(formatter.string(from: page.fetchedAt))")
+        print("   Size:    \(page.textContent.count) chars")
+        print()
+    }
+    print("Total: \(history.count) page(s)")
+    print("\nClear history? (y/N): ", terminator: "")
+    if let input = readLine(), input.lowercased() == "y" {
+        app.clearBrowsingHistory()
+        print("✓ Browsing history cleared.")
+    }
 }
