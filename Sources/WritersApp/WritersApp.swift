@@ -1223,8 +1223,12 @@ public class WritersApp {
     }
 
     public func updateProspectStatus(id: UUID, status: ProspectStatus) throws {
+        let isContactStatus: (ProspectStatus) -> Bool = {
+            $0 == .contacted || $0 == .replied || $0 == .meeting
+        }
+        let previousStatus = prospectDatabase.getProspect(id: id)?.status
         try prospectDatabase.updateProspectStatus(id: id, status: status)
-        if status == .contacted || status == .replied || status == .meeting {
+        if isContactStatus(status) && !(previousStatus.map(isContactStatus) ?? false) {
             activeCoworkSession?.prospectsContacted += 1
         }
     }

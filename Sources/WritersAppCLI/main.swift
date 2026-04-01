@@ -419,10 +419,11 @@ struct WritersAppCLI {
             print("106. Prospect Pipeline Stats")
             if app.isGmailEnabled {
                 print("107. View Gmail Inbox")
-                print("108. Send Email")
+                print("108. Mark Email as Read")
+                print("109. Send Email")
             }
-            print("109. Research URL (Browser)")
-            print("110. View Browsing History")
+            print("110. Research URL (Browser)")
+            print("111. View Browsing History")
 
             print("\n0. Exit")
             print()
@@ -587,10 +588,12 @@ struct WritersAppCLI {
             case 107:
                 await viewGmailInbox(app: app)
             case 108:
-                await sendGmail(app: app)
+                await markGmailMessageAsRead(app: app)
             case 109:
-                await researchURL(app: app)
+                await sendGmail(app: app)
             case 110:
+                await researchURL(app: app)
+            case 111:
                 viewBrowsingHistory(app: app)
             case 0:
                 await app.shutdownPlugins()
@@ -4142,9 +4145,18 @@ func viewGmailInbox(app: WritersApp) async {
         print("Gmail is not enabled. Set GMAIL_OAUTH_TOKEN and restart.")
         return
     }
-    print("Max results (default 10): ", terminator: "")
+    print("Max results (default 10, range 1-100): ", terminator: "")
     let maxInput = readLine() ?? ""
-    let maxResults = Int(maxInput) ?? 10
+    let trimmedMaxInput = maxInput.trimmingCharacters(in: .whitespacesAndNewlines)
+    let maxResults: Int
+    if trimmedMaxInput.isEmpty {
+        maxResults = 10
+    } else if let value = Int(trimmedMaxInput), (1...100).contains(value) {
+        maxResults = value
+    } else {
+        print("Invalid max results. Please enter a number between 1 and 100.")
+        return
+    }
     print("Search query (optional, e.g. 'from:agent@example.com'): ", terminator: "")
     let query = readLine().flatMap { $0.isEmpty ? nil : $0 }
 
@@ -4171,6 +4183,25 @@ func viewGmailInbox(app: WritersApp) async {
         }
     } catch {
         print("Error fetching inbox: \(error.localizedDescription)")
+    }
+}
+
+func markGmailMessageAsRead(app: WritersApp) async {
+    print("\n=== Mark Email as Read ===\n")
+    guard app.isGmailEnabled else {
+        print("Gmail is not enabled. Set GMAIL_OAUTH_TOKEN and restart.")
+        return
+    }
+    print("Enter message ID to mark as read: ", terminator: "")
+    guard let msgId = readLine(), !msgId.isEmpty else {
+        print("Message ID cannot be empty.")
+        return
+    }
+    do {
+        try await app.markGmailAsRead(id: msgId)
+        print("\n✓ Message \(String(msgId.prefix(16)))... marked as read.")
+    } catch {
+        print("Error: \(error.localizedDescription)")
     }
 }
 
