@@ -11,28 +11,45 @@ public class ProspectDatabase {
 
     public init() {}
 
-    // MARK: CRUD
+    /// Inserts or replaces a prospect in the database using the prospect's `id`.
+    /// - Parameter prospect: The `Prospect` to store; if an entry with the same `id` exists it will be overwritten.
 
     public func addProspect(_ prospect: Prospect) {
         prospects[prospect.id] = prospect
     }
 
+    /// Retrieve a prospect by its UUID.
+    /// - Returns: The prospect matching the given `id`, or `nil` if no such prospect exists.
     public func getProspect(id: UUID) -> Prospect? {
         return prospects[id]
     }
 
+    /// Retrieves all stored prospects ordered by creation date, newest first.
+    /// - Returns: An array of `Prospect` objects sorted with the most recently created prospect first.
     public func getAllProspects() -> [Prospect] {
         return Array(prospects.values).sorted { $0.createdAt > $1.createdAt }
     }
 
+    /// Fetches stored prospects that match the given status.
+    /// - Parameters:
+    ///   - status: The `ProspectStatus` to filter by.
+    /// - Returns: An array of `Prospect` objects whose `status` equals `status`, ordered by `createdAt` descending.
     public func getProspects(withStatus status: ProspectStatus) -> [Prospect] {
         return getAllProspects().filter { $0.status == status }
     }
 
+    /// Inserts or replaces a prospect in the in-memory database using the prospect's `id`.
+    /// - Parameters:
+    ///   - prospect: The `Prospect` to store; if a prospect with the same `id` already exists it will be overwritten.
     public func updateProspect(_ prospect: Prospect) {
         prospects[prospect.id] = prospect
     }
 
+    /// Updates the stored prospect's status and sets `lastContactedAt` when the new status indicates contact.
+    /// - Parameters:
+    ///   - id: The UUID of the prospect to update.
+    ///   - status: The new `ProspectStatus` to assign to the prospect.
+    /// - Throws: `CoworkError.prospectNotFound(id)` if no prospect exists for the provided `id`.
     public func updateProspectStatus(id: UUID, status: ProspectStatus) throws {
         guard var prospect = prospects[id] else {
             throw CoworkError.prospectNotFound(id)
@@ -44,10 +61,16 @@ public class ProspectDatabase {
         prospects[id] = prospect
     }
 
+    /// Removes the prospect with the given id from the database.
+    /// - Parameters:
+    ///   - id: The UUID of the prospect to remove. If no prospect exists for this id, the call has no effect.
     public func deleteProspect(id: UUID) {
         prospects.removeValue(forKey: id)
     }
 
+    /// Searches stored prospects for those matching the given text query.
+    /// - Parameter query: The text to search for; matching is case-insensitive and uses substring containment.
+    /// - Returns: An array of prospects whose `name`, `email`, `company` (if present), `notes`, or any `tags` element contains the query string (case-insensitive). The results preserve the ordering produced by `getAllProspects()` (sorted by `createdAt` descending).
     public func searchProspects(query: String) -> [Prospect] {
         let q = query.lowercased()
         return getAllProspects().filter {
@@ -59,7 +82,10 @@ public class ProspectDatabase {
         }
     }
 
-    // MARK: Statistics
+    /// Compute counts of stored prospects grouped by their status.
+    /// 
+    /// Includes every `ProspectStatus` case; statuses with no matching prospects will have a value of `0`.
+    /// - Returns: A dictionary mapping each `ProspectStatus` to the number of prospects currently in that status.
 
     public func getStats() -> [ProspectStatus: Int] {
         var counts: [ProspectStatus: Int] = [:]
@@ -90,7 +116,13 @@ public class GmailService {
     /// Fetch a list of messages from the inbox.
     /// - Parameters:
     ///   - maxResults: Maximum number of messages to fetch (default 20).
-    ///   - query: Optional Gmail search query (e.g. `"from:agent@example.com"`).
+    /// Fetches a list of Gmail messages optionally filtered by a search query.
+    /// 
+    /// Requests message IDs from the Gmail API and returns the full messages for those IDs.
+    /// - Parameters:
+    ///   - maxResults: The maximum number of messages to return.
+    ///   - query: An optional Gmail search query to filter results.
+    /// - Returns: An array of `GmailMessage` objects containing up to `maxResults` messages; any message IDs that cannot be fetched or parsed are omitted.
     public func listMessages(maxResults: Int = 20, query: String? = nil) async throws -> [GmailMessage] {
         var urlString = "\(baseURL)/messages?maxResults=\(maxResults)"
         if let q = query, !q.isEmpty {
@@ -117,7 +149,10 @@ public class GmailService {
 
     // MARK: Get single message
 
-    /// Fetch the full content of a specific message.
+    /// Fetches the full Gmail message for the provided Gmail message ID and returns it as a `GmailMessage`.
+    /// - Parameter id: The Gmail message ID to retrieve.
+    /// - Returns: A `GmailMessage` populated from the Gmail API response.
+    /// - Throws: `CoworkError.invalidURL` if the request URL cannot be constructed; may rethrow network or parsing errors from the underlying request and parsing helpers.
     public func getMessage(id: String) async throws -> GmailMessage {
         guard let url = URL(string: "\(baseURL)/messages/\(id)?format=full") else {
             throw CoworkError.invalidURL
@@ -130,7 +165,10 @@ public class GmailService {
 
     /// Send an email via Gmail.
     /// - Parameter draft: The composed email to send.
-    /// - Returns: The sent message ID.
+    /// Sends the provided Gmail draft and returns the Gmail message ID of the sent message.
+    /// - Parameter draft: The message draft to send. If `draft.inReplyTo` is set, it will be used as the `threadId` to send the message as a reply.
+    /// - Returns: The Gmail message ID of the sent message.
+    /// - Throws: `CoworkError.invalidURL` if the send endpoint URL cannot be constructed; `CoworkError.networkError` if the send response has an unexpected format or other network-related failures occur.
     @discardableResult
     public func sendMessage(draft: GmailDraft) async throws -> String {
         let rawMessage = buildRFC2822(draft: draft)
@@ -158,7 +196,11 @@ public class GmailService {
 
     // MARK: Mark as read
 
-    /// Mark a message as read by removing the UNREAD label.
+    /// Marks the specified Gmail message as read by removing its "UNREAD" label.
+    /// - Parameter id: The Gmail message ID to modify.
+    /// - Throws: `CoworkError.invalidURL` if the modify endpoint URL cannot be constructed.
+    ///           `CoworkError.invalidOAuthToken` if the stored OAuth token is rejected.
+    ///           `CoworkError.networkError` for other HTTP or network-related failures.
     public func markAsRead(id: String) async throws {
         guard let url = URL(string: "\(baseURL)/messages/\(id)/modify") else {
             throw CoworkError.invalidURL
@@ -167,7 +209,9 @@ public class GmailService {
         _ = try await performRequest(url: url, method: "POST", body: body)
     }
 
-    // MARK: - Private helpers
+    /// Builds an RFC 2822-style raw email string suitable for sending via the Gmail API.
+    /// - Parameter draft: The draft containing recipient (`to`), `subject`, `body`, and optional `inReplyTo` for replies.
+    /// - Returns: A CRLF-separated raw message with headers (`To`, `Subject`, `Content-Type`, and optionally `In-Reply-To` and `References`), a blank line, then the message body.
 
     private func buildRFC2822(draft: GmailDraft) -> String {
         var headers = [
@@ -182,6 +226,10 @@ public class GmailService {
         return (headers + ["", draft.body]).joined(separator: "\r\n")
     }
 
+    /// Parses Gmail API message JSON into a `GmailMessage`.
+    /// - Parameter data: Raw JSON data for a single Gmail message as returned by the Gmail API `messages/{id}` endpoint.
+    /// - Returns: A `GmailMessage` populated from the JSON. `id`, `threadId`, `snippet`, `labels`, `subject`, `from`, `to`, `body`, `date`, and `isRead` are extracted when present; `to` is split on commas and trimmed. If `internalDate` is missing or cannot be parsed, the current date is used. `isRead` is `true` when the `"UNREAD"` label is not present in the message labels.
+    /// - Throws: `CoworkError.networkError("Invalid message JSON")` if the top-level JSON is not an object.
     private func parseMessage(data: Data) throws -> GmailMessage {
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw CoworkError.networkError("Invalid message JSON")
@@ -231,6 +279,8 @@ public class GmailService {
         )
     }
 
+    /// Extracts the decoded plain-text body from a Gmail message payload, preferring the top-level body and falling back to any `text/plain` part.
+    /// - Returns: A `String` containing the decoded body text if present, otherwise an empty string.
     private func extractBody(payload: [String: Any]) -> String {
         if let bodySection = payload["body"] as? [String: Any],
            let encoded = bodySection["data"] as? String,
@@ -251,6 +301,10 @@ public class GmailService {
         return ""
     }
 
+    /// Decodes a base64url-encoded string into a UTF-8 string.
+    /// - Parameters:
+    ///   - encoded: A base64url (URL-safe Base64) encoded string where '-' and '_' are used instead of '+' and '/'.
+    /// - Returns: The decoded UTF-8 `String` if decoding succeeds, `nil` otherwise.
     private func decodeBase64URL(_ encoded: String) -> String? {
         var padded = encoded
             .replacingOccurrences(of: "-", with: "+")
@@ -263,6 +317,13 @@ public class GmailService {
         return String(data: data, encoding: .utf8)
     }
 
+    /// Performs an authenticated HTTP request and returns the raw response data.
+    /// - Parameters:
+    ///   - url: The destination URL for the request.
+    ///   - method: The HTTP method to use (e.g., "GET", "POST").
+    ///   - body: An optional JSON-serializable dictionary to send as the request body.
+    /// - Returns: The raw response `Data` from the server.
+    /// - Throws: `CoworkError.invalidOAuthToken` if the response status is 401; `CoworkError.networkError(...)` if the response has an HTTP status code >= 400 (the error includes the status and server message).
     private func performRequest(
         url: URL,
         method: String,
@@ -301,7 +362,11 @@ public class BrowserService {
     // MARK: Fetch
 
     /// Fetch a URL and return its text content.
-    /// - Parameter urlString: The URL to fetch (must begin with http:// or https://).
+    /// Fetches a web page, extracts its title and plain-text content, and appends the result to the session history.
+    /// - Parameters:
+    ///   - urlString: The URL string to fetch; must parse as a valid `http` or `https` URL.
+    /// - Returns: A `BrowsedPage` containing the requested URL, the extracted title (or `"Untitled"`), and the stripped text content.
+    /// - Throws: `CoworkError.invalidURL` if `urlString` is not a valid `http`/`https` URL; `CoworkError.browserFetchFailed("HTTP <status>")` if the response HTTP status is 400 or greater.
     public func fetch(urlString: String) async throws -> BrowsedPage {
         guard let url = URL(string: urlString),
               let scheme = url.scheme,
@@ -331,12 +396,14 @@ public class BrowserService {
         return page
     }
 
-    /// Clear the in-session browsing history.
+    /// Removes all stored browsed pages from the session history.
     public func clearHistory() {
         history.removeAll()
     }
 
-    // MARK: - HTML parsing helpers
+    /// Extracts the content of the HTML <title> element.
+    /// - Parameter html: The HTML document text to search for a title element.
+    /// - Returns: The title text trimmed of surrounding whitespace and newlines, or `"Untitled"` if no title element is found.
 
     private func extractHTMLTitle(from html: String) -> String {
         guard let titleStart = html.range(of: "<title", options: .caseInsensitive),
@@ -352,6 +419,11 @@ public class BrowserService {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Converts HTML into readable plain text by removing tags, decoding common entities, and normalizing whitespace.
+    /// 
+    /// The resulting text has script, style, and head blocks removed; block-level tags replaced with newlines; all other tags stripped; common HTML entities decoded; and empty lines removed.
+    /// - Parameter html: The HTML source to convert.
+    /// - Returns: Plain text with non-empty lines joined by single newlines.
     private func stripHTML(_ html: String) -> String {
         var text = html
 
