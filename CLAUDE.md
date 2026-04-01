@@ -41,7 +41,7 @@ swift package clean                   # Remove build artifacts
 │   │   │   ├── Document.swift        # Document, DocumentMetadata
 │   │   │   ├── AIModels.swift        # AI config, AIAssistanceType, tool loop types
 │   │   │   ├── AISuggestion.swift    # AISuggestion, UserSession, AIToolUsageStats
-│   │   │   ├── FocusSession.swift    # FocusSession, FocusMode, SessionStatus
+│   │   │   ├── FocusSession.swift    # FocusSession, FocusSessionType, FocusSessionState
 │   │   │   ├── Issue.swift           # Issue, IssueStatus, IssuePriority, IssueMetadata
 │   │   │   ├── KanbanModels.swift    # KanbanBoard, KanbanTask, KanbanColumn
 │   │   │   ├── TraceModels.swift     # Trace, TraceEvent, TraceSpan (analytics)
@@ -595,7 +595,7 @@ The **knowledge-advisor** subagent reads the relevant files and returns a focuse
 1. Create a class conforming to `Plugin` protocol in `Sources/WritersApp/Plugins/`
 2. Implement `initialize()`, `shutdown()`, `execute(action:)`
 3. Declare `capabilities` matching what the plugin supports
-4. Register via `PluginManager.shared.registerPlugin(_:)`
+4. Register via `PluginManager.shared.register(plugin:)`
 5. Expose convenience methods on `WritersApp` if needed
 
 ### Adding a Version Control Operation
