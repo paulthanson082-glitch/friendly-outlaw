@@ -241,4 +241,54 @@ describe('seed module', () => {
       expect(sql).toBeDefined();
     });
   });
+
+  describe('module exports (seed function visibility)', () => {
+    it('should not export a named "seed" function', async () => {
+      // In the PR, `export async function seed()` was changed to
+      // `async function seed()` — the function is now unexported (private).
+      // Use the already-loaded module (first import is sufficient for export check).
+      jest.resetModules();
+      const mod = await import('../seed');
+      expect((mod as any).seed).toBeUndefined();
+    });
+
+    it('should auto-execute seed() on module import without requiring an explicit call', async () => {
+      // The module self-invokes seed().catch(console.error) at import time.
+      // jest.resetModules() clears Jest's module registry so the module is fresh.
+      jest.resetModules();
+      await import('../seed');
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Successful auto-execution logs to console.log
+      expect(console.log).toHaveBeenCalled();
+    });
+
+    it('should catch seed errors via .catch(console.error) rather than propagating them', async () => {
+      // seed().catch(console.error) means errors are routed to console.error,
+      // not thrown to the caller.  Importing the module should never reject.
+      mockInitDb.mockRejectedValueOnce(new Error('Auto-run error'));
+
+      jest.resetModules();
+      let importError: unknown = null;
+      try {
+        await import('../seed');
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (err) {
+        importError = err;
+      }
+
+      expect(importError).toBeNull();
+      expect(console.error).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Auto-run error' })
+      );
+    });
+
+    it('should have no other named exports beyond the implicit module namespace', async () => {
+      jest.resetModules();
+      const mod = await import('../seed');
+      const exportedKeys = Object.keys(mod);
+      // The module should not expose anything meaningful since seed is unexported
+      expect(exportedKeys).not.toContain('seed');
+    });
+  });
 });

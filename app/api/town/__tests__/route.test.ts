@@ -424,3 +424,164 @@ describe('/api/town GET', () => {
     expect(resident).toHaveProperty('latestMemory');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Supplementary tests using mockResolvedValueOnce (correct pattern for
+// Promise.all with 4 independent SQL calls).  The route does:
+//   const [bots, messages, worldState, memories] = await Promise.all([sql`...`, sql`...`, sql`...`, sql`...`])
+// Each call needs its own resolved value, hence mockResolvedValueOnce × 4.
+// ---------------------------------------------------------------------------
+describe('/api/town GET (sequential mock pattern)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should return residents with correct field values when using sequential mocks', async () => {
+    const mockBots = [
+      { id: '1', handle: 'pixel', name: 'Pixel', description: 'An artist', created_at: '2024-01-01T00:00:00Z' },
+    ];
+
+    mockSql
+      .mockResolvedValueOnce(mockBots)    // bots query
+      .mockResolvedValueOnce([])          // messages query
+      .mockResolvedValueOnce([])          // world_state query
+      .mockResolvedValueOnce([]);         // memories query
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.residents).toHaveLength(1);
+    expect(data.residents[0].handle).toBe('pixel');
+    expect(data.residents[0].name).toBe('Pixel');
+    expect(data.residents[0].id).toBe('1');
+  });
+
+  it('should correctly map world state rows to key-value object', async () => {
+    const worldState = [
+      { key: 'tick', value: '7', updated_at: '2024-01-01T10:00:00Z' },
+      { key: 'status', value: 'running', updated_at: '2024-01-01T10:00:00Z' },
+    ];
+
+    mockSql
+      .mockResolvedValueOnce([])          // bots
+      .mockResolvedValueOnce([])          // messages
+      .mockResolvedValueOnce(worldState)  // world_state
+      .mockResolvedValueOnce([]);         // memories
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.world).toEqual({ tick: '7', status: 'running' });
+  });
+
+  it('should attach latestMemory to the matching resident', async () => {
+    const mockBots = [
+      { id: '1', handle: 'pixel', name: 'Pixel', description: 'Artist', created_at: '2024-01-01T00:00:00Z' },
+    ];
+    const mockMemories = [
+      { bot_handle: 'pixel', memory: 'Painted a masterpiece', created_at: '2024-01-01T09:00:00Z' },
+    ];
+
+    mockSql
+      .mockResolvedValueOnce(mockBots)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(mockMemories);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.residents[0].latestMemory).toBe('Painted a masterpiece');
+  });
+
+  it('should set latestMemory to null for residents without memories', async () => {
+    const mockBots = [
+      { id: '1', handle: 'pixel', name: 'Pixel', description: 'Artist', created_at: '2024-01-01T00:00:00Z' },
+    ];
+
+    mockSql
+      .mockResolvedValueOnce(mockBots)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.residents[0].latestMemory).toBeNull();
+  });
+
+  it('should return messages with correct fields in the feed', async () => {
+    const mockMessages = [
+      {
+        id: 'msg1', from: 'pixel', to: 'sage', content: 'Hello!',
+        type: 'message', timestamp: '2024-01-01T10:00:00Z',
+        from_name: 'Pixel', to_name: 'Sage',
+      },
+    ];
+
+    mockSql
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(mockMessages)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.feed).toHaveLength(1);
+    expect(data.feed[0].from_name).toBe('Pixel');
+    expect(data.feed[0].to_name).toBe('Sage');
+    expect(data.feed[0].content).toBe('Hello!');
+  });
+
+  it('should return empty arrays and object when database is empty', async () => {
+    mockSql
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.world).toEqual({});
+    expect(data.residents).toEqual([]);
+    expect(data.feed).toEqual([]);
+  });
+
+  it('should preserve all standard bot fields plus latestMemory in residents', async () => {
+    const mockBots = [
+      { id: '42', handle: 'nova', name: 'Nova', description: 'Stargazer', created_at: '2024-06-01T00:00:00Z' },
+    ];
+
+    mockSql
+      .mockResolvedValueOnce(mockBots)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data.residents[0]).toMatchObject({
+      id: '42',
+      handle: 'nova',
+      name: 'Nova',
+      description: 'Stargazer',
+      created_at: '2024-06-01T00:00:00Z',
+      latestMemory: null,
+    });
+  });
+
+  it('should return status 200', async () => {
+    mockSql
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const response = await GET();
+    expect(response.status).toBe(200);
+  });
+});

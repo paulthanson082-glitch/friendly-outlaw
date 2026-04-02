@@ -1,3 +1,4 @@
+import React from 'react';
 import { render } from '@testing-library/react';
 import RootLayout, { metadata } from '../layout';
 
@@ -139,5 +140,88 @@ describe('metadata', () => {
   it('should have metadata that matches page purpose', () => {
     expect(metadata.title.toLowerCase()).toContain('ai');
     expect(metadata.description.toLowerCase()).toContain('residents');
+  });
+});
+
+describe('RootLayout structure regression tests (PR container.querySelector change)', () => {
+  // The PR changed assertions from `document.documentElement` / `document.body`
+  // to `container.querySelector('html')` / `container.querySelector('body')`.
+  //
+  // In jsdom, when React renders <html><body>...</body></html>, the html and body
+  // elements are parsed as document.documentElement and document.body rather than
+  // being nested as children of the render container div. Therefore:
+  //   - container.querySelector('html') returns null
+  //   - document.documentElement returns the <html lang="en"> element
+  //
+  // These tests document the actual rendering behaviour in jsdom and verify that
+  // the RootLayout renders the expected document structure.
+
+  it('should produce an html element with lang="en" accessible via document.documentElement', () => {
+    render(
+      <RootLayout>
+        <span data-testid="anchor">content</span>
+      </RootLayout>
+    );
+
+    // The <html> element rendered by RootLayout ends up as document.documentElement
+    // in jsdom (not as a child of the container div).
+    expect(document.documentElement).toHaveAttribute('lang', 'en');
+  });
+
+  it('should produce a body element accessible via document.body', () => {
+    render(
+      <RootLayout>
+        <span>content</span>
+      </RootLayout>
+    );
+
+    expect(document.body).toBeInTheDocument();
+  });
+
+  it('container.querySelector("html") is null because html is not nested inside the container div', () => {
+    // This test documents a jsdom behaviour that was the source of the PR test changes:
+    // container is a <div> appended to document.body, so html is never a descendant.
+    const { container } = render(
+      <RootLayout>
+        <span>content</span>
+      </RootLayout>
+    );
+
+    expect(container.querySelector('html')).toBeNull();
+  });
+
+  it('should render children into the document tree and make them queryable via container', () => {
+    const { container } = render(
+      <RootLayout>
+        <p data-testid="inner-para">paragraph text</p>
+      </RootLayout>
+    );
+
+    // Children ARE reachable via container (they end up inside the container div
+    // that RTL appends to document.body).
+    expect(container.querySelector('[data-testid="inner-para"]')).toBeInTheDocument();
+  });
+
+  it('should set the document lang attribute to "en" when rendering RootLayout', () => {
+    render(
+      <RootLayout>
+        <div />
+      </RootLayout>
+    );
+
+    // The lang attribute on <html> affects the document language.
+    expect(document.documentElement.getAttribute('lang')).toBe('en');
+  });
+
+  it('should render children inside the document body when using RootLayout', () => {
+    const { getByText } = render(
+      <RootLayout>
+        <article>Nested article content</article>
+      </RootLayout>
+    );
+
+    const articleEl = getByText('Nested article content');
+    // The article is a descendant of document.body.
+    expect(document.body.contains(articleEl)).toBe(true);
   });
 });
