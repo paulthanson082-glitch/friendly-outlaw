@@ -47,7 +47,10 @@ public struct Document: Codable, Identifiable {
         return max(1, wordCount / wordsPerMinute)
     }
 
-    /// Enhanced word count with filtering for hyphenated words and special characters
+    /// Counts word-like tokens in the document content, excluding empty tokens and tokens that contain no letter or digit.
+    /// 
+    /// The content is split on whitespace and newlines; only components that are non-empty and contain at least one letter or digit are counted.
+    /// - Returns: The number of tokens in `content` that contain at least one letter or digit.
     public func enhancedWordCount() -> Int {
         let components = content.components(separatedBy: .whitespacesAndNewlines)
         return components.filter { word in
@@ -56,19 +59,25 @@ public struct Document: Codable, Identifiable {
         }.count
     }
 
-    /// Count sentences in the document
+    /// Counts sentence-like segments in the document content separated by the characters `.`, `!`, or `?`, ignoring segments that are empty or contain only whitespace.
+    /// - Returns: The number of detected sentences.
     public func sentenceCount() -> Int {
         let sentences = content.components(separatedBy: CharacterSet(charactersIn: ".!?"))
         return sentences.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
     }
 
-    /// Count paragraphs in the document
+    /// Counts non-empty paragraphs in the document.
+    /// 
+    /// Paragraphs are defined as segments separated by two consecutive newline characters ("\n\n"); segments that are empty or contain only whitespace/newlines are ignored.
+    /// - Returns: The number of non-empty paragraph segments.
     public func paragraphCount() -> Int {
         let paragraphs = content.components(separatedBy: "\n\n")
         return paragraphs.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
     }
 
-    /// Progress towards word count goal as percentage
+    /// Calculates progress toward the document's word count goal.
+    /// If `metadata.wordCountGoal` is missing or not greater than zero, returns `0.0`.
+    /// - Returns: A value between `0.0` and `1.0` representing the fraction of the goal completed; `1.0` when the word count meets or exceeds the goal.
     public func wordCountProgress() -> Double {
         guard let goal = metadata.wordCountGoal, goal > 0 else { return 0.0 }
         return min(1.0, Double(wordCount) / Double(goal))

@@ -206,12 +206,15 @@ public class WritersApp {
 
     // MARK: - Settings Management
 
-    /// Toggle dark mode on/off
+    /// Toggles the application's dark mode setting.
+    /// 
+    /// Flips `appSettings.isDarkModeEnabled` to the opposite value.
     public func toggleDarkMode() {
         appSettings.isDarkModeEnabled = !appSettings.isDarkModeEnabled
     }
 
-    /// Set dark mode to specific state
+    /// Sets whether the app uses dark mode.
+    /// - Parameter enabled: `true` to enable dark mode, `false` to disable it.
     public func setDarkMode(_ enabled: Bool) {
         appSettings.isDarkModeEnabled = enabled
     }
@@ -221,32 +224,38 @@ public class WritersApp {
         return appSettings.isDarkModeEnabled
     }
 
-    /// Set the app theme
+    /// Sets the application's UI theme.
+    /// - Parameter theme: The AppTheme to apply; updates the stored `appSettings.theme`.
     public func setTheme(_ theme: AppTheme) {
         appSettings.theme = theme
     }
 
-    /// Update font size
+    /// Set the application's font size.
+    /// - Parameter size: Desired font size; value will be clamped to the range 8–32.
     public func setFontSize(_ size: Int) {
         appSettings.fontSize = max(8, min(32, size))
     }
 
-    /// Update default word count goal
+    /// Sets the default target word count used for new documents.
+    /// - Parameter words: The default word-count goal to apply; pass `nil` to clear the default.
     public func setDefaultWordCountGoal(_ words: Int?) {
         appSettings.defaultWordCountGoal = words
     }
 
-    /// Enable/disable spell check
+    /// Enable or disable spell checking in the application's settings.
+    /// - Parameter enabled: `true` to enable spell checking, `false` to disable it.
     public func setSpellCheckEnabled(_ enabled: Bool) {
         appSettings.spellCheckEnabled = enabled
     }
 
-    /// Enable/disable grammar check
+    /// Sets whether grammar checking is enabled in the application's settings.
+    /// - Parameter enabled: `true` to enable grammar checking, `false` to disable it.
     public func setGrammarCheckEnabled(_ enabled: Bool) {
         appSettings.grammarCheckEnabled = enabled
     }
 
-    /// Get current app settings
+    /// Retrieve the current application settings.
+    /// - Returns: The current `AppSettings` instance representing persisted UI and writing preferences.
     public func getAppSettings() -> AppSettings {
         return appSettings
     }
