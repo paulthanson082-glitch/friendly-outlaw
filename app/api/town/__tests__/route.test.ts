@@ -57,7 +57,11 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockSql.mockResolvedValue([mockBots, mockMessages, mockWorldState, mockMemories]);
+    mockSql
+          .mockResolvedValueOnce(mockBots)
+          .mockResolvedValueOnce(mockMessages)
+          .mockResolvedValueOnce(mockWorldState)
+          .mockResolvedValueOnce(mockMemories);
 
     const response = await GET();
     const data = await response.json();
@@ -74,7 +78,11 @@ describe('/api/town GET', () => {
       { key: 'status', value: 'paused', updated_at: '2024-01-01T10:00:00Z' },
     ];
 
-    mockSql.mockResolvedValue([[], [], mockWorldState, []]);
+    mockSql
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce(mockWorldState)
+          .mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -104,7 +112,11 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockSql.mockResolvedValue([mockBots, [], [], mockMemories]);
+    mockSql
+          .mockResolvedValueOnce(mockBots)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce(mockMemories);
 
     const response = await GET();
     const data = await response.json();
@@ -123,7 +135,11 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockSql.mockResolvedValue([mockBots, [], [], []]);
+    mockSql
+          .mockResolvedValueOnce(mockBots)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -137,7 +153,11 @@ describe('/api/town GET', () => {
     const mockMemories = [];
 
     // Mock sql to verify LIMIT 30 is used
-    mockSql.mockResolvedValue([mockBots, [], mockWorldState, mockMemories]);
+    mockSql
+          .mockResolvedValueOnce(mockBots)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce(mockWorldState)
+          .mockResolvedValueOnce(mockMemories);
 
     await GET();
 
@@ -162,7 +182,11 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockSql.mockResolvedValue([mockBots, [], [], []]);
+    mockSql
+          .mockResolvedValueOnce(mockBots)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -195,7 +219,11 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockSql.mockResolvedValue([[], mockMessages, [], []]);
+    mockSql
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce(mockMessages)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -205,7 +233,11 @@ describe('/api/town GET', () => {
   });
 
   it('should handle empty database', async () => {
-    mockSql.mockResolvedValue([[], [], [], []]);
+    mockSql
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -235,7 +267,11 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockSql.mockResolvedValue([[], mockMessages, [], []]);
+    mockSql
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce(mockMessages)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -245,7 +281,11 @@ describe('/api/town GET', () => {
   });
 
   it('should use Promise.all for parallel queries', async () => {
-    mockSql.mockResolvedValue([[], [], [], []]);
+    mockSql
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([]);
 
     const startTime = Date.now();
     await GET();
@@ -256,7 +296,11 @@ describe('/api/town GET', () => {
   });
 
   it('should return NextResponse with JSON content type', async () => {
-    mockSql.mockResolvedValue([[], [], [], []]);
+    mockSql
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([]);
 
     const response = await GET();
 
@@ -283,7 +327,11 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockSql.mockResolvedValue([mockBots, [], [], mockMemories]);
+    mockSql
+          .mockResolvedValueOnce(mockBots)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce(mockMemories);
 
     const response = await GET();
     const data = await response.json();
@@ -302,7 +350,11 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockSql.mockResolvedValue([mockBots, [], [], []]);
+    mockSql
+          .mockResolvedValueOnce(mockBots)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -331,7 +383,11 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockSql.mockResolvedValue([[], mockMessages, [], []]);
+    mockSql
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce(mockMessages)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -341,7 +397,11 @@ describe('/api/town GET', () => {
   });
 
   it('should return data structure with correct top-level keys', async () => {
-    mockSql.mockResolvedValue([[], [], [], []]);
+    mockSql
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -360,7 +420,11 @@ describe('/api/town GET', () => {
       { bot_handle: 'sage', memory: 'Memory B', created_at: '2024-01-01T10:00:00Z' },
     ];
 
-    mockSql.mockResolvedValue([mockBots, [], [], mockMemories]);
+    mockSql
+          .mockResolvedValueOnce(mockBots)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce(mockMemories);
 
     const response = await GET();
     const data = await response.json();
@@ -382,7 +446,11 @@ describe('/api/town GET', () => {
       to_name: 'Sage',
     }));
 
-    mockSql.mockResolvedValue([[], largeFeed, [], []]);
+    mockSql
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce(largeFeed)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -391,7 +459,11 @@ describe('/api/town GET', () => {
   });
 
   it('should return valid JSON response', async () => {
-    mockSql.mockResolvedValue([[], [], [], []]);
+    mockSql
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([]);
 
     const response = await GET();
     const text = await response.text();
@@ -410,7 +482,11 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockSql.mockResolvedValue([mockBots, [], [], []]);
+    mockSql
+          .mockResolvedValueOnce(mockBots)
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
