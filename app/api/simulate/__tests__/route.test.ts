@@ -426,6 +426,113 @@ describe('/api/simulate', () => {
     });
   });
 
+  describe('exchanges clamping edge cases', () => {
+    it('should run 0 exchanges when exchanges=0 is specified', async () => {
+      const mockBots = [{ handle: 'pixel' }, { handle: 'sage' }];
+
+      mockSql
+        .mockResolvedValueOnce([{ value: 'running' }])
+        .mockResolvedValueOnce(mockBots)
+        .mockResolvedValueOnce([]) // Update tick
+        .mockResolvedValueOnce([{ value: '1' }]); // Get tick
+
+      const request = createMockRequest({ exchanges: 0 });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.generated).toHaveLength(0);
+    });
+
+    it('should run 0 exchanges when negative exchanges are specified', async () => {
+      const mockBots = [{ handle: 'pixel' }, { handle: 'sage' }];
+
+      mockSql
+        .mockResolvedValueOnce([{ value: 'running' }])
+        .mockResolvedValueOnce(mockBots)
+        .mockResolvedValueOnce([]) // Update tick
+        .mockResolvedValueOnce([{ value: '1' }]); // Get tick
+
+      const request = createMockRequest({ exchanges: -5 });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.generated).toHaveLength(0);
+    });
+
+    it('should coerce string exchanges to number', async () => {
+      // Prevent optional memory generation (Math.random >= 0.4 means no memory)
+      Math.random = jest.fn().mockReturnValue(0.5);
+      const mockBots = [{ handle: 'pixel' }, { handle: 'sage' }];
+
+      mockSql
+        .mockResolvedValueOnce([{ value: 'running' }])
+        .mockResolvedValueOnce(mockBots)
+        .mockResolvedValueOnce([]) // Messages
+        .mockResolvedValueOnce([]) // Memories
+        .mockResolvedValueOnce([]) // Insert
+        .mockResolvedValueOnce([]) // Update tick
+        .mockResolvedValueOnce([{ value: '1' }]); // Get tick
+
+      const request = createMockRequest({ exchanges: '1' });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.generated).toHaveLength(1);
+    });
+
+    it('should use exchanges=1 default when exchanges is null', async () => {
+      // Prevent optional memory generation (Math.random >= 0.4 means no memory)
+      Math.random = jest.fn().mockReturnValue(0.5);
+      const mockBots = [{ handle: 'pixel' }, { handle: 'sage' }];
+
+      mockSql
+        .mockResolvedValueOnce([{ value: 'running' }])
+        .mockResolvedValueOnce(mockBots)
+        .mockResolvedValueOnce([]) // Messages
+        .mockResolvedValueOnce([]) // Memories
+        .mockResolvedValueOnce([]) // Insert
+        .mockResolvedValueOnce([]) // Update tick
+        .mockResolvedValueOnce([{ value: '1' }]); // Get tick
+
+      const request = createMockRequest({ exchanges: null });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.generated).toHaveLength(1);
+    });
+
+    it('should run exactly 3 exchanges when exchanges=3', async () => {
+      // Prevent optional memory generation (Math.random >= 0.4 means no memory)
+      Math.random = jest.fn().mockReturnValue(0.5);
+      const mockBots = [{ handle: 'pixel' }, { handle: 'sage' }];
+
+      mockSql
+        .mockResolvedValueOnce([{ value: 'running' }])
+        .mockResolvedValueOnce(mockBots);
+
+      for (let i = 0; i < 3; i++) {
+        mockSql
+          .mockResolvedValueOnce([]) // Messages
+          .mockResolvedValueOnce([]) // Memories
+          .mockResolvedValueOnce([]); // Insert
+      }
+
+      mockSql
+        .mockResolvedValueOnce([]) // Update tick
+        .mockResolvedValueOnce([{ value: '3' }]); // Get tick
+
+      const request = createMockRequest({ exchanges: 3 });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(data.generated).toHaveLength(3);
+    });
+  });
+
   describe('Integration scenarios', () => {
     it('should ensure speaker and listener are different bots', async () => {
       const mockBots = [
