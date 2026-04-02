@@ -169,7 +169,31 @@ async def search_username(
     output_format: str = "json",
     print_found_only: bool = True
 ) -> Dict[str, Any]:
-    """Search for username across social networks"""
+    """
+    Search for a username across supported social networks using the sherlock CLI.
+    
+    Parameters:
+        username (str): The username to search for.
+        timeout (int): Maximum time in seconds to allow the sherlock process to run.
+        sites (List[str] | None): If provided, restrict the search to these site identifiers.
+        output_format (str): Desired output format; `"json"` attempts to read structured results from a temporary JSON file, otherwise raw text output is returned.
+        print_found_only (bool): If true, include only sites where the username was found.
+    
+    Returns:
+        Dict[str, Any]: A result dictionary. On success with JSON output: contains keys
+            - "success": True,
+            - "username": the queried username,
+            - "results": parsed JSON data,
+            - "format": "json".
+        For text output or JSON fallback: contains keys
+            - "success": True if the sherlock process exited with code 0, False otherwise,
+            - "username": the queried username,
+            - "output": sherlock's stdout,
+            - "errors": sherlock's stderr when the process failed, otherwise None,
+            - "format": "text".
+        On failures (timeout, missing executable, or other errors) the dictionary contains
+            - "success": False and one or more of "error", "recommendation", and "env_var" with human-readable messages describing the problem.
+    """
 
     try:
         # Build command
@@ -252,7 +276,21 @@ async def batch_search(
     timeout: int = DEFAULT_TIMEOUT,
     sites: List[str] = None
 ) -> Dict[str, Any]:
-    """Search multiple usernames in batch"""
+    """
+    Run Sherlock searches for a list of usernames and aggregate the per-username results.
+    
+    Parameters:
+        usernames (List[str]): Usernames to search, processed in order.
+        timeout (int): Per-search timeout in seconds.
+        sites (List[str] | None): If provided, restrict each search to these site identifiers; if None, searches all supported sites.
+    
+    Returns:
+        dict: Aggregated batch result with keys:
+            - batch_size (int): Number of usernames processed.
+            - timeout (int): Timeout value used for each search.
+            - sites_filter (List[str] | None): The sites filter passed through.
+            - results (Dict[str, Any]): Mapping of username to that username's search result object (as returned by `search_username`).
+    """
 
     results = {
         "batch_size": len(usernames),
@@ -279,7 +317,21 @@ async def batch_search(
 
 
 async def list_supported_sites(search_term: str = None) -> Dict[str, Any]:
-    """List all supported Sherlock sites"""
+    """
+    Return a list of site identifiers that the installed Sherlock CLI advertises, optionally filtered by a case-insensitive substring.
+    
+    Parameters:
+        search_term (str, optional): Case-insensitive substring to filter site names. If omitted, all discovered sites are returned.
+    
+    Returns:
+        dict: A dictionary with the following keys:
+            - success (bool): `True` when site extraction succeeded, `False` on error.
+            - total_sites (int): Number of sites included in `sites`.
+            - sites (List[str]): Discovered (and optionally filtered) site identifiers.
+            - search_filter (str|None): The provided `search_term`, or `None` if not supplied.
+            - error (str, optional): Present only when `success` is `False`, containing the error message.
+            - recommendation (str, optional): Present only on error with guidance to run `sherlock --help`.
+    """
 
     try:
         result = subprocess.run(
@@ -314,7 +366,22 @@ async def verify_username_availability(
     username: str,
     major_platforms_only: bool = True
 ) -> Dict[str, Any]:
-    """Quick check for username availability"""
+    """
+    Check if a username appears on selected platforms using a short Sherlock search.
+    
+    Parameters:
+        username (str): The username to check.
+        major_platforms_only (bool): If True, limit checks to the predefined MAJOR_PLATFORMS; if False, allow checking all supported sites.
+    
+    Returns:
+        dict: Result object with these keys:
+            - username (str): The checked username.
+            - available (bool): `True` if the username was not found on checked platforms, `False` otherwise.
+            - platforms_checked (str): `"major"` when `major_platforms_only` was True, `"all"` otherwise.
+            - results (dict): When `available` is `True`, contains the parsed Sherlock JSON results (may be empty).
+            - summary (str): When `available` is `True`, a human-readable summary of findings.
+            - error (str): When `available` is `False`, contains an error message when available.
+    """
 
     sites_to_check = MAJOR_PLATFORMS if major_platforms_only else None
 
@@ -344,7 +411,15 @@ async def verify_username_availability(
 
 
 def extract_sites_from_help(help_text: str) -> List[str]:
-    """Extract site names from Sherlock help text"""
+    """
+    Parse Sherlock CLI help text and return candidate site name tokens.
+    
+    Parameters:
+        help_text (str): Full help output from the Sherlock CLI.
+    
+    Returns:
+        List[str]: Candidate site name tokens extracted from the help text. This is a heuristic extraction and may include false positives or non-site tokens.
+    """
     # This is a simplified extraction - could be improved
     sites = []
     for line in help_text.split('\n'):
@@ -358,7 +433,15 @@ def extract_sites_from_help(help_text: str) -> List[str]:
 
 
 def format_availability_summary(result: Dict[str, Any]) -> str:
-    """Format availability check summary"""
+    """
+    Produce a human-readable summary of where a username was found from a Sherlock-style search result.
+    
+    Parameters:
+        result (Dict[str, Any]): Search result object expected to contain a "results" key whose value is a mapping of platform names to findings (or an empty mapping).
+    
+    Returns:
+        A summary string: `"Username not found on any checked platform (good availability!)"` when no platforms report a match; `"Username found on: <platform1, platform2, ...>"` when matches are present; or `"Unable to summarize results"` if the input cannot be summarized.
+    """
 
     try:
         found = result.get("results", {})
@@ -375,7 +458,19 @@ def format_availability_summary(result: Dict[str, Any]) -> str:
 
 @server.call_tool()
 async def call_tool(name: str, arguments: Dict[str, Any]) -> ToolResult:
-    """Handle tool calls from MCP clients"""
+    """
+    Dispatches an MCP tool invocation to the matching handler and returns a ToolResult representing the outcome.
+    
+    Parameters:
+        name (str): The tool name to invoke (e.g., "search_username", "batch_search",
+            "list_supported_sites", "verify_username_availability").
+        arguments (Dict[str, Any]): Tool-specific arguments to pass to the handler.
+    
+    Returns:
+        ToolResult: On success, contains a single text content item with the JSON-serialized
+        handler result and `isError=False`. If the tool name is unknown or an exception
+        occurs while handling the call, contains a text error message and `isError=True`.
+    """
 
     try:
         if name == "search_username":
@@ -410,7 +505,11 @@ async def list_tools() -> List[Tool]:
 
 
 async def main():
-    """Start the MCP server"""
+    """
+    Start and run the Sherlock MCP server until shutdown.
+    
+    Verifies the configured Sherlock executable (logging a warning if verification fails), writes startup status and the available tools to stderr, enters the server context, and waits for shutdown.
+    """
 
     # Verify Sherlock installation
     try:
