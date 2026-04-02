@@ -47,10 +47,8 @@ public struct Document: Codable, Identifiable {
         return max(1, wordCount / wordsPerMinute)
     }
 
-    /// Counts word-like tokens in the document content, excluding empty tokens and tokens that contain no letter or digit.
-    /// 
-    /// The content is split on whitespace and newlines; only components that are non-empty and contain at least one letter or digit are counted.
-    /// - Returns: The number of tokens in `content` that contain at least one letter or digit.
+    /// Counts the words in `content` by splitting on whitespace and newlines and excluding empty tokens and tokens that contain no letters or digits.
+    /// - Returns: The number of tokens considered words (excludes pure punctuation and empty tokens).
     public func enhancedWordCount() -> Int {
         let components = content.components(separatedBy: .whitespacesAndNewlines)
         return components.filter { word in
@@ -59,25 +57,25 @@ public struct Document: Codable, Identifiable {
         }.count
     }
 
-    /// Counts sentence-like segments in the document content separated by the characters `.`, `!`, or `?`, ignoring segments that are empty or contain only whitespace.
-    /// - Returns: The number of detected sentences.
+    /// Counts sentence-like segments in the document's content.
+    /// Splits the content on `.`, `!`, and `?`, trims whitespace and newlines from each segment, and counts the non-empty segments.
+    /// - Returns: The number of non-empty sentence segments.
     public func sentenceCount() -> Int {
         let sentences = content.components(separatedBy: CharacterSet(charactersIn: ".!?"))
         return sentences.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
     }
 
-    /// Counts non-empty paragraphs in the document.
+    /// Counts the paragraphs in the document.
     /// 
-    /// Paragraphs are defined as segments separated by two consecutive newline characters ("\n\n"); segments that are empty or contain only whitespace/newlines are ignored.
-    /// - Returns: The number of non-empty paragraph segments.
+    /// Splits `content` on the double-newline delimiter `"\n\n"`, trims whitespace and newlines from each segment, and counts segments that are not empty after trimming.
+    /// - Returns: The number of paragraphs found in `content`.
     public func paragraphCount() -> Int {
         let paragraphs = content.components(separatedBy: "\n\n")
         return paragraphs.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
     }
 
-    /// Calculates progress toward the document's word count goal.
-    /// If `metadata.wordCountGoal` is missing or not greater than zero, returns `0.0`.
-    /// - Returns: A value between `0.0` and `1.0` representing the fraction of the goal completed; `1.0` when the word count meets or exceeds the goal.
+    /// Computes progress toward the document's word count goal as a ratio.
+    /// - Returns: `0.0` if no positive goal is set; otherwise a value between `0.0` and `1.0` equal to `wordCount / goal`, clamped to `1.0`.
     public func wordCountProgress() -> Double {
         guard let goal = metadata.wordCountGoal, goal > 0 else { return 0.0 }
         return min(1.0, Double(wordCount) / Double(goal))

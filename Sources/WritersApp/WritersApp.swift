@@ -206,15 +206,14 @@ public class WritersApp {
 
     // MARK: - Settings Management
 
-    /// Toggles the application's dark mode setting.
-    /// 
-    /// Flips `appSettings.isDarkModeEnabled` to the opposite value.
+    /// Toggles the app's dark mode setting by switching the `appSettings.isDarkModeEnabled` flag.
     public func toggleDarkMode() {
         appSettings.isDarkModeEnabled = !appSettings.isDarkModeEnabled
     }
 
-    /// Sets whether the app uses dark mode.
-    /// - Parameter enabled: `true` to enable dark mode, `false` to disable it.
+    /// Configure the app's appearance mode to dark or light.
+    /// - Parameters:
+    ///   - enabled: `true` to enable dark mode, `false` to use light mode.
     public func setDarkMode(_ enabled: Bool) {
         appSettings.isDarkModeEnabled = enabled
     }
@@ -224,38 +223,39 @@ public class WritersApp {
         return appSettings.isDarkModeEnabled
     }
 
-    /// Sets the application's UI theme.
-    /// - Parameter theme: The AppTheme to apply; updates the stored `appSettings.theme`.
+    /// Updates the application's UI theme.
+    /// - Parameter theme: The theme to apply to the app's user interface.
     public func setTheme(_ theme: AppTheme) {
         appSettings.theme = theme
     }
 
-    /// Set the application's font size.
-    /// - Parameter size: Desired font size; value will be clamped to the range 8–32.
+    /// Updates the application's font size setting.
+    /// - Parameter size: Desired font size; values are clamped to the range 8–32 before being stored.
     public func setFontSize(_ size: Int) {
         appSettings.fontSize = max(8, min(32, size))
     }
 
-    /// Sets the default target word count used for new documents.
-    /// - Parameter words: The default word-count goal to apply; pass `nil` to clear the default.
+    /// Sets the app's default word count goal.
+    /// - Parameter words: The default target word count to use for new sessions or documents, or `nil` to clear the default.
     public func setDefaultWordCountGoal(_ words: Int?) {
         appSettings.defaultWordCountGoal = words
     }
 
-    /// Enable or disable spell checking in the application's settings.
-    /// - Parameter enabled: `true` to enable spell checking, `false` to disable it.
+    /// Sets whether spell checking is enabled in the app settings.
+    /// - Parameters:
+    ///   - enabled: `true` to enable spell checking, `false` to disable it.
     public func setSpellCheckEnabled(_ enabled: Bool) {
         appSettings.spellCheckEnabled = enabled
     }
 
-    /// Sets whether grammar checking is enabled in the application's settings.
+    /// Enable or disable grammar checking in the application's settings.
     /// - Parameter enabled: `true` to enable grammar checking, `false` to disable it.
     public func setGrammarCheckEnabled(_ enabled: Bool) {
         appSettings.grammarCheckEnabled = enabled
     }
 
-    /// Retrieve the current application settings.
-    /// - Returns: The current `AppSettings` instance representing persisted UI and writing preferences.
+    /// Accesses the current application settings.
+    /// - Returns: The current `AppSettings` instance.
     public func getAppSettings() -> AppSettings {
         return appSettings
     }

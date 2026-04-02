@@ -56,9 +56,12 @@ public class TemplateManager {
     /// Creates and adds a set of predefined templates covering fiction (novel, short story, screenplay, poetry),
     /// non-fiction and editorial (blog post, article), business documents (business letter), scheduled tasks
     /// (daily/weekly/monthly reports, dashboards, trackers, content calendar), and content/profile instructions
-    /// Registers the built-in set of writing templates in the manager's in-memory registry.
-    /// Adds predefined templates: Novel Chapter, Short Story, Screenplay Scene, Blog Post, Article, Poetry, and Business Letter.
-    /// Templates are kept in memory and made available through the manager's template access methods.
+    /// Registers a set of built-in templates into the manager's in-memory registry.
+    /// 
+    /// Creates and adds predefined templates — including "Novel Chapter", "Short Story",
+    /// "Screenplay Scene", "Blog Post", "Article", "Poetry", and "Business Letter" —
+    /// each populated with content, placeholders, and metadata tags. Each template is
+    /// inserted into the internal storage via addTemplate(_:).
 
     private func loadDefaultTemplates() {
         // Novel Chapter Template
