@@ -124,32 +124,37 @@ public class TemplateManager {
         let screenplayTemplate = Template(
             name: "Screenplay Scene",
             category: .screenplay,
-            description: "Standard screenplay scene format",
+            description: "Professional screenplay scene with industry-standard formatting",
             content: """
             {{scene_heading}}
 
             {{action}}
 
             {{character}}
+            ({{character_state}})
             {{dialogue}}
 
             {{character_2}}
             ({{parenthetical}})
             {{dialogue_2}}
 
+            {{shot_description}}
+
             {{transition}}
             """,
             placeholders: [
-                Placeholder(key: "scene_heading", label: "Scene Heading", description: "INT/EXT. LOCATION - TIME"),
-                Placeholder(key: "action", label: "Action/Description"),
-                Placeholder(key: "character", label: "Character Name"),
-                Placeholder(key: "dialogue", label: "Dialogue"),
-                Placeholder(key: "character_2", label: "Second Character", required: false),
-                Placeholder(key: "parenthetical", label: "Parenthetical", required: false),
-                Placeholder(key: "dialogue_2", label: "Second Dialogue", required: false),
-                Placeholder(key: "transition", label: "Transition", defaultValue: "CUT TO:")
+                Placeholder(key: "scene_heading", label: "Scene Heading", description: "INT/EXT. LOCATION - TIME OF DAY"),
+                Placeholder(key: "action", label: "Action Description", description: "What happens in the scene"),
+                Placeholder(key: "character", label: "Character Name", description: "All caps"),
+                Placeholder(key: "character_state", label: "Character State", description: "Physical action or emotion", required: false, defaultValue: ""),
+                Placeholder(key: "dialogue", label: "Dialogue", description: "What the character says"),
+                Placeholder(key: "character_2", label: "Second Character", description: "Another character's name", required: false),
+                Placeholder(key: "parenthetical", label: "Parenthetical", description: "How the dialogue is delivered", required: false, defaultValue: ""),
+                Placeholder(key: "dialogue_2", label: "Second Dialogue", description: "Second character's response", required: false),
+                Placeholder(key: "shot_description", label: "Shot Description", description: "Camera direction or special shot", required: false),
+                Placeholder(key: "transition", label: "Transition", description: "Scene transition method", defaultValue: "CUT TO:")
             ],
-            metadata: TemplateMetadata(tags: ["screenplay", "script", "scene"])
+            metadata: TemplateMetadata(tags: ["screenplay", "script", "scene", "film", "professional"])
         )
 
         // Blog Post Template

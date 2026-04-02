@@ -25,7 +25,7 @@ public struct Document: Codable, Identifiable {
         self.metadata = metadata
     }
 
-    /// Word count of the document
+    /// Word count of the document (basic counting)
     public var wordCount: Int {
         let words = content.components(separatedBy: .whitespacesAndNewlines)
         return words.filter { !$0.isEmpty }.count
@@ -36,10 +36,42 @@ public struct Document: Codable, Identifiable {
         return content.count
     }
 
+    /// Character count excluding spaces
+    public var characterCountWithoutSpaces: Int {
+        return content.replacingOccurrences(of: " ", with: "").count
+    }
+
     /// Estimated reading time in minutes
     public var readingTime: Int {
         let wordsPerMinute = 200
         return max(1, wordCount / wordsPerMinute)
+    }
+
+    /// Enhanced word count with filtering for hyphenated words and special characters
+    public func enhancedWordCount() -> Int {
+        let components = content.components(separatedBy: .whitespacesAndNewlines)
+        return components.filter { word in
+            // Filter out empty strings and pure punctuation
+            !word.isEmpty && word.contains { $0.isLetter || $0.isNumber }
+        }.count
+    }
+
+    /// Count sentences in the document
+    public func sentenceCount() -> Int {
+        let sentences = content.components(separatedBy: CharacterSet(charactersIn: ".!?"))
+        return sentences.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
+    }
+
+    /// Count paragraphs in the document
+    public func paragraphCount() -> Int {
+        let paragraphs = content.components(separatedBy: "\n\n")
+        return paragraphs.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
+    }
+
+    /// Progress towards word count goal as percentage
+    public func wordCountProgress() -> Double {
+        guard let goal = metadata.wordCountGoal, goal > 0 else { return 0.0 }
+        return min(1.0, Double(wordCount) / Double(goal))
     }
 }
 
