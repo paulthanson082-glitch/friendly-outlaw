@@ -30,23 +30,66 @@ export const RARITY_COLORS: Record<Rarity, string> = {
   legendary: '#f59e0b',
 }
 
-// ─── Species / cosmetics ──────────────────────────────────────────────────────
+// ─── Species — exported as const so sprites.ts can use them in switch/Record ──
 
-export const SPECIES = ['cat', 'dog', 'bunny', 'fox', 'bear'] as const
+export const duck = 'duck' as const
+export const goose = 'goose' as const
+export const blob = 'blob' as const
+export const cat = 'cat' as const
+export const dragon = 'dragon' as const
+export const octopus = 'octopus' as const
+export const owl = 'owl' as const
+export const penguin = 'penguin' as const
+export const turtle = 'turtle' as const
+export const snail = 'snail' as const
+export const ghost = 'ghost' as const
+export const axolotl = 'axolotl' as const
+export const capybara = 'capybara' as const
+export const cactus = 'cactus' as const
+export const robot = 'robot' as const
+export const rabbit = 'rabbit' as const
+export const mushroom = 'mushroom' as const
+export const chonk = 'chonk' as const
+
+export const SPECIES = [
+  duck,
+  goose,
+  blob,
+  cat,
+  dragon,
+  octopus,
+  owl,
+  penguin,
+  turtle,
+  snail,
+  ghost,
+  axolotl,
+  capybara,
+  cactus,
+  robot,
+  rabbit,
+  mushroom,
+  chonk,
+] as const
 export type Species = (typeof SPECIES)[number]
 
-/** Eye characters embedded in sprite art; replacement target during blink. */
+// ─── Eyes ─────────────────────────────────────────────────────────────────────
+
+/** Characters used as the `{E}` eye placeholder in sprite art. */
 export const EYES = ['o', '.', '0', '^', '*', '@'] as const
 export type Eye = (typeof EYES)[number]
 
-/** Hat cosmetics — 'none' is the common fallback. */
+// ─── Hats ─────────────────────────────────────────────────────────────────────
+
 export const HATS = [
   'none',
-  'cap',
   'crown',
   'tophat',
+  'propeller',
+  'halo',
+  'wizard',
   'beanie',
-  'bucket',
+  'tinyduck',
 ] as const
 export type Hat = (typeof HATS)[number]
 
@@ -63,9 +106,9 @@ export type StatName = (typeof STAT_NAMES)[number]
  */
 export interface CompanionBones {
   rarity: Rarity
-  species: string
-  eye: string
-  hat: string
+  species: Species
+  eye: Eye
+  hat: Hat
   shiny: boolean
   stats: Record<StatName, number>
 }
