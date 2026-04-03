@@ -146,10 +146,10 @@ public class TemplateManager {
                 Placeholder(key: "scene_heading", label: "Scene Heading", description: "INT/EXT. LOCATION - TIME OF DAY"),
                 Placeholder(key: "action", label: "Action Description", description: "What happens in the scene"),
                 Placeholder(key: "character", label: "Character Name", description: "All caps"),
-                Placeholder(key: "character_state", label: "Character State", description: "Physical action or emotion", required: false, defaultValue: ""),
+                Placeholder(key: "character_state", label: "Character State", description: "Physical action or emotion", defaultValue: "", required: false),
                 Placeholder(key: "dialogue", label: "Dialogue", description: "What the character says"),
                 Placeholder(key: "character_2", label: "Second Character", description: "Another character's name", required: false),
-                Placeholder(key: "parenthetical", label: "Parenthetical", description: "How the dialogue is delivered", required: false, defaultValue: ""),
+                Placeholder(key: "parenthetical", label: "Parenthetical", description: "How the dialogue is delivered", defaultValue: "", required: false),
                 Placeholder(key: "dialogue_2", label: "Second Dialogue", description: "Second character's response", required: false),
                 Placeholder(key: "shot_description", label: "Shot Description", description: "Camera direction or special shot", required: false),
                 Placeholder(key: "transition", label: "Transition", description: "Scene transition method", defaultValue: "CUT TO:")
