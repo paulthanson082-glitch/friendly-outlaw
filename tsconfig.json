@@ -25,6 +25,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "bun:bundle": [
+        "./src/compat/bun-bundle.ts"
       ]
     }
   },
