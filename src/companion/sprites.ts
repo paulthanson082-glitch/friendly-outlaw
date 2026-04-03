@@ -1,21 +1,33 @@
 import type { Companion } from './types.js'
 
-// Each species has an array of animation frames (each frame is an array of lines).
+// All rest frames use 'o' as the canonical eye placeholder so that
+// renderSprite can substitute companion.eye, and CompanionSprite's blink
+// logic (replaceAll(companion.eye, '-')) works on frame 0 without ambiguity.
 const SPRITES: Record<string, string[][]> = {
   cat: [
-    [' /\\_/\\ ', '( o.o )', ' > ^ < '], // rest
-    [' /\\_/\\ ', '( -.- )', ' > ^ < '], // fidget
-    [' /\\_/\\ ', '( ^.^ )', ' >~^~< '], // wiggle
+    [' /\\_/\\ ', '( o.o )', ' > ^ < '], // rest   — eyes = o
+    [' /\\_/\\ ', '( -.- )', ' > ^ < '], // fidget — eyes closed
+    [' /\\_/\\ ', '( ^.^ )', ' >~^~< '], // wiggle — excited
   ],
   dog: [
     [' /^ ^\\ ', '( o.o )', '  /|\\  '], // rest
-    [' /^ ^\\ ', '( ^.^ )', '  /|\\  '], // fidget
+    [' /^ ^\\ ', '( -.* )', '  /|\\  '], // fidget
     [' /^ ^\\ ', '( ~.~ )', ' \\-|-/ '], // wiggle
   ],
   bunny: [
-    [' (\\/) ', '( >.< )', '(")_(")'], // rest
-    [' (\\/) ', '( -.^ )', '(")_(")'], // fidget
-    [' (\\/) ', '( ^.^ )', '(")_(")'], // wiggle
+    ['  (\\/)  ', ' ( o.o )', ' (")_(")', ], // rest
+    ['  (\\/)  ', ' ( -.^ )', ' (")_(")', ], // fidget
+    ['  (\\/)  ', ' ( ^.^ )', ' (")_(")', ], // wiggle
+  ],
+  fox: [
+    [' /\\ /\\ ', '( o.o )', ' \\_V_/ '], // rest
+    [' /\\ /\\ ', '( -.* )', ' \\_V_/ '], // fidget
+    [' /\\ /\\ ', '( ^.^ )', ' \\_~_/ '], // wiggle
+  ],
+  bear: [
+    [' (o) (o)', '( o.o  )', ' \\___/  '], // rest
+    [' (o) (o)', '( -.o  )', ' \\___/  '], // fidget
+    [' (o) (o)', '( ^.^  )', ' \\~_~/  '], // wiggle
   ],
   default: [
     ['  o_o  ', ' (___) ', '  | |  '], // rest
@@ -24,22 +36,34 @@ const SPRITES: Record<string, string[][]> = {
   ],
 }
 
+// One-line face strings for narrow viewport mode, also authored with 'o'.
 const FACES: Record<string, string> = {
-  cat: '(=^.^=)',
+  cat: '(=o.o=)',
   dog: '(o ^_^ o)',
-  bunny: '(>.< )',
+  bunny: '(o.o )',
+  fox: '(/o.o\\)',
+  bear: '(o.o )',
   default: '(o_o)',
 }
 
-/** Returns a one-line face string for narrow terminal rendering. */
+/** Returns a one-line face string for narrow viewport rendering. */
 export function renderFace(companion: Companion): string {
-  return FACES[companion.species] ?? FACES['default']!
+  const face = FACES[companion.species] ?? FACES['default']!
+  return companion.eye === 'o'
+    ? face
+    : face.replaceAll('o', companion.eye)
 }
 
-/** Returns the sprite lines for the given animation frame. */
+/**
+ * Returns the sprite lines for the given animation frame, with the canonical
+ * 'o' eye placeholder replaced by companion.eye.
+ */
 export function renderSprite(companion: Companion, frame: number): string[] {
   const frames = SPRITES[companion.species] ?? SPRITES['default']!
-  return frames[frame % frames.length]!
+  const lines = frames[frame % frames.length]!
+  return companion.eye === 'o'
+    ? lines
+    : lines.map(l => l.replaceAll('o', companion.eye))
 }
 
 /** Returns how many animation frames the species has. */

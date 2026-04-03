@@ -1,8 +1,19 @@
+import type { Companion } from '../companion/types.js'
+
 export interface GlobalConfig {
   /** When true the companion sprite is hidden globally. */
   companionMuted: boolean
   /** Feature flag: enables the companion/buddy system. */
   buddyEnabled: boolean
+  /** OAuth account info when signed in. */
+  oauthAccount?: { accountUuid: string }
+  /** Fallback user identifier when no OAuth account is present. */
+  userID?: string
+  /**
+   * Persisted companion "soul" (name, etc.). Bones are always re-rolled from
+   * the seed on top of this, so species / rarity can never be faked here.
+   */
+  companion?: Partial<Companion>
 }
 
 let _config: GlobalConfig = {

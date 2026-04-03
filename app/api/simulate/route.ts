@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { generateBotResponse, generateMemory } from "@/lib/ai";
+import { type ConversationMessage, generateBotResponse, generateMemory } from "@/lib/ai";
 
 // POST /api/simulate
 // Runs one tick of the AI Town simulation:
@@ -86,8 +86,8 @@ export async function POST(request: NextRequest) {
 
     // Occasionally generate a memory after the exchange
     if (Math.random() < 0.4) {
-      const allMessages = [
-        ...recentMessages,
+      const allMessages: ConversationMessage[] = [
+        ...(recentMessages as ConversationMessage[]),
         { from: speaker, to: listener, content: responseText, timestamp: new Date().toISOString() },
       ];
       try {
