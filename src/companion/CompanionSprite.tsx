@@ -74,7 +74,7 @@ function SpeechBubble({
           key={i}
           italic
           dimColor={!fading}
-          color={fading ? '#9ca3af' : undefined}
+          color={fading ? 'inactive' : undefined}
         >
           {l}
         </Text>
@@ -202,7 +202,7 @@ export function CompanionSprite(): React.ReactNode {
     return (
       <Box paddingX={1} alignSelf="flex-end">
         <Text>
-          {petting && <Text color="#22c55e">{H} </Text>}
+          {petting && <Text color="autoAccept">{H} </Text>}
           <Text bold color={color}>
             {renderFace(companion)}
           </Text>{' '}
@@ -214,7 +214,7 @@ export function CompanionSprite(): React.ReactNode {
             color={
               reaction
                 ? fading
-                  ? '#9ca3af'
+                  ? 'inactive'
                   : color
                 : focused
                   ? color
@@ -262,7 +262,7 @@ export function CompanionSprite(): React.ReactNode {
       width={colWidth}
     >
       {sprite.map((line, i) => (
-        <Text key={i} color={i === 0 && heartFrame ? '#22c55e' : color}>
+        <Text key={i} color={i === 0 && heartFrame ? 'autoAccept' : color}>
           {line}
         </Text>
       ))}

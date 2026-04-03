@@ -4,9 +4,19 @@
  * Minimal web-compatible re-implementation of the Ink terminal UI primitives
  * (Box and Text). Uses inline CSS so the companion sprite renders correctly
  * in a browser without any extra dependencies.
+ *
+ * Color props accept either a raw CSS value or a named key from Theme.
+ * Theme keys are resolved to their CSS hex values via defaultTheme.
  */
 
 import React, { type CSSProperties } from 'react'
+import { defaultTheme } from './utils/theme.js'
+
+/** Resolve a theme key (e.g. 'inactive') or pass through a CSS color. */
+function resolveColor(color: string | undefined): string | undefined {
+  if (!color) return undefined
+  return (defaultTheme as Record<string, string>)[color] ?? color
+}
 
 // ─── Box ─────────────────────────────────────────────────────────────────────
 
@@ -40,6 +50,7 @@ export function Box({
   borderColor,
   children,
 }: BoxProps): React.ReactElement {
+  const resolvedBorder = resolveColor(borderColor)
   const style: CSSProperties = {
     display: 'flex',
     flexDirection,
@@ -55,7 +66,7 @@ export function Box({
     ...(width !== undefined && { width: `${width}ch` }),
     ...(flexShrink !== undefined && { flexShrink }),
     ...(borderStyle && {
-      border: `1px solid ${borderColor ?? 'currentColor'}`,
+      border: `1px solid ${resolvedBorder ?? 'currentColor'}`,
       borderRadius: borderStyle === 'round' ? '4px' : '0',
       padding: '2px 4px',
     }),
@@ -66,7 +77,7 @@ export function Box({
 // ─── Text ─────────────────────────────────────────────────────────────────────
 
 export interface TextProps {
-  /** Named theme key or any CSS color value */
+  /** Named theme key (e.g. 'inactive') or any CSS color value */
   color?: string
   bold?: boolean
   italic?: boolean
@@ -85,15 +96,16 @@ export function Text({
   inverse,
   children,
 }: TextProps): React.ReactElement {
+  const resolved = resolveColor(color)
   const style: CSSProperties = {
     fontFamily: 'monospace',
     whiteSpace: 'pre',
-    ...(color && !inverse && { color }),
+    ...(resolved && !inverse && { color: resolved }),
     ...(bold && { fontWeight: 'bold' }),
     ...(italic && { fontStyle: 'italic' }),
     ...(dimColor && { opacity: 0.4 }),
     ...(inverse && {
-      backgroundColor: color ?? 'currentColor',
+      backgroundColor: resolved ?? 'currentColor',
       color: '#000',
     }),
   }

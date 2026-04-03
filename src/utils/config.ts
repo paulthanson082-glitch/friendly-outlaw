@@ -1,4 +1,4 @@
-import type { Companion } from '../companion/types.js'
+import type { StoredCompanion } from '../companion/types.js'
 
 export interface GlobalConfig {
   /** When true the companion sprite is hidden globally. */
@@ -13,7 +13,7 @@ export interface GlobalConfig {
    * Persisted companion "soul" (name, etc.). Bones are always re-rolled from
    * the seed on top of this, so species / rarity can never be faked here.
    */
-  companion?: Partial<Companion>
+  companion?: StoredCompanion
 }
 
 let _config: GlobalConfig = {
