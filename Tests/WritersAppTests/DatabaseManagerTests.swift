@@ -284,7 +284,8 @@ final class DatabaseManagerTests: XCTestCase {
         
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
         XCTAssertNotNil(retrieved)
-        XCTAssertEqual(retrieved?.apiKey, "sk-test-key")
+        // API keys are not persisted to protect against plaintext credential leaks
+        XCTAssertEqual(retrieved?.apiKey, "")
         XCTAssertEqual(retrieved?.model, .claude3Opus)
         XCTAssertEqual(retrieved?.maxTokens, 8192)
         XCTAssertEqual(retrieved?.temperature, 0.8)
@@ -310,7 +311,8 @@ final class DatabaseManagerTests: XCTestCase {
         try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config2)
 
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
-        XCTAssertEqual(retrieved?.apiKey, "key2")
+        // API keys are not persisted to protect against plaintext credential leaks
+        XCTAssertEqual(retrieved?.apiKey, "")
         XCTAssertEqual(retrieved?.model, .claude35Sonnet)
     }
 
