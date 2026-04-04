@@ -253,8 +253,7 @@ public class AIService {
         }
 
         guard httpResponse.statusCode == 200 else {
-            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw AIServiceError.apiError(statusCode: httpResponse.statusCode, message: errorMessage)
+            throw AIServiceError.apiError(statusCode: httpResponse.statusCode, message: "Request failed")
         }
 
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -436,8 +435,7 @@ public class AIService {
         }
 
         guard httpResponse.statusCode == 200 else {
-            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw AIServiceError.apiError(statusCode: httpResponse.statusCode, message: errorMessage)
+            throw AIServiceError.apiError(statusCode: httpResponse.statusCode, message: "Request failed")
         }
 
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
