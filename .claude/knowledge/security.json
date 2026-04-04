@@ -43,6 +43,12 @@
       "title": "Error messages",
       "severity": "warning",
       "rule": "Error messages shown to the user must not expose internal implementation details, file paths, or stack traces. Use typed errors (AIError, AIServiceError) with user-facing messages."
+    },
+    {
+      "id": "sec-008",
+      "title": "No sourcemaps in production builds or npm packages",
+      "severity": "critical",
+      "rule": "Source maps (.map files) embed the full original source code in their sourcesContent field. Never ship them in production web builds or npm packages. In Vite, set `build.sourcemap: false`. In tsc, set `sourceMap: false` and `declarationMap: false`. Add a .npmignore that excludes `dist/**/*.map` and `dist/**/*.d.ts.map`. For Next.js, leave productionBrowserSourceMaps at its default false. This vulnerability was publicly demonstrated when the entire Claude Code source was extracted from the npm registry via a single .map file (March 2026)."
     }
   ]
 }
