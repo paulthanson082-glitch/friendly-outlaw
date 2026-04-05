@@ -1,0 +1,17 @@
+{
+  "name": "qwen-android-integration",
+  "version": "1.0.0",
+  "description": "Local Qwen reasoning via llama.cpp on Samsung S24 (Termux)",
+  "scripts": {
+    "test": "npx ts-node test.ts",
+    "benchmark": "npx ts-node benchmark-android.ts"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}
