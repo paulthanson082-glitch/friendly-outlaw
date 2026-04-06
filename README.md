@@ -171,6 +171,30 @@ See [SHERLOCK.md](SHERLOCK.md) for complete documentation and [examples/sherlock
 
 ## Development Environment
 
+### Build Systems
+
+friendly-outlaw supports **two build systems**:
+
+#### 1. Swift Package Manager (SPM) - Default
+
+```bash
+swift build              # Build the project
+swift test               # Run tests
+swift run WritersAppCLI  # Run the CLI
+```
+
+#### 2. Bazel with Bazelisk - Alternative
+
+For cross-platform builds and version consistency, use [Bazelisk](./BAZELISK.md):
+
+```bash
+bazel build //...                              # Build everything
+bazel test //...                               # Run tests
+bazel run //Sources/WritersAppCLI:WritersAppCLI  # Run the CLI
+```
+
+Bazelisk automatically manages Bazel versions via `.bazelversion`. See [BAZELISK.md](./BAZELISK.md) for installation and detailed usage.
+
 ### VS Code Setup for iPad and MacBook Pro
 
 This project includes a complete VS Code configuration for seamless development across iPad and MacBook Pro. See [VSCODE_SETUP.md](VSCODE_SETUP.md) for detailed setup instructions including:
@@ -814,7 +838,7 @@ After cloning the repository:
 # Install Node.js dependencies (for Next.js web interface)
 npm install
 
-# Verify Swift CLI works
+# Verify Swift CLI works (using SPM)
 ./run.sh --help
 
 # Run Next.js dev server
@@ -822,6 +846,11 @@ npm run dev
 ```
 
 **Note:** The `node_modules` directory is gitignored, so you must run `npm install` after cloning.
+
+**Alternative with Bazelisk:** If you prefer Bazel builds, install [Bazelisk](./BAZELISK.md) and run:
+```bash
+bazel run //Sources/WritersAppCLI:WritersAppCLI -- --help
+```
 
 ## Getting an API Key
 
@@ -881,6 +910,7 @@ When running as an MCP server, the following tools are available:
 - [DATABASE.md](DATABASE.md) - Complete database documentation
 - [QUICK_START.md](QUICK_START.md) - Quick start guide
 - [VSCODE_SETUP.md](VSCODE_SETUP.md) - VS Code setup guide
+- [BAZELISK.md](BAZELISK.md) - Bazel build system with Bazelisk version management
 - [CLOTHER.md](CLOTHER.md) - Using 100+ LLM providers with Clother
 - [CLOTHER_SETUP.md](CLOTHER_SETUP.md) - Contributor guide for Clother development
 - [SHERLOCK.md](SHERLOCK.md) - Sherlock integration guide for character/author research
