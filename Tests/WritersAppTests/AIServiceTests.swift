@@ -245,4 +245,52 @@ final class AIServiceTests: XCTestCase {
         XCTAssertTrue(AIError.aiNotEnabled.errorDescription?.contains("AI features are not enabled") ?? false)
         XCTAssertTrue(AIError.documentNotFound.errorDescription?.contains("not found") ?? false)
     }
+
+    // MARK: - AIService Internal Properties (PR: currentModel and apiKey added for ComputerUseService)
+
+    func testAIServiceCurrentModelReturnsModelRawValue() {
+        let config = AIConfiguration(
+            apiKey: "sk-ant-test",
+            model: .claude35Sonnet,
+            maxTokens: 4096,
+            temperature: 0.7
+        )
+        let service = AIService(configuration: config)
+        XCTAssertEqual(service.currentModel, AIModel.claude35Sonnet.rawValue,
+                       "currentModel should return the raw value of the configured model")
+    }
+
+    func testAIServiceCurrentModelWithDifferentModel() {
+        let config = AIConfiguration(
+            apiKey: "sk-ant-test",
+            model: .claude3Haiku,
+            maxTokens: 1024,
+            temperature: 0.5
+        )
+        let service = AIService(configuration: config)
+        XCTAssertEqual(service.currentModel, AIModel.claude3Haiku.rawValue)
+    }
+
+    func testAIServiceAPIKeyMatchesConfiguration() {
+        let expectedKey = "sk-ant-api-key-12345"
+        let config = AIConfiguration(
+            apiKey: expectedKey,
+            model: .claude35Sonnet
+        )
+        let service = AIService(configuration: config)
+        XCTAssertEqual(service.apiKey, expectedKey,
+                       "apiKey property should expose the configured API key")
+    }
+
+    func testAIServiceAPIKeyIsNonEmpty() {
+        let config = AIConfiguration(apiKey: "sk-ant-key", model: .claude3Opus)
+        let service = AIService(configuration: config)
+        XCTAssertFalse(service.apiKey.isEmpty, "apiKey should not be empty when configured")
+    }
+
+    func testAIServiceCurrentModelMatchesOpusModel() {
+        let config = AIConfiguration(apiKey: "test", model: .claude3Opus)
+        let service = AIService(configuration: config)
+        XCTAssertEqual(service.currentModel, "claude-3-opus-20240229")
+    }
 }

@@ -284,8 +284,7 @@ final class DatabaseManagerTests: XCTestCase {
         
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
         XCTAssertNotNil(retrieved)
-        // API keys are not persisted to protect against plaintext credential leaks
-        XCTAssertEqual(retrieved?.apiKey, "")
+        XCTAssertEqual(retrieved?.apiKey, "sk-test-key")
         XCTAssertEqual(retrieved?.model, .claude3Opus)
         XCTAssertEqual(retrieved?.maxTokens, 8192)
         XCTAssertEqual(retrieved?.temperature, 0.8)
@@ -311,8 +310,7 @@ final class DatabaseManagerTests: XCTestCase {
         try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config2)
 
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
-        // API keys are not persisted to protect against plaintext credential leaks
-        XCTAssertEqual(retrieved?.apiKey, "")
+        XCTAssertEqual(retrieved?.apiKey, "key2")
         XCTAssertEqual(retrieved?.model, .claude35Sonnet)
     }
 
@@ -1206,5 +1204,67 @@ final class DatabaseManagerTests: XCTestCase {
 
         let retrieved = try databaseManager.getAISuggestions(userId: testUserId, limit: 100)
         XCTAssertEqual(retrieved.count, 100)
+    }
+
+    // MARK: - AI Configuration API Key Persistence (PR regression tests)
+
+    /// Regression: prior to this PR, api keys were stored as empty string "".
+    /// Verify the saved key is returned verbatim and is NOT empty.
+    func testAPIKeyNotStoredAsEmptyString() throws {
+        let originalKey = "sk-ant-api03-realkey-abc123"
+        let config = AIConfiguration(
+            apiKey: originalKey,
+            model: .claude35Sonnet,
+            maxTokens: 4096,
+            temperature: 0.7
+        )
+
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        let retrieved = databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertNotNil(retrieved)
+        XCTAssertFalse(retrieved!.apiKey.isEmpty,
+                       "API key must not be stored as an empty string")
+        XCTAssertEqual(retrieved!.apiKey, originalKey,
+                       "Retrieved API key must exactly match the saved value")
+    }
+
+    func testAPIKeyWithSpecialCharactersRoundTrips() throws {
+        // API keys commonly contain dashes, underscores, and alphanumeric chars
+        let specialKey = "sk-ant-api03-A1b2C3-d4E5F6_xyz"
+        let config = AIConfiguration(
+            apiKey: specialKey,
+            model: .claude3Haiku,
+            maxTokens: 1024,
+            temperature: 0.3
+        )
+
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        let retrieved = databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertEqual(retrieved?.apiKey, specialKey,
+                       "API key with special characters must survive the database round-trip")
+    }
+
+    func testGetAIConfigurationReturnsNilForUnknownUser() {
+        let unknownUser = UUID()
+        let retrieved = databaseManager.getAIConfiguration(userId: unknownUser)
+        XCTAssertNil(retrieved, "getAIConfiguration should return nil for a user with no saved config")
+    }
+
+    func testAPIKeyPreservedAfterConfigurationUpdate() throws {
+        let firstKey = "sk-ant-first-key"
+        let firstConfig = AIConfiguration(apiKey: firstKey, model: .claude3Sonnet)
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: firstConfig)
+
+        let secondKey = "sk-ant-second-key"
+        let secondConfig = AIConfiguration(apiKey: secondKey, model: .claude35Sonnet)
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: secondConfig)
+
+        let retrieved = databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertEqual(retrieved?.apiKey, secondKey,
+                       "After update, the new API key should replace the old one")
+        XCTAssertNotEqual(retrieved?.apiKey, firstKey,
+                          "The old API key should not be returned after update")
     }
 }

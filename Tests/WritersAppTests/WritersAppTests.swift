@@ -1892,190 +1892,260 @@ final class WritersAppTests: XCTestCase {
         }
     }
 
-    // MARK: - CRM Manager Tests
+    // MARK: - Computer Use Tests
 
-    func testCreateCRMContact() {
-        let manager = CRMManager()
-        let contact = manager.createContact(
-            name: "Jane Agent",
-            email: "jane@literaryagency.com",
-            company: "Bloodstone Literary",
-            role: "Literary Agent"
+    func testComputerUseActionCodable() throws {
+        let action = ComputerUseAction(
+            action: .leftClick,
+            coordinate: [100, 200]
         )
-        XCTAssertEqual(contact.name, "Jane Agent")
-        XCTAssertEqual(contact.email, "jane@literaryagency.com")
-        XCTAssertEqual(contact.company, "Bloodstone Literary")
-        XCTAssertEqual(contact.role, "Literary Agent")
+        let data = try JSONEncoder().encode(action)
+        let decoded = try JSONDecoder().decode(ComputerUseAction.self, from: data)
+        XCTAssertEqual(decoded.action, .leftClick)
+        XCTAssertEqual(decoded.coordinate, [100, 200])
     }
 
-    func testGetCRMContactById() {
-        let manager = CRMManager()
-        let created = manager.createContact(name: "Tom Editor")
-        let fetched = manager.getContact(id: created.id)
-        XCTAssertNotNil(fetched)
-        XCTAssertEqual(fetched?.name, "Tom Editor")
+    func testComputerUseActionTypeRawValues() {
+        XCTAssertEqual(ComputerUseActionType.screenshot.rawValue, "screenshot")
+        XCTAssertEqual(ComputerUseActionType.leftClick.rawValue, "left_click")
+        XCTAssertEqual(ComputerUseActionType.type.rawValue, "type")
+        XCTAssertEqual(ComputerUseActionType.keypress.rawValue, "keypress")
+        XCTAssertEqual(ComputerUseActionType.scroll.rawValue, "scroll")
     }
 
-    func testGetAllCRMContactsSortedByName() {
-        let manager = CRMManager()
-        manager.createContact(name: "Zara Publisher")
-        manager.createContact(name: "Aaron Agent")
-        manager.createContact(name: "Maria Editor")
-        let all = manager.getAllContacts()
-        XCTAssertEqual(all.count, 3)
-        XCTAssertEqual(all[0].name, "Aaron Agent")
-        XCTAssertEqual(all[2].name, "Zara Publisher")
+    func testComputerUseConfigurationDefaults() {
+        let config = ComputerUseConfiguration()
+        XCTAssertEqual(config.displayWidth, 1024)
+        XCTAssertEqual(config.displayHeight, 768)
+        XCTAssertEqual(config.maxIterations, 20)
+        XCTAssertEqual(config.screenshotDelay, 0.5)
     }
 
-    func testUpdateCRMContact() {
-        let manager = CRMManager()
-        var contact = manager.createContact(name: "Old Name")
-        contact.name = "New Name"
-        manager.updateContact(contact)
-        XCTAssertEqual(manager.getContact(id: contact.id)?.name, "New Name")
-    }
-
-    func testDeleteCRMContactAlsoRemovesDeals() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Doomed Contact")
-        manager.createDeal(title: "Doomed Deal", contactId: contact.id)
-        manager.deleteContact(id: contact.id)
-        XCTAssertNil(manager.getContact(id: contact.id))
-        XCTAssertTrue(manager.getDeals(forContact: contact.id).isEmpty)
-    }
-
-    func testSearchCRMContactsByName() {
-        let manager = CRMManager()
-        manager.createContact(name: "Alice Smith", company: "Random House")
-        manager.createContact(name: "Bob Jones", company: "Penguin Press")
-        let results = manager.searchContacts(query: "alice")
-        XCTAssertEqual(results.count, 1)
-        XCTAssertEqual(results.first?.name, "Alice Smith")
-    }
-
-    func testSearchCRMContactsByCompany() {
-        let manager = CRMManager()
-        manager.createContact(name: "Alice Smith", company: "Random House")
-        manager.createContact(name: "Bob Jones", company: "Penguin Press")
-        let results = manager.searchContacts(query: "penguin")
-        XCTAssertEqual(results.count, 1)
-        XCTAssertEqual(results.first?.name, "Bob Jones")
-    }
-
-    func testCreateCRMDeal() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Publisher One")
-        let deal = manager.createDeal(
-            title: "Debut Novel",
-            contactId: contact.id,
-            stage: .queried,
-            value: 5000
+    func testComputerUseConfigurationCustom() {
+        let config = ComputerUseConfiguration(
+            displayWidth: 1920,
+            displayHeight: 1080,
+            maxIterations: 10,
+            screenshotDelay: 1.0
         )
-        XCTAssertEqual(deal.title, "Debut Novel")
-        XCTAssertEqual(deal.stage, .queried)
-        XCTAssertEqual(deal.value, 5000)
-        XCTAssertEqual(deal.contactId, contact.id)
+        XCTAssertEqual(config.displayWidth, 1920)
+        XCTAssertEqual(config.displayHeight, 1080)
+        XCTAssertEqual(config.maxIterations, 10)
+        XCTAssertEqual(config.screenshotDelay, 1.0)
     }
 
-    func testGetCRMDealsByStage() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Publisher X")
-        manager.createDeal(title: "Deal A", contactId: contact.id, stage: .prospect)
-        manager.createDeal(title: "Deal B", contactId: contact.id, stage: .queried)
-        manager.createDeal(title: "Deal C", contactId: contact.id, stage: .prospect)
-        let prospects = manager.getDeals(inStage: .prospect)
-        XCTAssertEqual(prospects.count, 2)
+    func testComputerUseSessionResultSummary() {
+        let actions = [
+            ComputerUseAction(action: .screenshot),
+            ComputerUseAction(action: .leftClick, coordinate: [50, 50])
+        ]
+        let result = ComputerUseSessionResult(
+            task: "Open browser",
+            finalResponse: "Done",
+            actions: actions,
+            iterationCount: 3,
+            wasExhausted: false
+        )
+        XCTAssertTrue(result.summary.contains("Open browser"))
+        XCTAssertTrue(result.summary.contains("2 actions"))
+        XCTAssertFalse(result.wasExhausted)
     }
 
-    func testAdvanceCRMDeal() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Publisher Y")
-        let deal = manager.createDeal(title: "Rising Deal", contactId: contact.id, stage: .prospect)
-        let newStage = manager.advanceDeal(id: deal.id)
-        XCTAssertEqual(newStage, .queried)
-        XCTAssertEqual(manager.getDeal(id: deal.id)?.stage, .queried)
+    func testComputerUseResultProperties() {
+        let action = ComputerUseAction(action: .screenshot)
+        let result = ComputerUseResult(
+            action: action,
+            screenshotBase64: "abc123",
+            error: nil
+        )
+        XCTAssertEqual(result.screenshotBase64, "abc123")
+        XCTAssertNil(result.error)
     }
 
-    func testAdvanceCRMDealAtTerminalReturnsNil() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Publisher Z")
-        let deal = manager.createDeal(title: "Final Deal", contactId: contact.id, stage: .contracted)
-        let result = manager.advanceDeal(id: deal.id)
-        XCTAssertNil(result)
+    func testComputerUseErrorDescriptions() {
+        XCTAssertNotNil(ComputerUseError.invalidRequest.errorDescription)
+        XCTAssertNotNil(ComputerUseError.invalidResponse.errorDescription)
+        XCTAssertNotNil(ComputerUseError.apiError("test").errorDescription)
+        XCTAssertNotNil(ComputerUseError.executorError("test").errorDescription)
     }
 
-    func testRejectCRMDeal() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Cold Publisher")
-        let deal = manager.createDeal(title: "Unlucky Pitch", contactId: contact.id, stage: .submitted)
-        let rejected = manager.rejectDeal(id: deal.id)
-        XCTAssertEqual(rejected?.stage, .rejected)
-        XCTAssertNotNil(rejected?.metadata.closedAt)
-    }
-
-    func testLogCRMInteractionUpdatesLastContacted() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Active Agent")
-        XCTAssertNil(manager.getContact(id: contact.id)?.metadata.lastContacted)
-        manager.logInteraction(contactId: contact.id, type: .email, summary: "Sent query letter")
-        XCTAssertNotNil(manager.getContact(id: contact.id)?.metadata.lastContacted)
-    }
-
-    func testGetCRMInteractionsForContact() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Frequent Contact")
-        manager.logInteraction(contactId: contact.id, type: .email, summary: "First touch")
-        manager.logInteraction(contactId: contact.id, type: .call, summary: "Follow-up call")
-        let interactions = manager.getInteractions(forContact: contact.id)
-        XCTAssertEqual(interactions.count, 2)
-    }
-
-    func testGetRecentCRMInteractions() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Busy Contact")
-        for i in 0..<5 {
-            manager.logInteraction(contactId: contact.id, type: .note, summary: "Note \(i)")
-        }
-        let recent = manager.getRecentInteractions(limit: 3)
-        XCTAssertEqual(recent.count, 3)
-    }
-
-    func testCRMStats() {
-        let manager = CRMManager()
-        let c1 = manager.createContact(name: "Contact 1")
-        let c2 = manager.createContact(name: "Contact 2")
-        manager.createDeal(title: "Deal 1", contactId: c1.id, stage: .queried, value: 1000)
-        manager.createDeal(title: "Deal 2", contactId: c1.id, stage: .contracted, value: 5000)
-        manager.createDeal(title: "Deal 3", contactId: c2.id, stage: .prospect)
-        manager.logInteraction(contactId: c1.id, type: .email, summary: "Recent email")
-        let stats = manager.getCRMStats()
-        XCTAssertEqual(stats.totalContacts, 2)
-        XCTAssertEqual(stats.totalDeals, 3)
-        XCTAssertEqual(stats.contractedDeals, 1)
-        XCTAssertEqual(stats.totalPipelineValue, 1000)  // Only non-terminal deal value
-        XCTAssertEqual(stats.recentInteractionCount, 1)
-    }
-
-    func testDealStageAdvanceSequence() {
-        XCTAssertEqual(DealStage.prospect.next, .queried)
-        XCTAssertEqual(DealStage.queried.next, .requested)
-        XCTAssertEqual(DealStage.requested.next, .submitted)
-        XCTAssertEqual(DealStage.submitted.next, .contracted)
-        XCTAssertNil(DealStage.contracted.next)
-        XCTAssertNil(DealStage.rejected.next)
-    }
-
-    func testDealStageIsTerminal() {
-        XCTAssertTrue(DealStage.contracted.isTerminal)
-        XCTAssertTrue(DealStage.rejected.isTerminal)
-        XCTAssertFalse(DealStage.prospect.isTerminal)
-        XCTAssertFalse(DealStage.submitted.isTerminal)
-    }
-
-    func testWritersAppExposesCRMManager() {
+    func testMakeComputerUseServiceWithoutAI() {
         let app = WritersApp()
-        let contact = app.crmManager.createContact(name: "Test Contact via App")
-        XCTAssertEqual(app.crmManager.getAllContacts().count, 1)
-        XCTAssertEqual(contact.name, "Test Contact via App")
+        // Without AI enabled, makeComputerUseService should return nil
+        let executor = MockComputerUseExecutor()
+        let service = app.makeComputerUseService(executor: executor)
+        XCTAssertNil(service)
+    }
+
+    func testMakeComputerUseServiceWithAI() {
+        let config = AIConfiguration(
+            apiKey: "sk-ant-test",
+            model: .claude35Sonnet,
+            maxTokens: 1024,
+            temperature: 0.7
+        )
+        let app = WritersApp(aiConfiguration: config)
+        let userId = UUID()
+        app.enableAI(configuration: config, userId: userId)
+        let executor = MockComputerUseExecutor()
+        let service = app.makeComputerUseService(executor: executor)
+        XCTAssertNotNil(service)
+    }
+
+    // MARK: - Document Changes (PR)
+
+    func testDocumentWordCountEmptyContent() {
+        let doc = Document(title: "Empty", content: "", category: .article)
+        XCTAssertEqual(doc.wordCount, 0)
+    }
+
+    func testDocumentWordCountSingleWord() {
+        let doc = Document(title: "Single", content: "Hello", category: .article)
+        XCTAssertEqual(doc.wordCount, 1)
+    }
+
+    func testDocumentWordCountMultipleSpaces() {
+        let doc = Document(title: "Spaces", content: "one  two   three", category: .article)
+        XCTAssertEqual(doc.wordCount, 3)
+    }
+
+    func testDocumentWordCountWithNewlines() {
+        let doc = Document(title: "Newlines", content: "line one\nline two\nline three", category: .article)
+        XCTAssertEqual(doc.wordCount, 6)
+    }
+
+    func testDocumentReadingTimeMinimumIsOne() {
+        // Short content (fewer than 200 words) should return 1 minute
+        let doc = Document(title: "Short", content: "A short document.", category: .article)
+        XCTAssertEqual(doc.readingTime, 1)
+    }
+
+    func testDocumentReadingTimeEmptyContentReturnsOne() {
+        let doc = Document(title: "Empty", content: "", category: .article)
+        XCTAssertEqual(doc.readingTime, 1)
+    }
+
+    func testDocumentCharacterCountMatchesContentLength() {
+        let content = "Hello, World!"
+        let doc = Document(title: "Char", content: content, category: .article)
+        XCTAssertEqual(doc.characterCount, content.count)
+    }
+
+    func testDocumentCharacterCountIncludesSpaces() {
+        let doc = Document(title: "Spaces", content: "a b c", category: .article)
+        XCTAssertEqual(doc.characterCount, 5)
+    }
+
+    // MARK: - TemplateManager Screenplay Template Changes (PR)
+
+    func testScreenplayTemplateDescriptionUpdated() {
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.name == "Screenplay Scene" }) else {
+            XCTFail("Screenplay Scene template not found")
+            return
+        }
+        XCTAssertEqual(screenplay.description, "Standard screenplay scene format",
+                       "Description should be simplified to 'Standard screenplay scene format'")
+    }
+
+    func testScreenplayTemplateHasEightPlaceholders() {
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.name == "Screenplay Scene" }) else {
+            XCTFail("Screenplay Scene template not found")
+            return
+        }
+        XCTAssertEqual(screenplay.placeholders.count, 8,
+                       "Simplified screenplay template should have exactly 8 placeholders")
+    }
+
+    func testScreenplayTemplateDoesNotHaveCharacterStatePlaceholder() {
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.name == "Screenplay Scene" }) else {
+            XCTFail("Screenplay Scene template not found")
+            return
+        }
+        let hasCharacterState = screenplay.placeholders.contains { $0.key == "character_state" }
+        XCTAssertFalse(hasCharacterState, "Removed 'character_state' placeholder should not exist")
+    }
+
+    func testScreenplayTemplateDoesNotHaveShotDescriptionPlaceholder() {
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.name == "Screenplay Scene" }) else {
+            XCTFail("Screenplay Scene template not found")
+            return
+        }
+        let hasShotDescription = screenplay.placeholders.contains { $0.key == "shot_description" }
+        XCTAssertFalse(hasShotDescription, "Removed 'shot_description' placeholder should not exist")
+    }
+
+    func testScreenplayTemplateTransitionHasDefaultValue() {
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.name == "Screenplay Scene" }) else {
+            XCTFail("Screenplay Scene template not found")
+            return
+        }
+        guard let transition = screenplay.placeholders.first(where: { $0.key == "transition" }) else {
+            XCTFail("'transition' placeholder not found in screenplay template")
+            return
+        }
+        XCTAssertEqual(transition.defaultValue, "CUT TO:")
+    }
+
+    func testScreenplayTemplateOptionalPlaceholders() {
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.name == "Screenplay Scene" }) else {
+            XCTFail("Screenplay Scene template not found")
+            return
+        }
+        let optionalKeys = ["character_2", "parenthetical", "dialogue_2"]
+        for key in optionalKeys {
+            if let placeholder = screenplay.placeholders.first(where: { $0.key == key }) {
+                XCTAssertFalse(placeholder.required,
+                               "Placeholder '\(key)' should be optional (required = false)")
+            } else {
+                XCTFail("Placeholder '\(key)' not found in screenplay template")
+            }
+        }
+    }
+
+    func testScreenplayTemplateTagsAreSimplified() {
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.name == "Screenplay Scene" }) else {
+            XCTFail("Screenplay Scene template not found")
+            return
+        }
+        let tags = screenplay.metadata.tags
+        XCTAssertTrue(tags.contains("screenplay"))
+        XCTAssertTrue(tags.contains("script"))
+        XCTAssertTrue(tags.contains("scene"))
+        XCTAssertFalse(tags.contains("film"), "'film' tag should have been removed")
+        XCTAssertFalse(tags.contains("professional"), "'professional' tag should have been removed")
+    }
+
+    func testScreenplayTemplateRequiredPlaceholdersPresent() {
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.name == "Screenplay Scene" }) else {
+            XCTFail("Screenplay Scene template not found")
+            return
+        }
+        let requiredKeys = ["scene_heading", "action", "character", "dialogue"]
+        for key in requiredKeys {
+            XCTAssertTrue(
+                screenplay.placeholders.contains { $0.key == key },
+                "Required placeholder '\(key)' should be present"
+            )
+        }
+    }
+}
+
+// MARK: - Test Helpers
+
+private class MockComputerUseExecutor: ComputerUseExecutor {
+    func takeScreenshot() async throws -> String {
+        return "mockScreenshotBase64Data"
+    }
+
+    func execute(action: ComputerUseAction) async throws -> ComputerUseResult {
+        return ComputerUseResult(action: action, screenshotBase64: "mockResultScreenshot")
     }
 }
