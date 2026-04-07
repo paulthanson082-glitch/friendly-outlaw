@@ -897,7 +897,16 @@ public class WritersAppViewModel: ObservableObject {
     }
 
     public func exportDocument() {
-        // TODO: Implement document export functionality
+        guard let doc = currentDocument else { return }
+
+        let exportedContent = writersApp?.exportDocument(id: doc.id, format: .markdown)
+
+        if let content = exportedContent {
+            UIPasteboard.general.string = content
+            print("Document exported as Markdown and copied to clipboard")
+        } else {
+            print("Failed to export document")
+        }
     }
 
     /// Presents the document information interface, showing the current document's metadata and available actions such as export and metadata editing.
