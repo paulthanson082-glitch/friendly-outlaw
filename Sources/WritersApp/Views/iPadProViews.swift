@@ -825,6 +825,7 @@ public class WritersAppViewModel: ObservableObject {
     @Published public var isSaving: Bool = false
     @Published public var aiResponse: String = ""
     @Published public var showWordCountSheet: Bool = false
+    @Published public var showDocumentInfoSheet: Bool = false
 
     // Statistics
     @Published public var wordCount: Int = 0
@@ -911,7 +912,7 @@ public class WritersAppViewModel: ObservableObject {
 
     /// Presents the document information interface, showing the current document's metadata and available actions such as export and metadata editing.
     public func showDocumentInfo() {
-        // TODO: Implement document info display
+        showDocumentInfoSheet = true
     }
 
     /// Shows the word count detail sheet.
@@ -923,31 +924,69 @@ public class WritersAppViewModel: ObservableObject {
     // MARK: - Formatting
 
     public func toggleBold() {
-        // TODO: Implement bold formatting
+        let boldText = "**\(currentDocumentContent)**"
+        currentDocumentContent = boldText
+        updateStatistics()
     }
 
     public func toggleItalic() {
-        // TODO: Implement italic formatting
+        let italicText = "*\(currentDocumentContent)*"
+        currentDocumentContent = italicText
+        updateStatistics()
     }
 
     public func toggleUnderline() {
-        // TODO: Implement underline formatting
+        let underlineText = "__\(currentDocumentContent)__"
+        currentDocumentContent = underlineText
+        updateStatistics()
     }
 
     public func applyHeading(level: Int) {
-        // TODO: Implement heading style for the given level
+        let heading = String(repeating: "#", count: level)
+        currentDocumentContent = "\(heading) \(currentDocumentContent)"
+        updateStatistics()
     }
 
     public func applyBodyStyle() {
-        // TODO: Implement body text style
+        // Reset to plain text (remove markdown formatting markers)
+        let plainText = currentDocumentContent
+            .replacingOccurrences(of: "^#+\\s", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "\\*\\*(.+?)\\*\\*", with: "$1", options: .regularExpression)
+            .replacingOccurrences(of: "\\*(.+?)\\*", with: "$1", options: .regularExpression)
+            .replacingOccurrences(of: "__(.+?)__", with: "$1", options: .regularExpression)
+        currentDocumentContent = plainText
+        updateStatistics()
     }
 
     public func toggleBulletList() {
-        // TODO: Implement bullet list toggling
+        let lines = currentDocumentContent.split(separator: "\n", omittingEmptySubsequences: false)
+        let formattedLines = lines.map { line -> String in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("- ") {
+                return String(line.dropFirst(2))
+            } else if !trimmed.isEmpty {
+                return "- \(line)"
+            }
+            return String(line)
+        }
+        currentDocumentContent = formattedLines.joined(separator: "\n")
+        updateStatistics()
     }
 
     public func toggleNumberedList() {
-        // TODO: Implement numbered list toggling
+        let lines = currentDocumentContent.split(separator: "\n", omittingEmptySubsequences: false)
+        let formattedLines = lines.enumerated().map { (index, line) -> String in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            let lineNum = index + 1
+            if trimmed.hasPrefix("\(lineNum). ") {
+                return String(line.dropFirst("\(lineNum). ".count))
+            } else if !trimmed.isEmpty {
+                return "\(lineNum). \(line)"
+            }
+            return String(line)
+        }
+        currentDocumentContent = formattedLines.joined(separator: "\n")
+        updateStatistics()
     }
 
     // MARK: - View Controls
@@ -967,51 +1006,226 @@ public class WritersAppViewModel: ObservableObject {
     // MARK: - AI Operations
 
     public func aiContinueWriting() {
-        // TODO: Implement AI continue writing functionality
+        guard let doc = currentDocument else { return }
+        Task {
+            do {
+                let response = try await writersApp?.continueDocument(
+                    documentId: doc.id,
+                    context: currentDocumentContent,
+                    appendToDocument: false
+                ) ?? ""
+                await MainActor.run {
+                    aiResponse = response
+                }
+            } catch {
+                await MainActor.run {
+                    aiResponse = "Error: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 
     public func aiImproveText() {
-        // TODO: Implement AI text improvement functionality
+        guard let doc = currentDocument else { return }
+        Task {
+            do {
+                let response = try await writersApp?.improveDocument(
+                    documentId: doc.id,
+                    context: currentDocumentContent,
+                    replaceContent: false
+                ) ?? ""
+                await MainActor.run {
+                    aiResponse = response
+                }
+            } catch {
+                await MainActor.run {
+                    aiResponse = "Error: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 
     public func aiExpandText() {
-        // TODO: Implement AI text expansion functionality
+        guard let doc = currentDocument else { return }
+        Task {
+            do {
+                let response = try await writersApp?.generateDocumentTitles(
+                    documentId: doc.id,
+                    context: currentDocumentContent
+                ) ?? []
+                await MainActor.run {
+                    aiResponse = response.joined(separator: "\n")
+                }
+            } catch {
+                await MainActor.run {
+                    aiResponse = "Error: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 
     public func aiSimplifyText() {
-        // TODO: Implement AI text simplification functionality
+        guard let doc = currentDocument else { return }
+        Task {
+            do {
+                let response = try await writersApp?.getAssistance(
+                    documentId: doc.id,
+                    type: .custom("Simplify the following text to be easier to understand:\n\(currentDocumentContent)"),
+                    context: currentDocumentContent
+                ) ?? AIResponse(text: "")
+                await MainActor.run {
+                    aiResponse = response.text
+                }
+            } catch {
+                await MainActor.run {
+                    aiResponse = "Error: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 
     public func aiCheckGrammar() {
-        // TODO: Implement AI grammar checking functionality
+        guard let doc = currentDocument else { return }
+        Task {
+            do {
+                let response = try await writersApp?.aiService?.checkGrammar(text: currentDocumentContent) ?? ""
+                await MainActor.run {
+                    aiResponse = response
+                }
+            } catch {
+                await MainActor.run {
+                    aiResponse = "Error: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 
     public func aiSummarize() {
-        // TODO: Implement AI summarization functionality
+        guard let doc = currentDocument else { return }
+        Task {
+            do {
+                let response = try await writersApp?.aiService?.summarize(text: currentDocumentContent) ?? ""
+                await MainActor.run {
+                    aiResponse = response
+                }
+            } catch {
+                await MainActor.run {
+                    aiResponse = "Error: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 
     public func aiBrainstorm() {
-        // TODO: Implement AI brainstorming functionality
+        Task {
+            do {
+                let response = try await writersApp?.brainstormIdeas(
+                    topic: currentDocumentTitle,
+                    context: currentDocumentContent
+                ) ?? ""
+                await MainActor.run {
+                    aiResponse = response
+                }
+            } catch {
+                await MainActor.run {
+                    aiResponse = "Error: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 
     public func aiGenerateOutline() {
-        // TODO: Implement AI outline generation functionality
+        Task {
+            do {
+                let response = try await writersApp?.generateOutline(
+                    concept: currentDocumentTitle,
+                    context: currentDocumentContent
+                ) ?? ""
+                await MainActor.run {
+                    aiResponse = response
+                }
+            } catch {
+                await MainActor.run {
+                    aiResponse = "Error: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 
     public func aiDevelopCharacter() {
-        // TODO: Implement AI character development functionality
+        Task {
+            do {
+                let response = try await writersApp?.developCharacter(
+                    characterConcept: currentDocumentTitle,
+                    context: currentDocumentContent
+                ) ?? ""
+                await MainActor.run {
+                    aiResponse = response
+                }
+            } catch {
+                await MainActor.run {
+                    aiResponse = "Error: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 
     public func aiImproveDialogue() {
-        // TODO: Implement AI dialogue improvement functionality
+        guard let doc = currentDocument else { return }
+        Task {
+            do {
+                let response = try await writersApp?.aiService?.improveDialogue(
+                    text: currentDocumentContent,
+                    context: currentDocumentTitle
+                ) ?? ""
+                await MainActor.run {
+                    aiResponse = response
+                }
+            } catch {
+                await MainActor.run {
+                    aiResponse = "Error: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 
     public func aiGenerateTitles() {
-        // TODO: Implement AI title generation functionality
+        guard let doc = currentDocument else { return }
+        Task {
+            do {
+                let response = try await writersApp?.generateDocumentTitles(
+                    documentId: doc.id,
+                    context: currentDocumentContent
+                ) ?? []
+                await MainActor.run {
+                    aiResponse = response.joined(separator: "\n")
+                }
+            } catch {
+                await MainActor.run {
+                    aiResponse = "Error: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 
     public func aiCustomRequest(prompt: String) {
-        // TODO: Implement custom AI request functionality
+        guard let doc = currentDocument else { return }
+        Task {
+            do {
+                let response = try await writersApp?.getAssistance(
+                    documentId: doc.id,
+                    type: .custom(prompt),
+                    context: currentDocumentContent
+                ) ?? AIResponse(text: "")
+                await MainActor.run {
+                    aiResponse = response.text
+                }
+            } catch {
+                await MainActor.run {
+                    aiResponse = "Error: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 
     public func insertAIResponse() {
