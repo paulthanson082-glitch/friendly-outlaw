@@ -1330,6 +1330,18 @@ public class WritersApp {
     public func clearBrowsingHistory() {
         browserService.clearHistory()
     }
+
+    // MARK: - Computer Use Service
+
+    /// Create a computer use service if AI is enabled.
+    /// - Parameter executor: A ComputerUseExecutor that will handle action execution.
+    /// - Returns: A ComputerUseService if AI is enabled, nil otherwise.
+    public func makeComputerUseService(executor: ComputerUseExecutor) -> ComputerUseService? {
+        guard isAIEnabled, let aiService = aiService else {
+            return nil
+        }
+        return ComputerUseService(aiService: aiService, executor: executor)
+    }
 }
 
 // MARK: - Supporting Types
