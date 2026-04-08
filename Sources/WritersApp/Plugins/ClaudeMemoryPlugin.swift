@@ -97,7 +97,7 @@ public class ClaudeMemoryPlugin: Plugin {
         let importance = params["importance"] as? Double ?? 0.5
         let ttl = params["ttl"] as? Int // Time-to-live in seconds, nil = permanent
 
-        let entry = MemoryEntry(
+        var entry = MemoryEntry(
             key: key,
             value: value,
             category: category,
@@ -106,6 +106,16 @@ public class ClaudeMemoryPlugin: Plugin {
             importance: importance,
             ttl: ttl
         )
+
+        // Contradiction detection: if a memory already exists for this key with a
+        // different value, mark the incoming entry so callers know the old fact was
+        // overwritten. The old entry is replaced rather than kept (last-write wins).
+        if let existing = memories[key], existing.value != value {
+            var contradictedEntry = entry
+            contradictedEntry.metadata["previous_value_preview"] = String(existing.value.prefix(100))
+            contradictedEntry.metadata["contradicted_previous"] = "true"
+            entry = contradictedEntry
+        }
 
         memories[key] = entry
 
@@ -153,7 +163,11 @@ public class ClaudeMemoryPlugin: Plugin {
             "category": entry.category,
             "tags": entry.tags.joined(separator: ","),
             "importance": String(entry.importance),
-            "accessCount": String(entry.accessCount)
+            "accessCount": String(entry.accessCount),
+            // Surface verification status so callers can decide how much to trust the value.
+            "verificationStatus": entry.verificationStatus.rawValue,
+            // Memories are hints, not facts — callers should verify against the source of truth.
+            "treatAsHint": entry.verificationStatus == .verified ? "false" : "true"
         ])
     }
 
@@ -304,6 +318,16 @@ public class ClaudeMemoryPlugin: Plugin {
         case "compact":
             return compact()
 
+        case "consolidate":
+            let maxCount = params["maxCount"] as? Int ?? 500
+            let report = consolidateMemories(maxCount: maxCount)
+            return PluginResult.success(data: [
+                "promoted": report.promoted,
+                "markedStale": report.markedStale,
+                "contradictions": report.contradictions,
+                "removed": report.removed
+            ])
+
         case "export":
             return exportMemories(params: params)
 
@@ -450,6 +474,100 @@ public class ClaudeMemoryPlugin: Plugin {
         return PluginResult.success(data: Array(categories))
     }
 
+    // MARK: - Memory Consolidation
+
+    /// Summary returned by `consolidateMemories()`.
+    public struct ConsolidationReport {
+        /// Memories promoted from `.unverified` to `.verified`.
+        public let promoted: Int
+        /// Memories newly marked as `.stale`.
+        public let markedStale: Int
+        /// Keys of memories where a contradiction was detected (value changed since last store).
+        public let contradictions: [String]
+        /// Memories removed to satisfy `maxCount`.
+        public let removed: Int
+    }
+
+    /// Consolidate in-memory state according to the "skeptical memory" pattern.
+    ///
+    /// - Promote unverified memories to `.verified` when they have been accessed ≥ 5 times
+    ///   and were accessed within the last 30 days.
+    /// - Mark memories as `.stale` when they have not been accessed in more than 60 days
+    ///   and are not already verified.
+    /// - Collect keys whose metadata shows a prior contradiction.
+    /// - If `maxCount` is specified, evict the lowest-importance stale/unverified memories
+    ///   until the count is within bounds.
+    ///
+    /// This method does **not** call the AI — it operates purely on local usage statistics,
+    /// mirroring the "autoDream" consolidation worker concept from the security analysis.
+    @discardableResult
+    public func consolidateMemories(maxCount: Int = 500) -> ConsolidationReport {
+        let now = Date()
+        var promoted = 0
+        var markedStale = 0
+        var contradictions: [String] = []
+
+        for (key, var entry) in memories {
+            // Skip expired entries (they will be cleared by compact()).
+            if let ttl = entry.ttl, now > entry.created.addingTimeInterval(TimeInterval(ttl)) {
+                continue
+            }
+
+            let daysSinceAccess = now.timeIntervalSince(entry.lastAccessed) / 86_400
+
+            // Promote to verified if frequently accessed and recently used.
+            if entry.verificationStatus == .unverified,
+               entry.accessCount >= 5,
+               daysSinceAccess < 30 {
+                entry.verificationStatus = .verified
+                memories[key] = entry
+                saveMemory(entry)
+                promoted += 1
+            }
+
+            // Mark as stale if not accessed in 60+ days and not verified.
+            if entry.verificationStatus != .verified,
+               entry.verificationStatus != .stale,
+               daysSinceAccess > 60 {
+                entry.verificationStatus = .stale
+                memories[key] = entry
+                saveMemory(entry)
+                markedStale += 1
+            }
+
+            // Collect contradiction markers written by storeMemory().
+            if entry.metadata["contradicted_previous"] == "true" {
+                contradictions.append(key)
+            }
+        }
+
+        saveIndex()
+
+        // Evict over-capacity memories: prefer removing stale/unverified low-importance entries.
+        var removed = 0
+        if memories.count > maxCount {
+            let candidates = memories.values
+                .filter { $0.verificationStatus == .stale || $0.verificationStatus == .unverified }
+                .sorted { $0.importance < $1.importance }
+
+            let toRemove = Array(candidates.prefix(memories.count - maxCount))
+            for entry in toRemove {
+                memories.removeValue(forKey: entry.key)
+                memoryIndex.remove(key: entry.key)
+                deleteMemoryFile(key: entry.key)
+                removed += 1
+            }
+            if removed > 0 { saveIndex() }
+        }
+
+        return ConsolidationReport(
+            promoted: promoted,
+            markedStale: markedStale,
+            contradictions: contradictions,
+            removed: removed
+        )
+    }
+
     // MARK: - Relevance Scoring
 
     private func calculateRelevanceScore(entry: MemoryEntry, query: String) -> Double {
@@ -556,6 +674,24 @@ public class ClaudeMemoryPlugin: Plugin {
     }
 }
 
+// MARK: - Memory Verification Status
+
+/// Represents how much confidence we have in a stored memory.
+///
+/// Implements the "skeptical memory" pattern: memories start as unverified hints and
+/// are promoted to verified only after repeated successful use. Stale or contradicted
+/// memories are kept but deprioritised during retrieval and consolidation.
+public enum MemoryVerificationStatus: String, Codable {
+    /// Newly stored; not yet confirmed by use. Treat as a hint, not a fact.
+    case unverified
+    /// Confirmed accurate via repeated successful retrieval (accessCount ≥ 5, recently used).
+    case verified
+    /// Not accessed in 60+ days; may be outdated. Still available but lower priority.
+    case stale
+    /// A newer memory with the same key was stored with a different value.
+    case contradicted
+}
+
 // MARK: - Memory Entry
 
 /// A single memory entry
@@ -570,6 +706,15 @@ public struct MemoryEntry: Codable {
     public let created: Date
     public var lastAccessed: Date
     public var accessCount: Int
+    /// Verification status — starts as `.unverified`, updated by consolidation.
+    public var verificationStatus: MemoryVerificationStatus
+
+    // Explicit CodingKeys so the custom init(from:) can use them and Swift can
+    // still synthesise encode(to:) without repeating every property manually.
+    private enum CodingKeys: String, CodingKey {
+        case key, value, category, tags, metadata, importance, ttl
+        case created, lastAccessed, accessCount, verificationStatus
+    }
 
     public init(
         key: String,
@@ -590,6 +735,24 @@ public struct MemoryEntry: Codable {
         self.created = Date()
         self.lastAccessed = Date()
         self.accessCount = 0
+        self.verificationStatus = .unverified
+    }
+
+    // Custom Codable init to provide a default for `verificationStatus` so that
+    // JSON files written before this field was added can still be decoded.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        key = try c.decode(String.self, forKey: .key)
+        value = try c.decode(String.self, forKey: .value)
+        category = try c.decode(String.self, forKey: .category)
+        tags = try c.decode([String].self, forKey: .tags)
+        metadata = try c.decode([String: String].self, forKey: .metadata)
+        importance = try c.decode(Double.self, forKey: .importance)
+        ttl = try c.decodeIfPresent(Int.self, forKey: .ttl)
+        created = try c.decode(Date.self, forKey: .created)
+        lastAccessed = try c.decode(Date.self, forKey: .lastAccessed)
+        accessCount = try c.decode(Int.self, forKey: .accessCount)
+        verificationStatus = try c.decodeIfPresent(MemoryVerificationStatus.self, forKey: .verificationStatus) ?? .unverified
     }
 }
 

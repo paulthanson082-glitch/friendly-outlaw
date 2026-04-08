@@ -8,6 +8,12 @@ public class AIService {
     private let configuration: AIConfiguration
     private let apiURL = "https://api.anthropic.com/v1/messages"
 
+    /// Sanitizes user-supplied text before embedding it in AI prompts.
+    private let inputSanitizer = AIInputSanitizer()
+
+    /// Tracks per-model response quality metrics for routing and regression detection.
+    public let performanceTracker = ModelPerformanceTracker()
+
     public init(configuration: AIConfiguration) {
         self.configuration = configuration
     }
@@ -20,7 +26,8 @@ public class AIService {
         type: AIAssistanceType,
         context: AIContext? = nil
     ) async throws -> AIResponse {
-        let prompt = type.prompt(for: text, context: context)
+        let sanitized = inputSanitizer.sanitize(text)
+        let prompt = type.prompt(for: sanitized.sanitizedText, context: context)
         let generatedContent = try await sendRequest(prompt: prompt)
 
         return AIResponse(
@@ -284,7 +291,8 @@ public class AIService {
         context: AIContext? = nil,
         maxIterations: Int = 10
     ) async throws -> AIResponse {
-        let prompt = type.prompt(for: text, context: context)
+        let sanitized = inputSanitizer.sanitize(text)
+        let prompt = type.prompt(for: sanitized.sanitizedText, context: context)
         let generatedContent = try await sendRequestWithToolLoop(
             prompt: prompt,
             tools: tools,
