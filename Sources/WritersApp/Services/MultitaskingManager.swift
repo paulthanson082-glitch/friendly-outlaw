@@ -413,6 +413,7 @@ public enum ContentType: String, Codable {
 
 // MARK: - Scene Configuration
 
+#if canImport(CoreGraphics)
 /// Configuration for iPad Pro scene management
 public struct SceneConfiguration: Codable {
     public var windowStyle: WindowStyle
@@ -465,3 +466,4 @@ public enum WindowStyle: String, Codable {
         }
     }
 }
+#endif // canImport(CoreGraphics)

@@ -1,6 +1,12 @@
 import Foundation
 
 // MARK: - Stage Manager Support
+//
+// Stage Manager is an Apple-only feature (iPadOS 16+ / macOS 13+).
+// All types in this file that reference CGSize or CGRect are conditionally
+// compiled out on platforms where CoreGraphics is unavailable (e.g. Android).
+#if canImport(CoreGraphics)
+import CoreGraphics
 
 /// Provides Stage Manager support for iPad Pro running iPadOS 16+
 public class StageManagerSupport {
@@ -516,3 +522,5 @@ public enum ExternalDisplayContent: String, Codable {
     case outline
     case reference
 }
+
+#endif // canImport(CoreGraphics)
