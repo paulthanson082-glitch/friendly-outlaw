@@ -53,6 +53,11 @@ public class DatabaseManager {
     
     // MARK: - Connection Management
     
+    /// Gets the database file path
+    public func getDatabasePath() -> String {
+        return databasePath
+    }
+
     /// Opens the database connection and creates tables if needed
     public func initialize() throws {
         guard sqlite3_open(databasePath, &db) == SQLITE_OK else {

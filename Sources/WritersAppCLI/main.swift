@@ -102,7 +102,41 @@ struct WritersAppCLI {
 
         // Parse command-line arguments
         let arguments = CommandLine.arguments
-        
+
+        // Handle daemon commands first (they don't enter interactive mode)
+        if arguments.count > 1 && arguments[1] == "daemon" {
+            if arguments.count > 2 {
+                let daemonCommand = arguments[2]
+                switch daemonCommand {
+                case "start":
+                    let port = (arguments.count > 4 && arguments[3] == "--port") ? Int(arguments[4]) ?? 8000 : 8000
+                    await handleDaemonStart(app: app, port: port)
+                    return
+                case "stop":
+                    await handleDaemonStop(app: app)
+                    return
+                case "restart":
+                    let port = (arguments.count > 4 && arguments[3] == "--port") ? Int(arguments[4]) ?? 8000 : 8000
+                    await handleDaemonRestart(app: app, port: port)
+                    return
+                case "status":
+                    await handleDaemonStatus(app: app)
+                    return
+                case "logs":
+                    let lines = (arguments.count > 4 && arguments[3] == "--tail") ? Int(arguments[4]) ?? 50 : 50
+                    await handleDaemonLogs(app: app, lines: lines)
+                    return
+                default:
+                    print("Unknown daemon command: \(daemonCommand)")
+                    print("Usage: WritersAppCLI daemon {start|stop|restart|status|logs} [options]")
+                    return
+                }
+            } else {
+                print("Usage: WritersAppCLI daemon {start|stop|restart|status|logs} [options]")
+                return
+            }
+        }
+
         // Handle command-line arguments
         if arguments.count > 1 {
             // Parse all arguments to support combined commands
@@ -115,11 +149,11 @@ struct WritersAppCLI {
             var guiDocArg: String? = nil
             var guiStats = false
             var guiKanbanArg: String? = nil
-            
+
             var i = 1
             while i < arguments.count {
                 let arg = arguments[i]
-                
+
                 switch arg {
                 case "--help", "-h":
                     shouldShowHelp = true
@@ -4260,5 +4294,57 @@ func viewBrowsingHistory(app: WritersApp) {
     if let input = readLine(), input.lowercased() == "y" {
         app.clearBrowsingHistory()
         print("✓ Browsing history cleared.")
+    }
+}
+
+// MARK: - Daemon Commands
+
+func handleDaemonStart(app: WritersApp, port: Int) async {
+    do {
+        print("🦞 Starting WritersApp daemon on port \(port)...")
+        try await app.startDaemon(port: port)
+        print("✓ Daemon started successfully")
+        print("   Access via: http://localhost:\(port)")
+        print("   Methods: writersapp.storeMemory, writersapp.retrieveMemory, writersapp.searchMemories, writersapp.listMemories, writersapp.health")
+    } catch {
+        print("✗ Failed to start daemon: \(error.localizedDescription)")
+    }
+}
+
+func handleDaemonStop(app: WritersApp) async {
+    do {
+        print("🦞 Stopping WritersApp daemon...")
+        try await app.stopDaemon()
+        print("✓ Daemon stopped successfully")
+    } catch {
+        print("✗ Failed to stop daemon: \(error.localizedDescription)")
+    }
+}
+
+func handleDaemonRestart(app: WritersApp, port: Int) async {
+    do {
+        print("🦞 Restarting WritersApp daemon...")
+        try await app.restartDaemon(port: port)
+        print("✓ Daemon restarted successfully on port \(port)")
+    } catch {
+        print("✗ Failed to restart daemon: \(error.localizedDescription)")
+    }
+}
+
+func handleDaemonStatus(app: WritersApp) async {
+    do {
+        let status = try await app.getDaemonStatus()
+        print(status)
+    } catch {
+        print("✗ Failed to get daemon status: \(error.localizedDescription)")
+    }
+}
+
+func handleDaemonLogs(app: WritersApp, lines: Int) async {
+    do {
+        let logs = try await app.getDaemonLogs(lines: lines)
+        print(logs)
+    } catch {
+        print("✗ Failed to retrieve logs: \(error.localizedDescription)")
     }
 }

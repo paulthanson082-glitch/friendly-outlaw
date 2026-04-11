@@ -1330,6 +1330,184 @@ public class WritersApp {
     public func clearBrowsingHistory() {
         browserService.clearHistory()
     }
+
+    // MARK: - Daemon & Server Management
+
+    private var codexServer: CodexServer?
+    private var daemonManager: DaemonManager?
+
+    /// Starts the Codex daemon server
+    /// - Parameter port: Port to run the server on (default 8000)
+    /// - Throws: Errors starting the daemon
+    public func startDaemon(port: Int = 8000) async throws {
+        let daemonMgr = DaemonManager()
+        self.daemonManager = daemonMgr
+
+        let serverConfig = CodexServerConfig(
+            port: port,
+            instanceId: UUID().uuidString,
+            capabilities: ["memory", "documents", "ai", "plugins"]
+        )
+        let server = CodexServer(config: serverConfig)
+        self.codexServer = server
+
+        try await daemonMgr.startDaemon(port: port)
+        try await server.start()
+    }
+
+    /// Stops the daemon server
+    /// - Throws: Errors stopping the daemon
+    public func stopDaemon() async throws {
+        if let daemon = daemonManager {
+            try await daemon.stopDaemon()
+        }
+        if let server = codexServer {
+            try await server.stop()
+        }
+        self.codexServer = nil
+        self.daemonManager = nil
+    }
+
+    /// Restarts the daemon server
+    /// - Parameter port: Port to run the server on
+    /// - Throws: Errors during restart
+    public func restartDaemon(port: Int = 8000) async throws {
+        try await stopDaemon()
+        try await startDaemon(port: port)
+    }
+
+    /// Gets daemon status
+    /// - Returns: Status message
+    public func getDaemonStatus() async throws -> String {
+        guard let daemon = daemonManager else {
+            return "Daemon not initialized"
+        }
+        return try await daemon.getDaemonStatus()
+    }
+
+    /// Gets daemon logs
+    /// - Parameter lines: Number of lines to tail (default 50)
+    /// - Returns: Log content
+    public func getDaemonLogs(lines: Int = 50) async throws -> String {
+        guard let daemon = daemonManager else {
+            return "Daemon not initialized"
+        }
+        return try await daemon.tailLogs(lines: lines)
+    }
+
+    // MARK: - Memory Plugin Management
+
+    /// Installs and enables the Active Memory plugin
+    /// - Parameter encryptionEnabled: Whether to encrypt stored memories (default true)
+    /// - Throws: Errors initializing the plugin
+    public func installActiveMemoryPlugin(encryptionEnabled: Bool = true) async throws {
+        let plugin = ActiveMemoryPlugin(
+            databasePath: databaseManager.getDatabasePath(),
+            encryptionEnabled: encryptionEnabled,
+            encryptionKey: nil
+        )
+
+        pluginManager.register(plugin: plugin)
+        try await pluginManager.initializePlugin(id: plugin.id)
+
+        self.memoryPlugin = plugin
+    }
+
+    /// Stores a memory in the Active Memory plugin
+    /// - Parameters:
+    ///   - key: Memory key
+    ///   - value: Memory value
+    ///   - category: Category (default "default")
+    ///   - importance: Importance score 0-1
+    ///   - ttl: Time-to-live in seconds (optional)
+    /// - Throws: Errors storing memory
+    public func storeMemory(
+        key: String,
+        value: String,
+        category: String = "default",
+        importance: Double = 0.5,
+        ttl: Int? = nil
+    ) async throws {
+        let action = PluginAction(
+            type: .storeMemory,
+            parameters: [
+                "key": key,
+                "value": value,
+                "category": category,
+                "importance": importance,
+                "ttl": ttl as Any
+            ]
+        )
+
+        let result = try await pluginManager.execute(
+            pluginId: "active-memory",
+            action: action
+        )
+
+        guard result.success else {
+            throw NSError(domain: "WritersApp", code: -1, userInfo: ["error": result.error?.localizedDescription ?? "Unknown error"])
+        }
+    }
+
+    /// Retrieves a memory from the Active Memory plugin
+    /// - Parameter key: Memory key
+    /// - Returns: Memory value and metadata
+    /// - Throws: Errors retrieving memory
+    public func retrieveMemory(key: String) async throws -> [String: Any] {
+        let action = PluginAction(
+            type: .retrieveMemory,
+            parameters: ["key": key]
+        )
+
+        let result = try await pluginManager.execute(
+            pluginId: "active-memory",
+            action: action
+        )
+
+        guard result.success, let data = result.data as? [String: Any] else {
+            throw NSError(domain: "WritersApp", code: -1, userInfo: ["error": "Memory not found"])
+        }
+
+        return data
+    }
+
+    /// Searches memories in the Active Memory plugin
+    /// - Parameters:
+    ///   - query: Search query
+    ///   - category: Optional category filter
+    ///   - limit: Maximum results to return
+    /// - Returns: Search results
+    /// - Throws: Errors searching
+    public func searchMemories(
+        query: String,
+        category: String? = nil,
+        limit: Int = 10
+    ) async throws -> [[String: Any]] {
+        var params: [String: Any] = [
+            "query": query,
+            "limit": limit
+        ]
+        if let cat = category {
+            params["category"] = cat
+        }
+
+        let action = PluginAction(
+            type: .searchMemory,
+            parameters: params
+        )
+
+        let result = try await pluginManager.execute(
+            pluginId: "active-memory",
+            action: action
+        )
+
+        guard result.success, let data = result.data as? [String: Any],
+              let results = data["results"] as? [[String: Any]] else {
+            return []
+        }
+
+        return results
+    }
 }
 
 // MARK: - Supporting Types
