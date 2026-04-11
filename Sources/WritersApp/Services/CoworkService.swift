@@ -309,6 +309,12 @@ public class BrowserService {
             throw CoworkError.invalidURL
         }
 
+        // Validate URL for SSRF safety
+        let ssrfResult = NetworkSecurity.validateSSRFSafety(url: url)
+        guard ssrfResult.isAllowed else {
+            throw CoworkError.invalidURL
+        }
+
         var request = URLRequest(url: url)
         request.setValue(
             "Mozilla/5.0 (compatible; WritersApp/1.0)",

@@ -252,6 +252,12 @@ public class MCPClient {
             throw MCPError.invalidConfiguration("Invalid URL")
         }
 
+        // Validate URL for SSRF safety
+        let ssrfResult = NetworkSecurity.validateSSRFSafety(url: url)
+        guard ssrfResult.isAllowed else {
+            throw MCPError.invalidConfiguration("MCP server URL is not accessible: \(ssrfResult.reason)")
+        }
+
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")

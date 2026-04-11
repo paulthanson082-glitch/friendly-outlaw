@@ -1,4 +1,5 @@
 import Foundation
+import os.log
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
@@ -32,7 +33,26 @@ public class GuiNewService {
     public init(apiKey: String? = nil, baseURL: String? = nil) {
         let env = ProcessInfo.processInfo.environment
         self.apiKey = apiKey ?? env["GUI_NEW_API_KEY"]
-        self.baseURL = baseURL ?? env["GUI_NEW_URL"] ?? "https://gui.new"
+
+        // Validate baseURL for SSRF safety
+        let configuredURL = baseURL ?? env["GUI_NEW_URL"] ?? "https://gui.new"
+        if let urlObject = URL(string: configuredURL) {
+            let ssrfResult = NetworkSecurity.validateSSRFSafety(url: urlObject)
+            if !ssrfResult.isAllowed {
+                // Log warning but use default HTTPS endpoint for safety
+                os_log(
+                    "GuiNewService: baseURL validation failed (%@), using default endpoint",
+                    log: OSLog(subsystem: "com.writersapp.gui", category: "config"),
+                    type: .warning,
+                    ssrfResult.reason
+                )
+                self.baseURL = "https://gui.new"
+            } else {
+                self.baseURL = configuredURL
+            }
+        } else {
+            self.baseURL = "https://gui.new"
+        }
     }
 
     // MARK: - Private helpers

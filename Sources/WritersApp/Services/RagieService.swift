@@ -94,6 +94,14 @@ public class RagieService {
             throw RagieServiceError.invalidURL
         }
 
+        // Validate the document URL for SSRF safety
+        if let documentURLObject = URL(string: documentURL) {
+            let ssrfResult = NetworkSecurity.validateSSRFSafety(url: documentURLObject)
+            guard ssrfResult.isAllowed else {
+                throw RagieServiceError.invalidURL
+            }
+        }
+
         var body: [String: Any] = ["url": documentURL]
         if let name = name {
             body["name"] = name
