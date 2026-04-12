@@ -51,15 +51,9 @@ public class ComputerUseService {
                 finalResponse = nextAction.response ?? ""
                 break
             }
-
-            if iterationCount >= configuration.maxIterations {
-                wasExhausted = true
-            }
         }
 
-        if iterationCount >= configuration.maxIterations && !wasExhausted {
-            wasExhausted = true
-        }
+        wasExhausted = iterationCount >= configuration.maxIterations && finalResponse.isEmpty
 
         return ComputerUseSessionResult(
             task: task,
@@ -93,13 +87,13 @@ public class ComputerUseService {
         Current screenshot (base64): [screenshot provided]
         What is the next action to complete the task? Reply with "DONE" if finished.
         """
-        _ = screenshot // screenshot would be sent as image content in a real implementation
+        // TODO: Send screenshot as vision content when implementing full Anthropic computer use API integration
+        _ = screenshot
         let response = try await aiService.continueWriting(text: prompt)
         if response.uppercased().contains("DONE") {
             return ActionResponse(action: nil, response: response, isDone: true)
         }
-        // Return a screenshot action as a placeholder when we cannot parse an action
-        let action = ComputerUseAction(action: .screenshot)
-        return ActionResponse(action: action, response: response, isDone: false)
+        // Mark as done when we cannot parse a concrete action to avoid infinite screenshot loops
+        return ActionResponse(action: nil, response: response, isDone: true)
     }
 }
