@@ -1229,6 +1229,15 @@ public class WritersApp {
 
     // MARK: - Multi-Agent Harness
 
+    /// Create a `ComputerUseService` wired to the active AI service.
+    ///
+    /// - Parameter executor: The executor responsible for taking screenshots and performing actions.
+    /// - Returns: A configured `ComputerUseService`, or `nil` if AI has not been enabled.
+    public func makeComputerUseService(executor: ComputerUseExecutor) -> ComputerUseService? {
+        guard let ai = aiService else { return nil }
+        return ComputerUseService(aiService: ai, executor: executor)
+    }
+
     /// Create a `MultiAgentHarness` wired to the active AI service.
     ///
     /// - Parameter configuration: Harness settings (revision budget, quality threshold, model).
