@@ -15,6 +15,7 @@ public class WritersApp {
     public private(set) var guiService: GuiNewService?
     public private(set) var aiService: AIService?
     public private(set) var chatbotService: ChatbotService?
+    public private(set) var hermesService: HermesService?
     public private(set) var ragieService: RagieService?
     public private(set) var currentUserId: UUID?
     private var currentSessionId: UUID?
@@ -66,8 +67,14 @@ public class WritersApp {
                 documentManager: self.documentManager,
                 templateManager: self.templateManager
             )
+            self.hermesService = HermesService(
+                aiService: svc,
+                documentManager: self.documentManager,
+                templateManager: self.templateManager
+            )
         } else {
             self.chatbotService = nil
+            self.hermesService = nil
         }
         try? databaseManager.initialize()
     }
@@ -77,6 +84,11 @@ public class WritersApp {
         let aiSvc = AIService(configuration: configuration)
         self.aiService = aiSvc
         self.chatbotService = ChatbotService(
+            aiService: aiSvc,
+            documentManager: self.documentManager,
+            templateManager: self.templateManager
+        )
+        self.hermesService = HermesService(
             aiService: aiSvc,
             documentManager: self.documentManager,
             templateManager: self.templateManager
@@ -91,6 +103,7 @@ public class WritersApp {
     public func disableAI() {
         self.aiService = nil
         self.chatbotService = nil
+        self.hermesService = nil
     }
 
     /// Check if AI is available
@@ -202,6 +215,58 @@ public class WritersApp {
     /// Check if Jules is in adult mode
     public var isJulesAdultModeEnabled: Bool {
         return chatbotService?.isAdultModeEnabled ?? false
+    }
+
+    // MARK: - Hermes (Creative Idea Generator)
+
+    /// Start a new Hermes ideation session
+    ///
+    /// - Parameter context: Optional story context (genre, logline, characters, etc.)
+    /// - Throws: `HermesError.aiNotAvailable` if AI has not been enabled
+    public func startHermesSession(context: HermesContext = HermesContext()) throws -> HermesSession {
+        guard let service = hermesService else {
+            throw HermesError.aiNotAvailable
+        }
+        return service.startSession(context: context)
+    }
+
+    /// Send a creative prompt to Hermes and receive structured ideas
+    ///
+    /// - Parameters:
+    ///   - prompt: What the writer needs help with
+    ///   - session: The active Hermes session (mutated in place)
+    /// - Returns: A `HermesResponse` containing the raw message and parsed `[HermesIdea]`
+    /// - Throws: `HermesError.aiNotAvailable` if AI is not enabled
+    public func generateIdeas(
+        prompt: String,
+        in session: inout HermesSession
+    ) async throws -> HermesResponse {
+        guard let service = hermesService else {
+            throw HermesError.aiNotAvailable
+        }
+        return try await service.generateIdeas(prompt, in: &session)
+    }
+
+    /// Expand on a specific idea, generating deeper variations
+    ///
+    /// - Parameters:
+    ///   - ideaId: UUID of the idea to expand
+    ///   - session: The active Hermes session (mutated in place)
+    /// - Returns: A `HermesResponse` with expanded variations
+    /// - Throws: `HermesError.aiNotAvailable` or `HermesError.ideaNotFound`
+    public func expandIdea(
+        ideaId: UUID,
+        in session: inout HermesSession
+    ) async throws -> HermesResponse {
+        guard let service = hermesService else {
+            throw HermesError.aiNotAvailable
+        }
+        return try await service.expandIdea(ideaId, in: &session)
+    }
+
+    /// End the current Hermes session
+    public func endHermesSession() {
+        hermesService?.endSession()
     }
 
     // MARK: - Settings Management

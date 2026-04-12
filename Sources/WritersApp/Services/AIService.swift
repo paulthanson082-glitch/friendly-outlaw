@@ -313,7 +313,8 @@ public class AIService {
         prompt: String,
         tools: [ToolDefinition],
         toolExecutor: AIToolExecutor,
-        maxIterations: Int
+        maxIterations: Int,
+        systemPrompt: String? = nil
     ) async throws -> String {
         guard let url = URL(string: apiURL) else {
             throw AIServiceError.invalidURL
@@ -326,7 +327,7 @@ public class AIService {
         let toolDefinitions = tools.map { $0.toDict() }
 
         for _ in 0..<maxIterations {
-            let request = try buildAPIURLRequest(url: url, messages: messages, toolDefinitions: toolDefinitions)
+            let request = try buildAPIURLRequest(url: url, messages: messages, toolDefinitions: toolDefinitions, systemPrompt: systemPrompt)
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
@@ -448,6 +449,26 @@ public class AIService {
         }
 
         return text
+    }
+
+    /// Send an agent task with a dedicated system prompt AND tool loop support.
+    ///
+    /// Combines the persona injection of `performAgentTask` with the iterative
+    /// tool execution of `sendRequestWithToolLoop`. Used by `HermesService`.
+    public func performAgentTaskWithTools(
+        systemPrompt: String,
+        userPrompt: String,
+        tools: [ToolDefinition],
+        toolExecutor: AIToolExecutor,
+        maxIterations: Int = 10
+    ) async throws -> String {
+        return try await sendRequestWithToolLoop(
+            prompt: userPrompt,
+            tools: tools,
+            toolExecutor: toolExecutor,
+            maxIterations: maxIterations,
+            systemPrompt: systemPrompt
+        )
     }
 
     /// Extracts joined text from a list of content blocks.
