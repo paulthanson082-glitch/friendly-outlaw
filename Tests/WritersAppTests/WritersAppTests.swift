@@ -2433,6 +2433,132 @@ final class ScreenplayTemplateContentTests: XCTestCase {
     }
 }
 
+    // MARK: - Writing Advisor Tests
+
+    func testAdvisorCategoryAllCasesCount() {
+        XCTAssertEqual(AdvisorCategory.allCases.count, 5)
+    }
+
+    func testAdvisorPriorityAllCasesCount() {
+        XCTAssertEqual(AdvisorPriority.allCases.count, 3)
+    }
+
+    func testAdvisorCategoryDisplayNamesNonEmpty() {
+        for category in AdvisorCategory.allCases {
+            XCTAssertFalse(category.displayName.isEmpty,
+                           "\(category.rawValue) displayName must not be empty")
+        }
+    }
+
+    func testAdvisorRecommendationIsIdentifiable() {
+        let rec1 = AdvisorRecommendation(
+            category: .productivity,
+            priority: .high,
+            title: "Write More",
+            recommendation: "Set a daily word goal.",
+            actionableSteps: ["Open app", "Write 500 words"]
+        )
+        let rec2 = AdvisorRecommendation(
+            category: .craft,
+            priority: .medium,
+            title: "Improve Dialogue",
+            recommendation: "Read your dialogue aloud.",
+            actionableSteps: ["Read aloud", "Edit"]
+        )
+        XCTAssertNotEqual(rec1.id, rec2.id)
+    }
+
+    func testAdvisorRecommendationCodable() throws {
+        let original = AdvisorRecommendation(
+            id: UUID(),
+            category: .consistency,
+            priority: .low,
+            title: "Stay Consistent",
+            recommendation: "Write every day.",
+            actionableSteps: ["Set a timer", "Write for 10 minutes"],
+            generatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(AdvisorRecommendation.self, from: data)
+        XCTAssertEqual(decoded.id, original.id)
+        XCTAssertEqual(decoded.category, original.category)
+        XCTAssertEqual(decoded.priority, original.priority)
+        XCTAssertEqual(decoded.title, original.title)
+        XCTAssertEqual(decoded.recommendation, original.recommendation)
+        XCTAssertEqual(decoded.actionableSteps, original.actionableSteps)
+    }
+
+    func testWritingAdvisorReportCodable() throws {
+        let rec = AdvisorRecommendation(
+            category: .goals,
+            priority: .high,
+            title: "Set a Goal",
+            recommendation: "Define a clear project goal.",
+            actionableSteps: ["Pick a target word count", "Set a deadline"]
+        )
+        let report = WritingAdvisorReport(
+            recommendations: [rec],
+            overallAssessment: "You are making solid progress.",
+            focusArea: .goals,
+            generatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let data = try JSONEncoder().encode(report)
+        let decoded = try JSONDecoder().decode(WritingAdvisorReport.self, from: data)
+        XCTAssertEqual(decoded.recommendations.count, 1)
+        XCTAssertEqual(decoded.overallAssessment, report.overallAssessment)
+        XCTAssertEqual(decoded.focusArea, report.focusArea)
+    }
+
+    func testWritingAdvisorServiceRequiresAI() async {
+        let noAIApp = WritersApp()
+        do {
+            _ = try await noAIApp.getPersonalizedWritingAdvice()
+            XCTFail("Expected AIError.aiNotEnabled to be thrown")
+        } catch AIError.aiNotEnabled {
+            // expected
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testWritingAdvisorServiceCreatedWhenAIEnabled() {
+        let config = AIConfiguration(apiKey: "test-key")
+        let aiApp = WritersApp(aiConfiguration: config)
+        XCTAssertNotNil(aiApp.writingAdvisorService,
+                        "writingAdvisorService must be non-nil when AI is enabled at init")
+    }
+
+    func testWritingAdvisorServiceNilledWhenAIDisabled() {
+        let config = AIConfiguration(apiKey: "test-key")
+        let aiApp = WritersApp(aiConfiguration: config)
+        XCTAssertNotNil(aiApp.writingAdvisorService)
+        aiApp.disableAI()
+        XCTAssertNil(aiApp.writingAdvisorService,
+                     "writingAdvisorService must be nil after disableAI()")
+    }
+
+    func testAIAssistanceTypeHasWritingAdvisorCase() {
+        let type = AIAssistanceType.writingAdvisor
+        XCTAssertEqual(type.displayName, "Writing Advisor")
+    }
+
+    func testWritingAdvisorPromptIsNonEmpty() {
+        let prompt = AIAssistanceType.writingAdvisor.prompt(for: "Documents: 5 total", context: nil)
+        XCTAssertFalse(prompt.isEmpty, "Writing advisor prompt must not be empty")
+        XCTAssertTrue(prompt.contains("JSON"),
+                      "Writing advisor prompt must instruct Claude to return JSON")
+    }
+
+    func testWritingAdvisorServiceCreatedByEnableAI() {
+        let app = WritersApp()
+        XCTAssertNil(app.writingAdvisorService)
+        let config = AIConfiguration(apiKey: "test-key")
+        app.enableAI(configuration: config)
+        XCTAssertNotNil(app.writingAdvisorService,
+                        "writingAdvisorService must be non-nil after enableAI()")
+    }
+}
+
 // MARK: - Test Helpers
 
 private class MockComputerUseExecutor: ComputerUseExecutor {
