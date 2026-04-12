@@ -2433,7 +2433,9 @@ final class ScreenplayTemplateContentTests: XCTestCase {
     }
 }
 
-    // MARK: - Writing Advisor Tests
+// MARK: - Writing Advisor Tests
+
+final class WritingAdvisorTests: XCTestCase {
 
     func testAdvisorCategoryAllCasesCount() {
         XCTAssertEqual(AdvisorCategory.allCases.count, 5)

@@ -1,3 +1,5 @@
+import Foundation
+
 // MARK: - Advisor Models
 
 public enum AdvisorCategory: String, Codable, CaseIterable {
