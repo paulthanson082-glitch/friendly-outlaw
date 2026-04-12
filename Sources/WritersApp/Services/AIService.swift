@@ -308,7 +308,22 @@ public class AIService {
     /// while response.stop_reason == "tool_use":
     ///     result = your_tool_executor(response.tool_use)
     ///     response = client.messages.create(tool_result=result, **params)
-    /// ```
+    /// Sends the prompt to the Anthropic messages API and runs an iterative tool-use loop until the model produces a final text response or the loop is exhausted.
+    /// 
+    /// The method posts the current conversation (including any tool results) to the API, handles `tool_use` responses by executing the requested tools via `toolExecutor`, and feeds tool outputs back into the conversation for further turns.
+    /// - Parameters:
+    ///   - prompt: The initial user prompt to send to the model.
+    ///   - tools: Tool definitions available to the model; converted to request `tools` when present.
+    ///   - toolExecutor: Executor used to run tool calls requested by the model and produce tool result payloads.
+    ///   - maxIterations: Maximum number of request/response iterations to perform before aborting.
+    ///   - systemPrompt: Optional system-level prompt to include in the request payload.
+    /// - Returns: The final text output produced by the model (possibly empty).
+    /// - Throws:
+    ///   - `AIServiceError.invalidURL` if the configured API URL is invalid.
+    ///   - `AIServiceError.invalidResponse` if the network response is not an HTTP response.
+    ///   - `AIServiceError.apiError` if the API returns a non-200 status code (includes status code and message).
+    ///   - `AIServiceError.invalidResponseFormat` if the response JSON is missing expected fields or text cannot be extracted.
+    ///   - `AIServiceError.toolLoopExhausted` if no final response is produced within `maxIterations`.
     private func sendRequestWithToolLoop(
         prompt: String,
         tools: [ToolDefinition],
@@ -413,7 +428,12 @@ public class AIService {
     ///
     /// Used by `MultiAgentHarness` to give each agent (planner, generator, evaluator)
     /// its own specialised system prompt without affecting the general-purpose assistance
-    /// methods. All network I/O still flows through `AIService`.
+    /// Sends a user prompt together with a system prompt to the Anthropic Messages API and returns the assistant's extracted text response.
+    /// - Parameters:
+    ///   - systemPrompt: System-level instructions to include in the request's `system` field.
+    ///   - userPrompt: The user-facing prompt sent as the single user message.
+    /// - Returns: The assistant-generated text extracted from the API response.
+    /// - Throws: `AIServiceError.invalidURL` if the configured API URL is invalid; `AIServiceError.invalidResponse` if the HTTP response is missing or malformed; `AIServiceError.apiError(statusCode:message:)` for non-200 HTTP responses; `AIServiceError.invalidResponseFormat` if the API response JSON or content blocks cannot be parsed.
     public func performAgentTask(
         systemPrompt: String,
         userPrompt: String
@@ -454,7 +474,14 @@ public class AIService {
     /// Send an agent task with a dedicated system prompt AND tool loop support.
     ///
     /// Combines the persona injection of `performAgentTask` with the iterative
-    /// tool execution of `sendRequestWithToolLoop`. Used by `HermesService`.
+    /// Performs an agent task that may use external tools and returns the assistant's final response.
+    /// - Parameters:
+    ///   - systemPrompt: Instructions injected as the system-level prompt for the agent.
+    ///   - userPrompt: The user-facing prompt that starts the conversation.
+    ///   - tools: Definitions of tools the agent may invoke during the interaction.
+    ///   - toolExecutor: Executor responsible for running tool calls and returning their results.
+    ///   - maxIterations: Maximum number of tool-invocation/response cycles to allow before aborting.
+    /// - Returns: The assistant's generated response text.
     public func performAgentTaskWithTools(
         systemPrompt: String,
         userPrompt: String,
@@ -472,7 +499,8 @@ public class AIService {
     }
 
     /// Extracts joined text from a list of content blocks.
-    /// Returns nil if no text blocks are present.
+    /// Extracts and concatenated text blocks from a content array.
+    /// - Returns: The joined text of all blocks where `"type" == "text"`, or `nil` if no text blocks are present.
     private func extractText(from content: [[String: Any]]) -> String? {
         let textParts = content.compactMap { block -> String? in
             guard block["type"] as? String == "text" else { return nil }

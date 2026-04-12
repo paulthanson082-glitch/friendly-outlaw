@@ -79,7 +79,10 @@ public class WritersApp {
         try? databaseManager.initialize()
     }
 
-    /// Enable AI features by providing configuration
+    /// Enables the application's AI features by creating and wiring AI-related services.
+    /// - Parameters:
+    ///   - configuration: Configuration used to initialize the AI subsystem.
+    ///   - userId: Optional user identifier; when provided the AI configuration is associated with and persisted for that user.
     public func enableAI(configuration: AIConfiguration, userId: UUID? = nil) {
         let aiSvc = AIService(configuration: configuration)
         self.aiService = aiSvc
@@ -99,7 +102,9 @@ public class WritersApp {
         }
     }
 
-    /// Disable AI features
+    /// Disables all AI features for the application.
+    /// 
+    /// Clears the configured AI, chatbot, and Hermes service instances so AI-based functionality becomes unavailable.
     public func disableAI() {
         self.aiService = nil
         self.chatbotService = nil
@@ -222,7 +227,10 @@ public class WritersApp {
     /// Start a new Hermes ideation session
     ///
     /// - Parameter context: Optional story context (genre, logline, characters, etc.)
-    /// - Throws: `HermesError.aiNotAvailable` if AI has not been enabled
+    /// Starts a new Hermes ideation session using the provided context.
+    /// - Parameter context: Configuration and seed data used to initialize the Hermes session. Defaults to an empty `HermesContext`.
+    /// - Returns: A newly created `HermesSession`.
+    /// - Throws: `HermesError.aiNotAvailable` if the Hermes service is not enabled.
     public func startHermesSession(context: HermesContext = HermesContext()) throws -> HermesSession {
         guard let service = hermesService else {
             throw HermesError.aiNotAvailable
@@ -236,7 +244,12 @@ public class WritersApp {
     ///   - prompt: What the writer needs help with
     ///   - session: The active Hermes session (mutated in place)
     /// - Returns: A `HermesResponse` containing the raw message and parsed `[HermesIdea]`
-    /// - Throws: `HermesError.aiNotAvailable` if AI is not enabled
+    /// Generates structured ideas from a prompt and updates the provided Hermes session.
+    /// - Parameters:
+    ///   - prompt: The textual prompt used to seed idea generation.
+    ///   - session: An inout `HermesSession` that will be mutated to reflect the generation state and any produced ideas.
+    /// - Returns: A `HermesResponse` containing the generated ideas and related metadata.
+    /// - Throws: `HermesError.aiNotAvailable` if the Hermes service is not enabled.
     public func generateIdeas(
         prompt: String,
         in session: inout HermesSession
@@ -253,7 +266,12 @@ public class WritersApp {
     ///   - ideaId: UUID of the idea to expand
     ///   - session: The active Hermes session (mutated in place)
     /// - Returns: A `HermesResponse` with expanded variations
-    /// - Throws: `HermesError.aiNotAvailable` or `HermesError.ideaNotFound`
+    /// Expands an existing idea into deeper variations within a Hermes session.
+    /// - Parameters:
+    ///   - ideaId: The identifier of the idea to expand.
+    ///   - session: The active `HermesSession` to update; mutated in place with expansion results.
+    /// - Returns: A `HermesResponse` containing the expansion output.
+    /// - Throws: `HermesError.aiNotAvailable` if the Hermes service is not enabled.
     public func expandIdea(
         ideaId: UUID,
         in session: inout HermesSession
@@ -264,7 +282,9 @@ public class WritersApp {
         return try await service.expandIdea(ideaId, in: &session)
     }
 
-    /// End the current Hermes session
+    /// Ends the active Hermes ideation session.
+    /// 
+    /// If Hermes is not enabled or no session is active, this does nothing.
     public func endHermesSession() {
         hermesService?.endSession()
     }
