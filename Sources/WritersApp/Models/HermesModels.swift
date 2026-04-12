@@ -64,6 +64,10 @@ public struct HermesIdea: Identifiable, Codable {
         timestamp = formatter.date(from: timestampString) ?? Date()
     }
 
+    /// Encodes the instance into the provided encoder.
+    /// 
+    /// Encodes `id`, `title`, `description`, and `ideaType` using their coding keys and serializes `timestamp` as an ISO-8601 formatted string.
+    /// - Parameter encoder: The encoder to write this value into.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
@@ -144,6 +148,12 @@ public struct HermesMessage: Identifiable, Codable {
         timestamp = formatter.date(from: timestampString) ?? Date()
     }
 
+    /// Encodes the message's properties into the given encoder.
+    /// 
+    /// The message's `timestamp` is serialized as an ISO-8601 formatted string.
+    /// - Parameters:
+    ///   - encoder: The encoder to write this message's encoded representation into.
+    /// - Throws: An error if any of the message's properties fail to encode.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
@@ -193,6 +203,11 @@ public struct HermesSession: Identifiable, Codable {
         lastMessageAt = formatter.date(from: lastMessageAtString) ?? Date()
     }
 
+    /// Encodes the session into the provided encoder, serializing `startedAt` and `lastMessageAt` as ISO-8601 strings.
+    ///
+    /// Encodes `id`, `messages`, and `context` using their standard keyed representations and writes `startedAt` and `lastMessageAt` as ISO-8601 formatted strings.
+    /// - Parameter encoder: The encoder to write data to.
+    /// - Throws: An error if any of the values fail to encode.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)

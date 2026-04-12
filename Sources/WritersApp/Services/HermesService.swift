@@ -68,21 +68,29 @@ public class HermesService {
 
     // MARK: - Session Lifecycle
 
-    /// Start a new Hermes ideation session
+    /// Creates a new `HermesSession` with the provided context and makes it the active session.
+    /// - Parameter context: Initial session context containing story metadata and settings; defaults to an empty `HermesContext`.
+    /// - Returns: The newly created `HermesSession`, also stored in `currentSession`.
     public func startSession(context: HermesContext = HermesContext()) -> HermesSession {
         let session = HermesSession(context: context)
         currentSession = session
         return session
     }
 
-    /// End the current session
+    /// Ends the active Hermes session by clearing the service's `currentSession`.
+    /// If no session is active, this method is a no-op.
     public func endSession() {
         currentSession = nil
     }
 
     // MARK: - Core Interaction
 
-    /// Send a creative prompt to Hermes and receive structured ideas
+    /// Generate ideation output for a user's prompt, append the user and Hermes messages (including parsed ideas) to the provided session, and return the raw message plus structured ideas.
+    /// - Parameters:
+    ///   - prompt: The user's prompt text to send to the Hermes persona.
+    ///   - session: The active `HermesSession` to update; this will be trimmed, and the new user and Hermes messages plus parsed ideas will be appended. The session's `lastMessageAt` will be updated on success.
+    /// - Returns: A `HermesResponse` containing the session id, the raw Hermes message text, and the parsed `[HermesIdea]`.
+    /// - Throws: `HermesError.emptyPrompt` if the prompt is empty after trimming; `HermesError.promptTooLong` if the prompt exceeds `maxPromptLength`; `HermesError.aiServiceFailed` if the AI service call fails.
     public func generateIdeas(
         _ prompt: String,
         in session: inout HermesSession
@@ -122,7 +130,12 @@ public class HermesService {
         )
     }
 
-    /// Expand on a specific idea by its UUID, generating deeper variations
+    /// Finds a previously generated idea by UUID, requests five deeper variations of it, and generates an expanded Hermes response appended to the session.
+    /// - Parameters:
+    ///   - ideaId: The UUID of the idea to expand.
+    ///   - session: The session to search for the idea and to update with the generated messages.
+    /// - Returns: A `HermesResponse` containing the raw Hermes message and the parsed expanded ideas.
+    /// - Throws: `HermesError.ideaNotFound(id:)` if no idea with the given `ideaId` exists in the session.
     public func expandIdea(
         _ ideaId: UUID,
         in session: inout HermesSession
@@ -149,17 +162,25 @@ public class HermesService {
 
     // MARK: - History
 
-    /// Return all messages in a session
+    /// Retrieve the session's message history in chronological order.
+    /// - Parameter session: The session whose messages are being retrieved.
+    /// - Returns: An array of `HermesMessage` in the session's stored order (oldest message first).
     public func getHistory(from session: HermesSession) -> [HermesMessage] {
         return session.messages
     }
 
-    /// Clear all messages in a session (context is preserved)
+    /// Clears all messages from the given session while preserving its other context (e.g., id, metadata, and session settings).
+    /// - Parameters:
+    ///   - session: The `HermesSession` whose message history will be removed.
     public func clearHistory(for session: inout HermesSession) {
         session.messages.removeAll()
     }
 
-    // MARK: - Private Helpers
+    /// Validates a user prompt by trimming surrounding whitespace and enforcing non-empty text and the configured maximum length.
+    /// - Parameter prompt: The raw user prompt; leading and trailing whitespace and newlines are ignored for validation.
+    /// - Throws:
+    ///   - `HermesError.emptyPrompt` if the trimmed prompt is empty.
+    ///   - `HermesError.promptTooLong` if the trimmed prompt's character count exceeds `maxPromptLength`.
 
     private func validatePrompt(_ prompt: String) throws {
         let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -171,6 +192,8 @@ public class HermesService {
         }
     }
 
+    /// Trims the session's message history to at most `maxHistoryMessages`, removing the oldest messages first.
+    /// - Parameter session: The session whose `messages` array will be modified; no change occurs if its count is already within the limit.
     private func trimHistory(_ session: inout HermesSession) {
         if session.messages.count > maxHistoryMessages {
             let excess = session.messages.count - maxHistoryMessages
@@ -178,6 +201,11 @@ public class HermesService {
         }
     }
 
+    /// Builds the composed user prompt sent to the Hermes AI, including story context, a recent exchange, and the final user turn.
+    /// - Parameters:
+    ///   - userText: The user's current input to place as the final `User:` line.
+    ///   - session: The session whose `context` (genre, logline, current scene, characters, themes) and recent messages are included.
+    /// - Returns: A single prompt string containing an optional "Story context" block, an optional "Recent exchange" block with up to the last 6 user/Hermes messages, and a trailing `User: <userText>\nHermes:` line.
     private func buildUserPrompt(userText: String, session: HermesSession) -> String {
         var prompt = ""
         let ctx = session.context
@@ -211,7 +239,11 @@ public class HermesService {
     }
 
     /// Parse a numbered idea list from Hermes's raw response text.
-    /// Exposed as `internal` so tests can call it directly without an API key.
+    /// Parses a raw Hermes AI response containing a numbered list of ideas into an array of `HermesIdea`.
+    /// 
+    /// The input may include numbered items like `1. Title` or `1. [TYPE] Title`, optional bold markdown (`*`), and multi-line descriptions; descriptions for each idea are concatenated into a single string and the `[TYPE]` tag (when present) is mapped to a `HermesIdeaType`.
+    /// - Parameter text: Raw AI response text containing a numbered list of ideas (may include optional `[TYPE]` tags and `*` markdown).
+    /// - Returns: An array of `HermesIdea` where each element has a `title`, a combined `description`, and a classified `ideaType`.
     internal func parseIdeas(from text: String) -> [HermesIdea] {
         var ideas: [HermesIdea] = []
         let lines = text.components(separatedBy: "\n")
@@ -220,6 +252,8 @@ public class HermesService {
         var currentType: HermesIdeaType = .plotHook
         var descLines: [String] = []
 
+        /// Finalizes the currently buffered idea and appends it to the accumulated ideas.
+        /// - Discussion: If no title is present, the function does nothing. Otherwise it builds the idea's description by trimming and joining collected description lines, appends a `HermesIdea` with the buffered title, description, and type to `ideas`, and then clears the buffered title and description lines.
         func flush() {
             guard let title = currentTitle, !title.isEmpty else { return }
             let desc = descLines
@@ -259,6 +293,9 @@ public class HermesService {
         return ideas
     }
 
+    /// Maps a textual idea tag to the corresponding `HermesIdeaType`.
+    /// - Parameter tag: The tag text extracted from an AI response (case-insensitive), e.g. "plot hook", "character trait".
+    /// - Returns: The matching `HermesIdeaType`; returns `.plotHook` when the tag is unrecognized.
     private func classifyIdeaType(from tag: String) -> HermesIdeaType {
         switch tag.lowercased() {
         case "plot hook":       return .plotHook
