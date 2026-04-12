@@ -89,13 +89,10 @@ public class HermesService {
     ) async throws -> HermesResponse {
         try validatePrompt(prompt)
 
-        // Append user message
-        session.messages.append(HermesMessage(role: .user, content: prompt))
-
-        // Trim history before making the API call
+        // Build the prompt from existing history BEFORE appending the new user
+        // message — otherwise the current turn would appear twice (once in the
+        // history block and once as the final "User: …\nHermes:" line).
         trimHistory(&session)
-
-        // Build full user prompt including context + conversation history
         let userPrompt = buildUserPrompt(userText: prompt, session: session)
 
         // Call Claude with the Hermes persona as the system prompt and tool support
@@ -111,15 +108,11 @@ public class HermesService {
             throw HermesError.aiServiceFailed(error.localizedDescription)
         }
 
-        // Parse structured ideas out of the response
+        // Persist both messages only after a successful round-trip so a failed
+        // API call never corrupts the session history.
         let ideas = parseIdeas(from: rawResponse)
-
-        // Append Hermes response message
-        session.messages.append(HermesMessage(
-            role: .hermes,
-            content: rawResponse,
-            ideas: ideas
-        ))
+        session.messages.append(HermesMessage(role: .user, content: prompt))
+        session.messages.append(HermesMessage(role: .hermes, content: rawResponse, ideas: ideas))
         session.lastMessageAt = Date()
 
         return HermesResponse(
@@ -169,7 +162,7 @@ public class HermesService {
     // MARK: - Private Helpers
 
     private func validatePrompt(_ prompt: String) throws {
-        let trimmed = prompt.trimmingCharacters(in: .whitespaces)
+        let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             throw HermesError.emptyPrompt
         }
