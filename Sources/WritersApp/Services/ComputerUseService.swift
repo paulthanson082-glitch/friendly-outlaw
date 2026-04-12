@@ -66,8 +66,10 @@ public class ComputerUseService {
         var performedActions: [ComputerUseAction] = []
         var finalResponse = ""
         var exhausted = false
+        var iterationCount = 0
 
         for iteration in 0..<configuration.maxIterations {
+            iterationCount = iteration + 1
             let requestBody = buildRequestBody(messages: messages, systemPrompt: systemPrompt)
             let request = try buildURLRequest(url: url, body: requestBody)
             let (data, response) = try await URLSession.shared.data(for: request)
@@ -159,7 +161,7 @@ public class ComputerUseService {
             task: task,
             finalResponse: finalResponse,
             actions: performedActions,
-            iterationCount: performedActions.isEmpty ? 1 : performedActions.count,
+            iterationCount: iterationCount,
             wasExhausted: exhausted
         )
     }
