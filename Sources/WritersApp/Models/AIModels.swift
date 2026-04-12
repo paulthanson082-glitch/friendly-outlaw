@@ -64,6 +64,7 @@ public enum AIAssistanceType {
     case verifyWithCitations
     case analyzeWithUncertainty
     case chainOfThoughtVerification
+    case writingAdvisor
 
     public var displayName: String {
         switch self {
@@ -87,6 +88,7 @@ public enum AIAssistanceType {
         case .verifyWithCitations: return "Verify with Citations"
         case .analyzeWithUncertainty: return "Analyze with Uncertainty"
         case .chainOfThoughtVerification: return "Chain of Thought Verification"
+        case .writingAdvisor: return "Writing Advisor"
         }
     }
 
@@ -332,6 +334,30 @@ public enum AIAssistanceType {
             \(text)
 
             Step-by-step analysis:
+            """
+
+        case .writingAdvisor:
+            return """
+            You are a personalized writing coach. Based on the writer's data below, \
+            provide 3-5 specific, actionable coaching recommendations.
+
+            Return ONLY valid JSON in this exact format:
+            {
+              "overallAssessment": "2-3 sentence honest assessment of the writer's current state",
+              "focusArea": "productivity|creativity|consistency|craft|goals",
+              "recommendations": [
+                {
+                  "category": "productivity|creativity|consistency|craft|goals",
+                  "priority": "high|medium|low",
+                  "title": "Short recommendation title",
+                  "recommendation": "Detailed, specific recommendation",
+                  "actionableSteps": ["Concrete step 1", "Concrete step 2", "Concrete step 3"]
+                }
+              ]
+            }
+
+            Writer's data:
+            \(text)
             """
         }
     }

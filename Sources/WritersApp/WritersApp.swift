@@ -17,6 +17,7 @@ public class WritersApp {
     public private(set) var chatbotService: ChatbotService?
     public private(set) var hermesService: HermesService?
     public private(set) var ragieService: RagieService?
+    public private(set) var writingAdvisorService: WritingAdvisorService?
     public private(set) var currentUserId: UUID?
     private var currentSessionId: UUID?
     private var memoryPlugin: ClaudeMemoryPlugin?
@@ -72,9 +73,11 @@ public class WritersApp {
                 documentManager: self.documentManager,
                 templateManager: self.templateManager
             )
+            self.writingAdvisorService = WritingAdvisorService(aiService: svc)
         } else {
             self.chatbotService = nil
             self.hermesService = nil
+            self.writingAdvisorService = nil
         }
         try? databaseManager.initialize()
     }
@@ -96,6 +99,7 @@ public class WritersApp {
             documentManager: self.documentManager,
             templateManager: self.templateManager
         )
+        self.writingAdvisorService = WritingAdvisorService(aiService: aiSvc)
         if let uid = userId {
             self.currentUserId = uid
             try? self.databaseManager.saveAIConfiguration(userId: uid, configuration: configuration)
@@ -109,6 +113,7 @@ public class WritersApp {
         self.aiService = nil
         self.chatbotService = nil
         self.hermesService = nil
+        self.writingAdvisorService = nil
     }
 
     /// Check if AI is available
@@ -949,6 +954,42 @@ public class WritersApp {
             toolExecutor: toolExecutor,
             context: context,
             maxIterations: maxIterations
+        )
+    }
+
+    // MARK: - Writing Advisor
+
+    /// Returns a full personalized coaching report with 3-5 recommendations based on
+    /// the writer's documents and session history.
+    public func getPersonalizedWritingAdvice(notes: String? = nil) async throws -> WritingAdvisorReport {
+        guard let advisorService = writingAdvisorService else { throw AIError.aiNotEnabled }
+        let context = buildAdvisorContext(additionalNotes: notes)
+        return try await advisorService.getAdvisorReport(context: context)
+    }
+
+    /// Returns a single focused recommendation for the specified coaching category.
+    public func getWritingAdvice(
+        for category: AdvisorCategory,
+        notes: String? = nil
+    ) async throws -> AdvisorRecommendation {
+        guard let advisorService = writingAdvisorService else { throw AIError.aiNotEnabled }
+        let context = buildAdvisorContext(additionalNotes: notes)
+        return try await advisorService.getRecommendation(for: category, context: context)
+    }
+
+    private func buildAdvisorContext(additionalNotes: String?) -> AdvisorContext {
+        let docs = documentManager.getAllDocuments()
+        let totalWords = docs.reduce(0) { $0 + $1.wordCount }
+        let titles = Array(docs.prefix(5).map { $0.title })
+        let categories = Array(Set(docs.map { $0.category.rawValue }))
+        let stats = currentUserId.flatMap { try? databaseManager.getSessionStats(userId: $0) }
+        return AdvisorContext(
+            totalDocuments: docs.count,
+            recentDocumentTitles: titles,
+            totalWordsAcrossDocuments: totalWords,
+            documentCategories: categories,
+            sessionStats: stats,
+            additionalNotes: additionalNotes
         )
     }
 
