@@ -217,6 +217,27 @@ public class WritersApp {
         return chatbotService?.isAdultModeEnabled ?? false
     }
 
+    // MARK: - Computer Use
+
+    /// Create a `ComputerUseService` wired to the active AI session.
+    ///
+    /// Returns `nil` if AI has not been enabled, so callers can guard accordingly.
+    ///
+    /// - Parameter executor: The platform-specific executor that takes screenshots and executes actions.
+    /// - Returns: A configured `ComputerUseService`, or `nil` if no AI service is active.
+    public func makeComputerUseService(
+        executor: ComputerUseExecutor,
+        configuration: ComputerUseConfiguration = ComputerUseConfiguration()
+    ) -> ComputerUseService? {
+        guard let ai = aiService else { return nil }
+        return ComputerUseService(
+            apiKey: ai.apiKey,
+            model: ai.currentModel,
+            executor: executor,
+            configuration: configuration
+        )
+    }
+
     // MARK: - Hermes (Creative Idea Generator)
 
     /// Start a new Hermes ideation session

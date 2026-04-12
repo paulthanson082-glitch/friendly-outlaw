@@ -8,6 +8,12 @@ public class AIService {
     private let configuration: AIConfiguration
     private let apiURL = "https://api.anthropic.com/v1/messages"
 
+    /// The raw model identifier string (e.g. "claude-3-5-sonnet-20241022")
+    var currentModel: String { configuration.model.rawValue }
+
+    /// The API key configured for this service
+    var apiKey: String { configuration.apiKey }
+
     public init(configuration: AIConfiguration) {
         self.configuration = configuration
     }
