@@ -82,10 +82,10 @@ public class WritersApp {
         try? databaseManager.initialize()
     }
 
-    /// Enables the application's AI features by creating and wiring AI-related services.
+    /// Initializes and enables AI services for the app using the provided configuration.
     /// - Parameters:
-    ///   - configuration: Configuration used to initialize the AI subsystem.
-    ///   - userId: Optional user identifier; when provided the AI configuration is associated with and persisted for that user.
+    ///   - configuration: Configuration used to create the AI service and related AI-enabled features.
+    ///   - userId: Optional user identifier; if provided, sets the current user and persists the AI configuration to the database (persistence errors are ignored).
     public func enableAI(configuration: AIConfiguration, userId: UUID? = nil) {
         let aiSvc = AIService(configuration: configuration)
         self.aiService = aiSvc
@@ -106,9 +106,9 @@ public class WritersApp {
         }
     }
 
-    /// Disables all AI features for the application.
+    /// Disables all AI functionality for the app.
     /// 
-    /// Clears the configured AI, chatbot, and Hermes service instances so AI-based functionality becomes unavailable.
+    /// Clears the configured AI service and any dependent AI-based helpers (chatbot, Hermes, and writing advisor), preventing further AI operations until AI is re-enabled.
     public func disableAI() {
         self.aiService = nil
         self.chatbotService = nil
@@ -933,7 +933,14 @@ public class WritersApp {
     ///
     /// This enables Claude to use built-in writing tools (word count, document search,
     /// template listing, reading time) during its response generation. The tool loop
-    /// continues until Claude produces a final text response.
+    /// Request AI assistance for a specific document using tool-enabled multi-step reasoning.
+    /// - Parameters:
+    ///   - documentId: The UUID of the document to analyze and assist with.
+    ///   - type: The kind of assistance to request (e.g., edit, brainstorm, outline).
+    ///   - context: Optional additional context to guide the AI.
+    ///   - maxIterations: Maximum number of tool-iteration cycles the AI may perform.
+    /// - Returns: An `AIResponse` containing the final assistant output and any tool results.
+    /// - Throws: `AIError.aiNotEnabled` if AI is not configured; `AIError.documentNotFound` if the document does not exist.
     public func getAIAssistanceWithTools(
         documentId: UUID,
         type: AIAssistanceType,
@@ -960,14 +967,23 @@ public class WritersApp {
     // MARK: - Writing Advisor
 
     /// Returns a full personalized coaching report with 3-5 recommendations based on
-    /// the writer's documents and session history.
+    /// Generate a personalized writing advisor report using the current documents and optional notes.
+    /// - Parameters:
+    ///   - notes: Optional additional notes to include in the advisor context.
+    /// - Returns: A `WritingAdvisorReport` containing personalized insights and recommendations.
+    /// - Throws: `AIError.aiNotEnabled` if the writing advisor service is not configured.
     public func getPersonalizedWritingAdvice(notes: String? = nil) async throws -> WritingAdvisorReport {
         guard let advisorService = writingAdvisorService else { throw AIError.aiNotEnabled }
         let context = buildAdvisorContext(additionalNotes: notes)
         return try await advisorService.getAdvisorReport(context: context)
     }
 
-    /// Returns a single focused recommendation for the specified coaching category.
+    /// Fetches a tailored writing recommendation for the specified advisor category using the current app context.
+    /// - Parameters:
+    ///   - category: The advisor category to request guidance for.
+    ///   - notes: Optional additional notes to include in the advisor context.
+    /// - Returns: An `AdvisorRecommendation` containing the advisor's recommendation for the given category.
+    /// - Throws: `AIError.aiNotEnabled` if the writing advisor service is not enabled.
     public func getWritingAdvice(
         for category: AdvisorCategory,
         notes: String? = nil
@@ -977,6 +993,15 @@ public class WritersApp {
         return try await advisorService.getRecommendation(for: category, context: context)
     }
 
+    /// Builds an AdvisorContext summarizing the current document corpus and optional user session data.
+    /// - Parameter additionalNotes: Optional free-form notes to include in the returned context.
+    /// - Returns: An AdvisorContext containing:
+    ///   - totalDocuments: the number of documents,
+    ///   - recentDocumentTitles: up to five most recent document titles,
+    ///   - totalWordsAcrossDocuments: cumulative word count across all documents,
+    ///   - documentCategories: unique category identifiers from the documents,
+    ///   - sessionStats: session statistics for the current user if available,
+    ///   - additionalNotes: the provided notes.
     private func buildAdvisorContext(additionalNotes: String?) -> AdvisorContext {
         let docs = documentManager.getAllDocuments()
         let totalWords = docs.reduce(0) { $0 + $1.wordCount }
@@ -993,7 +1018,12 @@ public class WritersApp {
         )
     }
 
-    /// Brainstorm ideas for a topic
+    /// Generates brainstorming suggestions for the given subject.
+    /// - Parameters:
+    ///   - topic: The subject or prompt to generate ideas about.
+    ///   - context: Optional contextual hints (tone, constraints, or additional prompts) to guide generation.
+    /// - Returns: A string containing AI-generated brainstorming suggestions for the provided topic.
+    /// - Throws: `AIError.aiNotEnabled` if the AI service is not configured.
     public func brainstormIdeas(
         topic: String,
         context: AIContext? = nil
