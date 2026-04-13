@@ -986,7 +986,7 @@ public class WritersApp {
 
     // MARK: - Writing Advisor
 
-    /// Returns personalised writing advice for the current writer.
+    /// Returns personalized writing advice for the current writer.
     ///
     /// - Parameter notes: Optional additional context or focus area for the advice.
     /// - Returns: A `WritingAdvisorReport` with coaching recommendations.

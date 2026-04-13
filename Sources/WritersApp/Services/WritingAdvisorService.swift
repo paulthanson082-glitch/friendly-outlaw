@@ -42,7 +42,7 @@ public class WritingAdvisorService {
 
     // MARK: - Advice Generation
 
-    /// Generates personalised writing advice.
+    /// Generates personalized writing advice.
     public func getPersonalizedAdvice(notes: String? = nil) async throws -> WritingAdvisorReport {
         let ctx = AdvisorContext(
             totalDocuments: 0,
