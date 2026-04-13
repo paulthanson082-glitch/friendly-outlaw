@@ -17,6 +17,7 @@ public class WritersApp {
     public private(set) var chatbotService: ChatbotService?
     public private(set) var hermesService: HermesService?
     public private(set) var ragieService: RagieService?
+    public private(set) var writingAdvisorService: WritingAdvisorService?
     public private(set) var currentUserId: UUID?
     private var currentSessionId: UUID?
     private var memoryPlugin: ClaudeMemoryPlugin?
@@ -72,9 +73,11 @@ public class WritersApp {
                 documentManager: self.documentManager,
                 templateManager: self.templateManager
             )
+            self.writingAdvisorService = WritingAdvisorService(aiService: svc)
         } else {
             self.chatbotService = nil
             self.hermesService = nil
+            self.writingAdvisorService = nil
         }
         try? databaseManager.initialize()
     }
@@ -96,6 +99,7 @@ public class WritersApp {
             documentManager: self.documentManager,
             templateManager: self.templateManager
         )
+        self.writingAdvisorService = WritingAdvisorService(aiService: aiSvc)
         if let uid = userId {
             self.currentUserId = uid
             try? self.databaseManager.saveAIConfiguration(userId: uid, configuration: configuration)
@@ -109,6 +113,7 @@ public class WritersApp {
         self.aiService = nil
         self.chatbotService = nil
         self.hermesService = nil
+        self.writingAdvisorService = nil
     }
 
     /// Check if AI is available
@@ -977,6 +982,28 @@ public class WritersApp {
     ) async throws -> String {
         guard let ai = aiService else { throw AIError.aiNotEnabled }
         return try await ai.developCharacter(characterConcept: characterConcept, context: context)
+    }
+
+    // MARK: - Writing Advisor
+
+    /// Returns personalised writing advice for the current writer.
+    ///
+    /// - Parameter notes: Optional additional context or focus area for the advice.
+    /// - Returns: A `WritingAdvisorReport` with coaching recommendations.
+    /// - Throws: `AIError.aiNotEnabled` if AI has not been configured.
+    public func getPersonalizedWritingAdvice(notes: String? = nil) async throws -> WritingAdvisorReport {
+        guard let advisor = writingAdvisorService else { throw AIError.aiNotEnabled }
+        return try await advisor.getPersonalizedAdvice(notes: notes)
+    }
+
+    /// Returns writing advice focused on a specific advisor category.
+    ///
+    /// - Parameter category: The category of advice to generate.
+    /// - Returns: A `WritingAdvisorReport` focused on the requested category.
+    /// - Throws: `AIError.aiNotEnabled` if AI has not been configured.
+    public func getWritingAdvice(for category: AdvisorCategory) async throws -> WritingAdvisorReport {
+        guard let advisor = writingAdvisorService else { throw AIError.aiNotEnabled }
+        return try await advisor.getAdvice(for: category)
     }
 
     // MARK: - Hallucination Reduction Methods
