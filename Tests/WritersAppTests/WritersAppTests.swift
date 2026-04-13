@@ -2431,121 +2431,133 @@ final class ScreenplayTemplateContentTests: XCTestCase {
         XCTAssertFalse(screenplay.metadata.tags.contains("professional"),
                        "'professional' tag must have been removed from the screenplay template")
     }
+}
 
-    // MARK: - Hermes Tests
+// MARK: - Writing Advisor Tests
 
-    func testHermesContextDefaults() {
-        let ctx = HermesContext()
-        XCTAssertEqual(ctx.genre, "")
-        XCTAssertEqual(ctx.logline, "")
-        XCTAssertEqual(ctx.currentScene, "")
-        XCTAssertTrue(ctx.characters.isEmpty)
-        XCTAssertTrue(ctx.themes.isEmpty)
-        XCTAssertNil(ctx.documentId)
+final class WritingAdvisorBasicTests: XCTestCase {
+
+    func testAdvisorCategoryAllCasesCount() {
+        XCTAssertEqual(AdvisorCategory.allCases.count, 5)
     }
 
-    func testHermesContextWithAllFields() {
-        let docId = UUID()
-        let ctx = HermesContext(
-            genre: "Fantasy",
-            logline: "A dragon seeks redemption",
-            currentScene: "Throne room confrontation",
-            characters: ["Kira", "The Dragon"],
-            themes: ["redemption", "power"],
-            documentId: docId
-        )
-        XCTAssertEqual(ctx.genre, "Fantasy")
-        XCTAssertEqual(ctx.logline, "A dragon seeks redemption")
-        XCTAssertEqual(ctx.currentScene, "Throne room confrontation")
-        XCTAssertEqual(ctx.characters, ["Kira", "The Dragon"])
-        XCTAssertEqual(ctx.themes, ["redemption", "power"])
-        XCTAssertEqual(ctx.documentId, docId)
+    func testAdvisorPriorityAllCasesCount() {
+        XCTAssertEqual(AdvisorPriority.allCases.count, 3)
     }
 
-    func testHermesSessionStartsEmpty() {
-        let session = HermesSession()
-        XCTAssertTrue(session.messages.isEmpty)
-        XCTAssertNotNil(session.id)
-    }
-
-    func testHermesIdeaTypeCodable() throws {
-        let idea = HermesIdea(title: "Test", description: "A description", ideaType: .twist)
-        let data = try JSONEncoder().encode(idea)
-        let decoded = try JSONDecoder().decode(HermesIdea.self, from: data)
-        XCTAssertEqual(decoded.ideaType, .twist)
-        XCTAssertEqual(decoded.title, "Test")
-        XCTAssertEqual(decoded.description, "A description")
-    }
-
-    func testHermesIdeaTypeAllCasesHaveDisplayName() {
-        for type in HermesIdeaType.allCases {
-            XCTAssertFalse(type.displayName.isEmpty, "\(type.rawValue) must have a non-empty displayName")
+    func testAdvisorCategoryDisplayNamesNonEmpty() {
+        for category in AdvisorCategory.allCases {
+            XCTAssertFalse(category.displayName.isEmpty,
+                           "\(category.rawValue) displayName must not be empty")
         }
     }
 
-    func testHermesIdeaParsingNumberedList() {
-        let service = HermesService(
-            aiService: AIService(configuration: AIConfiguration(apiKey: "test-key")),
-            documentManager: app.documentManager,
-            templateManager: app.templateManager
+    func testAdvisorRecommendationIsIdentifiable() {
+        let rec1 = AdvisorRecommendation(
+            category: .productivity,
+            priority: .high,
+            title: "Write More",
+            recommendation: "Set a daily word goal.",
+            actionableSteps: ["Open app", "Write 500 words"]
         )
-        let sampleResponse = """
-        1. [PLOT HOOK] The Last Cartographer
-           Maps have started appearing that show places that don't exist — yet.
-        2. [CHARACTER TRAIT] Pathological Honesty
-           A character who literally cannot lie, not even to be kind.
-        3. [TWIST] The Villain Was Right
-           The antagonist's goal turns out to be the only thing that saves the world.
-        """
-        let ideas = service.parseIdeas(from: sampleResponse)
-        XCTAssertEqual(ideas.count, 3)
-        XCTAssertEqual(ideas[0].ideaType, .plotHook)
-        XCTAssertEqual(ideas[0].title, "The Last Cartographer")
-        XCTAssertEqual(ideas[1].ideaType, .characterTrait)
-        XCTAssertEqual(ideas[1].title, "Pathological Honesty")
-        XCTAssertEqual(ideas[2].ideaType, .twist)
-        XCTAssertEqual(ideas[2].title, "The Villain Was Right")
-    }
-
-    func testHermesIdeaParsingEmptyResponse() {
-        let service = HermesService(
-            aiService: AIService(configuration: AIConfiguration(apiKey: "test-key")),
-            documentManager: app.documentManager,
-            templateManager: app.templateManager
+        let rec2 = AdvisorRecommendation(
+            category: .craft,
+            priority: .medium,
+            title: "Improve Dialogue",
+            recommendation: "Read your dialogue aloud.",
+            actionableSteps: ["Read aloud", "Edit"]
         )
-        let ideas = service.parseIdeas(from: "")
-        XCTAssertTrue(ideas.isEmpty)
+        XCTAssertNotEqual(rec1.id, rec2.id)
     }
 
-    func testHermesIdeaParsingUnknownTypeDefaultsToPlotHook() {
-        let service = HermesService(
-            aiService: AIService(configuration: AIConfiguration(apiKey: "test-key")),
-            documentManager: app.documentManager,
-            templateManager: app.templateManager
+    func testAdvisorRecommendationCodable() throws {
+        let original = AdvisorRecommendation(
+            id: UUID(),
+            category: .consistency,
+            priority: .low,
+            title: "Stay Consistent",
+            recommendation: "Write every day.",
+            actionableSteps: ["Set a timer", "Write for 10 minutes"],
+            generatedAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
-        let response = "1. [UNKNOWN TAG] Some weird idea\n   Description here."
-        let ideas = service.parseIdeas(from: response)
-        XCTAssertEqual(ideas.count, 1)
-        XCTAssertEqual(ideas[0].ideaType, .plotHook)
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(AdvisorRecommendation.self, from: data)
+        XCTAssertEqual(decoded.id, original.id)
+        XCTAssertEqual(decoded.category, original.category)
+        XCTAssertEqual(decoded.priority, original.priority)
+        XCTAssertEqual(decoded.title, original.title)
+        XCTAssertEqual(decoded.recommendation, original.recommendation)
+        XCTAssertEqual(decoded.actionableSteps, original.actionableSteps)
     }
 
-    func testHermesServiceNotAvailableWithoutAI() {
-        // app is initialized with WritersApp() — no AI config
-        XCTAssertNil(app.hermesService)
+    func testWritingAdvisorReportCodable() throws {
+        let rec = AdvisorRecommendation(
+            category: .goals,
+            priority: .high,
+            title: "Set a Goal",
+            recommendation: "Define a clear project goal.",
+            actionableSteps: ["Pick a target word count", "Set a deadline"]
+        )
+        let report = WritingAdvisorReport(
+            recommendations: [rec],
+            overallAssessment: "You are making solid progress.",
+            focusArea: .goals,
+            generatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let data = try JSONEncoder().encode(report)
+        let decoded = try JSONDecoder().decode(WritingAdvisorReport.self, from: data)
+        XCTAssertEqual(decoded.recommendations.count, 1)
+        XCTAssertEqual(decoded.overallAssessment, report.overallAssessment)
+        XCTAssertEqual(decoded.focusArea, report.focusArea)
     }
 
-    func testHermesServiceAvailableAfterEnableAI() {
-        app.enableAI(configuration: AIConfiguration(apiKey: "test-key"))
-        XCTAssertNotNil(app.hermesService)
-        app.disableAI()
-        XCTAssertNil(app.hermesService)
-    }
-
-    func testStartHermesSessionThrowsWhenNoAI() {
-        // No AI enabled — should throw
-        XCTAssertThrowsError(try app.startHermesSession()) { error in
-            XCTAssertTrue(error is HermesError)
+    func testWritingAdvisorServiceRequiresAI() async {
+        let noAIApp = WritersApp()
+        do {
+            _ = try await noAIApp.getPersonalizedWritingAdvice()
+            XCTFail("Expected AIError.aiNotEnabled to be thrown")
+        } catch AIError.aiNotEnabled {
+            // expected
+        } catch {
+            XCTFail("Unexpected error: \(error)")
         }
+    }
+
+    func testWritingAdvisorServiceCreatedWhenAIEnabled() {
+        let config = AIConfiguration(apiKey: "test-key")
+        let aiApp = WritersApp(aiConfiguration: config)
+        XCTAssertNotNil(aiApp.writingAdvisorService,
+                        "writingAdvisorService must be non-nil when AI is enabled at init")
+    }
+
+    func testWritingAdvisorServiceNilledWhenAIDisabled() {
+        let config = AIConfiguration(apiKey: "test-key")
+        let aiApp = WritersApp(aiConfiguration: config)
+        XCTAssertNotNil(aiApp.writingAdvisorService)
+        aiApp.disableAI()
+        XCTAssertNil(aiApp.writingAdvisorService,
+                     "writingAdvisorService must be nil after disableAI()")
+    }
+
+    func testAIAssistanceTypeHasWritingAdvisorCase() {
+        let type = AIAssistanceType.writingAdvisor
+        XCTAssertEqual(type.displayName, "Writing Advisor")
+    }
+
+    func testWritingAdvisorPromptIsNonEmpty() {
+        let prompt = AIAssistanceType.writingAdvisor.prompt(for: "Documents: 5 total", context: nil)
+        XCTAssertFalse(prompt.isEmpty, "Writing advisor prompt must not be empty")
+        XCTAssertTrue(prompt.contains("JSON"),
+                      "Writing advisor prompt must instruct Claude to return JSON")
+    }
+
+    func testWritingAdvisorServiceCreatedByEnableAI() {
+        let app = WritersApp()
+        XCTAssertNil(app.writingAdvisorService)
+        let config = AIConfiguration(apiKey: "test-key")
+        app.enableAI(configuration: config)
+        XCTAssertNotNil(app.writingAdvisorService,
+                        "writingAdvisorService must be non-nil after enableAI()")
     }
 }
 
