@@ -121,6 +121,22 @@ public class WritersApp {
         return aiService != nil
     }
 
+    // MARK: - Computer Use
+
+    /// Creates a `ComputerUseService` if AI is currently enabled, otherwise returns `nil`.
+    ///
+    /// - Parameters:
+    ///   - executor: The object responsible for taking screenshots and executing actions.
+    ///   - configuration: Optional configuration for the session (defaults apply if omitted).
+    /// - Returns: A configured `ComputerUseService`, or `nil` when no AI service is active.
+    public func makeComputerUseService(
+        executor: ComputerUseExecutor,
+        configuration: ComputerUseConfiguration = ComputerUseConfiguration()
+    ) -> ComputerUseService? {
+        guard let svc = aiService else { return nil }
+        return ComputerUseService(aiService: svc, executor: executor, configuration: configuration)
+    }
+
     // MARK: - Ragie Integration
 
     /// Initializes and enables the Ragie integration using the provided configuration.
