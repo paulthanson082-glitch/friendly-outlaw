@@ -931,8 +931,6 @@ public class WritersApp {
 
     /// Get AI assistance with tool support (implements the tool loop pattern).
     ///
-    /// This enables Claude to use built-in writing tools (word count, document search,
-    /// template listing, reading time) during its response generation. The tool loop
     /// Request AI assistance for a specific document using tool-enabled multi-step reasoning.
     /// - Parameters:
     ///   - documentId: The UUID of the document to analyze and assist with.
@@ -966,7 +964,6 @@ public class WritersApp {
 
     // MARK: - Writing Advisor
 
-    /// Returns a full personalized coaching report with 3-5 recommendations based on
     /// Generate a personalized writing advisor report using the current documents and optional notes.
     /// - Parameters:
     ///   - notes: Optional additional notes to include in the advisor context.
