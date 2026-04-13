@@ -2431,9 +2431,10 @@ final class ScreenplayTemplateContentTests: XCTestCase {
         XCTAssertFalse(screenplay.metadata.tags.contains("professional"),
                        "'professional' tag must have been removed from the screenplay template")
     }
+
 }
 
-// MARK: - Writing Advisor Tests
+// MARK: - Writing Advisor Basic Tests
 
 final class WritingAdvisorBasicTests: XCTestCase {
 
