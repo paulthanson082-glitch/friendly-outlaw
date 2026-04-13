@@ -2431,9 +2431,125 @@ final class ScreenplayTemplateContentTests: XCTestCase {
         XCTAssertFalse(screenplay.metadata.tags.contains("professional"),
                        "'professional' tag must have been removed from the screenplay template")
     }
+
+    // MARK: - Hermes Tests
+
+    func testHermesContextDefaults() {
+        let ctx = HermesContext()
+        XCTAssertEqual(ctx.genre, "")
+        XCTAssertEqual(ctx.logline, "")
+        XCTAssertEqual(ctx.currentScene, "")
+        XCTAssertTrue(ctx.characters.isEmpty)
+        XCTAssertTrue(ctx.themes.isEmpty)
+        XCTAssertNil(ctx.documentId)
+    }
+
+    func testHermesContextWithAllFields() {
+        let docId = UUID()
+        let ctx = HermesContext(
+            genre: "Fantasy",
+            logline: "A dragon seeks redemption",
+            currentScene: "Throne room confrontation",
+            characters: ["Kira", "The Dragon"],
+            themes: ["redemption", "power"],
+            documentId: docId
+        )
+        XCTAssertEqual(ctx.genre, "Fantasy")
+        XCTAssertEqual(ctx.logline, "A dragon seeks redemption")
+        XCTAssertEqual(ctx.currentScene, "Throne room confrontation")
+        XCTAssertEqual(ctx.characters, ["Kira", "The Dragon"])
+        XCTAssertEqual(ctx.themes, ["redemption", "power"])
+        XCTAssertEqual(ctx.documentId, docId)
+    }
+
+    func testHermesSessionStartsEmpty() {
+        let session = HermesSession()
+        XCTAssertTrue(session.messages.isEmpty)
+        XCTAssertNotNil(session.id)
+    }
+
+    func testHermesIdeaTypeCodable() throws {
+        let idea = HermesIdea(title: "Test", description: "A description", ideaType: .twist)
+        let data = try JSONEncoder().encode(idea)
+        let decoded = try JSONDecoder().decode(HermesIdea.self, from: data)
+        XCTAssertEqual(decoded.ideaType, .twist)
+        XCTAssertEqual(decoded.title, "Test")
+        XCTAssertEqual(decoded.description, "A description")
+    }
+
+    func testHermesIdeaTypeAllCasesHaveDisplayName() {
+        for type in HermesIdeaType.allCases {
+            XCTAssertFalse(type.displayName.isEmpty, "\(type.rawValue) must have a non-empty displayName")
+        }
+    }
+
+    func testHermesIdeaParsingNumberedList() {
+        let service = HermesService(
+            aiService: AIService(configuration: AIConfiguration(apiKey: "test-key")),
+            documentManager: app.documentManager,
+            templateManager: app.templateManager
+        )
+        let sampleResponse = """
+        1. [PLOT HOOK] The Last Cartographer
+           Maps have started appearing that show places that don't exist — yet.
+        2. [CHARACTER TRAIT] Pathological Honesty
+           A character who literally cannot lie, not even to be kind.
+        3. [TWIST] The Villain Was Right
+           The antagonist's goal turns out to be the only thing that saves the world.
+        """
+        let ideas = service.parseIdeas(from: sampleResponse)
+        XCTAssertEqual(ideas.count, 3)
+        XCTAssertEqual(ideas[0].ideaType, .plotHook)
+        XCTAssertEqual(ideas[0].title, "The Last Cartographer")
+        XCTAssertEqual(ideas[1].ideaType, .characterTrait)
+        XCTAssertEqual(ideas[1].title, "Pathological Honesty")
+        XCTAssertEqual(ideas[2].ideaType, .twist)
+        XCTAssertEqual(ideas[2].title, "The Villain Was Right")
+    }
+
+    func testHermesIdeaParsingEmptyResponse() {
+        let service = HermesService(
+            aiService: AIService(configuration: AIConfiguration(apiKey: "test-key")),
+            documentManager: app.documentManager,
+            templateManager: app.templateManager
+        )
+        let ideas = service.parseIdeas(from: "")
+        XCTAssertTrue(ideas.isEmpty)
+    }
+
+    func testHermesIdeaParsingUnknownTypeDefaultsToPlotHook() {
+        let service = HermesService(
+            aiService: AIService(configuration: AIConfiguration(apiKey: "test-key")),
+            documentManager: app.documentManager,
+            templateManager: app.templateManager
+        )
+        let response = "1. [UNKNOWN TAG] Some weird idea\n   Description here."
+        let ideas = service.parseIdeas(from: response)
+        XCTAssertEqual(ideas.count, 1)
+        XCTAssertEqual(ideas[0].ideaType, .plotHook)
+    }
+
+    func testHermesServiceNotAvailableWithoutAI() {
+        // app is initialized with WritersApp() — no AI config
+        XCTAssertNil(app.hermesService)
+    }
+
+    func testHermesServiceAvailableAfterEnableAI() {
+        app.enableAI(configuration: AIConfiguration(apiKey: "test-key"))
+        XCTAssertNotNil(app.hermesService)
+        app.disableAI()
+        XCTAssertNil(app.hermesService)
+    }
+
+    func testStartHermesSessionThrowsWhenNoAI() {
+        // No AI enabled — should throw
+        XCTAssertThrowsError(try app.startHermesSession()) { error in
+            XCTAssertTrue(error is HermesError)
+        }
+    }
 }
 
-// MARK: - Writing Advisor Tests
+// MARK: - Writing Advisor Basic Tests
 
 final class WritingAdvisorBasicTests: XCTestCase {
 
