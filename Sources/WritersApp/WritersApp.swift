@@ -947,9 +947,10 @@ public class WritersApp {
 
     /// Get AI assistance with tool support (implements the tool loop pattern).
     ///
+    /// Request AI assistance for a specific document using tool-enabled multi-step reasoning.
     /// This enables Claude to use built-in writing tools (word count, document search,
     /// template listing, reading time) during its response generation. The tool loop
-    /// Request AI assistance for a specific document using tool-enabled multi-step reasoning.
+    /// continues until Claude produces a final text response.
     /// - Parameters:
     ///   - documentId: The UUID of the document to analyze and assist with.
     ///   - type: The kind of assistance to request (e.g., edit, brainstorm, outline).
