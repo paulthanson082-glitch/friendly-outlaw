@@ -1027,7 +1027,7 @@ public class WritersAppViewModel: ObservableObject {
         let formattedLines = lines.map { line -> String in
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             // Check if line starts with any number followed by ". "
-            if trimmed.hasPrefix(where: { $0.isNumber }) {
+            if trimmed.first?.isNumber == true {
                 // Try to extract and remove existing number
                 let parts = trimmed.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
                 if parts.count >= 2 && parts[0].allSatisfy({ $0.isNumber }) && parts[1].hasPrefix(" ") {
