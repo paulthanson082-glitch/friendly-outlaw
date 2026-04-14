@@ -966,6 +966,15 @@ public class WritersApp {
         return try await ai.brainstormIdeas(topic: topic, context: context)
     }
 
+    /// Brainstorm ideas organized by category
+    public func brainstormIdeasCategorized(
+        topic: String,
+        context: AIContext? = nil
+    ) async throws -> BrainstormResult {
+        guard let ai = aiService else { throw AIError.aiNotEnabled }
+        return try await ai.brainstormIdeasCategorized(topic: topic, context: context)
+    }
+
     /// Generate outline from concept
     public func generateOutline(
         concept: String,
