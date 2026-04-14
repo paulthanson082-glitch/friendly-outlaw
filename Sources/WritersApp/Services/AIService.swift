@@ -535,6 +535,68 @@ public class AIService {
         return toolResults
     }
 
+    // MARK: - Vision Support
+
+    /// Get AI assistance with vision content (text + image)
+    ///
+    /// Sends a request to Claude with both text and image data. Useful for computer use,
+    /// screenshot analysis, and other vision-based tasks.
+    /// - Parameters:
+    ///   - text: The text prompt or instruction
+    ///   - imageBase64: Base64-encoded image data
+    ///   - mediaType: MIME type of the image (e.g., "image/png", "image/jpeg")
+    /// - Returns: The assistant's text response
+    public func getAssistanceWithVision(
+        text: String,
+        imageBase64: String,
+        mediaType: String = "image/png"
+    ) async throws -> String {
+        guard let url = URL(string: apiURL) else {
+            throw AIServiceError.invalidURL
+        }
+
+        let contentArray: [[String: Any]] = [
+            [
+                "type": "image",
+                "source": [
+                    "type": "base64",
+                    "media_type": mediaType,
+                    "data": imageBase64
+                ]
+            ],
+            [
+                "type": "text",
+                "text": text
+            ]
+        ]
+
+        let messages: [[String: Any]] = [
+            ["role": "user", "content": contentArray]
+        ]
+
+        let request = try buildAPIURLRequest(url: url, messages: messages, toolDefinitions: [])
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AIServiceError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw AIServiceError.apiError(statusCode: httpResponse.statusCode, message: "Request failed")
+        }
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let content = json["content"] as? [[String: Any]] else {
+            throw AIServiceError.invalidResponseFormat
+        }
+
+        guard let responseText = extractText(from: content) else {
+            throw AIServiceError.invalidResponseFormat
+        }
+
+        return responseText
+    }
+
     // MARK: - Batch Operations
 
     /// Process multiple requests in batch
