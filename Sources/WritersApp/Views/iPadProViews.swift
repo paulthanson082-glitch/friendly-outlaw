@@ -924,40 +924,49 @@ public class WritersAppViewModel: ObservableObject {
     // MARK: - Formatting
 
     public func toggleBold() {
-        let trimmed = currentDocumentContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        let original = currentDocumentContent
+        let trimmed = original.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.hasPrefix("**") && trimmed.hasSuffix("**") && trimmed.count > 4 {
-            // Remove bold formatting
+            // Remove bold formatting while preserving surrounding whitespace
             let withoutMarkers = String(trimmed.dropFirst(2).dropLast(2))
-            currentDocumentContent = withoutMarkers
+            let leading = original.prefix(while: { $0.isWhitespace || $0.isNewline })
+            let trailing = original.reversed().prefix(while: { $0.isWhitespace || $0.isNewline }).reversed()
+            currentDocumentContent = leading + withoutMarkers + trailing
         } else {
             // Add bold formatting
-            currentDocumentContent = "**\(currentDocumentContent)**"
+            currentDocumentContent = "**\(original)**"
         }
         updateStatistics()
     }
 
     public func toggleItalic() {
-        let trimmed = currentDocumentContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        let original = currentDocumentContent
+        let trimmed = original.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.hasPrefix("*") && trimmed.hasSuffix("*") && !trimmed.hasPrefix("**") && trimmed.count > 2 {
-            // Remove italic formatting
+            // Remove italic formatting while preserving surrounding whitespace
             let withoutMarkers = String(trimmed.dropFirst().dropLast())
-            currentDocumentContent = withoutMarkers
+            let leading = original.prefix(while: { $0.isWhitespace || $0.isNewline })
+            let trailing = original.reversed().prefix(while: { $0.isWhitespace || $0.isNewline }).reversed()
+            currentDocumentContent = leading + withoutMarkers + trailing
         } else {
             // Add italic formatting
-            currentDocumentContent = "*\(currentDocumentContent)*"
+            currentDocumentContent = "*\(original)*"
         }
         updateStatistics()
     }
 
     public func toggleUnderline() {
-        let trimmed = currentDocumentContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        let original = currentDocumentContent
+        let trimmed = original.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.hasPrefix("<u>") && trimmed.hasSuffix("</u>") && trimmed.count > 7 {
-            // Remove underline formatting
+            // Remove underline formatting while preserving surrounding whitespace
             let withoutMarkers = String(trimmed.dropFirst(3).dropLast(4))
-            currentDocumentContent = withoutMarkers
+            let leading = original.prefix(while: { $0.isWhitespace || $0.isNewline })
+            let trailing = original.reversed().prefix(while: { $0.isWhitespace || $0.isNewline }).reversed()
+            currentDocumentContent = leading + withoutMarkers + trailing
         } else {
             // Add underline formatting using HTML (native Markdown has no underline)
-            currentDocumentContent = "<u>\(currentDocumentContent)</u>"
+            currentDocumentContent = "<u>\(original)</u>"
         }
         updateStatistics()
     }
@@ -966,40 +975,49 @@ public class WritersAppViewModel: ObservableObject {
         let trimmed = currentDocumentContent.trimmingCharacters(in: .whitespacesAndNewlines)
         let headingPrefix = String(repeating: "#", count: level)
 
-        // Check if already a heading and remove existing heading level
+        // Strip existing heading prefix (any run of # followed by optional whitespace)
         if trimmed.hasPrefix("#") {
-            let components = trimmed.split(separator: " ", maxSplits: 1)
-            let content = components.count > 1 ? String(components[1]) : trimmed
-            currentDocumentContent = "\(headingPrefix) \(content)"
+            var contentStart = trimmed.startIndex
+            while contentStart < trimmed.endIndex && trimmed[contentStart] == "#" {
+                contentStart = trimmed.index(after: contentStart)
+            }
+            while contentStart < trimmed.endIndex && trimmed[contentStart].isWhitespace {
+                contentStart = trimmed.index(after: contentStart)
+            }
+            let content = String(trimmed[contentStart...])
+            currentDocumentContent = content.isEmpty ? headingPrefix : "\(headingPrefix) \(content)"
         } else {
-            currentDocumentContent = "\(headingPrefix) \(currentDocumentContent)"
+            currentDocumentContent = trimmed.isEmpty ? headingPrefix : "\(headingPrefix) \(currentDocumentContent)"
         }
         updateStatistics()
     }
 
     public func applyBodyStyle() {
-        // Reset to plain text (remove markdown formatting markers)
+        // Reset to plain text — remove all markdown/HTML formatting throughout the document
         var plainText = currentDocumentContent
 
-        // Remove heading markers at line start
-        if let regex = try? NSRegularExpression(pattern: "^#+\\s+", options: []) {
+        // Remove heading markers at the start of each line (multiline-aware)
+        if let regex = try? NSRegularExpression(pattern: "^#+\\s*", options: [.anchorsMatchLines]) {
             let range = NSRange(plainText.startIndex..<plainText.endIndex, in: plainText)
             plainText = regex.stringByReplacingMatches(in: plainText, options: [], range: range, withTemplate: "")
         }
 
-        // Remove bold formatting (**text**)
-        if plainText.hasPrefix("**") && plainText.hasSuffix("**") && plainText.count > 4 {
-            plainText = String(plainText.dropFirst(2).dropLast(2))
+        // Remove bold formatting (**text**) throughout the document
+        if let regex = try? NSRegularExpression(pattern: "\\*\\*(.*?)\\*\\*", options: [.dotMatchesLineSeparators]) {
+            let range = NSRange(plainText.startIndex..<plainText.endIndex, in: plainText)
+            plainText = regex.stringByReplacingMatches(in: plainText, options: [], range: range, withTemplate: "$1")
         }
 
-        // Remove italic formatting (*text*)
-        if plainText.hasPrefix("*") && plainText.hasSuffix("*") && plainText.count > 2 && !plainText.hasPrefix("**") {
-            plainText = String(plainText.dropFirst().dropLast())
+        // Remove italic formatting (*text*) throughout the document
+        if let regex = try? NSRegularExpression(pattern: "\\*(.*?)\\*", options: [.dotMatchesLineSeparators]) {
+            let range = NSRange(plainText.startIndex..<plainText.endIndex, in: plainText)
+            plainText = regex.stringByReplacingMatches(in: plainText, options: [], range: range, withTemplate: "$1")
         }
 
-        // Remove underline formatting (<u>text</u>)
-        if plainText.hasPrefix("<u>") && plainText.hasSuffix("</u>") && plainText.count > 7 {
-            plainText = String(plainText.dropFirst(3).dropLast(4))
+        // Remove underline formatting (<u>text</u>) throughout the document
+        if let regex = try? NSRegularExpression(pattern: "<u>(.*?)</u>", options: [.dotMatchesLineSeparators]) {
+            let range = NSRange(plainText.startIndex..<plainText.endIndex, in: plainText)
+            plainText = regex.stringByReplacingMatches(in: plainText, options: [], range: range, withTemplate: "$1")
         }
 
         currentDocumentContent = plainText
@@ -1023,27 +1041,38 @@ public class WritersAppViewModel: ObservableObject {
 
     public func toggleNumberedList() {
         let lines = currentDocumentContent.split(separator: "\n", omittingEmptySubsequences: false)
-        var itemNumber = 1
-        let formattedLines = lines.map { line -> String in
+
+        // Detect if all non-empty lines already start with a numbered list pattern
+        let nonEmptyLines = lines.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        let allNumbered = !nonEmptyLines.isEmpty && nonEmptyLines.allSatisfy { line in
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            // Check if line starts with any number followed by ". "
-            if trimmed.first?.isNumber == true {
-                // Try to extract and remove existing number
+            let parts = trimmed.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
+            return parts.count >= 2 && parts[0].allSatisfy({ $0.isNumber }) && String(parts[1]).hasPrefix(" ")
+        }
+
+        let formattedLines: [String]
+        if allNumbered {
+            // Toggle off: strip numbered list prefixes
+            formattedLines = lines.map { line -> String in
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
                 let parts = trimmed.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
-                if parts.count >= 2 && parts[0].allSatisfy({ $0.isNumber }) && parts[1].hasPrefix(" ") {
-                    // Remove existing number
-                    let content = String(parts[1]).trimmingCharacters(in: .whitespaces)
-                    let result = "\(itemNumber). \(content)"
+                if parts.count >= 2 && parts[0].allSatisfy({ $0.isNumber }) && String(parts[1]).hasPrefix(" ") {
+                    return String(parts[1]).trimmingCharacters(in: .whitespaces)
+                }
+                return String(line)
+            }
+        } else {
+            // Toggle on: add numbered list prefixes
+            var itemNumber = 1
+            formattedLines = lines.map { line -> String in
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if !trimmed.isEmpty {
+                    let result = "\(itemNumber). \(trimmed)"
                     itemNumber += 1
                     return result
                 }
+                return String(line)
             }
-            if !trimmed.isEmpty {
-                let result = "\(itemNumber). \(trimmed)"
-                itemNumber += 1
-                return result
-            }
-            return String(line)
         }
         currentDocumentContent = formattedLines.joined(separator: "\n")
         updateStatistics()
