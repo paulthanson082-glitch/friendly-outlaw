@@ -64,6 +64,7 @@ public enum AIAssistanceType {
     case verifyWithCitations
     case analyzeWithUncertainty
     case chainOfThoughtVerification
+    case writingAdvisor
 
     public var displayName: String {
         switch self {
@@ -87,6 +88,7 @@ public enum AIAssistanceType {
         case .verifyWithCitations: return "Verify with Citations"
         case .analyzeWithUncertainty: return "Analyze with Uncertainty"
         case .chainOfThoughtVerification: return "Chain of Thought Verification"
+        case .writingAdvisor: return "Writing Advisor"
         }
     }
 
@@ -332,6 +334,32 @@ public enum AIAssistanceType {
             \(text)
 
             Step-by-step analysis:
+            """
+
+        case .writingAdvisor:
+            return """
+            \(contextInfo)
+            You are a personal writing coach. Based on the following writer data, provide 3-5 personalised coaching recommendations.
+
+            Writer data:
+            \(text)
+
+            Respond with a JSON object matching this schema exactly:
+            {
+              "overallAssessment": "<string>",
+              "focusArea": "<productivity|creativity|consistency|craft|goals>",
+              "recommendations": [
+                {
+                  "category": "<productivity|creativity|consistency|craft|goals>",
+                  "priority": "<high|medium|low>",
+                  "title": "<string>",
+                  "recommendation": "<string>",
+                  "actionableSteps": ["<string>"]
+                }
+              ]
+            }
+
+            Return only the JSON object, no other text.
             """
         }
     }
