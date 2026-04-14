@@ -268,17 +268,10 @@ public class HermesService {
     private func setFavoriteFlag(ideaId: UUID, value: Bool, in session: inout HermesSession) throws {
         for msgIdx in session.messages.indices {
             let message = session.messages[msgIdx]
+            guard message.role == .hermes else { continue }
             guard let ideaIdx = message.ideas.firstIndex(where: { $0.id == ideaId }) else { continue }
-            let existing = message.ideas[ideaIdx]
             var updatedIdeas = message.ideas
-            updatedIdeas[ideaIdx] = HermesIdea(
-                id: existing.id,
-                title: existing.title,
-                description: existing.description,
-                ideaType: existing.ideaType,
-                timestamp: existing.timestamp,
-                isFavorite: value
-            )
+            updatedIdeas[ideaIdx].isFavorite = value
             session.messages[msgIdx] = HermesMessage(
                 id: message.id,
                 role: message.role,

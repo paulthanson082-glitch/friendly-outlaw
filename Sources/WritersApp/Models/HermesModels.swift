@@ -25,7 +25,7 @@ public enum HermesTone: String, Codable, CaseIterable {
     }
 
     /// One-line prompt fragment injected into the Hermes persona when this tone is active
-    var promptHint: String {
+    public var promptHint: String {
         switch self {
         case .inspirational: return "Be uplifting and motivating — make the writer feel that anything is possible."
         case .provocative:   return "Be bold and challenging — push conventional boundaries and subvert expectations."
@@ -103,7 +103,7 @@ public struct HermesIdea: Identifiable, Codable {
         let formatter = ISO8601DateFormatter()
         timestamp = formatter.date(from: timestampString) ?? Date()
         // Backward-compatible: existing payloads without this key default to false
-        isFavorite = (try? container.decodeIfPresent(Bool.self, forKey: .isFavorite)) ?? false
+        isFavorite = try container.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -283,7 +283,8 @@ public struct HermesResponse {
 }
 
 /// Aggregated statistics for a completed or in-progress Hermes session
-public struct HermesSessionStats {
+public struct HermesSessionStats: Codable, Identifiable {
+    public var id: UUID { sessionId }
     /// Identifier of the session these stats describe
     public let sessionId: UUID
     /// Total number of messages exchanged (user + Hermes combined)

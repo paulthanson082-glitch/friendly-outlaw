@@ -2910,10 +2910,11 @@ final class HermesAgentTests: XCTestCase {
 
     // MARK: - Helpers
 
-    /// Build a HermesService backed by an in-memory stub (no real AI calls).
+    /// Build a HermesService for tests that only exercise non-AI behavior (parsing, session utilities).
     private func makeService() -> HermesService {
-        let app = WritersApp()
-        // Use the real initialiser path — AI is nil so we test the non-AI layers.
+        let app = WritersApp(databasePath: ":memory:")
+        // Use a real AIService configured with a test key; these tests avoid network calls
+        // by only exercising non-AI code paths.
         return HermesService(
             aiService: AIService(configuration: AIConfiguration(apiKey: "test-key")),
             documentManager: app.documentManager,
