@@ -78,18 +78,24 @@ public class ComputerUseService {
         previousActions: [ComputerUseAction],
         configuration: ComputerUseConfiguration
     ) async throws -> ActionResponse {
-        // Build a simple text-based prompt for the AI
+        // Build the prompt for the AI
         let history = previousActions.map { $0.action.rawValue }.joined(separator: ", ")
         let prompt = """
         Task: \(task)
         Display: \(configuration.displayWidth)x\(configuration.displayHeight)
         Previous actions: \(history.isEmpty ? "none" : history)
-        Current screenshot (base64): [screenshot provided]
-        What is the next action to complete the task? Reply with "DONE" if finished.
+
+        Analyze the current screenshot and determine the next action to complete the task.
+        Reply with "DONE" if the task is finished, or describe the next action to take.
         """
-        // TODO: Send screenshot as vision content when implementing full Anthropic computer use API integration
-        _ = screenshot
-        let response = try await aiService.continueWriting(text: prompt)
+
+        // Send screenshot as vision content using the Anthropic API vision capabilities
+        let response = try await aiService.getAssistanceWithVision(
+            text: prompt,
+            imageBase64: screenshot,
+            mediaType: "image/png"
+        )
+
         if response.uppercased().contains("DONE") {
             return ActionResponse(action: nil, response: response, isDone: true)
         }
