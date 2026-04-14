@@ -2,6 +2,42 @@ import Foundation
 
 // MARK: - Hermes Models
 
+/// The emotional tone Hermes should adopt when generating ideas
+public enum HermesTone: String, Codable, CaseIterable {
+    case inspirational
+    case provocative
+    case calm
+    case energetic
+    case whimsical
+    case dark
+    case playful
+
+    public var displayName: String {
+        switch self {
+        case .inspirational: return "Inspirational"
+        case .provocative:   return "Provocative"
+        case .calm:          return "Calm"
+        case .energetic:     return "Energetic"
+        case .whimsical:     return "Whimsical"
+        case .dark:          return "Dark"
+        case .playful:       return "Playful"
+        }
+    }
+
+    /// One-line prompt fragment injected into the Hermes persona when this tone is active
+    var promptHint: String {
+        switch self {
+        case .inspirational: return "Be uplifting and motivating — make the writer feel that anything is possible."
+        case .provocative:   return "Be bold and challenging — push conventional boundaries and subvert expectations."
+        case .calm:          return "Be measured and serene — offer ideas with quiet confidence and gentle clarity."
+        case .energetic:     return "Be vivid and fast-paced — flood the writer with momentum and excitement."
+        case .whimsical:     return "Be playfully strange and dreamy — let ideas drift into the unexpected."
+        case .dark:          return "Be brooding and intense — explore shadow, conflict, and moral complexity."
+        case .playful:       return "Be lighthearted and witty — ideas should sparkle with humour and fun."
+        }
+    }
+}
+
 /// The type of creative idea Hermes generated
 public enum HermesIdeaType: String, Codable, CaseIterable {
     case plotHook = "plotHook"
@@ -34,23 +70,27 @@ public struct HermesIdea: Identifiable, Codable {
     public let description: String
     public let ideaType: HermesIdeaType
     public let timestamp: Date
+    /// Whether the writer has marked this idea as a favourite for later use
+    public var isFavorite: Bool
 
     public init(
         id: UUID = UUID(),
         title: String,
         description: String,
         ideaType: HermesIdeaType,
-        timestamp: Date = Date()
+        timestamp: Date = Date(),
+        isFavorite: Bool = false
     ) {
         self.id = id
         self.title = title
         self.description = description
         self.ideaType = ideaType
         self.timestamp = timestamp
+        self.isFavorite = isFavorite
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, description, ideaType, timestamp
+        case id, title, description, ideaType, timestamp, isFavorite
     }
 
     public init(from decoder: Decoder) throws {
@@ -62,12 +102,10 @@ public struct HermesIdea: Identifiable, Codable {
         let timestampString = try container.decode(String.self, forKey: .timestamp)
         let formatter = ISO8601DateFormatter()
         timestamp = formatter.date(from: timestampString) ?? Date()
+        // Backward-compatible: existing payloads without this key default to false
+        isFavorite = (try? container.decodeIfPresent(Bool.self, forKey: .isFavorite)) ?? false
     }
 
-    /// Encodes the instance into the provided encoder.
-    /// 
-    /// Encodes `id`, `title`, `description`, and `ideaType` using their coding keys and serializes `timestamp` as an ISO-8601 formatted string.
-    /// - Parameter encoder: The encoder to write this value into.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
@@ -76,6 +114,7 @@ public struct HermesIdea: Identifiable, Codable {
         try container.encode(ideaType, forKey: .ideaType)
         let formatter = ISO8601DateFormatter()
         try container.encode(formatter.string(from: timestamp), forKey: .timestamp)
+        try container.encode(isFavorite, forKey: .isFavorite)
     }
 }
 
@@ -87,6 +126,8 @@ public struct HermesContext: Codable {
     public let characters: [String]
     public let themes: [String]
     public let documentId: UUID?
+    /// Desired emotional tone for generated ideas. When set, Hermes adjusts its voice accordingly.
+    public let tone: HermesTone?
 
     public init(
         genre: String = "",
@@ -94,7 +135,8 @@ public struct HermesContext: Codable {
         currentScene: String = "",
         characters: [String] = [],
         themes: [String] = [],
-        documentId: UUID? = nil
+        documentId: UUID? = nil,
+        tone: HermesTone? = nil
     ) {
         self.genre = genre
         self.logline = logline
@@ -102,6 +144,7 @@ public struct HermesContext: Codable {
         self.characters = characters
         self.themes = themes
         self.documentId = documentId
+        self.tone = tone
     }
 }
 
@@ -236,6 +279,42 @@ public struct HermesResponse {
         self.message = message
         self.ideas = ideas
         self.timestamp = timestamp
+    }
+}
+
+/// Aggregated statistics for a completed or in-progress Hermes session
+public struct HermesSessionStats {
+    /// Identifier of the session these stats describe
+    public let sessionId: UUID
+    /// Total number of messages exchanged (user + Hermes combined)
+    public let messageCount: Int
+    /// Total number of ideas generated across all Hermes messages
+    public let totalIdeas: Int
+    /// Number of ideas the writer has marked as favourite
+    public let favoriteCount: Int
+    /// Idea count broken down by `HermesIdeaType`
+    public let ideaCountByType: [HermesIdeaType: Int]
+    /// Wall-clock duration from session start to the last message, in seconds
+    public let sessionDuration: TimeInterval
+    /// Mean number of ideas per Hermes message (0 when no Hermes messages exist)
+    public let averageIdeasPerMessage: Double
+
+    public init(
+        sessionId: UUID,
+        messageCount: Int,
+        totalIdeas: Int,
+        favoriteCount: Int,
+        ideaCountByType: [HermesIdeaType: Int],
+        sessionDuration: TimeInterval,
+        averageIdeasPerMessage: Double
+    ) {
+        self.sessionId = sessionId
+        self.messageCount = messageCount
+        self.totalIdeas = totalIdeas
+        self.favoriteCount = favoriteCount
+        self.ideaCountByType = ideaCountByType
+        self.sessionDuration = sessionDuration
+        self.averageIdeasPerMessage = averageIdeasPerMessage
     }
 }
 
