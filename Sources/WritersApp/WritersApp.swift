@@ -12,6 +12,7 @@ public class WritersApp {
     public let encouragementService: EncouragementService
     public let versionControl: DoltVersionControlService
     public let giftCardManager: GiftCardManager
+    public let crmManager: CRMManager
     public private(set) var guiService: GuiNewService?
     public private(set) var aiService: AIService?
     public private(set) var chatbotService: ChatbotService?
@@ -54,6 +55,7 @@ public class WritersApp {
         self.encouragementService = EncouragementService()
         self.versionControl = DoltVersionControlService(databaseManager: databaseManager)
         self.giftCardManager = GiftCardManager(databaseManager: databaseManager)
+        self.crmManager = CRMManager()
         self.guiService = nil
         self.appSettings = AppSettings()
         self.prospectDatabase = ProspectDatabase()
