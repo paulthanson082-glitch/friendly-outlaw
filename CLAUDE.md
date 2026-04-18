@@ -1,34 +1,25 @@
 # CLAUDE.md - AI Assistant Guide for friendly-outlaw
 
-This document provides essential context for AI assistants working with this codebase.
+## Start Here
 
-## Project Overview
+**New to the project?** Read in this order:
+1. `.claude/project.md` — What friendly-outlaw is and how to build/test/run it
+2. `.claude/workflow.md` — How to work with Claude: ask → plan → execute
+3. This file — Detailed API reference and architecture
 
-**friendly-outlaw** is a Swift application for writers featuring template management, document creation with word count tracking, AI-powered writing assistance (via Claude/Anthropic API), issue tracking, Kanban boards, version control, plugin architecture, and multi-format export capabilities.
+**Just need standards before writing code?** → Use the knowledge-advisor subagent:
 
-- **Type**: Swift library + CLI application
-- **Platforms**: macOS 13+, iOS 16+
-- **Swift Version**: 5.9+
-- **Dependencies**: `CSQLite` (system library wrapping `sqlite3`) for persistent storage
+> "I'm adding a new async method to AIService for generating chapter summaries. What standards apply?"
 
-## Quick Commands
+**Adding a new feature?** → Use a skill:
+- `add-template` — Add a writing template
+- `add-ai-feature` — Implement AI assistance
+- `add-version-control-op` — Extend version control
+- `build-and-test` — Build and run tests
 
-```bash
-# Build
-swift build                           # Debug build
-swift build -c release                # Release build
+## Quick Reference
 
-# Test
-swift test                            # Run all tests
-swift test --verbose                  # Verbose output
-
-# Run
-swift run WritersAppCLI               # Run CLI app
-ANTHROPIC_API_KEY="sk-..." swift run WritersAppCLI  # With AI features
-
-# Clean
-swift package clean                   # Remove build artifacts
-```
+See `.claude/project.md` for quick commands, APIs, and project structure. This document contains the detailed reference.
 
 ## Project Structure
 
@@ -41,7 +32,7 @@ swift package clean                   # Remove build artifacts
 │   │   │   ├── Document.swift        # Document, DocumentMetadata
 │   │   │   ├── AIModels.swift        # AI config, AIAssistanceType, tool loop types
 │   │   │   ├── AISuggestion.swift    # AISuggestion, UserSession, AIToolUsageStats
-│   │   │   ├── FocusSession.swift    # FocusSession, FocusMode, SessionStatus
+│   │   │   ├── FocusSession.swift    # FocusSession, FocusSessionType, FocusSessionState
 │   │   │   ├── Issue.swift           # Issue, IssueStatus, IssuePriority, IssueMetadata
 │   │   │   ├── KanbanModels.swift    # KanbanBoard, KanbanTask, KanbanColumn
 │   │   │   ├── TraceModels.swift     # Trace, TraceEvent, TraceSpan (analytics)
@@ -595,7 +586,7 @@ The **knowledge-advisor** subagent reads the relevant files and returns a focuse
 1. Create a class conforming to `Plugin` protocol in `Sources/WritersApp/Plugins/`
 2. Implement `initialize()`, `shutdown()`, `execute(action:)`
 3. Declare `capabilities` matching what the plugin supports
-4. Register via `PluginManager.shared.registerPlugin(_:)`
+4. Register via `PluginManager.shared.register(plugin:)`
 5. Expose convenience methods on `WritersApp` if needed
 
 ### Adding a Version Control Operation
