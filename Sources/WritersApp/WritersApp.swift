@@ -12,6 +12,7 @@ public class WritersApp {
     public let pluginManager: PluginManager
     public let encouragementService: EncouragementService
     public let versionControl: DoltVersionControlService
+    public let giftCardManager: GiftCardManager
     public private(set) var guiService: GuiNewService?
     public private(set) var aiService: AIService?
     public private(set) var chatbotService: ChatbotService?
@@ -54,6 +55,7 @@ public class WritersApp {
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
         self.versionControl = DoltVersionControlService(databaseManager: databaseManager)
+        self.giftCardManager = GiftCardManager(databaseManager: databaseManager)
         self.guiService = nil
         self.appSettings = AppSettings()
         self.prospectDatabase = ProspectDatabase()
@@ -74,10 +76,12 @@ public class WritersApp {
                 documentManager: self.documentManager,
                 templateManager: self.templateManager
             )
+            self.writingAdvisorService = WritingAdvisorService(aiService: svc)
         } else {
             self.chatbotService = nil
             self.writingAdvisorService = nil
             self.hermesService = nil
+            self.writingAdvisorService = nil
         }
         try? databaseManager.initialize()
     }
@@ -100,6 +104,7 @@ public class WritersApp {
             documentManager: self.documentManager,
             templateManager: self.templateManager
         )
+        self.writingAdvisorService = WritingAdvisorService(aiService: aiSvc)
         if let uid = userId {
             self.currentUserId = uid
             try? self.databaseManager.saveAIConfiguration(userId: uid, configuration: configuration)
@@ -114,6 +119,7 @@ public class WritersApp {
         self.chatbotService = nil
         self.writingAdvisorService = nil
         self.hermesService = nil
+        self.writingAdvisorService = nil
     }
 
     /// Check if AI is available
@@ -1032,6 +1038,15 @@ public class WritersApp {
         return try await ai.brainstormIdeas(topic: topic, context: context)
     }
 
+    /// Brainstorm ideas organized by category
+    public func brainstormIdeasCategorized(
+        topic: String,
+        context: AIContext? = nil
+    ) async throws -> BrainstormResult {
+        guard let ai = aiService else { throw AIError.aiNotEnabled }
+        return try await ai.brainstormIdeasCategorized(topic: topic, context: context)
+    }
+
     /// Generate outline from concept
     public func generateOutline(
         concept: String,
@@ -1048,6 +1063,28 @@ public class WritersApp {
     ) async throws -> String {
         guard let ai = aiService else { throw AIError.aiNotEnabled }
         return try await ai.developCharacter(characterConcept: characterConcept, context: context)
+    }
+
+    // MARK: - Writing Advisor
+
+    /// Returns personalized writing advice for the current writer.
+    ///
+    /// - Parameter notes: Optional additional context or focus area for the advice.
+    /// - Returns: A `WritingAdvisorReport` with coaching recommendations.
+    /// - Throws: `AIError.aiNotEnabled` if AI has not been configured.
+    public func getPersonalizedWritingAdvice(notes: String? = nil) async throws -> WritingAdvisorReport {
+        guard let advisor = writingAdvisorService else { throw AIError.aiNotEnabled }
+        return try await advisor.getPersonalizedAdvice(notes: notes)
+    }
+
+    /// Returns writing advice focused on a specific advisor category.
+    ///
+    /// - Parameter category: The category of advice to generate.
+    /// - Returns: A `WritingAdvisorReport` focused on the requested category.
+    /// - Throws: `AIError.aiNotEnabled` if AI has not been configured.
+    public func getWritingAdvice(for category: AdvisorCategory) async throws -> WritingAdvisorReport {
+        guard let advisor = writingAdvisorService else { throw AIError.aiNotEnabled }
+        return try await advisor.getAdvice(for: category)
     }
 
     // MARK: - Hallucination Reduction Methods
@@ -1300,6 +1337,15 @@ public class WritersApp {
 
     // MARK: - Multi-Agent Harness
 
+    /// Create a `ComputerUseService` wired to the active AI service.
+    ///
+    /// - Parameter executor: The executor responsible for taking screenshots and performing actions.
+    /// - Returns: A configured `ComputerUseService`, or `nil` if AI has not been enabled.
+    public func makeComputerUseService(executor: ComputerUseExecutor) -> ComputerUseService? {
+        guard let ai = aiService else { return nil }
+        return ComputerUseService(aiService: ai, executor: executor)
+    }
+
     /// Create a `MultiAgentHarness` wired to the active AI service.
     ///
     /// - Parameter configuration: Harness settings (revision budget, quality threshold, model).
@@ -1485,6 +1531,68 @@ public class WritersApp {
     /// Clear the browsing history.
     public func clearBrowsingHistory() {
         browserService.clearHistory()
+    }
+
+    // MARK: - Gift Card Bundle Management
+
+    @discardableResult
+    public func createGiftCardBundle(
+        name: String,
+        description: String,
+        price: Decimal,
+        bundleType: BundleType,
+        includedTemplateIds: [UUID] = [],
+        aiCredits: Int,
+        expirationDays: Int
+    ) throws -> GiftCardBundle {
+        return try giftCardManager.createBundle(
+            name: name,
+            description: description,
+            price: price,
+            bundleType: bundleType,
+            includedTemplateIds: includedTemplateIds,
+            aiCredits: aiCredits,
+            expirationDays: expirationDays
+        )
+    }
+
+    public func getGiftCardBundle(id: UUID) -> GiftCardBundle? {
+        return giftCardManager.getBundle(id: id)
+    }
+
+    public func getAllGiftCardBundles() -> [GiftCardBundle] {
+        return giftCardManager.getAllBundles()
+    }
+
+    public func updateGiftCardBundle(_ bundle: GiftCardBundle) throws {
+        try giftCardManager.updateBundle(bundle)
+    }
+
+    public func deleteGiftCardBundle(id: UUID) throws {
+        try giftCardManager.deleteBundle(id: id)
+    }
+
+    // MARK: - Gift Card Management
+
+    @discardableResult
+    public func generateGiftCard(bundleId: UUID) throws -> GiftCard {
+        return try giftCardManager.createGiftCard(bundleId: bundleId)
+    }
+
+    public func redeemGiftCard(code: String, userId: UUID) throws -> GiftCardBundle {
+        return try giftCardManager.redeemGiftCard(code: code, userId: userId)
+    }
+
+    public func getGiftCardByCode(_ code: String) -> GiftCard? {
+        return giftCardManager.getGiftCardByCode(code)
+    }
+
+    public func getGiftCardStatistics() -> GiftCardStats {
+        return giftCardManager.getGiftCardStats()
+    }
+
+    public func getGiftCardBundleStatistics() -> BundleStats {
+        return giftCardManager.getBundleStats()
     }
 }
 

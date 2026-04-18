@@ -105,6 +105,20 @@ public class AIService {
         return response.generatedContent
     }
 
+    /// Brainstorm ideas organized by category
+    public func brainstormIdeasCategorized(
+        topic: String,
+        context: AIContext? = nil
+    ) async throws -> BrainstormResult {
+        let response = try await getAssistance(
+            text: topic,
+            type: .brainstormIdeasCategorized,
+            context: context
+        )
+
+        return try decodeJSON(from: response.generatedContent, as: BrainstormResult.self)
+    }
+
     /// Develop character
     public func developCharacter(
         characterConcept: String,
@@ -533,6 +547,162 @@ public class AIService {
             }
         }
         return toolResults
+    }
+
+    // MARK: - JSON Parsing Helpers
+
+    /// Extracts and decodes JSON from Claude's response.
+    ///
+    /// Handles several common patterns:
+    /// - Bare JSON: `{"key": "value"}`
+    /// - Markdown code blocks: ` ```json\n{"key": "value"}\n``` `
+    /// - Wrapped text: `Here's the JSON:\n\n{"key": "value"}`
+    ///
+    /// - Parameters:
+    ///   - response: Raw response text from Claude
+    ///   - type: Type to decode into
+    /// - Returns: Decoded object of type T
+    /// - Throws: AIServiceError.invalidResponseFormat with details on parse failure
+    private func decodeJSON<T: Decodable>(
+        from response: String,
+        as type: T.Type
+    ) throws -> T {
+        // Try to extract JSON from markdown code block first
+        var jsonString = response
+
+        // Pattern 1: ```json ... ```
+        if let startIdx = response.range(of: "```json"),
+           let endIdx = response.range(of: "```", range: response.index(startIdx.upperBound, offsetBy: 1)..<response.endIndex) {
+            jsonString = String(response[startIdx.upperBound..<endIdx.lowerBound])
+        }
+        // Pattern 2: ``` ... ``` (generic code block)
+        else if response.contains("```") {
+            if let startIdx = response.range(of: "```"),
+               let endIdx = response.range(of: "```", range: response.index(startIdx.upperBound, offsetBy: 1)..<response.endIndex) {
+                jsonString = String(response[startIdx.upperBound..<endIdx.lowerBound])
+            }
+        }
+
+        // Trim whitespace
+        jsonString = jsonString.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Try to find JSON object/array if response has surrounding text
+        if !jsonString.starts(with: "{") && !jsonString.starts(with: "[") {
+            // Look for first { or [ and extract from there using depth-tracking
+            if let jsonStart = jsonString.firstIndex(where: { $0 == "{" || $0 == "[" }) {
+                let remaining = jsonString[jsonStart...]
+                let openChar: Character = remaining.first!
+                let closeChar: Character = openChar == "{" ? "}" : "]"
+
+                // Track depth to correctly handle nested structures
+                var depth = 0
+                var inString = false
+                var escapeNext = false
+                var endIndex: String.Index? = nil
+
+                for idx in remaining.indices {
+                    let ch = remaining[idx]
+                    if escapeNext {
+                        escapeNext = false
+                        continue
+                    }
+                    if ch == "\\" && inString {
+                        escapeNext = true
+                        continue
+                    }
+                    if ch == "\"" {
+                        inString.toggle()
+                        continue
+                    }
+                    if inString { continue }
+                    if ch == openChar { depth += 1 }
+                    else if ch == closeChar {
+                        depth -= 1
+                        if depth == 0 {
+                            endIndex = remaining.index(after: idx)
+                            break
+                        }
+                    }
+                }
+
+                if let end = endIndex {
+                    jsonString = String(remaining[..<end])
+                }
+            }
+        }
+
+        guard let data = jsonString.data(using: .utf8) else {
+            throw AIServiceError.invalidResponseFormat
+        }
+
+        let decoder = JSONDecoder()
+        do {
+            return try decoder.decode(type, from: data)
+        } catch {
+            throw AIServiceError.invalidResponseFormat
+        }
+    }
+
+    // MARK: - Vision Support
+
+    /// Get AI assistance with vision content (text + image)
+    ///
+    /// Sends a request to Claude with both text and image data. Useful for computer use,
+    /// screenshot analysis, and other vision-based tasks.
+    /// - Parameters:
+    ///   - text: The text prompt or instruction
+    ///   - imageBase64: Base64-encoded image data
+    ///   - mediaType: MIME type of the image (e.g., "image/png", "image/jpeg")
+    /// - Returns: The assistant's text response
+    public func getAssistanceWithVision(
+        text: String,
+        imageBase64: String,
+        mediaType: String = "image/png"
+    ) async throws -> String {
+        guard let url = URL(string: apiURL) else {
+            throw AIServiceError.invalidURL
+        }
+
+        let contentArray: [[String: Any]] = [
+            [
+                "type": "image",
+                "source": [
+                    "type": "base64",
+                    "media_type": mediaType,
+                    "data": imageBase64
+                ]
+            ],
+            [
+                "type": "text",
+                "text": text
+            ]
+        ]
+
+        let messages: [[String: Any]] = [
+            ["role": "user", "content": contentArray]
+        ]
+
+        let request = try buildAPIURLRequest(url: url, messages: messages, toolDefinitions: [])
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AIServiceError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw AIServiceError.apiError(statusCode: httpResponse.statusCode, message: "Request failed")
+        }
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let content = json["content"] as? [[String: Any]] else {
+            throw AIServiceError.invalidResponseFormat
+        }
+
+        guard let responseText = extractText(from: content) else {
+            throw AIServiceError.invalidResponseFormat
+        }
+
+        return responseText
     }
 
     // MARK: - Batch Operations
