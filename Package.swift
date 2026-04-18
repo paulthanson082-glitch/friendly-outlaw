@@ -19,7 +19,10 @@ let package = Package(
             targets: ["MockerKit"]),
         .executable(
             name: "mocker",
-            targets: ["Mocker"])
+            targets: ["Mocker"]),
+        .executable(
+            name: "manop",
+            targets: ["ManpageOperator"])
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
@@ -54,6 +57,13 @@ let package = Package(
             ]),
         .testTarget(
             name: "MockerKitTests",
-            dependencies: ["MockerKit"])
+            dependencies: ["MockerKit"]),
+
+        // ManpageOperator target
+        .executableTarget(
+            name: "ManpageOperator",
+            dependencies: [
+                .product(name: "ArgumentParser", package: "swift-argument-parser")
+            ])
     ]
 )

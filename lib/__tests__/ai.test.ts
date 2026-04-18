@@ -1,18 +1,16 @@
 import { generateBotResponse, generateMemory, ConversationMessage, Memory } from '../ai';
 import { getCharacterByHandle } from '../characters';
 
-// Create mock before using it
-const mockCreate = jest.fn().mockResolvedValue({
-  content: [
-    {
-      type: 'text',
-      text: 'This is a test response from Claude.',
-    },
-  ],
-});
-
 // Mock the Anthropic SDK
 jest.mock('@anthropic-ai/sdk', () => {
+  const mockCreate = jest.fn().mockResolvedValue({
+    content: [
+      {
+        type: 'text',
+        text: 'This is a test response from Claude.',
+      },
+    ],
+  });
   return jest.fn().mockImplementation(() => ({
     messages: {
       create: mockCreate,
@@ -29,6 +27,13 @@ describe('ai module', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.ANTHROPIC_API_KEY = 'test-api-key';
+
+    // Restore default mock return value after clearAllMocks clears call history
+    const Anthropic = require('@anthropic-ai/sdk');
+    const mockInstance = new Anthropic();
+    mockInstance.messages.create.mockResolvedValue({
+      content: [{ type: 'text', text: 'This is a test response from Claude.' }],
+    });
 
     mockGetCharacterByHandle.mockImplementation((handle: string) => {
       if (handle === 'pixel') {

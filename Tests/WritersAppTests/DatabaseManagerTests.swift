@@ -314,6 +314,120 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertEqual(retrieved?.model, .claude35Sonnet)
     }
 
+    // MARK: - API Key Persistence Regression Tests (PR: apiKey now persisted to SQLite)
+
+    func testAPIKeyPersistsAfterDatabaseCloseAndReopen() throws {
+        // Regression: before this PR, apiKey was stored as "" and always returned "".
+        // Now the real key must survive a close/reopen cycle.
+        let config = AIConfiguration(
+            apiKey: "sk-ant-persistent-key",
+            model: .claude35Sonnet,
+            maxTokens: 4096,
+            temperature: 0.7
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        // Close and re-open the same database file
+        databaseManager.close()
+        try databaseManager.initialize()
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertNotNil(retrieved)
+        XCTAssertEqual(retrieved?.apiKey, "sk-ant-persistent-key",
+                       "API key must survive database close/reopen")
+    }
+
+    func testAPIKeyWithSpecialCharactersRoundTrips() throws {
+        // Keys often contain hyphens, underscores, and alphanumeric characters.
+        // Verify none of these are mangled by SQLite binding.
+        let specialKey = "sk-ant-api03-AbCdEf123_XYZ-09!@#"
+        let config = AIConfiguration(
+            apiKey: specialKey,
+            model: .claude3Opus,
+            maxTokens: 2048,
+            temperature: 0.5
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertEqual(retrieved?.apiKey, specialKey,
+                       "API key with special characters must round-trip without modification")
+    }
+
+    func testAPIKeyIsNotEmptyStringAfterSave() throws {
+        // Before the PR this always returned "". After the PR it must return the real key.
+        let config = AIConfiguration(
+            apiKey: "sk-ant-real-key",
+            model: .claude35Sonnet,
+            maxTokens: 4096,
+            temperature: 0.7
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertNotEqual(retrieved?.apiKey, "",
+                          "Saved API key must not be returned as empty string")
+    }
+
+    func testEmptyAPIKeyCanBeStoredAndRetrieved() throws {
+        // Edge case: if an empty key is deliberately stored, it should round-trip as empty.
+        let config = AIConfiguration(
+            apiKey: "",
+            model: .claude35Sonnet,
+            maxTokens: 4096,
+            temperature: 0.7
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertEqual(retrieved?.apiKey, "",
+                       "An explicitly empty API key should be stored and returned as empty")
+    }
+
+    func testAIConfigurationApiKeyIsNonEmptyAfterSave() throws {
+        let config = AIConfiguration(
+            apiKey: "sk-ant-api03-realKey",
+            model: .claude35Sonnet,
+            maxTokens: 4096,
+            temperature: 0.7
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertNotNil(retrieved)
+        XCTAssertFalse(retrieved!.apiKey.isEmpty)
+        XCTAssertEqual(retrieved!.apiKey, "sk-ant-api03-realKey")
+    }
+
+    func testAIConfigurationApiKeyWithSpecialCharacters() throws {
+        let specialKey = "sk-ant-api03-abc+/=XYZ!@#$%"
+        let config = AIConfiguration(
+            apiKey: specialKey,
+            model: .claude3Haiku,
+            maxTokens: 1024,
+            temperature: 0.5
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertEqual(retrieved?.apiKey, specialKey)
+    }
+
+    func testAIConfigurationApiKeyIsIsolatedPerUser() throws {
+        let userId2 = UUID()
+        let config1 = AIConfiguration(apiKey: "key-for-user-1", model: .claude35Sonnet, maxTokens: 4096, temperature: 0.7)
+        let config2 = AIConfiguration(apiKey: "key-for-user-2", model: .claude3Haiku, maxTokens: 2048, temperature: 0.5)
+
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config1)
+        try databaseManager.saveAIConfiguration(userId: userId2, configuration: config2)
+
+        let retrieved1 = try databaseManager.getAIConfiguration(userId: testUserId)
+        let retrieved2 = try databaseManager.getAIConfiguration(userId: userId2)
+
+        XCTAssertEqual(retrieved1?.apiKey, "key-for-user-1")
+        XCTAssertEqual(retrieved2?.apiKey, "key-for-user-2")
+    }
+
     // MARK: - Version Control: Branch Tests
 
     func testInsertAndRetrieveVCBranch() throws {

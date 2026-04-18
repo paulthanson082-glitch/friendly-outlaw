@@ -207,6 +207,35 @@ public class DatabaseManager {
         );
         """
 
+        let createGiftCardBundlesTable = """
+        CREATE TABLE IF NOT EXISTS GiftCardBundles (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL,
+            price TEXT NOT NULL,
+            bundle_type TEXT NOT NULL,
+            included_template_ids TEXT,
+            ai_credits INTEGER NOT NULL,
+            expiration_days INTEGER NOT NULL,
+            created_at REAL NOT NULL,
+            modified_at REAL NOT NULL
+        );
+        """
+
+        let createGiftCardsTable = """
+        CREATE TABLE IF NOT EXISTS GiftCards (
+            id TEXT PRIMARY KEY,
+            code TEXT UNIQUE NOT NULL,
+            bundle_id TEXT NOT NULL,
+            status TEXT NOT NULL,
+            redeemed_by_user_id TEXT,
+            redeemed_at REAL,
+            created_at REAL NOT NULL,
+            expires_at REAL,
+            FOREIGN KEY (bundle_id) REFERENCES GiftCardBundles(id)
+        );
+        """
+
         try execute(createAISuggestionsTable)
         try execute(createUserSessionsTable)
         try execute(createAIConfigurationsTable)
@@ -216,6 +245,8 @@ public class DatabaseManager {
         try execute(createVCBranchesTable)
         try execute(createVCCommitsTable)
         try execute(createVCSnapshotsTable)
+        try execute(createGiftCardBundlesTable)
+        try execute(createGiftCardsTable)
 
     }
     
@@ -249,7 +280,11 @@ public class DatabaseManager {
             "CREATE INDEX IF NOT EXISTS idx_vc_commits_timestamp ON vc_commits(timestamp);",
             "CREATE INDEX IF NOT EXISTS idx_vc_snapshots_commit ON vc_document_snapshots(commit_id);",
             "CREATE INDEX IF NOT EXISTS idx_vc_snapshots_document ON vc_document_snapshots(document_id);",
-            "CREATE INDEX IF NOT EXISTS idx_vc_snapshots_captured ON vc_document_snapshots(captured_at);"
+            "CREATE INDEX IF NOT EXISTS idx_vc_snapshots_captured ON vc_document_snapshots(captured_at);",
+            "CREATE INDEX IF NOT EXISTS idx_gift_card_code ON GiftCards(code);",
+            "CREATE INDEX IF NOT EXISTS idx_gift_card_status ON GiftCards(status);",
+            "CREATE INDEX IF NOT EXISTS idx_gift_card_bundle ON GiftCards(bundle_id);",
+            "CREATE INDEX IF NOT EXISTS idx_bundle_type ON GiftCardBundles(bundle_type);"
         ]
         
         for index in indexes {
@@ -976,7 +1011,8 @@ public class DatabaseManager {
         }
         
         sqlite3_bind_text(statement, 1, userId.uuidString, -1, SQLITE_TRANSIENT)
-        sqlite3_bind_text(statement, 2, configuration.apiKey, -1, SQLITE_TRANSIENT)
+        // API keys must not be persisted in plaintext. Use Keychain for secure storage.
+        sqlite3_bind_text(statement, 2, "", -1, SQLITE_TRANSIENT)
         sqlite3_bind_text(statement, 3, configuration.model.rawValue, -1, SQLITE_TRANSIENT)
         sqlite3_bind_int(statement, 4, Int32(configuration.maxTokens))
         sqlite3_bind_double(statement, 5, configuration.temperature)
@@ -1022,17 +1058,17 @@ public class DatabaseManager {
             return nil
         }
         
-        let apiKey = String(cString: sqlite3_column_text(statement, 0))
+        // API keys are not persisted — retrieve them from a secure source (e.g. Keychain or env var).
         let modelString = String(cString: sqlite3_column_text(statement, 1))
         let maxTokens = Int(sqlite3_column_int(statement, 2))
         let temperature = sqlite3_column_double(statement, 3)
-        
+
         guard let model = AIModel(rawValue: modelString) else {
             return nil
         }
-        
+
         return AIConfiguration(
-            apiKey: apiKey,
+            apiKey: "",
             model: model,
             maxTokens: maxTokens,
             temperature: temperature
@@ -1942,6 +1978,370 @@ public class DatabaseManager {
                 wordCount: wordCount, capturedAt: capturedAt))
         }
         return snapshots
+    }
+
+    // MARK: - Gift Card Operations
+
+    public func insertGiftCardBundle(_ bundle: GiftCardBundle) throws {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+
+        let sql = """
+        INSERT INTO GiftCardBundles (id, name, description, price, bundle_type, included_template_ids, ai_credits, expiration_days, created_at, modified_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """
+
+        var statement: OpaquePointer?
+        defer { if statement != nil { sqlite3_finalize(statement) } }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+
+        let templateIds = try JSONEncoder().encode(bundle.includedTemplateIds)
+        let templateIdsString = String(data: templateIds, encoding: .utf8) ?? "[]"
+        let priceString = bundle.price.description
+
+        sqlite3_bind_text(statement, 1, bundle.id.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 2, bundle.name, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 3, bundle.description, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 4, priceString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 5, bundle.bundleType.rawValue, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 6, templateIdsString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_int(statement, 7, Int32(bundle.aiCredits))
+        sqlite3_bind_int(statement, 8, Int32(bundle.expirationDays))
+        sqlite3_bind_double(statement, 9, bundle.metadata.created.timeIntervalSince1970)
+        sqlite3_bind_double(statement, 10, bundle.metadata.modified.timeIntervalSince1970)
+
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Insert failed: \(errorMessage)")
+        }
+    }
+
+    public func getGiftCardBundle(id: UUID) throws -> GiftCardBundle? {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+
+        let sql = """
+        SELECT id, name, description, price, bundle_type, included_template_ids, ai_credits, expiration_days, created_at, modified_at
+        FROM GiftCardBundles WHERE id = ?;
+        """
+
+        var statement: OpaquePointer?
+        defer { if statement != nil { sqlite3_finalize(statement) } }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+
+        sqlite3_bind_text(statement, 1, id.uuidString, -1, SQLITE_TRANSIENT)
+
+        guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+
+        guard let idText = sqlite3_column_text(statement, 0),
+              let nameText = sqlite3_column_text(statement, 1),
+              let descText = sqlite3_column_text(statement, 2),
+              let priceText = sqlite3_column_text(statement, 3),
+              let typeText = sqlite3_column_text(statement, 4),
+              let bundleId = UUID(uuidString: String(cString: idText)),
+              let bundleType = BundleType(rawValue: String(cString: typeText)) else {
+            return nil
+        }
+
+        let name = String(cString: nameText)
+        let description = String(cString: descText)
+        let priceString = String(cString: priceText)
+        let price = Decimal(string: priceString) ?? 0
+
+        let templateIdsText = sqlite3_column_text(statement, 5)
+        let templateIds: [UUID] = templateIdsText.flatMap {
+            try? JSONDecoder().decode([UUID].self, from: Data(String(cString: $0).utf8))
+        } ?? []
+
+        let aiCredits = Int(sqlite3_column_int(statement, 6))
+        let expirationDays = Int(sqlite3_column_int(statement, 7))
+        let created = Date(timeIntervalSince1970: sqlite3_column_double(statement, 8))
+        let modified = Date(timeIntervalSince1970: sqlite3_column_double(statement, 9))
+
+        let metadata = BundleMetadata(created: created, modified: modified)
+
+        return GiftCardBundle(
+            id: bundleId,
+            name: name,
+            description: description,
+            price: price,
+            bundleType: bundleType,
+            includedTemplateIds: templateIds,
+            aiCredits: aiCredits,
+            expirationDays: expirationDays,
+            metadata: metadata
+        )
+    }
+
+    public func updateGiftCardBundle(_ bundle: GiftCardBundle) throws {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+
+        let sql = """
+        UPDATE GiftCardBundles
+        SET name = ?, description = ?, price = ?, bundle_type = ?, included_template_ids = ?, ai_credits = ?, expiration_days = ?, modified_at = ?
+        WHERE id = ?;
+        """
+
+        var statement: OpaquePointer?
+        defer { if statement != nil { sqlite3_finalize(statement) } }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+
+        let templateIds = try JSONEncoder().encode(bundle.includedTemplateIds)
+        let templateIdsString = String(data: templateIds, encoding: .utf8) ?? "[]"
+        let priceString = bundle.price.description
+
+        sqlite3_bind_text(statement, 1, bundle.name, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 2, bundle.description, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 3, priceString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 4, bundle.bundleType.rawValue, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 5, templateIdsString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_int(statement, 6, Int32(bundle.aiCredits))
+        sqlite3_bind_int(statement, 7, Int32(bundle.expirationDays))
+        sqlite3_bind_double(statement, 8, bundle.metadata.modified.timeIntervalSince1970)
+        sqlite3_bind_text(statement, 9, bundle.id.uuidString, -1, SQLITE_TRANSIENT)
+
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Update failed: \(errorMessage)")
+        }
+    }
+
+    public func deleteGiftCardBundle(id: UUID) throws {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+
+        let sql = "DELETE FROM GiftCardBundles WHERE id = ?;"
+
+        var statement: OpaquePointer?
+        defer { if statement != nil { sqlite3_finalize(statement) } }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+
+        sqlite3_bind_text(statement, 1, id.uuidString, -1, SQLITE_TRANSIENT)
+
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Delete failed: \(errorMessage)")
+        }
+    }
+
+    public func insertGiftCard(_ card: GiftCard) throws {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+
+        let sql = """
+        INSERT INTO GiftCards (id, code, bundle_id, status, redeemed_by_user_id, redeemed_at, created_at, expires_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+        """
+
+        var statement: OpaquePointer?
+        defer { if statement != nil { sqlite3_finalize(statement) } }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+
+        sqlite3_bind_text(statement, 1, card.id.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 2, card.code, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 3, card.bundleId.uuidString, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 4, card.status.rawValue, -1, SQLITE_TRANSIENT)
+
+        if let userId = card.redeemedByUserId {
+            sqlite3_bind_text(statement, 5, userId.uuidString, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(statement, 5)
+        }
+
+        if let redeemedAt = card.redeemedAt {
+            sqlite3_bind_double(statement, 6, redeemedAt.timeIntervalSince1970)
+        } else {
+            sqlite3_bind_null(statement, 6)
+        }
+
+        sqlite3_bind_double(statement, 7, card.metadata.createdAt.timeIntervalSince1970)
+
+        if let expiresAt = card.metadata.expiresAt {
+            sqlite3_bind_double(statement, 8, expiresAt.timeIntervalSince1970)
+        } else {
+            sqlite3_bind_null(statement, 8)
+        }
+
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Insert failed: \(errorMessage)")
+        }
+    }
+
+    public func getGiftCard(id: UUID) throws -> GiftCard? {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+
+        let sql = """
+        SELECT id, code, bundle_id, status, redeemed_by_user_id, redeemed_at, created_at, expires_at
+        FROM GiftCards WHERE id = ?;
+        """
+
+        var statement: OpaquePointer?
+        defer { if statement != nil { sqlite3_finalize(statement) } }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+
+        sqlite3_bind_text(statement, 1, id.uuidString, -1, SQLITE_TRANSIENT)
+
+        guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+
+        return try parseGiftCard(from: statement)
+    }
+
+    public func getGiftCardByCode(_ code: String) throws -> GiftCard? {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+
+        let sql = """
+        SELECT id, code, bundle_id, status, redeemed_by_user_id, redeemed_at, created_at, expires_at
+        FROM GiftCards WHERE code = ?;
+        """
+
+        var statement: OpaquePointer?
+        defer { if statement != nil { sqlite3_finalize(statement) } }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+
+        sqlite3_bind_text(statement, 1, code, -1, SQLITE_TRANSIENT)
+
+        guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
+
+        return try parseGiftCard(from: statement)
+    }
+
+    public func updateGiftCard(_ card: GiftCard) throws {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+
+        let sql = """
+        UPDATE GiftCards
+        SET status = ?, redeemed_by_user_id = ?, redeemed_at = ?
+        WHERE id = ?;
+        """
+
+        var statement: OpaquePointer?
+        defer { if statement != nil { sqlite3_finalize(statement) } }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+
+        sqlite3_bind_text(statement, 1, card.status.rawValue, -1, SQLITE_TRANSIENT)
+
+        if let userId = card.redeemedByUserId {
+            sqlite3_bind_text(statement, 2, userId.uuidString, -1, SQLITE_TRANSIENT)
+        } else {
+            sqlite3_bind_null(statement, 2)
+        }
+
+        if let redeemedAt = card.redeemedAt {
+            sqlite3_bind_double(statement, 3, redeemedAt.timeIntervalSince1970)
+        } else {
+            sqlite3_bind_null(statement, 3)
+        }
+
+        sqlite3_bind_text(statement, 4, card.id.uuidString, -1, SQLITE_TRANSIENT)
+
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Update failed: \(errorMessage)")
+        }
+    }
+
+    public func deleteGiftCard(id: UUID) throws {
+        guard isInitialized, let db = db else {
+            throw DatabaseError.notInitialized
+        }
+
+        let sql = "DELETE FROM GiftCards WHERE id = ?;"
+
+        var statement: OpaquePointer?
+        defer { if statement != nil { sqlite3_finalize(statement) } }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Prepare failed: \(errorMessage)")
+        }
+
+        sqlite3_bind_text(statement, 1, id.uuidString, -1, SQLITE_TRANSIENT)
+
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            let errorMessage = String(cString: sqlite3_errmsg(db))
+            throw DatabaseError.queryFailed("Delete failed: \(errorMessage)")
+        }
+    }
+
+    private func parseGiftCard(from statement: OpaquePointer?) throws -> GiftCard? {
+        guard let idText = sqlite3_column_text(statement, 0),
+              let codeText = sqlite3_column_text(statement, 1),
+              let bundleText = sqlite3_column_text(statement, 2),
+              let statusText = sqlite3_column_text(statement, 3),
+              let cardId = UUID(uuidString: String(cString: idText)),
+              let bundleId = UUID(uuidString: String(cString: bundleText)),
+              let status = GiftCardStatus(rawValue: String(cString: statusText)) else {
+            return nil
+        }
+
+        let code = String(cString: codeText)
+
+        let redeemedByUserId: UUID? = sqlite3_column_text(statement, 4).flatMap { UUID(uuidString: String(cString: $0)) }
+
+        let redeemedAt = sqlite3_column_type(statement, 5) != SQLITE_NULL ?
+            Date(timeIntervalSince1970: sqlite3_column_double(statement, 5)) : nil
+
+        let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(statement, 6))
+
+        let expiresAt = sqlite3_column_type(statement, 7) != SQLITE_NULL ?
+            Date(timeIntervalSince1970: sqlite3_column_double(statement, 7)) : nil
+
+        let metadata = GiftCardMetadata(createdAt: createdAt, expiresAt: expiresAt)
+
+        return GiftCard(
+            id: cardId,
+            code: code,
+            bundleId: bundleId,
+            status: status,
+            redeemedByUserId: redeemedByUserId,
+            redeemedAt: redeemedAt,
+            metadata: metadata
+        )
     }
 
 }
