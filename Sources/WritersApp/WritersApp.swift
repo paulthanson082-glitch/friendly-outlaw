@@ -54,6 +54,7 @@ public class WritersApp {
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
         self.versionControl = DoltVersionControlService(databaseManager: databaseManager)
+        self.spoilerProtection = SpoilerProtectionService()
         self.giftCardManager = GiftCardManager(databaseManager: databaseManager)
         self.crmManager = CRMManager()
         self.guiService = nil
@@ -125,6 +126,61 @@ public class WritersApp {
     /// Check if AI is available
     public var isAIEnabled: Bool {
         return aiService != nil
+    }
+
+    // MARK: - Spoiler Protection
+
+    /// Tags a range of a document's content as a spoiler.
+    /// Returns nil if the range is invalid (startOffset must be >= 0 and < endOffset).
+    @discardableResult
+    public func tagSpoiler(
+        in documentId: UUID,
+        startOffset: Int,
+        endOffset: Int,
+        description: String = "",
+        severity: SpoilerSeverity = .moderate
+    ) -> SpoilerTag? {
+        return spoilerProtection.tagSpoiler(
+            in: documentId,
+            startOffset: startOffset,
+            endOffset: endOffset,
+            description: description,
+            severity: severity
+        )
+    }
+
+    /// Removes a spoiler tag from a document
+    public func removeSpoilerTag(id: UUID) {
+        spoilerProtection.removeSpoilerTag(id: id)
+    }
+
+    /// Returns all spoiler tags for a document
+    public func getSpoilerTags(forDocument documentId: UUID) -> [SpoilerTag] {
+        return spoilerProtection.getSpoilerTags(forDocument: documentId)
+    }
+
+    /// Returns whether a document has any spoiler-tagged regions
+    public func documentHasSpoilers(_ documentId: UUID) -> Bool {
+        return spoilerProtection.hasSpoilers(in: documentId)
+    }
+
+    /// Returns the document content with spoiler regions redacted
+    public func redactedContent(forDocument documentId: UUID) -> String? {
+        guard let document = documentManager.getDocument(id: documentId) else { return nil }
+        return spoilerProtection.redactSpoilers(in: document.content, document: documentId)
+    }
+
+    /// Exports a document with spoiler regions wrapped in markup
+    public func exportDocumentWithSpoilerMarkup(
+        id documentId: UUID,
+        format: SpoilerMarkupFormat = .markdown
+    ) -> String? {
+        guard let document = documentManager.getDocument(id: documentId) else { return nil }
+        return spoilerProtection.exportWithSpoilerMarkup(
+            content: document.content,
+            document: documentId,
+            format: format
+        )
     }
 
     // MARK: - Ragie Integration
@@ -441,7 +497,13 @@ public class WritersApp {
         return nil
     }
 
-    /// Search memories
+    /// Searches stored memories matching `query` and returns matching memory entries.
+    /// - Parameters:
+    ///   - query: Text to match against stored memories.
+    ///   - category: Optional category to restrict the search.
+    ///   - limit: Maximum number of results to return.
+    /// - Returns: An array of memory records as dictionaries (`[[String: Any]]`); empty if no matches are found.
+    /// - Throws: `PluginError.notInitialized` if the memory plugin is not installed or enabled; forwards any errors thrown while executing the plugin action.
     public func searchMemories(query: String, category: String? = nil, limit: Int = 10) async throws -> [[String: Any]] {
         guard let plugin = memoryPlugin, plugin.isEnabled else {
             throw PluginError.notInitialized
@@ -462,7 +524,13 @@ public class WritersApp {
         return []
     }
 
-    /// List all memories
+    /// Lists stored memories, optionally filtered by category, limited, and sorted.
+    /// - Parameters:
+    ///   - category: Optional category to filter memories.
+    ///   - limit: Maximum number of memory entries to return.
+    ///   - sortBy: Field name to sort results by (e.g., `"created"`).
+    /// - Throws: `PluginError.notInitialized` if the memory plugin is not enabled; propagates errors thrown by the plugin during execution.
+    /// - Returns: An array of memory records as dictionaries; returns an empty array if the plugin reports no results.
     public func listMemories(category: String? = nil, limit: Int = 100, sortBy: String = "created") async throws -> [[String: Any]] {
         guard let plugin = memoryPlugin, plugin.isEnabled else {
             throw PluginError.notInitialized
@@ -483,7 +551,12 @@ public class WritersApp {
         return []
     }
 
-    /// Clear a specific memory or all memories
+    /// Clears stored memory entries matching an optional key and/or category.
+    /// - Parameters:
+    ///   - key: An optional memory key to clear; when omitted, entries are not filtered by key.
+    ///   - category: An optional category to restrict which memories are cleared; when omitted, entries are not filtered by category.
+    /// - Returns: The number of memory entries that were cleared.
+    /// - Throws: `PluginError.notInitialized` if the memory plugin is not available or enabled. Propagates errors thrown by the plugin execution.
     public func clearMemory(key: String? = nil, category: String? = nil) async throws -> Int {
         guard let plugin = memoryPlugin, plugin.isEnabled else {
             throw PluginError.notInitialized
@@ -647,7 +720,12 @@ public class WritersApp {
         try? databaseManager.insertUserSession(session)
     }
     
-    /// Ends the current session
+    /// Ends the currently active user session and records its completion.
+    ///
+    /// If a session is active for the current user, sets the session's `endTime` to now,
+    /// updates `durationSeconds` to the number of seconds between `startTime` and `endTime`,
+    /// and attempts to persist the updated session (errors are suppressed). Clears the in-memory
+    /// `currentSessionId` whether or not persistence succeeded.
     public func endSession() {
         guard let sessionId = currentSessionId, let userId = currentUserId else { return }
 
@@ -870,7 +948,10 @@ public class WritersApp {
 
     // MARK: - AI-Powered Features
 
-    /// Returns the active AI service and the document for `documentId`, throwing if either is unavailable.
+    /// Ensures AI is enabled and retrieves the document with the given identifier.
+    /// - Parameter documentId: The UUID of the document to load.
+    /// - Returns: The active `AIService` and the corresponding `Document`.
+    /// - Throws: `AIError.aiNotEnabled` if AI is not enabled, `AIError.documentNotFound` if no document exists for the given ID.
     private func requireAIAndDocument(documentId: UUID) throws -> (AIService, Document) {
         guard let ai = aiService else {
             throw AIError.aiNotEnabled
@@ -881,7 +962,13 @@ public class WritersApp {
         return (ai, document)
     }
 
-    /// Get AI assistance for a document
+    /// Request AI assistance for the specified document.
+    /// - Parameters:
+    ///   - documentId: The identifier of the document to analyze and assist with.
+    ///   - type: The kind of assistance to request.
+    ///   - context: Optional additional context to guide the AI's response.
+    /// - Returns: An `AIResponse` containing the AI's suggestions or generated content for the document.
+    /// - Throws: `AIError.aiNotEnabled` if AI is disabled, `AIError.documentNotFound` if the document does not exist, or other errors propagated from the AI service.
     public func getAIAssistance(
         documentId: UUID,
         type: AIAssistanceType,
@@ -891,7 +978,13 @@ public class WritersApp {
         return try await ai.getAssistance(text: document.content, type: type, context: context)
     }
 
-    /// Continue writing a document with AI
+    /// Generate a continuation for the specified document using the enabled AI service.
+    /// - Parameters:
+    ///   - documentId: The identifier of the document to continue.
+    ///   - context: Optional AI context to guide the continuation.
+    ///   - appendToDocument: If `true`, append the generated continuation to the document's content and persist the update.
+    /// - Returns: The generated continuation text.
+    /// - Throws: `AIError.aiNotEnabled` if AI is not enabled, `AIError.documentNotFound` if the document cannot be found, or any error produced by the AI service.
     public func continueDocument(
         documentId: UUID,
         context: AIContext? = nil,
@@ -925,7 +1018,13 @@ public class WritersApp {
         return continuation
     }
 
-    /// Improve document content with AI
+    /// Produces an improved version of a document's text using the configured AI.
+    /// - Parameters:
+    ///   - documentId: The identifier of the document to improve.
+    ///   - context: Optional AIContext providing additional instructions or guidance for the improvement.
+    ///   - replaceContent: If `true`, replaces the stored document content with the improved text; otherwise leaves the document unchanged.
+    /// - Returns: The improved document text.
+    /// - Throws: `AIError.aiNotEnabled` if AI is not enabled; `AIError.documentNotFound` if the document cannot be found. Propagates errors thrown by the AI service or underlying persistence operations.
     public func improveDocument(
         documentId: UUID,
         context: AIContext? = nil,
@@ -959,7 +1058,12 @@ public class WritersApp {
         return improved
     }
 
-    /// Generate title suggestions for a document
+    /// Generate candidate titles for a document using the configured AI service.
+    /// - Parameters:
+    ///   - documentId: The identifier of the document to analyze.
+    ///   - context: Optional contextual hints to guide title generation.
+    /// - Returns: Suggested titles for the document.
+    /// - Throws: `AIError.aiNotEnabled` if AI is disabled, `AIError.documentNotFound` if the document cannot be found, or other AI-related errors encountered while generating titles.
     public func generateDocumentTitles(
         documentId: UUID,
         context: AIContext? = nil
@@ -968,13 +1072,20 @@ public class WritersApp {
         return try await ai.generateTitles(content: document.content, context: context)
     }
 
-    /// Analyze a document comprehensively
+    /// Performs an AI-powered analysis of the specified document.
+    /// - Parameter documentId: The UUID of the document to analyze.
+    /// - Returns: A `DocumentAnalysis` containing the analysis results for the document.
+    /// - Throws: `AIError.aiNotEnabled` if AI is not enabled.
+    /// - Throws: `AIError.documentNotFound` if no document exists with the given `documentId`.
+    /// - Throws: Any error produced by the AI service while performing the analysis.
     public func analyzeDocument(documentId: UUID) async throws -> DocumentAnalysis {
         let (ai, document) = try requireAIAndDocument(documentId: documentId)
         return try await ai.analyzeDocument(document: document)
     }
 
-    /// Get writing insights for a document
+    /// Fetches writing insights for the specified document using the enabled AI service.
+    /// - Returns: `WritingInsights` containing analysis and recommendations derived from the document's content.
+    /// - Throws: `AIError.aiNotEnabled` if AI is disabled; `AIError.documentNotFound` if no document exists for the given `documentId`.
     public func getDocumentInsights(documentId: UUID) async throws -> WritingInsights {
         let (ai, document) = try requireAIAndDocument(documentId: documentId)
         return try await ai.getWritingInsights(document: document)
@@ -1092,7 +1203,12 @@ public class WritersApp {
         return try await ai.brainstormIdeasCategorized(topic: topic, context: context)
     }
 
-    /// Generate outline from concept
+    /// Generate an outline for the provided concept using the configured AI service.
+    /// - Parameters:
+    ///   - concept: The topic or idea to generate an outline for.
+    ///   - context: Optional AIContext providing additional guidance or constraints for generation.
+    /// - Throws: `AIError.aiNotEnabled` if the AI service is not enabled.
+    /// - Returns: The generated outline as a `String`.
     public func generateOutline(
         concept: String,
         context: AIContext? = nil

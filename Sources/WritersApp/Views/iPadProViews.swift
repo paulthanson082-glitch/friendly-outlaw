@@ -97,6 +97,9 @@ struct SidebarView: View {
                 Label("Statistics", systemImage: "chart.bar")
                     .tag(SidebarSection.statistics)
 
+                Label("Spoiler Guard", systemImage: "eye.slash.circle")
+                    .tag(SidebarSection.spoilerGuard)
+
                 Label("Settings", systemImage: "gear")
                     .tag(SidebarSection.settings)
             }
@@ -119,6 +122,7 @@ enum SidebarSection: Hashable {
     case recent
     case category(TemplateCategory)
     case statistics
+    case spoilerGuard
     case settings
 }
 
@@ -170,6 +174,11 @@ struct DocumentEditorView: View {
         .background(Color(uiColor: .systemBackground))
         .sheet(isPresented: $viewModel.showWordCountSheet) {
             WordCountDetailView(viewModel: viewModel)
+        }
+        .sheet(isPresented: $viewModel.showSpoilerPanel) {
+            if let svm = viewModel.spoilerPanelVM {
+                SpoilerManagerView(viewModel: svm)
+            }
         }
     }
 }
@@ -328,6 +337,10 @@ struct EditorToolbarView: View {
                 }
                 Button(action: { viewModel.showWordCount() }) {
                     Label("Word Count", systemImage: "number")
+                }
+                Divider()
+                Button(action: { viewModel.openSpoilerPanel() }) {
+                    Label("Spoiler Guard", systemImage: "eye.slash.circle")
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
@@ -1377,6 +1390,25 @@ public class WritersAppViewModel: ObservableObject {
         if !layout.showAIPanel {
             showAIPanel = false
         }
+    }
+
+    // MARK: - Spoiler Protection
+
+    @Published public var showSpoilerPanel: Bool = false
+    private(set) var spoilerPanelVM: SpoilerViewModel?
+
+    /// Opens the Spoiler Guard panel for the current document.
+    public func openSpoilerPanel() {
+        guard let app = writersApp else { return }
+        if spoilerPanelVM == nil {
+            spoilerPanelVM = SpoilerViewModel(spoilerService: app.spoilerProtection)
+        }
+        if let docId = currentDocument?.id {
+            spoilerPanelVM?.documentId = docId
+            spoilerPanelVM?.documentContent = currentDocumentContent
+            spoilerPanelVM?.loadTags()
+        }
+        showSpoilerPanel = true
     }
 
     // MARK: - Statistics
