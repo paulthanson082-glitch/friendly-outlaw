@@ -387,6 +387,19 @@ PluginError:      notInitialized, actionNotSupported, invalidParameters,
 
 ## AI Integration
 
+### Claude Models Supported
+
+This project supports multiple Claude models from Anthropic:
+
+| Model | Best For | Context | Performance |
+|-------|----------|---------|-------------|
+| **Claude 3.5 Sonnet** | General-purpose, most cost-effective | 200K tokens | Excellent balance of speed/quality |
+| **Claude 3 Opus** | Complex reasoning, long documents | 200K tokens | Highest reasoning power |
+| **Claude 3 Sonnet** | Fast responses, real-time features | 200K tokens | Good speed/quality ratio |
+| **Claude Mythos Preview** | Autonomous coding, security, long-running tasks | Extended | Adaptive thinking, best-in-class |
+
+**Claude Mythos Preview** is available as a gated research preview with special capabilities for this project. See [MYTHOS.md](MYTHOS.md) for detailed information on when and how to use it.
+
 ### Configuration
 ```swift
 let config = AIConfiguration(
