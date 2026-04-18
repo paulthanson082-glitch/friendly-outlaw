@@ -6,7 +6,6 @@ public class WritersApp {
     public let documentManager: DocumentManager
     public let issueManager: IssueManager
     public let kanbanManager: KanbanManager
-    public let crmManager: CRMManager
     public let hardwareManager: HardwareManager
     public let databaseManager: DatabaseManager
     public let pluginManager: PluginManager
@@ -49,7 +48,6 @@ public class WritersApp {
         self.documentManager = DocumentManager()
         self.issueManager = IssueManager()
         self.kanbanManager = KanbanManager()
-        self.crmManager = CRMManager()
         self.hardwareManager = HardwareManager()
         self.databaseManager = databaseManager
         self.pluginManager = PluginManager.shared
@@ -1435,7 +1433,12 @@ public class WritersApp {
         return try await harness.run(prompt: prompt)
     }
 
-    /// Run the generator–evaluator loop for an existing `WritingPlan` (skips the planner).
+    /// Executes a multi-agent harness using the provided writing plan.
+    /// - Parameters:
+    ///   - plan: The prepared `WritingPlan` to execute.
+    ///   - configuration: `HarnessConfiguration` to apply when creating the harness. Defaults to `.default`.
+    /// - Returns: A `HarnessResult` containing the outcome of running the harness.
+    /// - Throws: If AI is not enabled or the harness fails during creation or execution.
     public func runMultiAgentHarness(
         plan: WritingPlan,
         configuration: HarnessConfiguration = .default
@@ -1447,12 +1450,14 @@ public class WritersApp {
     // MARK: - Cowork Mode
 
     /// Enable Gmail integration using the given OAuth 2.0 bearer token.
-    /// The token must be obtained by the caller (e.g. from the GMAIL_OAUTH_TOKEN env var).
+    /// Enables Gmail integration for the app using the provided OAuth access token.
+    /// - Parameter oauthToken: OAuth access token used to authenticate requests to the Gmail API.
     public func enableGmail(oauthToken: String) {
         self.gmailService = GmailService(oauthToken: oauthToken)
     }
 
-    /// Disable Gmail integration.
+    /// Disables the Gmail integration and clears any existing Gmail service configuration.
+    /// After calling this, `isGmailEnabled` will return `false`.
     public func disableGmail() {
         self.gmailService = nil
     }
@@ -1464,7 +1469,10 @@ public class WritersApp {
 
     // MARK: Cowork session lifecycle
 
-    /// Start a new cowork session, replacing any active one.
+    /// Creates and activates a new cowork session.
+    /// 
+    /// Sets this WritersApp's `activeCoworkSession` to the created session.
+    /// - Returns: The newly created `CoworkSession`.
     @discardableResult
     public func startCoworkSession() -> CoworkSession {
         let session = CoworkSession()
@@ -1472,7 +1480,8 @@ public class WritersApp {
         return session
     }
 
-    /// End the active cowork session and return its summary.
+    /// Ends the currently active cowork session.
+    /// - Returns: The ended `CoworkSession` if a session was active, `nil` otherwise.
     @discardableResult
     public func endCoworkSession() -> CoworkSession? {
         guard var session = activeCoworkSession else { return nil }
@@ -1483,7 +1492,10 @@ public class WritersApp {
 
     // MARK: Prospect facade
 
-    /// Add a new prospect to the database.
+    /// Creates a new prospect, saves it to the prospect database, and records the addition on the active cowork session if present.
+    /// 
+    /// The prospect is constructed from the provided fields and added to `prospectDatabase`. If an `activeCoworkSession` exists, its `prospectsAdded` counter is incremented.
+    /// - Returns: The created `Prospect`.
     @discardableResult
     public func addProspect(
         name: String,
@@ -1506,18 +1518,32 @@ public class WritersApp {
         return prospect
     }
 
+    /// Fetches all prospects stored in the prospect database.
+    /// - Returns: An array containing every stored `Prospect`.
     public func getAllProspects() -> [Prospect] {
         return prospectDatabase.getAllProspects()
     }
 
+    /// Retrieves all prospects that have the specified status.
+    /// - Parameter status: The prospect status to filter by.
+    /// - Returns: An array of `Prospect` objects whose status equals the provided `status`.
     public func getProspects(withStatus status: ProspectStatus) -> [Prospect] {
         return prospectDatabase.getProspects(withStatus: status)
     }
 
+    /// Searches prospects using the provided query across common prospect fields (name, email, company, role, and notes).
+    /// - Parameter query: The search text to match against prospect fields.
+    /// - Returns: An array of `Prospect` objects that match the query.
     public func searchProspects(query: String) -> [Prospect] {
         return prospectDatabase.searchProspects(query: query)
     }
 
+    /// Update the status of a prospect and, when applicable, increment the active cowork session's contacted count.
+    /// - Parameters:
+    ///   - id: The unique identifier of the prospect to update.
+    ///   - status: The new status to assign to the prospect.
+    /// - Throws: Any error produced while updating the prospect status in the prospect database.
+    /// - Note: If the new status is `.contacted`, `.replied`, or `.meeting`, increments `activeCoworkSession?.prospectsContacted` by 1.
     public func updateProspectStatus(id: UUID, status: ProspectStatus) throws {
         try prospectDatabase.updateProspectStatus(id: id, status: status)
         if status == .contacted || status == .replied || status == .meeting {
@@ -1525,10 +1551,14 @@ public class WritersApp {
         }
     }
 
+    /// Deletes the prospect with the given identifier.
+    /// - Parameter id: The UUID of the prospect to remove.
     public func deleteProspect(id: UUID) {
         prospectDatabase.deleteProspect(id: id)
     }
 
+    /// Counts prospects grouped by their status.
+    /// - Returns: A dictionary mapping each `ProspectStatus` to the number of prospects with that status.
     public func getProspectStats() -> [ProspectStatus: Int] {
         return prospectDatabase.getStats()
     }
@@ -1536,14 +1566,22 @@ public class WritersApp {
     // MARK: Gmail facade
 
     /// List Gmail inbox messages.
-    /// - Throws: `CoworkError.gmailNotEnabled` if Gmail has not been enabled.
+    /// Retrieve Gmail messages from the configured Gmail service.
+    /// - Parameters:
+    ///   - maxResults: The maximum number of messages to return.
+    ///   - query: An optional Gmail search query to filter results (e.g., "is:unread").
+    /// - Returns: An array of `GmailMessage` objects matching the query, limited to `maxResults`.
+    /// - Throws: `CoworkError.gmailNotEnabled` if Gmail integration is not enabled.
     public func listGmailMessages(maxResults: Int = 20, query: String? = nil) async throws -> [GmailMessage] {
         guard let gmail = gmailService else { throw CoworkError.gmailNotEnabled }
         return try await gmail.listMessages(maxResults: maxResults, query: query)
     }
 
     /// Send an email via Gmail and record it in the active cowork session.
-    /// - Throws: `CoworkError.gmailNotEnabled` if Gmail has not been enabled.
+    /// Send an email draft using the configured Gmail service and increment the active cowork session's sent counter.
+    /// - Parameter draft: The `GmailDraft` to send.
+    /// - Returns: The sent message's identifier as a `String`.
+    /// - Throws: `CoworkError.gmailNotEnabled` if Gmail is not configured; rethrows errors produced by the underlying `GmailService` when sending fails.
     @discardableResult
     public func sendGmail(draft: GmailDraft) async throws -> String {
         guard let gmail = gmailService else { throw CoworkError.gmailNotEnabled }
@@ -1553,7 +1591,10 @@ public class WritersApp {
     }
 
     /// Mark a Gmail message as read.
-    /// - Throws: `CoworkError.gmailNotEnabled` if Gmail has not been enabled.
+    /// Marks a Gmail message as read.
+    /// - Parameters:
+    ///   - id: The Gmail message identifier to mark as read.
+    /// - Throws: `CoworkError.gmailNotEnabled` if Gmail integration is not configured; rethrows errors from the `GmailService` if the mark-as-read operation fails.
     public func markGmailAsRead(id: String) async throws {
         guard let gmail = gmailService else { throw CoworkError.gmailNotEnabled }
         try await gmail.markAsRead(id: id)
@@ -1561,19 +1602,22 @@ public class WritersApp {
 
     // MARK: Browser facade
 
-    /// Fetch a URL and return its plain-text content.
+    /// Fetches the page at the given URL and increments the active cowork session's researched-pages counter.
+    /// - Parameter urlString: The URL string to fetch.
+    /// - Returns: The fetched `BrowsedPage`.
     public func browseURL(_ urlString: String) async throws -> BrowsedPage {
         let page = try await browserService.fetch(urlString: urlString)
         activeCoworkSession?.pagesResearched += 1
         return page
     }
 
-    /// Return all pages browsed in this session.
+    /// Retrieve the stored browsing history.
+    /// - Returns: An array of `BrowsedPage` entries held by the browser service.
     public func getBrowsingHistory() -> [BrowsedPage] {
         return browserService.history
     }
 
-    /// Clear the browsing history.
+    /// Clears the browsing history maintained by the BrowserService.
     public func clearBrowsingHistory() {
         browserService.clearHistory()
     }

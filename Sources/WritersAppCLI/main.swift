@@ -95,7 +95,9 @@ struct WritersAppCLI {
     /// - Initializes WritersApp and global analytics.
     /// - Parses and handles command-line flags for help, listing, opening documents, running focus sessions, GUI exports, trace analysis, and playful actions.
     /// - Enables optional features based on environment variables (Anthropic/Clother AI, gui.new, Ragie) and attempts to initialize the Claude memory plugin.
-    /// - Enters an interactive menu loop presenting document, AI, memory, plugin, productivity, issue, hardware board, gui.new export, and Ragie operations; dispatches user choices to the appropriate handlers and shuts down plugins on exit.
+    /// Application entry point that initializes global services, processes command-line flags, and runs the interactive CLI menu.
+    /// 
+    /// When invoked, this method initializes application-wide managers and analytics, parses and executes supported CLI options (which may perform one-off actions and exit), and—if no terminating CLI action is performed—performs interactive startup (provider/feature initialization) before entering the main menu loop that dispatches user-selected commands to the various handlers (document management, AI tools, plugins, productivity features, cowork mode, etc.).
     static func main() async {
         let app = WritersApp()
         analyticsService = ProductivityAnalytics(focusManager: focusManager, goalManager: goalManager)
@@ -3945,7 +3947,9 @@ func moveKanbanTaskCLI(app: WritersApp) {
     print("\n✓ Task '\(task.title)' moved to \(targetColumn.displayName)")
 }
 
-/// Deletes a Kanban board and all its tasks.
+/// Interactively prompts the user to select and delete a Kanban board from the application.
+/// 
+/// Lists all Kanban boards with their task counts, prompts for a selection number, and asks for an explicit `y` confirmation before deleting the chosen board and its tasks. If there are no boards, the selection is skipped. Invalid selection or any confirmation other than `y` cancels the operation and prints a corresponding message.
 func deleteKanbanBoardCLI(app: WritersApp) {
     print("\n=== Delete Kanban Board ===\n")
     let boards = app.getAllKanbanBoards()
@@ -3972,7 +3976,10 @@ func deleteKanbanBoardCLI(app: WritersApp) {
     print("\n✓ Kanban board '\(board.name)' deleted.")
 }
 
-// MARK: - Cowork Mode Handlers
+/// Starts a cowork session and displays its metadata and integration readiness.
+/// 
+/// Prints a short session identifier, the session start time, whether Gmail is enabled,
+/// and readiness indicators for prospects and browser integrations.
 
 func startCoworkSession(app: WritersApp) {
     let session = app.startCoworkSession()
@@ -3987,6 +3994,8 @@ func startCoworkSession(app: WritersApp) {
     print("Browser:   ready")
 }
 
+/// Ends the currently active cowork session (if any) and prints a concise summary to stdout.
+/// - Parameter app: The application instance used to end the session and retrieve the final session details.
 func endCoworkSession(app: WritersApp) {
     guard let session = app.endCoworkSession() else {
         print("\nNo active cowork session.")
@@ -4002,6 +4011,8 @@ func endCoworkSession(app: WritersApp) {
     print("\nSession ended. Great work!")
 }
 
+/// Prompts the user for prospect information (name, email, optional company, role, notes, and tags), validates required fields, creates the prospect via the provided app, and prints a confirmation or validation error.
+/// - Parameter app: The application instance used to persist the new prospect.
 func addProspect(app: WritersApp) {
     print("\n=== Add Prospect ===\n")
     print("Name: ", terminator: "")
@@ -4032,6 +4043,11 @@ func addProspect(app: WritersApp) {
     print("\n✓ Prospect '\(prospect.name)' added (ID: \(prospect.id.uuidString.prefix(8))...)")
 }
 
+/// Prints a formatted list of all prospects and their metadata to standard output.
+/// - Parameters:
+///   - app: The application instance used to retrieve prospect data. The function fetches all prospects from `app` and renders each prospect's name, company, role, email, status, optional notes, tags, and last-contacted date.
+/// 
+/// If no prospects exist, prints a short message indicating the database is empty and how to add a prospect; always prints a final total count.
 func listProspects(app: WritersApp) {
     print("\n=== Prospect Database ===\n")
     let prospects = app.getAllProspects()
@@ -4062,6 +4078,11 @@ func listProspects(app: WritersApp) {
     print("Total: \(prospects.count) prospect(s)")
 }
 
+/// Prompts the user for a search query and displays matching prospects.
+/// 
+/// Reads a line from standard input, validates it is non-empty, performs a search via the app's prospect index, and prints either a "no matches" message or a numbered summary of matching prospects (name, optional company, email, and status).
+/// 
+/// Side effects: reads from stdin and writes formatted results to stdout.
 func searchProspects(app: WritersApp) {
     print("\n=== Search Prospects ===\n")
     print("Search query: ", terminator: "")
@@ -4081,6 +4102,9 @@ func searchProspects(app: WritersApp) {
     }
 }
 
+/// Interactively update the status of a prospect selected from the application's prospect list.
+/// 
+/// Prompts the user to choose a prospect and a new status, applies the change via the provided application instance, and prints a success or error message.
 func updateProspectStatus(app: WritersApp) {
     print("\n=== Update Prospect Status ===\n")
     let prospects = app.getAllProspects()
@@ -4119,6 +4143,9 @@ func updateProspectStatus(app: WritersApp) {
     }
 }
 
+/// Prints a textual prospect pipeline summary to standard output.
+/// 
+/// The summary lists each prospect status with a fixed-width label, a three-digit count, an ASCII bar proportional to the count, and a final total count. The statuses are printed in the order defined by `ProspectStatus.allCases`.
 func viewProspectPipelineStats(app: WritersApp) {
     print("\n=== Prospect Pipeline ===\n")
     let stats = app.getProspectStats()
@@ -4136,6 +4163,9 @@ func viewProspectPipelineStats(app: WritersApp) {
     print("\nTotal: \(total) prospect(s)")
 }
 
+/// Displays an interactive Gmail inbox listing.
+///
+/// Prompts the user for a maximum number of results (default 10) and an optional Gmail search query, then fetches messages and prints a formatted list. Each entry shows an unread marker, subject (or "(no subject)"), sender, short date, and a truncated snippet preview. If Gmail is not enabled the function prints a guidance message and returns. Errors encountered while fetching messages are caught and printed.
 func viewGmailInbox(app: WritersApp) async {
     print("\n=== Gmail Inbox ===\n")
     guard app.isGmailEnabled else {
@@ -4174,6 +4204,9 @@ func viewGmailInbox(app: WritersApp) async {
     }
 }
 
+/// Presents an interactive CLI flow to compose and send an email through the app's Gmail integration.
+/// 
+/// Prompts for recipient, subject, and a multi-line body (terminated by a line containing only `.`), validates the recipient contains `@`, asks for confirmation, and then sends the message using the app's Gmail service. If Gmail is not enabled the function returns early. Prints success with a shortened message ID or an error description on failure.
 func sendGmail(app: WritersApp) async {
     print("\n=== Send Email via Gmail ===\n")
     guard app.isGmailEnabled else {
@@ -4211,6 +4244,9 @@ func sendGmail(app: WritersApp) async {
     }
 }
 
+/// Fetches a web page, prints a short preview of its text content, and records the page in browsing history.
+/// 
+/// Prompts the user for a URL, retrieves the page via the app, prints the page title, URL, and up to the first 40 text lines, and reports that the page was saved to browsing history. Errors encountered during fetching are printed to standard output.
 func researchURL(app: WritersApp) async {
     print("\n=== Research URL ===\n")
     print("Enter URL to fetch (https://...): ", terminator: "")
@@ -4238,6 +4274,10 @@ func researchURL(app: WritersApp) async {
     }
 }
 
+/// Displays the current browsing history and prompts the user to optionally clear it.
+/// 
+/// Lists each visited page with its title, URL, fetched time, and character count, then shows the total number of pages. If the user confirms by entering `y`, the history is cleared.
+/// - Parameter app: The `WritersApp` instance used to retrieve and clear browsing history.
 func viewBrowsingHistory(app: WritersApp) {
     print("\n=== Browsing History ===\n")
     let history = app.getBrowsingHistory()
