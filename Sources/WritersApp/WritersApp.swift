@@ -290,10 +290,55 @@ public class WritersApp {
     }
 
     /// Ends the active Hermes ideation session.
-    /// 
+    ///
     /// If Hermes is not enabled or no session is active, this does nothing.
     public func endHermesSession() {
         hermesService?.endSession()
+    }
+
+    /// Returns all ideas generated in the session, optionally filtered by type.
+    /// - Parameters:
+    ///   - session: The session to query.
+    ///   - type: When non-nil, only ideas of this type are returned.
+    /// - Returns: A flat array of `HermesIdea` in chronological order.
+    public func getAllIdeas(from session: HermesSession, filteredBy type: HermesIdeaType? = nil) -> [HermesIdea] {
+        return hermesService?.getAllIdeas(from: session, filteredBy: type) ?? []
+    }
+
+    /// Returns all ideas the writer has marked as favourite in the session.
+    /// - Parameter session: The session to query.
+    /// - Returns: A flat array of favourite `HermesIdea` in chronological order.
+    public func getFavorites(from session: HermesSession) -> [HermesIdea] {
+        return hermesService?.getFavorites(from: session) ?? []
+    }
+
+    /// Marks a specific idea in the session as a favourite.
+    /// - Parameters:
+    ///   - ideaId: UUID of the idea to favourite.
+    ///   - session: The session containing the idea; mutated in place.
+    /// - Throws: `HermesError.aiNotAvailable` if Hermes is not enabled.
+    ///           `HermesError.ideaNotFound(id:)` if the idea does not exist.
+    public func favoriteIdea(ideaId: UUID, in session: inout HermesSession) throws {
+        guard let service = hermesService else { throw HermesError.aiNotAvailable }
+        try service.favoriteIdea(ideaId, in: &session)
+    }
+
+    /// Removes the favourite mark from a specific idea in the session.
+    /// - Parameters:
+    ///   - ideaId: UUID of the idea to un-favourite.
+    ///   - session: The session containing the idea; mutated in place.
+    /// - Throws: `HermesError.aiNotAvailable` if Hermes is not enabled.
+    ///           `HermesError.ideaNotFound(id:)` if the idea does not exist.
+    public func unfavoriteIdea(ideaId: UUID, in session: inout HermesSession) throws {
+        guard let service = hermesService else { throw HermesError.aiNotAvailable }
+        try service.unfavoriteIdea(ideaId, in: &session)
+    }
+
+    /// Computes aggregated statistics for a Hermes session.
+    /// - Parameter session: The session to analyse.
+    /// - Returns: A `HermesSessionStats` value, or `nil` if Hermes is not enabled.
+    public func getHermesSessionStats(from session: HermesSession) -> HermesSessionStats? {
+        return hermesService?.getSessionStats(from: session)
     }
 
     // MARK: - Settings Management

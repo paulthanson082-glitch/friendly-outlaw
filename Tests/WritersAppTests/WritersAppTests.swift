@@ -3127,6 +3127,382 @@ final class WritingAdvisorTests: XCTestCase {
     }
 }
 
+// MARK: - Hermes Agent V0.9.0 Tests
+
+final class HermesAgentTests: XCTestCase {
+
+    // MARK: - Helpers
+
+    /// Build a HermesService for tests that only exercise non-AI behavior (parsing, session utilities).
+    private func makeService() -> HermesService {
+        let app = WritersApp(databasePath: ":memory:")
+        // Use a real AIService configured with a test key; these tests avoid network calls
+        // by only exercising non-AI code paths.
+        return HermesService(
+            aiService: AIService(configuration: AIConfiguration(apiKey: "test-key")),
+            documentManager: app.documentManager,
+            templateManager: app.templateManager
+        )
+    }
+
+    /// Inject a pre-built HermesMessage with known ideas into a session.
+    private func sessionWith(ideas: [HermesIdea]) -> HermesSession {
+        let message = HermesMessage(role: .hermes, content: "Here are some ideas.", ideas: ideas)
+        return HermesSession(messages: [message])
+    }
+
+    private func makeIdea(
+        type: HermesIdeaType = .plotHook,
+        title: String = "Test Idea",
+        isFavorite: Bool = false
+    ) -> HermesIdea {
+        HermesIdea(title: title, description: "A description.", ideaType: type, isFavorite: isFavorite)
+    }
+
+    // MARK: - HermesTone
+
+    func testHermesToneDisplayNamesAreNonEmpty() {
+        for tone in HermesTone.allCases {
+            XCTAssertFalse(tone.displayName.isEmpty, "\(tone) displayName must not be empty")
+        }
+    }
+
+    func testHermesTonePromptHintsAreNonEmpty() {
+        for tone in HermesTone.allCases {
+            XCTAssertFalse(tone.promptHint.isEmpty, "\(tone) promptHint must not be empty")
+        }
+    }
+
+    func testHermesToneRoundTripsViaCodable() throws {
+        for tone in HermesTone.allCases {
+            let data = try JSONEncoder().encode(tone)
+            let decoded = try JSONDecoder().decode(HermesTone.self, from: data)
+            XCTAssertEqual(decoded, tone)
+        }
+    }
+
+    func testHermesContextStoresTone() {
+        let ctx = HermesContext(genre: "Fantasy", tone: .dark)
+        XCTAssertEqual(ctx.tone, .dark)
+    }
+
+    func testHermesContextDefaultToneIsNil() {
+        let ctx = HermesContext()
+        XCTAssertNil(ctx.tone)
+    }
+
+    // MARK: - HermesIdea isFavorite
+
+    func testHermesIdeaDefaultIsNotFavorite() {
+        let idea = makeIdea()
+        XCTAssertFalse(idea.isFavorite)
+    }
+
+    func testHermesIdeaIsFavoriteRoundTripsCodable() throws {
+        let idea = makeIdea(isFavorite: true)
+        let data = try JSONEncoder().encode(idea)
+        let decoded = try JSONDecoder().decode(HermesIdea.self, from: data)
+        XCTAssertTrue(decoded.isFavorite)
+    }
+
+    func testHermesIdeaIsFavoriteDefaultsFalseOnLegacyPayload() throws {
+        // Simulate a payload that was encoded before isFavorite existed
+        let json = """
+        {
+            "id": "00000000-0000-0000-0000-000000000001",
+            "title": "Old Idea",
+            "description": "Desc",
+            "ideaType": "plotHook",
+            "timestamp": "2026-01-01T00:00:00Z"
+        }
+        """.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(HermesIdea.self, from: json)
+        XCTAssertFalse(decoded.isFavorite, "Legacy payloads without isFavorite must default to false")
+    }
+
+    // MARK: - parseIdeas
+
+    func testParseIdeasExtractsNumberedList() {
+        let service = makeService()
+        let raw = """
+        1. [PLOT HOOK] The Dragon's Secret
+           A dragon guards a secret about the hero's true identity.
+        2. [CHARACTER TRAIT] Reluctant Hero
+           She never wanted to save the world — until today.
+        """
+        let ideas = service.parseIdeas(from: raw)
+        XCTAssertEqual(ideas.count, 2)
+        XCTAssertEqual(ideas[0].title, "The Dragon's Secret")
+        XCTAssertEqual(ideas[0].ideaType, .plotHook)
+        XCTAssertEqual(ideas[1].title, "Reluctant Hero")
+        XCTAssertEqual(ideas[1].ideaType, .characterTrait)
+    }
+
+    func testParseIdeasWithNoTagDefaultsToPlotHook() {
+        let service = makeService()
+        let raw = "1. An Untitled Mystery\n   Somebody stole the crown jewels."
+        let ideas = service.parseIdeas(from: raw)
+        XCTAssertEqual(ideas.count, 1)
+        XCTAssertEqual(ideas[0].ideaType, .plotHook)
+    }
+
+    func testParseIdeasReturnsEmptyForNonListInput() {
+        let service = makeService()
+        let ideas = service.parseIdeas(from: "Just a plain sentence with no numbered list.")
+        XCTAssertTrue(ideas.isEmpty)
+    }
+
+    func testParseIdeasStripsBoldMarkdown() {
+        let service = makeService()
+        let raw = "1. **Bold Title**\n   Description here."
+        let ideas = service.parseIdeas(from: raw)
+        XCTAssertEqual(ideas.count, 1)
+        XCTAssertFalse(ideas[0].title.contains("*"), "Bold markdown asterisks must be stripped")
+    }
+
+    // MARK: - getAllIdeas
+
+    func testGetAllIdeasReturnsFlatList() {
+        let service = makeService()
+        let ideas = [
+            makeIdea(type: .plotHook, title: "Hook"),
+            makeIdea(type: .setting, title: "City")
+        ]
+        let session = sessionWith(ideas: ideas)
+        XCTAssertEqual(service.getAllIdeas(from: session).count, 2)
+    }
+
+    func testGetAllIdeasFilteredByType() {
+        let service = makeService()
+        let ideas = [
+            makeIdea(type: .plotHook, title: "Hook"),
+            makeIdea(type: .setting, title: "City"),
+            makeIdea(type: .setting, title: "Forest")
+        ]
+        let session = sessionWith(ideas: ideas)
+        let filtered = service.getAllIdeas(from: session, filteredBy: .setting)
+        XCTAssertEqual(filtered.count, 2)
+        XCTAssertTrue(filtered.allSatisfy { $0.ideaType == .setting })
+    }
+
+    func testGetAllIdeasFilteredReturnsEmptyWhenNoMatch() {
+        let service = makeService()
+        let ideas = [makeIdea(type: .plotHook)]
+        let session = sessionWith(ideas: ideas)
+        let filtered = service.getAllIdeas(from: session, filteredBy: .dialogue)
+        XCTAssertTrue(filtered.isEmpty)
+    }
+
+    // MARK: - favoriteIdea / unfavoriteIdea
+
+    func testFavoriteIdeaSetsFlagOnCorrectIdea() throws {
+        let service = makeService()
+        let target = makeIdea(type: .twist, title: "Big Twist")
+        var session = sessionWith(ideas: [target, makeIdea(title: "Other")])
+
+        try service.favoriteIdea(target.id, in: &session)
+
+        let updated = service.getAllIdeas(from: session).first { $0.id == target.id }
+        XCTAssertEqual(updated?.isFavorite, true)
+    }
+
+    func testUnfavoriteIdeaClearsFlagOnCorrectIdea() throws {
+        let service = makeService()
+        let target = makeIdea(isFavorite: true)
+        var session = sessionWith(ideas: [target])
+
+        try service.unfavoriteIdea(target.id, in: &session)
+
+        let updated = service.getAllIdeas(from: session).first { $0.id == target.id }
+        XCTAssertEqual(updated?.isFavorite, false)
+    }
+
+    func testFavoriteIdeaThrowsIdeaNotFound() {
+        let service = makeService()
+        var session = sessionWith(ideas: [makeIdea()])
+        XCTAssertThrowsError(try service.favoriteIdea(UUID(), in: &session)) { error in
+            guard case HermesError.ideaNotFound = error else {
+                XCTFail("Expected HermesError.ideaNotFound, got \(error)")
+                return
+            }
+        }
+    }
+
+    func testUnfavoriteIdeaThrowsIdeaNotFound() {
+        let service = makeService()
+        var session = sessionWith(ideas: [makeIdea()])
+        XCTAssertThrowsError(try service.unfavoriteIdea(UUID(), in: &session)) { error in
+            guard case HermesError.ideaNotFound = error else {
+                XCTFail("Expected HermesError.ideaNotFound, got \(error)")
+                return
+            }
+        }
+    }
+
+    func testFavoritingOneIdeaDoesNotAffectOthers() throws {
+        let service = makeService()
+        let a = makeIdea(title: "Alpha")
+        let b = makeIdea(title: "Beta")
+        var session = sessionWith(ideas: [a, b])
+
+        try service.favoriteIdea(a.id, in: &session)
+
+        let bAfter = service.getAllIdeas(from: session).first { $0.id == b.id }
+        XCTAssertEqual(bAfter?.isFavorite, false, "Un-targeted idea must remain un-favourited")
+    }
+
+    // MARK: - getFavorites
+
+    func testGetFavoritesReturnsOnlyFavoritedIdeas() throws {
+        let service = makeService()
+        let fav = makeIdea(title: "Keep Me", isFavorite: true)
+        let notFav = makeIdea(title: "Skip Me", isFavorite: false)
+        let session = sessionWith(ideas: [fav, notFav])
+
+        let favorites = service.getFavorites(from: session)
+        XCTAssertEqual(favorites.count, 1)
+        XCTAssertEqual(favorites[0].id, fav.id)
+    }
+
+    func testGetFavoritesReturnsEmptyWhenNoneFavorited() {
+        let service = makeService()
+        let session = sessionWith(ideas: [makeIdea(), makeIdea()])
+        XCTAssertTrue(service.getFavorites(from: session).isEmpty)
+    }
+
+    // MARK: - getSessionStats
+
+    func testSessionStatsIdeasCount() {
+        let service = makeService()
+        let session = sessionWith(ideas: [
+            makeIdea(type: .plotHook),
+            makeIdea(type: .setting),
+            makeIdea(type: .plotHook)
+        ])
+        let stats = service.getSessionStats(from: session)
+        XCTAssertEqual(stats.totalIdeas, 3)
+        XCTAssertEqual(stats.ideaCountByType[.plotHook], 2)
+        XCTAssertEqual(stats.ideaCountByType[.setting], 1)
+    }
+
+    func testSessionStatsFavoriteCount() {
+        let service = makeService()
+        let session = sessionWith(ideas: [
+            makeIdea(isFavorite: true),
+            makeIdea(isFavorite: false),
+            makeIdea(isFavorite: true)
+        ])
+        let stats = service.getSessionStats(from: session)
+        XCTAssertEqual(stats.favoriteCount, 2)
+    }
+
+    func testSessionStatsMessageCount() {
+        let service = makeService()
+        let userMsg = HermesMessage(role: .user, content: "Give me ideas")
+        let hermesMsg = HermesMessage(role: .hermes, content: "Here:", ideas: [makeIdea()])
+        var session = HermesSession()
+        session.messages = [userMsg, hermesMsg]
+        let stats = service.getSessionStats(from: session)
+        XCTAssertEqual(stats.messageCount, 2)
+    }
+
+    func testSessionStatsAverageIdeasPerMessageEmptySession() {
+        let service = makeService()
+        let session = HermesSession()
+        let stats = service.getSessionStats(from: session)
+        XCTAssertEqual(stats.averageIdeasPerMessage, 0.0)
+    }
+
+    func testSessionStatsAverageIdeasPerMessage() {
+        let service = makeService()
+        let session = sessionWith(ideas: [makeIdea(), makeIdea(), makeIdea()])
+        let stats = service.getSessionStats(from: session)
+        // 3 ideas in 1 Hermes message
+        XCTAssertEqual(stats.averageIdeasPerMessage, 3.0, accuracy: 0.001)
+    }
+
+    func testSessionStatsDurationIsNonNegative() {
+        let service = makeService()
+        let session = HermesSession()
+        let stats = service.getSessionStats(from: session)
+        XCTAssertGreaterThanOrEqual(stats.sessionDuration, 0.0)
+    }
+
+    // MARK: - clearHistory
+
+    func testClearHistoryRemovesAllMessages() {
+        let service = makeService()
+        let msg = HermesMessage(role: .user, content: "Hello")
+        var session = HermesSession(messages: [msg])
+        service.clearHistory(for: &session)
+        XCTAssertTrue(session.messages.isEmpty)
+    }
+
+    // MARK: - startHermesSession / endHermesSession (via WritersApp)
+
+    func testStartHermesSessionThrowsWhenAINotEnabled() {
+        let noAIApp = WritersApp()
+        XCTAssertThrowsError(try noAIApp.startHermesSession()) { error in
+            guard case HermesError.aiNotAvailable = error else {
+                XCTFail("Expected HermesError.aiNotAvailable")
+                return
+            }
+        }
+    }
+
+    func testGetAllIdeasViaWritersAppWithNoAIReturnsEmpty() {
+        let noAIApp = WritersApp()
+        let session = HermesSession()
+        XCTAssertTrue(noAIApp.getAllIdeas(from: session).isEmpty)
+    }
+
+    func testGetFavoritesViaWritersAppWithNoAIReturnsEmpty() {
+        let noAIApp = WritersApp()
+        let session = HermesSession()
+        XCTAssertTrue(noAIApp.getFavorites(from: session).isEmpty)
+    }
+
+    func testFavoriteIdeaThrowsAINotAvailableWhenNoAI() {
+        let noAIApp = WritersApp()
+        var session = HermesSession()
+        XCTAssertThrowsError(try noAIApp.favoriteIdea(ideaId: UUID(), in: &session)) { error in
+            guard case HermesError.aiNotAvailable = error else {
+                XCTFail("Expected HermesError.aiNotAvailable")
+                return
+            }
+        }
+    }
+
+    func testGetHermesSessionStatsReturnsNilWhenNoAI() {
+        let noAIApp = WritersApp()
+        let session = HermesSession()
+        XCTAssertNil(noAIApp.getHermesSessionStats(from: session))
+    }
+
+    // MARK: - HermesSessionStats
+
+    func testHermesSessionStatsInitialiserStoresAllFields() {
+        let id = UUID()
+        let byType: [HermesIdeaType: Int] = [.plotHook: 3, .twist: 1]
+        let stats = HermesSessionStats(
+            sessionId: id,
+            messageCount: 4,
+            totalIdeas: 4,
+            favoriteCount: 1,
+            ideaCountByType: byType,
+            sessionDuration: 120.0,
+            averageIdeasPerMessage: 2.0
+        )
+        XCTAssertEqual(stats.sessionId, id)
+        XCTAssertEqual(stats.messageCount, 4)
+        XCTAssertEqual(stats.totalIdeas, 4)
+        XCTAssertEqual(stats.favoriteCount, 1)
+        XCTAssertEqual(stats.ideaCountByType[.plotHook], 3)
+        XCTAssertEqual(stats.sessionDuration, 120.0, accuracy: 0.001)
+        XCTAssertEqual(stats.averageIdeasPerMessage, 2.0, accuracy: 0.001)
+    }
+}
+
 // MARK: - Test Helpers
 
 private class MockComputerUseExecutor: ComputerUseExecutor {
