@@ -11,13 +11,17 @@ public class WritersApp {
     public let pluginManager: PluginManager
     public let encouragementService: EncouragementService
     public let versionControl: DoltVersionControlService
+    public let giftCardManager: GiftCardManager
     public private(set) var guiService: GuiNewService?
     public private(set) var aiService: AIService?
     public private(set) var chatbotService: ChatbotService?
+    public private(set) var hermesService: HermesService?
     public private(set) var ragieService: RagieService?
+    public private(set) var writingAdvisorService: WritingAdvisorService?
     public private(set) var currentUserId: UUID?
     private var currentSessionId: UUID?
     private var memoryPlugin: ClaudeMemoryPlugin?
+    private(set) var appSettings: AppSettings
 
     // MARK: - Cowork Mode
     public let prospectDatabase: ProspectDatabase
@@ -49,7 +53,9 @@ public class WritersApp {
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
         self.versionControl = DoltVersionControlService(databaseManager: databaseManager)
+        self.giftCardManager = GiftCardManager(databaseManager: databaseManager)
         self.guiService = nil
+        self.appSettings = AppSettings()
         self.prospectDatabase = ProspectDatabase()
         self.browserService = BrowserService()
         self.gmailService = nil
@@ -62,13 +68,24 @@ public class WritersApp {
                 documentManager: self.documentManager,
                 templateManager: self.templateManager
             )
+            self.hermesService = HermesService(
+                aiService: svc,
+                documentManager: self.documentManager,
+                templateManager: self.templateManager
+            )
+            self.writingAdvisorService = WritingAdvisorService(aiService: svc)
         } else {
             self.chatbotService = nil
+            self.hermesService = nil
+            self.writingAdvisorService = nil
         }
         try? databaseManager.initialize()
     }
 
-    /// Enable AI features by providing configuration
+    /// Enables the application's AI features by creating and wiring AI-related services.
+    /// - Parameters:
+    ///   - configuration: Configuration used to initialize the AI subsystem.
+    ///   - userId: Optional user identifier; when provided the AI configuration is associated with and persisted for that user.
     public func enableAI(configuration: AIConfiguration, userId: UUID? = nil) {
         let aiSvc = AIService(configuration: configuration)
         self.aiService = aiSvc
@@ -77,16 +94,26 @@ public class WritersApp {
             documentManager: self.documentManager,
             templateManager: self.templateManager
         )
+        self.hermesService = HermesService(
+            aiService: aiSvc,
+            documentManager: self.documentManager,
+            templateManager: self.templateManager
+        )
+        self.writingAdvisorService = WritingAdvisorService(aiService: aiSvc)
         if let uid = userId {
             self.currentUserId = uid
             try? self.databaseManager.saveAIConfiguration(userId: uid, configuration: configuration)
         }
     }
 
-    /// Disable AI features
+    /// Disables all AI features for the application.
+    /// 
+    /// Clears the configured AI, chatbot, and Hermes service instances so AI-based functionality becomes unavailable.
     public func disableAI() {
         self.aiService = nil
         self.chatbotService = nil
+        self.hermesService = nil
+        self.writingAdvisorService = nil
     }
 
     /// Check if AI is available
@@ -198,6 +225,120 @@ public class WritersApp {
     /// Check if Jules is in adult mode
     public var isJulesAdultModeEnabled: Bool {
         return chatbotService?.isAdultModeEnabled ?? false
+    }
+
+    // MARK: - Hermes (Creative Idea Generator)
+
+    /// Start a new Hermes ideation session
+    ///
+    /// - Parameter context: Optional story context (genre, logline, characters, etc.)
+    /// Starts a new Hermes ideation session using the provided context.
+    /// - Parameter context: Configuration and seed data used to initialize the Hermes session. Defaults to an empty `HermesContext`.
+    /// - Returns: A newly created `HermesSession`.
+    /// - Throws: `HermesError.aiNotAvailable` if the Hermes service is not enabled.
+    public func startHermesSession(context: HermesContext = HermesContext()) throws -> HermesSession {
+        guard let service = hermesService else {
+            throw HermesError.aiNotAvailable
+        }
+        return service.startSession(context: context)
+    }
+
+    /// Send a creative prompt to Hermes and receive structured ideas
+    ///
+    /// - Parameters:
+    ///   - prompt: What the writer needs help with
+    ///   - session: The active Hermes session (mutated in place)
+    /// - Returns: A `HermesResponse` containing the raw message and parsed `[HermesIdea]`
+    /// Generates structured ideas from a prompt and updates the provided Hermes session.
+    /// - Parameters:
+    ///   - prompt: The textual prompt used to seed idea generation.
+    ///   - session: An inout `HermesSession` that will be mutated to reflect the generation state and any produced ideas.
+    /// - Returns: A `HermesResponse` containing the generated ideas and related metadata.
+    /// - Throws: `HermesError.aiNotAvailable` if the Hermes service is not enabled.
+    public func generateIdeas(
+        prompt: String,
+        in session: inout HermesSession
+    ) async throws -> HermesResponse {
+        guard let service = hermesService else {
+            throw HermesError.aiNotAvailable
+        }
+        return try await service.generateIdeas(prompt, in: &session)
+    }
+
+    /// Expand on a specific idea, generating deeper variations
+    ///
+    /// - Parameters:
+    ///   - ideaId: UUID of the idea to expand
+    ///   - session: The active Hermes session (mutated in place)
+    /// - Returns: A `HermesResponse` with expanded variations
+    /// Expands an existing idea into deeper variations within a Hermes session.
+    /// - Parameters:
+    ///   - ideaId: The identifier of the idea to expand.
+    ///   - session: The active `HermesSession` to update; mutated in place with expansion results.
+    /// - Returns: A `HermesResponse` containing the expansion output.
+    /// - Throws: `HermesError.aiNotAvailable` if the Hermes service is not enabled.
+    public func expandIdea(
+        ideaId: UUID,
+        in session: inout HermesSession
+    ) async throws -> HermesResponse {
+        guard let service = hermesService else {
+            throw HermesError.aiNotAvailable
+        }
+        return try await service.expandIdea(ideaId, in: &session)
+    }
+
+    /// Ends the active Hermes ideation session.
+    /// 
+    /// If Hermes is not enabled or no session is active, this does nothing.
+    public func endHermesSession() {
+        hermesService?.endSession()
+    }
+
+    // MARK: - Settings Management
+
+    /// Toggle dark mode on/off
+    public func toggleDarkMode() {
+        appSettings.isDarkModeEnabled = !appSettings.isDarkModeEnabled
+    }
+
+    /// Set dark mode to specific state
+    public func setDarkMode(_ enabled: Bool) {
+        appSettings.isDarkModeEnabled = enabled
+    }
+
+    /// Get current dark mode state
+    public var isDarkModeEnabled: Bool {
+        return appSettings.isDarkModeEnabled
+    }
+
+    /// Set the app theme
+    public func setTheme(_ theme: AppTheme) {
+        appSettings.theme = theme
+    }
+
+    /// Update font size
+    public func setFontSize(_ size: Int) {
+        appSettings.fontSize = max(8, min(32, size))
+    }
+
+    /// Update default word count goal
+    public func setDefaultWordCountGoal(_ words: Int?) {
+        appSettings.defaultWordCountGoal = words
+    }
+
+    /// Enable/disable spell check
+    public func setSpellCheckEnabled(_ enabled: Bool) {
+        appSettings.spellCheckEnabled = enabled
+    }
+
+    /// Enable/disable grammar check
+    public func setGrammarCheckEnabled(_ enabled: Bool) {
+        appSettings.grammarCheckEnabled = enabled
+    }
+
+    /// Get current app settings
+    public func getAppSettings() -> AppSettings {
+        return appSettings
     }
 
     // MARK: - Plugin Management
@@ -825,6 +966,15 @@ public class WritersApp {
         return try await ai.brainstormIdeas(topic: topic, context: context)
     }
 
+    /// Brainstorm ideas organized by category
+    public func brainstormIdeasCategorized(
+        topic: String,
+        context: AIContext? = nil
+    ) async throws -> BrainstormResult {
+        guard let ai = aiService else { throw AIError.aiNotEnabled }
+        return try await ai.brainstormIdeasCategorized(topic: topic, context: context)
+    }
+
     /// Generate outline from concept
     public func generateOutline(
         concept: String,
@@ -841,6 +991,28 @@ public class WritersApp {
     ) async throws -> String {
         guard let ai = aiService else { throw AIError.aiNotEnabled }
         return try await ai.developCharacter(characterConcept: characterConcept, context: context)
+    }
+
+    // MARK: - Writing Advisor
+
+    /// Returns personalized writing advice for the current writer.
+    ///
+    /// - Parameter notes: Optional additional context or focus area for the advice.
+    /// - Returns: A `WritingAdvisorReport` with coaching recommendations.
+    /// - Throws: `AIError.aiNotEnabled` if AI has not been configured.
+    public func getPersonalizedWritingAdvice(notes: String? = nil) async throws -> WritingAdvisorReport {
+        guard let advisor = writingAdvisorService else { throw AIError.aiNotEnabled }
+        return try await advisor.getPersonalizedAdvice(notes: notes)
+    }
+
+    /// Returns writing advice focused on a specific advisor category.
+    ///
+    /// - Parameter category: The category of advice to generate.
+    /// - Returns: A `WritingAdvisorReport` focused on the requested category.
+    /// - Throws: `AIError.aiNotEnabled` if AI has not been configured.
+    public func getWritingAdvice(for category: AdvisorCategory) async throws -> WritingAdvisorReport {
+        guard let advisor = writingAdvisorService else { throw AIError.aiNotEnabled }
+        return try await advisor.getAdvice(for: category)
     }
 
     // MARK: - Hallucination Reduction Methods
@@ -1093,6 +1265,15 @@ public class WritersApp {
 
     // MARK: - Multi-Agent Harness
 
+    /// Create a `ComputerUseService` wired to the active AI service.
+    ///
+    /// - Parameter executor: The executor responsible for taking screenshots and performing actions.
+    /// - Returns: A configured `ComputerUseService`, or `nil` if AI has not been enabled.
+    public func makeComputerUseService(executor: ComputerUseExecutor) -> ComputerUseService? {
+        guard let ai = aiService else { return nil }
+        return ComputerUseService(aiService: ai, executor: executor)
+    }
+
     /// Create a `MultiAgentHarness` wired to the active AI service.
     ///
     /// - Parameter configuration: Harness settings (revision budget, quality threshold, model).
@@ -1324,6 +1505,68 @@ public class WritersApp {
     /// Clears the browsing history maintained by the BrowserService.
     public func clearBrowsingHistory() {
         browserService.clearHistory()
+    }
+
+    // MARK: - Gift Card Bundle Management
+
+    @discardableResult
+    public func createGiftCardBundle(
+        name: String,
+        description: String,
+        price: Decimal,
+        bundleType: BundleType,
+        includedTemplateIds: [UUID] = [],
+        aiCredits: Int,
+        expirationDays: Int
+    ) throws -> GiftCardBundle {
+        return try giftCardManager.createBundle(
+            name: name,
+            description: description,
+            price: price,
+            bundleType: bundleType,
+            includedTemplateIds: includedTemplateIds,
+            aiCredits: aiCredits,
+            expirationDays: expirationDays
+        )
+    }
+
+    public func getGiftCardBundle(id: UUID) -> GiftCardBundle? {
+        return giftCardManager.getBundle(id: id)
+    }
+
+    public func getAllGiftCardBundles() -> [GiftCardBundle] {
+        return giftCardManager.getAllBundles()
+    }
+
+    public func updateGiftCardBundle(_ bundle: GiftCardBundle) throws {
+        try giftCardManager.updateBundle(bundle)
+    }
+
+    public func deleteGiftCardBundle(id: UUID) throws {
+        try giftCardManager.deleteBundle(id: id)
+    }
+
+    // MARK: - Gift Card Management
+
+    @discardableResult
+    public func generateGiftCard(bundleId: UUID) throws -> GiftCard {
+        return try giftCardManager.createGiftCard(bundleId: bundleId)
+    }
+
+    public func redeemGiftCard(code: String, userId: UUID) throws -> GiftCardBundle {
+        return try giftCardManager.redeemGiftCard(code: code, userId: userId)
+    }
+
+    public func getGiftCardByCode(_ code: String) -> GiftCard? {
+        return giftCardManager.getGiftCardByCode(code)
+    }
+
+    public func getGiftCardStatistics() -> GiftCardStats {
+        return giftCardManager.getGiftCardStats()
+    }
+
+    public func getGiftCardBundleStatistics() -> BundleStats {
+        return giftCardManager.getBundleStats()
     }
 }
 

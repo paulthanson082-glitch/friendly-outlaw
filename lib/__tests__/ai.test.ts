@@ -1,15 +1,17 @@
 import { generateBotResponse, generateMemory, ConversationMessage, Memory } from '../ai';
 import { getCharacterByHandle } from '../characters';
 
-// Create mock before using it
-const mockCreate = jest.fn().mockResolvedValue({
-  content: [
-    {
-      type: 'text',
-      text: 'This is a test response from Claude.',
-    },
-  ],
-});
+// Use jest.hoisted so mockCreate is available inside the hoisted jest.mock() factory
+const { mockCreate } = jest.hoisted(() => ({
+  mockCreate: jest.fn().mockResolvedValue({
+    content: [
+      {
+        type: 'text',
+        text: 'This is a test response from Claude.',
+      },
+    ],
+  }),
+}));
 
 // Mock the Anthropic SDK
 jest.mock('@anthropic-ai/sdk', () => {

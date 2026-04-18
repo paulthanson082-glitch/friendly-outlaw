@@ -49,6 +49,7 @@ public enum AIAssistanceType {
     case styleSuggestions
     case generateOutline
     case brainstormIdeas
+    case brainstormIdeasCategorized
     case characterDevelopment
     case plotSuggestions
     case dialogueImprovement
@@ -64,6 +65,7 @@ public enum AIAssistanceType {
     case verifyWithCitations
     case analyzeWithUncertainty
     case chainOfThoughtVerification
+    case writingAdvisor
 
     public var displayName: String {
         switch self {
@@ -73,6 +75,7 @@ public enum AIAssistanceType {
         case .styleSuggestions: return "Style Suggestions"
         case .generateOutline: return "Generate Outline"
         case .brainstormIdeas: return "Brainstorm Ideas"
+        case .brainstormIdeasCategorized: return "Brainstorm Ideas (Categorized)"
         case .characterDevelopment: return "Character Development"
         case .plotSuggestions: return "Plot Suggestions"
         case .dialogueImprovement: return "Dialogue Improvement"
@@ -87,6 +90,7 @@ public enum AIAssistanceType {
         case .verifyWithCitations: return "Verify with Citations"
         case .analyzeWithUncertainty: return "Analyze with Uncertainty"
         case .chainOfThoughtVerification: return "Chain of Thought Verification"
+        case .writingAdvisor: return "Writing Advisor"
         }
     }
 
@@ -161,6 +165,36 @@ public enum AIAssistanceType {
             \(text)
 
             Ideas:
+            """
+
+        case .brainstormIdeasCategorized:
+            return """
+            \(contextInfo)
+            Brainstorm creative ideas related to this topic or concept. Organize ideas into logical categories.
+
+            Important: Only suggest ideas that are feasible and well-grounded. If you're proposing something speculative, mark it as such.
+
+            Respond with a JSON object matching this schema exactly:
+            {
+              "categories": [
+                {
+                  "name": "<category name>",
+                  "description": "<brief description of this category>",
+                  "ideas": [
+                    {
+                      "title": "<short title>",
+                      "description": "<detailed description>",
+                      "isSpeculative": <boolean>
+                    }
+                  ]
+                }
+              ]
+            }
+
+            Topic:
+            \(text)
+
+            Return only the JSON object, no other text.
             """
 
         case .characterDevelopment:
@@ -332,6 +366,32 @@ public enum AIAssistanceType {
             \(text)
 
             Step-by-step analysis:
+            """
+
+        case .writingAdvisor:
+            return """
+            \(contextInfo)
+            You are a personal writing coach. Based on the following writer data, provide 3-5 personalised coaching recommendations.
+
+            Writer data:
+            \(text)
+
+            Respond with a JSON object matching this schema exactly:
+            {
+              "overallAssessment": "<string>",
+              "focusArea": "<productivity|creativity|consistency|craft|goals>",
+              "recommendations": [
+                {
+                  "category": "<productivity|creativity|consistency|craft|goals>",
+                  "priority": "<high|medium|low>",
+                  "title": "<string>",
+                  "recommendation": "<string>",
+                  "actionableSteps": ["<string>"]
+                }
+              ]
+            }
+
+            Return only the JSON object, no other text.
             """
         }
     }
@@ -613,5 +673,42 @@ public struct ReasoningStep: Codable {
         self.reasoning = reasoning
         self.assumptions = assumptions
         self.uncertainty = uncertainty
+    }
+}
+
+// MARK: - Brainstorm Ideas Categorization
+
+/// A single idea in a brainstorm result
+public struct CategorizedIdea: Codable {
+    public let title: String
+    public let description: String
+    public let isSpeculative: Bool
+
+    public init(title: String, description: String, isSpeculative: Bool) {
+        self.title = title
+        self.description = description
+        self.isSpeculative = isSpeculative
+    }
+}
+
+/// A category containing related ideas
+public struct IdeaCategory: Codable {
+    public let name: String
+    public let description: String
+    public let ideas: [CategorizedIdea]
+
+    public init(name: String, description: String, ideas: [CategorizedIdea]) {
+        self.name = name
+        self.description = description
+        self.ideas = ideas
+    }
+}
+
+/// Result of brainstorming with categorized ideas
+public struct BrainstormResult: Codable {
+    public let categories: [IdeaCategory]
+
+    public init(categories: [IdeaCategory]) {
+        self.categories = categories
     }
 }

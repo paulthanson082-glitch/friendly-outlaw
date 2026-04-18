@@ -38,6 +38,9 @@
   "exclude": [
     "node_modules",
     "Sources",
-    "Tests"
+    "Tests",
+    "backend",
+    "frontend",
+    "mobile"
   ]
 }

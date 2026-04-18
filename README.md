@@ -157,6 +157,18 @@ Extensible plugin architecture with Model Context Protocol (MCP) support:
 
 See the plugin system in action through the CLI menu options or integrate MCP servers via `PluginManager` API.
 
+### 🔍 Sherlock Integration (NEW!)
+Integrated username and social media profile research for character development:
+- **Character Research**: Find existing social media profiles to study character personas
+- **Username Verification**: Verify username availability across 400+ social networks
+- **Author Pseudonym Checking**: Check if pen names are available or already registered
+- **Social Media Profile Study**: Research real profiles for authentic character voices
+- **MCP Server Integration**: Query Sherlock through the MCP protocol
+- **Batch Searching**: Research multiple usernames efficiently
+- **Multiple Output Formats**: JSON, CSV, and text results for flexible integration
+
+See [SHERLOCK.md](SHERLOCK.md) for complete documentation and [examples/sherlock_integration.md](examples/sherlock_integration.md) for practical use cases.
+
 ## Development Environment
 
 ### VS Code Setup for iPad and MacBook Pro
@@ -871,6 +883,8 @@ When running as an MCP server, the following tools are available:
 - [VSCODE_SETUP.md](VSCODE_SETUP.md) - VS Code setup guide
 - [CLOTHER.md](CLOTHER.md) - Using 100+ LLM providers with Clother
 - [CLOTHER_SETUP.md](CLOTHER_SETUP.md) - Contributor guide for Clother development
+- [SHERLOCK.md](SHERLOCK.md) - Sherlock integration guide for character/author research
+- [examples/sherlock_integration.md](examples/sherlock_integration.md) - Practical Sherlock integration examples and use cases
 
 ## Containers/Orchestration
 
