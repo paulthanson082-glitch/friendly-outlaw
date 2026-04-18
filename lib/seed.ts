@@ -6,7 +6,7 @@ import { characters } from "./characters";
  *
  * Inserts each character from the `characters` list and, on a handle conflict, updates that record's `name` and `description`. Logs a summary of seeded residents to the console.
  */
-async function seed() {
+export async function seed() {
   await initDb();
   const sql = getDb();
 
