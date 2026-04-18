@@ -8,6 +8,10 @@ public class AIService {
     private let configuration: AIConfiguration
     private let apiURL = "https://api.anthropic.com/v1/messages"
 
+    internal var currentModel: String { configuration.model.rawValue }
+    internal var apiKey: String { configuration.apiKey }
+    internal var maxTokens: Int { configuration.maxTokens }
+
     public init(configuration: AIConfiguration) {
         self.configuration = configuration
     }
