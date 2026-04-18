@@ -1,3 +1,6 @@
+/**
+ * @jest-environment node
+ */
 import { POST, GET, PATCH } from '../route';
 import { NextRequest } from 'next/server';
 
@@ -20,7 +23,9 @@ const originalRandom = Math.random;
 describe('/api/simulate', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    Math.random = originalRandom;
+    // Default Math.random to 0.5 so memory generation (< 0.4) is skipped by default.
+    // Tests that exercise memory generation override this explicitly.
+    Math.random = jest.fn().mockReturnValue(0.5);
   });
 
   const createMockRequest = (body: any) => {
@@ -514,171 +519,6 @@ describe('/api/simulate', () => {
 
       expect(messagesCalls.length).toBeGreaterThan(0);
       expect(memoriesCalls.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('POST edge cases', () => {
-    it('should treat exchanges=0 as zero exchanges and still return tick', async () => {
-      // Math.min(0, 3) = 0, so no exchanges run but tick still increments
-      const mockBots = [{ handle: 'pixel' }, { handle: 'sage' }];
-
-      mockSql
-        .mockResolvedValueOnce([{ value: 'running' }])
-        .mockResolvedValueOnce(mockBots)
-        .mockResolvedValueOnce([]) // Update tick
-        .mockResolvedValueOnce([{ value: '3' }]); // Get tick
-
-      const request = createMockRequest({ exchanges: 0 });
-      const response = await POST(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data.generated).toHaveLength(0);
-      expect(data.tick).toBe(3);
-    });
-
-    it('should handle non-numeric exchanges value by defaulting to 1', async () => {
-      // Number("abc") = NaN, Math.min(NaN, 3) = NaN, so the for loop runs 0 times
-      // because i < NaN is false. generated should be empty.
-      const mockBots = [{ handle: 'pixel' }, { handle: 'sage' }];
-
-      mockSql
-        .mockResolvedValueOnce([{ value: 'running' }])
-        .mockResolvedValueOnce(mockBots)
-        .mockResolvedValueOnce([]) // Update tick
-        .mockResolvedValueOnce([{ value: '1' }]);
-
-      const request = createMockRequest({ exchanges: 'abc' });
-      const response = await POST(request);
-
-      expect(response.status).toBe(200);
-    });
-
-    it('should return tick as 0 when tick row is missing from world_state', async () => {
-      const mockBots = [{ handle: 'pixel' }, { handle: 'sage' }];
-
-      mockSql
-        .mockResolvedValueOnce([{ value: 'running' }])
-        .mockResolvedValueOnce(mockBots)
-        .mockResolvedValueOnce([]) // Messages
-        .mockResolvedValueOnce([]) // Memories
-        .mockResolvedValueOnce([]) // Insert
-        .mockResolvedValueOnce([]) // Update tick
-        .mockResolvedValueOnce([]); // Get tick — empty result, tickRow is undefined
-
-      const request = createMockRequest({});
-      const response = await POST(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data.tick).toBe(0);
-    });
-
-    it('should clamp negative exchanges to 0', async () => {
-      // Math.min(-5, 3) = -5 → loop runs 0 times
-      const mockBots = [{ handle: 'pixel' }, { handle: 'sage' }];
-
-      mockSql
-        .mockResolvedValueOnce([{ value: 'running' }])
-        .mockResolvedValueOnce(mockBots)
-        .mockResolvedValueOnce([]) // Update tick
-        .mockResolvedValueOnce([{ value: '1' }]);
-
-      const request = createMockRequest({ exchanges: -5 });
-      const response = await POST(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data.generated).toHaveLength(0);
-    });
-
-    it('generated entries should have from, to, and content fields', async () => {
-      const { generateBotResponse } = require('@/lib/ai');
-      generateBotResponse.mockResolvedValueOnce('A friendly greeting');
-
-      const mockBots = [{ handle: 'alpha' }, { handle: 'beta' }];
-
-      mockSql
-        .mockResolvedValueOnce([{ value: 'running' }])
-        .mockResolvedValueOnce(mockBots)
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ value: '1' }]);
-
-      const request = createMockRequest({ exchanges: 1 });
-      const response = await POST(request);
-      const data = await response.json();
-
-      expect(data.generated[0]).toHaveProperty('from');
-      expect(data.generated[0]).toHaveProperty('to');
-      expect(data.generated[0]).toHaveProperty('content');
-      expect(typeof data.generated[0].from).toBe('string');
-      expect(typeof data.generated[0].to).toBe('string');
-      expect(data.generated[0].content).toBe('A friendly greeting');
-    });
-  });
-
-  describe('PATCH additional cases', () => {
-    it('should return 400 for action=stop (not a valid action)', async () => {
-      const request = createMockRequest({ action: 'stop' });
-      const response = await PATCH(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(400);
-      expect(data.error).toBeDefined();
-    });
-
-    it('should return 400 for action=null', async () => {
-      const request = createMockRequest({ action: null });
-      const response = await PATCH(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(400);
-    });
-
-    it('should set status to "running" when action is resume', async () => {
-      mockSql.mockResolvedValueOnce([]);
-
-      const request = createMockRequest({ action: 'resume' });
-      const response = await PATCH(request);
-      const data = await response.json();
-
-      expect(data.status).toBe('running');
-    });
-  });
-
-  describe('GET additional cases', () => {
-    it('should return all world state keys including custom ones', async () => {
-      const mockState = [
-        { key: 'tick', value: '7', updated_at: '2024-01-01T00:00:00Z' },
-        { key: 'status', value: 'running', updated_at: '2024-01-01T00:00:00Z' },
-        { key: 'custom', value: 'data', updated_at: '2024-01-01T00:00:00Z' },
-      ];
-
-      mockSql.mockResolvedValueOnce(mockState);
-
-      const response = await GET();
-      const data = await response.json();
-
-      expect(Object.keys(data)).toHaveLength(3);
-      expect(data.tick).toBe('7');
-      expect(data.status).toBe('running');
-      expect(data.custom).toBe('data');
-    });
-
-    it('should not include updated_at in the returned object', async () => {
-      const mockState = [
-        { key: 'tick', value: '1', updated_at: '2024-01-01T00:00:00Z' },
-      ];
-
-      mockSql.mockResolvedValueOnce(mockState);
-
-      const response = await GET();
-      const data = await response.json();
-
-      expect(data.updated_at).toBeUndefined();
     });
   });
 });

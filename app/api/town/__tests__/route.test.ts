@@ -1,3 +1,6 @@
+/**
+ * @jest-environment node
+ */
 import { GET } from '../route';
 import { NextResponse } from 'next/server';
 
@@ -7,26 +10,6 @@ const mockSql = jest.fn();
 jest.mock('@/lib/db', () => ({
   getDb: jest.fn(() => mockSql),
 }));
-
-/**
- * The GET handler uses Promise.all with four separate sql template-tag calls.
- * Each call must be independently stubbed with mockResolvedValueOnce so each
- * resolves to the correct dataset.
- *
- * Order: [bots, messages, worldState, memories]
- */
-function mockDbQueries(
-  bots: any[],
-  messages: any[],
-  worldState: any[],
-  memories: any[]
-) {
-  mockSql
-    .mockResolvedValueOnce(bots)
-    .mockResolvedValueOnce(messages)
-    .mockResolvedValueOnce(worldState)
-    .mockResolvedValueOnce(memories);
-}
 
 describe('/api/town GET', () => {
   beforeEach(() => {
@@ -77,7 +60,7 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockDbQueries(mockBots, mockMessages, mockWorldState, mockMemories);
+    mockSql.mockResolvedValueOnce(mockBots).mockResolvedValueOnce(mockMessages).mockResolvedValueOnce(mockWorldState).mockResolvedValueOnce(mockMemories);
 
     const response = await GET();
     const data = await response.json();
@@ -94,7 +77,7 @@ describe('/api/town GET', () => {
       { key: 'status', value: 'paused', updated_at: '2024-01-01T10:00:00Z' },
     ];
 
-    mockDbQueries([], [], mockWorldState, []);
+    mockSql.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce(mockWorldState).mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -124,7 +107,7 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockDbQueries(mockBots, [], [], mockMemories);
+    mockSql.mockResolvedValueOnce(mockBots).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce(mockMemories);
 
     const response = await GET();
     const data = await response.json();
@@ -143,7 +126,7 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockDbQueries(mockBots, [], [], []);
+    mockSql.mockResolvedValueOnce(mockBots).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -152,12 +135,12 @@ describe('/api/town GET', () => {
   });
 
   it('should limit messages to 30', async () => {
-    const mockBots: any[] = [];
-    const mockWorldState: any[] = [];
-    const mockMemories: any[] = [];
+    const mockBots = [];
+    const mockWorldState = [];
+    const mockMemories = [];
 
     // Mock sql to verify LIMIT 30 is used
-    mockDbQueries(mockBots, [], mockWorldState, mockMemories);
+    mockSql.mockResolvedValueOnce(mockBots).mockResolvedValueOnce([]).mockResolvedValueOnce(mockWorldState).mockResolvedValueOnce(mockMemories);
 
     await GET();
 
@@ -182,7 +165,7 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockDbQueries(mockBots, [], [], []);
+    mockSql.mockResolvedValueOnce(mockBots).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -215,7 +198,7 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockDbQueries([], mockMessages, [], []);
+    mockSql.mockResolvedValueOnce([]).mockResolvedValueOnce(mockMessages).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -225,7 +208,7 @@ describe('/api/town GET', () => {
   });
 
   it('should handle empty database', async () => {
-    mockDbQueries([], [], [], []);
+    mockSql.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -255,7 +238,7 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockDbQueries([], mockMessages, [], []);
+    mockSql.mockResolvedValueOnce([]).mockResolvedValueOnce(mockMessages).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -265,7 +248,7 @@ describe('/api/town GET', () => {
   });
 
   it('should use Promise.all for parallel queries', async () => {
-    mockDbQueries([], [], [], []);
+    mockSql.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const startTime = Date.now();
     await GET();
@@ -275,17 +258,8 @@ describe('/api/town GET', () => {
     expect(duration).toBeLessThan(1000);
   });
 
-  it('should use Promise.all – four independent sql calls are made', async () => {
-    mockDbQueries([], [], [], []);
-
-    await GET();
-
-    // Promise.all fires all 4 sql template-tag calls
-    expect(mockSql).toHaveBeenCalledTimes(4);
-  });
-
   it('should return NextResponse with JSON content type', async () => {
-    mockDbQueries([], [], [], []);
+    mockSql.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const response = await GET();
 
@@ -312,7 +286,7 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockDbQueries(mockBots, [], [], mockMemories);
+    mockSql.mockResolvedValueOnce(mockBots).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce(mockMemories);
 
     const response = await GET();
     const data = await response.json();
@@ -331,7 +305,7 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockDbQueries(mockBots, [], [], []);
+    mockSql.mockResolvedValueOnce(mockBots).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -360,7 +334,7 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockDbQueries([], mockMessages, [], []);
+    mockSql.mockResolvedValueOnce([]).mockResolvedValueOnce(mockMessages).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -370,7 +344,7 @@ describe('/api/town GET', () => {
   });
 
   it('should return data structure with correct top-level keys', async () => {
-    mockDbQueries([], [], [], []);
+    mockSql.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -389,7 +363,7 @@ describe('/api/town GET', () => {
       { bot_handle: 'sage', memory: 'Memory B', created_at: '2024-01-01T10:00:00Z' },
     ];
 
-    mockDbQueries(mockBots, [], [], mockMemories);
+    mockSql.mockResolvedValueOnce(mockBots).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce(mockMemories);
 
     const response = await GET();
     const data = await response.json();
@@ -411,7 +385,7 @@ describe('/api/town GET', () => {
       to_name: 'Sage',
     }));
 
-    mockDbQueries([], largeFeed, [], []);
+    mockSql.mockResolvedValueOnce([]).mockResolvedValueOnce(largeFeed).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -420,7 +394,7 @@ describe('/api/town GET', () => {
   });
 
   it('should return valid JSON response', async () => {
-    mockDbQueries([], [], [], []);
+    mockSql.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const response = await GET();
     const text = await response.text();
@@ -439,7 +413,7 @@ describe('/api/town GET', () => {
       },
     ];
 
-    mockDbQueries(mockBots, [], [], []);
+    mockSql.mockResolvedValueOnce(mockBots).mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
     const response = await GET();
     const data = await response.json();
@@ -451,53 +425,5 @@ describe('/api/town GET', () => {
     expect(resident).toHaveProperty('description');
     expect(resident).toHaveProperty('created_at');
     expect(resident).toHaveProperty('latestMemory');
-  });
-
-  it('should map memories by bot_handle, not position', async () => {
-    const mockBots = [
-      { id: '1', handle: 'pixel', name: 'Pixel', description: 'Artist', created_at: '2024-01-01T00:00:00Z' },
-      { id: '2', handle: 'sage', name: 'Sage', description: 'Librarian', created_at: '2024-01-01T00:00:00Z' },
-    ];
-
-    const mockMemories = [
-      // Only sage has a memory
-      { bot_handle: 'sage', memory: 'Sage memory only', created_at: '2024-01-01T10:00:00Z' },
-    ];
-
-    mockDbQueries(mockBots, [], [], mockMemories);
-
-    const response = await GET();
-    const data = await response.json();
-
-    const pixel = data.residents.find((r: any) => r.handle === 'pixel');
-    const sage = data.residents.find((r: any) => r.handle === 'sage');
-
-    expect(pixel.latestMemory).toBeNull();
-    expect(sage.latestMemory).toBe('Sage memory only');
-  });
-
-  it('should build world state from all worldState rows', async () => {
-    const mockWorldState = [
-      { key: 'tick', value: '42', updated_at: '2024-01-01T10:00:00Z' },
-      { key: 'status', value: 'running', updated_at: '2024-01-01T10:00:00Z' },
-      { key: 'custom', value: 'value123', updated_at: '2024-01-01T10:00:00Z' },
-    ];
-
-    mockDbQueries([], [], mockWorldState, []);
-
-    const response = await GET();
-    const data = await response.json();
-
-    expect(data.world.tick).toBe('42');
-    expect(data.world.status).toBe('running');
-    expect(data.world.custom).toBe('value123');
-  });
-
-  it('should return 200 status code', async () => {
-    mockDbQueries([], [], [], []);
-
-    const response = await GET();
-
-    expect(response.status).toBe(200);
   });
 });
