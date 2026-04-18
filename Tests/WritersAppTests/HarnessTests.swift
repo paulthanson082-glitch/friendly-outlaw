@@ -566,7 +566,8 @@ final class HarnessQualityReportTests: XCTestCase {
         XCTAssertEqual(decoded.totalSections, 3)
         XCTAssertEqual(decoded.totalRevisions, 4)
         XCTAssertEqual(decoded.sectionsPassedFirstAttempt, 2)
-        XCTAssertEqual(decoded.averageScoresByCriterion[WritingCriterion.craft.rawValue], 8.5, accuracy: 0.001)
+        let craftScore = try XCTUnwrap(decoded.averageScoresByCriterion[WritingCriterion.craft.rawValue])
+        XCTAssertEqual(craftScore, 8.5, accuracy: 0.001)
     }
 }
 

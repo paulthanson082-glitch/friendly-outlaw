@@ -49,7 +49,7 @@ public class MetalDashboardViewModel: ObservableObject {
 
     // MARK: - Init
 
-    nonisolated public init(
+    public init(
         app: WritersApp = WritersApp(),
         focusSessionManager: FocusSessionManager = FocusSessionManager(),
         goalManager: WritingGoalManager = WritingGoalManager()

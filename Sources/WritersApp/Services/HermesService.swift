@@ -103,19 +103,11 @@ public class HermesService {
         trimHistory(&session)
         let userPrompt = buildUserPrompt(userText: prompt, session: session)
 
-        // Append tone instruction when the session context specifies one
-        let effectivePersona: String
-        if let tone = session.context.tone {
-            effectivePersona = hermesPersona + "\n\nTone instruction: \(tone.promptHint)"
-        } else {
-            effectivePersona = hermesPersona
-        }
-
         // Call Claude with the Hermes persona as the system prompt and tool support
         let rawResponse: String
         do {
             rawResponse = try await aiService.performAgentTaskWithTools(
-                systemPrompt: effectivePersona,
+                systemPrompt: hermesPersona,
                 userPrompt: userPrompt,
                 tools: WritingToolExecutor.tools,
                 toolExecutor: toolExecutor
@@ -183,34 +175,6 @@ public class HermesService {
         return all.filter { $0.ideaType == filter }
     }
 
-    /// Returns every idea in the session that has been marked as a favourite.
-    /// - Parameter session: The session to scan.
-    /// - Returns: A flat array of favourite `HermesIdea` in chronological order.
-    public func getFavorites(from session: HermesSession) -> [HermesIdea] {
-        return session.messages
-            .filter { $0.role == .hermes }
-            .flatMap { $0.ideas }
-            .filter { $0.isFavorite }
-    }
-
-    /// Marks an idea in the session as a favourite.
-    /// - Parameters:
-    ///   - ideaId: UUID of the idea to favourite.
-    ///   - session: The session containing the idea; mutated in place.
-    /// - Throws: `HermesError.ideaNotFound(id:)` if no idea with that UUID exists.
-    public func favoriteIdea(_ ideaId: UUID, in session: inout HermesSession) throws {
-        try setFavoriteFlag(ideaId: ideaId, value: true, in: &session)
-    }
-
-    /// Removes the favourite mark from an idea in the session.
-    /// - Parameters:
-    ///   - ideaId: UUID of the idea to un-favourite.
-    ///   - session: The session containing the idea; mutated in place.
-    /// - Throws: `HermesError.ideaNotFound(id:)` if no idea with that UUID exists.
-    public func unfavoriteIdea(_ ideaId: UUID, in session: inout HermesSession) throws {
-        try setFavoriteFlag(ideaId: ideaId, value: false, in: &session)
-    }
-
     // MARK: - Session Statistics
 
     /// Computes aggregated statistics for a Hermes session.
@@ -221,10 +185,8 @@ public class HermesService {
         let allIdeas = hermesMessages.flatMap { $0.ideas }
 
         var countByType: [HermesIdeaType: Int] = [:]
-        var favoriteCount = 0
         for idea in allIdeas {
             countByType[idea.ideaType, default: 0] += 1
-            if idea.isFavorite { favoriteCount += 1 }
         }
 
         let duration = session.lastMessageAt.timeIntervalSince(session.startedAt)
@@ -236,7 +198,7 @@ public class HermesService {
             sessionId: session.id,
             messageCount: session.messages.count,
             totalIdeas: allIdeas.count,
-            favoriteCount: favoriteCount,
+            favoriteCount: 0,
             ideaCountByType: countByType,
             sessionDuration: max(0, duration),
             averageIdeasPerMessage: avgIdeas
@@ -257,31 +219,6 @@ public class HermesService {
     ///   - session: The `HermesSession` whose message history will be removed.
     public func clearHistory(for session: inout HermesSession) {
         session.messages.removeAll()
-    }
-
-    /// Sets the `isFavorite` flag on an idea inside the session, rebuilding the containing message in place.
-    /// - Parameters:
-    ///   - ideaId: UUID of the idea to update.
-    ///   - value: The new favourite flag value.
-    ///   - session: The session to mutate.
-    /// - Throws: `HermesError.ideaNotFound(id:)` if the idea does not exist in the session.
-    private func setFavoriteFlag(ideaId: UUID, value: Bool, in session: inout HermesSession) throws {
-        for msgIdx in session.messages.indices {
-            let message = session.messages[msgIdx]
-            guard message.role == .hermes else { continue }
-            guard let ideaIdx = message.ideas.firstIndex(where: { $0.id == ideaId }) else { continue }
-            var updatedIdeas = message.ideas
-            updatedIdeas[ideaIdx].isFavorite = value
-            session.messages[msgIdx] = HermesMessage(
-                id: message.id,
-                role: message.role,
-                content: message.content,
-                ideas: updatedIdeas,
-                timestamp: message.timestamp
-            )
-            return
-        }
-        throw HermesError.ideaNotFound(id: ideaId)
     }
 
     /// Validates a user prompt by trimming surrounding whitespace and enforcing non-empty text and the configured maximum length.
