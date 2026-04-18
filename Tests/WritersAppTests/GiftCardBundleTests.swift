@@ -1,0 +1,419 @@
+import XCTest
+@testable import WritersApp
+
+final class GiftCardBundleTests: XCTestCase {
+    var giftCardManager: GiftCardManager!
+    var databaseManager: DatabaseManager!
+    var testDatabasePath: String!
+
+    override func setUp() {
+        super.setUp()
+        testDatabasePath = "/tmp/test_giftcard_\(UUID().uuidString).db"
+        try? FileManager.default.removeItem(atPath: testDatabasePath)
+        databaseManager = DatabaseManager(databasePath: testDatabasePath)
+        try? databaseManager.initialize()
+        giftCardManager = GiftCardManager(databaseManager: databaseManager)
+    }
+
+    override func tearDown() {
+        super.tearDown()
+        databaseManager.close()
+        try? FileManager.default.removeItem(atPath: testDatabasePath)
+    }
+
+    // MARK: - Bundle CRUD Tests
+
+    func testCreateGiftCardBundle() throws {
+        let bundle = try giftCardManager.createBundle(
+            name: "Starter Pack",
+            description: "Get started with WritersApp",
+            price: 29.99,
+            bundleType: .starter,
+            aiCredits: 100,
+            expirationDays: 365
+        )
+
+        XCTAssertEqual(bundle.name, "Starter Pack")
+        XCTAssertEqual(bundle.bundleType, .starter)
+        XCTAssertEqual(bundle.aiCredits, 100)
+        XCTAssertEqual(bundle.expirationDays, 365)
+    }
+
+    func testCreateBundleInvalidInput() {
+        XCTAssertThrowsError(
+            try giftCardManager.createBundle(
+                name: "",
+                description: "Invalid",
+                price: 29.99,
+                bundleType: .starter,
+                aiCredits: 100,
+                expirationDays: 365
+            )
+        ) { error in
+            XCTAssertTrue(error is GiftCardError)
+        }
+
+        XCTAssertThrowsError(
+            try giftCardManager.createBundle(
+                name: "Valid",
+                description: "Invalid",
+                price: 29.99,
+                bundleType: .starter,
+                aiCredits: 0,
+                expirationDays: 365
+            )
+        ) { error in
+            XCTAssertTrue(error is GiftCardError)
+        }
+    }
+
+    func testGetBundle() throws {
+        let created = try giftCardManager.createBundle(
+            name: "Professional",
+            description: "For professionals",
+            price: 99.99,
+            bundleType: .professional,
+            aiCredits: 500,
+            expirationDays: 365
+        )
+
+        let retrieved = giftCardManager.getBundle(id: created.id)
+        XCTAssertEqual(retrieved?.id, created.id)
+        XCTAssertEqual(retrieved?.name, "Professional")
+    }
+
+    func testUpdateBundle() throws {
+        var bundle = try giftCardManager.createBundle(
+            name: "Original",
+            description: "Original description",
+            price: 50.0,
+            bundleType: .starter,
+            aiCredits: 100,
+            expirationDays: 365
+        )
+
+        bundle.name = "Updated"
+        bundle.aiCredits = 200
+        try giftCardManager.updateBundle(bundle)
+
+        let updated = giftCardManager.getBundle(id: bundle.id)
+        XCTAssertEqual(updated?.name, "Updated")
+        XCTAssertEqual(updated?.aiCredits, 200)
+    }
+
+    func testDeleteBundle() throws {
+        let bundle = try giftCardManager.createBundle(
+            name: "Deletable",
+            description: "To be deleted",
+            price: 10.0,
+            bundleType: .custom,
+            aiCredits: 50,
+            expirationDays: 30
+        )
+
+        try giftCardManager.deleteBundle(id: bundle.id)
+        let deleted = giftCardManager.getBundle(id: bundle.id)
+        XCTAssertNil(deleted)
+    }
+
+    // MARK: - Gift Card CRUD Tests
+
+    func testCreateGiftCard() throws {
+        let bundle = try giftCardManager.createBundle(
+            name: "Test Bundle",
+            description: "Test",
+            price: 29.99,
+            bundleType: .starter,
+            aiCredits: 100,
+            expirationDays: 365
+        )
+
+        let card = try giftCardManager.createGiftCard(bundleId: bundle.id)
+
+        XCTAssertEqual(card.status, .unused)
+        XCTAssertTrue(card.code.contains("GC-"))
+        XCTAssertNil(card.redeemedByUserId)
+        XCTAssertNotNil(card.metadata.expiresAt)
+    }
+
+    func testCreateGiftCardInvalidBundle() {
+        XCTAssertThrowsError(
+            try giftCardManager.createGiftCard(bundleId: UUID())
+        ) { error in
+            XCTAssertTrue(error is GiftCardError)
+        }
+    }
+
+    func testGetGiftCard() throws {
+        let bundle = try giftCardManager.createBundle(
+            name: "Test",
+            description: "Test",
+            price: 10.0,
+            bundleType: .starter,
+            aiCredits: 50,
+            expirationDays: 30
+        )
+
+        let created = try giftCardManager.createGiftCard(bundleId: bundle.id)
+        let retrieved = giftCardManager.getGiftCard(id: created.id)
+
+        XCTAssertEqual(retrieved?.id, created.id)
+        XCTAssertEqual(retrieved?.code, created.code)
+    }
+
+    func testGetGiftCardByCode() throws {
+        let bundle = try giftCardManager.createBundle(
+            name: "Test",
+            description: "Test",
+            price: 10.0,
+            bundleType: .starter,
+            aiCredits: 50,
+            expirationDays: 30
+        )
+
+        let created = try giftCardManager.createGiftCard(bundleId: bundle.id)
+        let retrieved = giftCardManager.getGiftCardByCode(created.code)
+
+        XCTAssertEqual(retrieved?.code, created.code)
+    }
+
+    func testGiftCardCodeUniqueness() throws {
+        let bundle = try giftCardManager.createBundle(
+            name: "Test",
+            description: "Test",
+            price: 10.0,
+            bundleType: .starter,
+            aiCredits: 50,
+            expirationDays: 30
+        )
+
+        let card1 = try giftCardManager.createGiftCard(bundleId: bundle.id)
+        let card2 = try giftCardManager.createGiftCard(bundleId: bundle.id)
+
+        XCTAssertNotEqual(card1.code, card2.code)
+    }
+
+    // MARK: - Redemption Tests
+
+    func testRedeemGiftCard() throws {
+        let bundle = try giftCardManager.createBundle(
+            name: "Redemption Test",
+            description: "Test redemption",
+            price: 50.0,
+            bundleType: .professional,
+            aiCredits: 200,
+            expirationDays: 30
+        )
+
+        let card = try giftCardManager.createGiftCard(bundleId: bundle.id)
+        let userId = UUID()
+
+        let redeemed = try giftCardManager.redeemGiftCard(code: card.code, userId: userId)
+
+        XCTAssertEqual(redeemed.id, bundle.id)
+
+        let updated = giftCardManager.getGiftCardByCode(card.code)
+        XCTAssertEqual(updated?.status, .redeemed)
+        XCTAssertEqual(updated?.redeemedByUserId, userId)
+        XCTAssertNotNil(updated?.redeemedAt)
+    }
+
+    func testRedeemInvalidCode() {
+        XCTAssertThrowsError(
+            try giftCardManager.redeemGiftCard(code: "INVALID", userId: UUID())
+        ) { error in
+            XCTAssertEqual(error as? GiftCardError, .invalidCode)
+        }
+    }
+
+    func testRedeemAlreadyRedeemedCard() throws {
+        let bundle = try giftCardManager.createBundle(
+            name: "Test",
+            description: "Test",
+            price: 10.0,
+            bundleType: .starter,
+            aiCredits: 50,
+            expirationDays: 30
+        )
+
+        let card = try giftCardManager.createGiftCard(bundleId: bundle.id)
+        let userId = UUID()
+
+        try giftCardManager.redeemGiftCard(code: card.code, userId: userId)
+
+        XCTAssertThrowsError(
+            try giftCardManager.redeemGiftCard(code: card.code, userId: UUID())
+        ) { error in
+            XCTAssertEqual(error as? GiftCardError, .alreadyRedeemed)
+        }
+    }
+
+    // MARK: - Expiration Tests
+
+    func testGiftCardExpiration() throws {
+        let bundle = try giftCardManager.createBundle(
+            name: "Expiration Test",
+            description: "Test expiration",
+            price: 10.0,
+            bundleType: .starter,
+            aiCredits: 50,
+            expirationDays: 0
+        )
+
+        let card = try giftCardManager.createGiftCard(bundleId: bundle.id)
+        let isExpired = giftCardManager.isGiftCardExpired(card)
+
+        XCTAssertTrue(isExpired)
+    }
+
+    func testRedeemExpiredCard() throws {
+        let bundle = try giftCardManager.createBundle(
+            name: "Expired",
+            description: "Already expired",
+            price: 10.0,
+            bundleType: .starter,
+            aiCredits: 50,
+            expirationDays: 0
+        )
+
+        let card = try giftCardManager.createGiftCard(bundleId: bundle.id)
+
+        XCTAssertThrowsError(
+            try giftCardManager.redeemGiftCard(code: card.code, userId: UUID())
+        ) { error in
+            XCTAssertEqual(error as? GiftCardError, .bundleExpired)
+        }
+    }
+
+    // MARK: - Statistics Tests
+
+    func testGiftCardStats() throws {
+        let bundle = try giftCardManager.createBundle(
+            name: "Test",
+            description: "Test",
+            price: 10.0,
+            bundleType: .starter,
+            aiCredits: 50,
+            expirationDays: 30
+        )
+
+        let card1 = try giftCardManager.createGiftCard(bundleId: bundle.id)
+        let card2 = try giftCardManager.createGiftCard(bundleId: bundle.id)
+
+        try giftCardManager.redeemGiftCard(code: card1.code, userId: UUID())
+
+        let stats = giftCardManager.getGiftCardStats()
+
+        XCTAssertEqual(stats.totalCards, 2)
+        XCTAssertEqual(stats.redeemedCards, 1)
+        XCTAssertEqual(stats.unusedCards, 1)
+    }
+
+    func testBundleStats() throws {
+        let starterBundle = try giftCardManager.createBundle(
+            name: "Starter",
+            description: "Starter",
+            price: 29.99,
+            bundleType: .starter,
+            aiCredits: 100,
+            expirationDays: 365
+        )
+
+        let proBundle = try giftCardManager.createBundle(
+            name: "Professional",
+            description: "Professional",
+            price: 99.99,
+            bundleType: .professional,
+            aiCredits: 500,
+            expirationDays: 365
+        )
+
+        let stats = giftCardManager.getBundleStats()
+
+        XCTAssertEqual(stats.totalBundles, 2)
+        XCTAssertEqual(stats.totalRevenue, 129.98)
+        XCTAssertEqual(stats.bundlesByType["Starter"], 1)
+        XCTAssertEqual(stats.bundlesByType["Professional"], 1)
+    }
+
+    func testValidateCode() throws {
+        let bundle = try giftCardManager.createBundle(
+            name: "Test",
+            description: "Test",
+            price: 10.0,
+            bundleType: .starter,
+            aiCredits: 50,
+            expirationDays: 30
+        )
+
+        let card = try giftCardManager.createGiftCard(bundleId: bundle.id)
+
+        XCTAssertNoThrow(try giftCardManager.validateCode(card.code))
+
+        XCTAssertThrowsError(
+            try giftCardManager.validateCode("")
+        ) { error in
+            XCTAssertTrue(error is GiftCardError)
+        }
+
+        XCTAssertThrowsError(
+            try giftCardManager.validateCode("NONEXISTENT")
+        ) { error in
+            XCTAssertEqual(error as? GiftCardError, .invalidCode)
+        }
+    }
+
+    // MARK: - Database Integration Tests
+
+    func testBundlePersistence() throws {
+        let bundle = try giftCardManager.createBundle(
+            name: "Persistent",
+            description: "Should persist",
+            price: 99.99,
+            bundleType: .enterprise,
+            aiCredits: 1000,
+            expirationDays: 730
+        )
+
+        let retrieved = try databaseManager.getGiftCardBundle(id: bundle.id)
+        XCTAssertEqual(retrieved?.name, "Persistent")
+        XCTAssertEqual(retrieved?.bundleType, .enterprise)
+    }
+
+    func testGiftCardPersistence() throws {
+        let bundle = try giftCardManager.createBundle(
+            name: "Test",
+            description: "Test",
+            price: 10.0,
+            bundleType: .starter,
+            aiCredits: 50,
+            expirationDays: 30
+        )
+
+        let card = try giftCardManager.createGiftCard(bundleId: bundle.id)
+
+        let retrieved = try databaseManager.getGiftCard(id: card.id)
+        XCTAssertEqual(retrieved?.code, card.code)
+        XCTAssertEqual(retrieved?.status, .unused)
+    }
+
+    func testRedemptionAuditTrail() throws {
+        let bundle = try giftCardManager.createBundle(
+            name: "Test",
+            description: "Test",
+            price: 10.0,
+            bundleType: .starter,
+            aiCredits: 50,
+            expirationDays: 30
+        )
+
+        let card = try giftCardManager.createGiftCard(bundleId: bundle.id)
+        let userId = UUID()
+
+        try giftCardManager.redeemGiftCard(code: card.code, userId: userId)
+
+        let retrieved = try databaseManager.getGiftCard(id: card.id)
+        XCTAssertEqual(retrieved?.redeemedByUserId, userId)
+        XCTAssertNotNil(retrieved?.redeemedAt)
+    }
+}
