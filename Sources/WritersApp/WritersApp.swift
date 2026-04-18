@@ -12,6 +12,7 @@ public class WritersApp {
     public let pluginManager: PluginManager
     public let encouragementService: EncouragementService
     public let versionControl: DoltVersionControlService
+    public let giftCardManager: GiftCardManager
     public private(set) var guiService: GuiNewService?
     public private(set) var aiService: AIService?
     public private(set) var chatbotService: ChatbotService?
@@ -54,6 +55,7 @@ public class WritersApp {
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
         self.versionControl = DoltVersionControlService(databaseManager: databaseManager)
+        self.giftCardManager = GiftCardManager(databaseManager: databaseManager)
         self.guiService = nil
         self.appSettings = AppSettings()
         self.prospectDatabase = ProspectDatabase()
@@ -966,6 +968,15 @@ public class WritersApp {
         return try await ai.brainstormIdeas(topic: topic, context: context)
     }
 
+    /// Brainstorm ideas organized by category
+    public func brainstormIdeasCategorized(
+        topic: String,
+        context: AIContext? = nil
+    ) async throws -> BrainstormResult {
+        guard let ai = aiService else { throw AIError.aiNotEnabled }
+        return try await ai.brainstormIdeasCategorized(topic: topic, context: context)
+    }
+
     /// Generate outline from concept
     public func generateOutline(
         concept: String,
@@ -1450,6 +1461,68 @@ public class WritersApp {
     /// Clear the browsing history.
     public func clearBrowsingHistory() {
         browserService.clearHistory()
+    }
+
+    // MARK: - Gift Card Bundle Management
+
+    @discardableResult
+    public func createGiftCardBundle(
+        name: String,
+        description: String,
+        price: Decimal,
+        bundleType: BundleType,
+        includedTemplateIds: [UUID] = [],
+        aiCredits: Int,
+        expirationDays: Int
+    ) throws -> GiftCardBundle {
+        return try giftCardManager.createBundle(
+            name: name,
+            description: description,
+            price: price,
+            bundleType: bundleType,
+            includedTemplateIds: includedTemplateIds,
+            aiCredits: aiCredits,
+            expirationDays: expirationDays
+        )
+    }
+
+    public func getGiftCardBundle(id: UUID) -> GiftCardBundle? {
+        return giftCardManager.getBundle(id: id)
+    }
+
+    public func getAllGiftCardBundles() -> [GiftCardBundle] {
+        return giftCardManager.getAllBundles()
+    }
+
+    public func updateGiftCardBundle(_ bundle: GiftCardBundle) throws {
+        try giftCardManager.updateBundle(bundle)
+    }
+
+    public func deleteGiftCardBundle(id: UUID) throws {
+        try giftCardManager.deleteBundle(id: id)
+    }
+
+    // MARK: - Gift Card Management
+
+    @discardableResult
+    public func generateGiftCard(bundleId: UUID) throws -> GiftCard {
+        return try giftCardManager.createGiftCard(bundleId: bundleId)
+    }
+
+    public func redeemGiftCard(code: String, userId: UUID) throws -> GiftCardBundle {
+        return try giftCardManager.redeemGiftCard(code: code, userId: userId)
+    }
+
+    public func getGiftCardByCode(_ code: String) -> GiftCard? {
+        return giftCardManager.getGiftCardByCode(code)
+    }
+
+    public func getGiftCardStatistics() -> GiftCardStats {
+        return giftCardManager.getGiftCardStats()
+    }
+
+    public func getGiftCardBundleStatistics() -> BundleStats {
+        return giftCardManager.getBundleStats()
     }
 }
 
