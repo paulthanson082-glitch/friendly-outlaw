@@ -8,6 +8,10 @@ public class AIService {
     private let configuration: AIConfiguration
     private let apiURL = "https://api.anthropic.com/v1/messages"
 
+    internal var currentModel: String { configuration.model.rawValue }
+    internal var apiKey: String { configuration.apiKey }
+    internal var maxTokens: Int { configuration.maxTokens }
+
     public init(configuration: AIConfiguration) {
         self.configuration = configuration
     }
@@ -103,6 +107,20 @@ public class AIService {
             context: context
         )
         return response.generatedContent
+    }
+
+    /// Brainstorm ideas organized by category
+    public func brainstormIdeasCategorized(
+        topic: String,
+        context: AIContext? = nil
+    ) async throws -> BrainstormResult {
+        let response = try await getAssistance(
+            text: topic,
+            type: .brainstormIdeasCategorized,
+            context: context
+        )
+
+        return try decodeJSON(from: response.generatedContent, as: BrainstormResult.self)
     }
 
     /// Develop character
@@ -253,8 +271,7 @@ public class AIService {
         }
 
         guard httpResponse.statusCode == 200 else {
-            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw AIServiceError.apiError(statusCode: httpResponse.statusCode, message: errorMessage)
+            throw AIServiceError.apiError(statusCode: httpResponse.statusCode, message: "Request failed")
         }
 
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -309,12 +326,28 @@ public class AIService {
     /// while response.stop_reason == "tool_use":
     ///     result = your_tool_executor(response.tool_use)
     ///     response = client.messages.create(tool_result=result, **params)
-    /// ```
+    /// Sends the prompt to the Anthropic messages API and runs an iterative tool-use loop until the model produces a final text response or the loop is exhausted.
+    /// 
+    /// The method posts the current conversation (including any tool results) to the API, handles `tool_use` responses by executing the requested tools via `toolExecutor`, and feeds tool outputs back into the conversation for further turns.
+    /// - Parameters:
+    ///   - prompt: The initial user prompt to send to the model.
+    ///   - tools: Tool definitions available to the model; converted to request `tools` when present.
+    ///   - toolExecutor: Executor used to run tool calls requested by the model and produce tool result payloads.
+    ///   - maxIterations: Maximum number of request/response iterations to perform before aborting.
+    ///   - systemPrompt: Optional system-level prompt to include in the request payload.
+    /// - Returns: The final text output produced by the model (possibly empty).
+    /// - Throws:
+    ///   - `AIServiceError.invalidURL` if the configured API URL is invalid.
+    ///   - `AIServiceError.invalidResponse` if the network response is not an HTTP response.
+    ///   - `AIServiceError.apiError` if the API returns a non-200 status code (includes status code and message).
+    ///   - `AIServiceError.invalidResponseFormat` if the response JSON is missing expected fields or text cannot be extracted.
+    ///   - `AIServiceError.toolLoopExhausted` if no final response is produced within `maxIterations`.
     private func sendRequestWithToolLoop(
         prompt: String,
         tools: [ToolDefinition],
         toolExecutor: AIToolExecutor,
-        maxIterations: Int
+        maxIterations: Int,
+        systemPrompt: String? = nil
     ) async throws -> String {
         guard let url = URL(string: apiURL) else {
             throw AIServiceError.invalidURL
@@ -327,7 +360,7 @@ public class AIService {
         let toolDefinitions = tools.map { $0.toDict() }
 
         for _ in 0..<maxIterations {
-            let request = try buildAPIURLRequest(url: url, messages: messages, toolDefinitions: toolDefinitions)
+            let request = try buildAPIURLRequest(url: url, messages: messages, toolDefinitions: toolDefinitions, systemPrompt: systemPrompt)
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
@@ -379,7 +412,8 @@ public class AIService {
     private func buildAPIURLRequest(
         url: URL,
         messages: [[String: Any]],
-        toolDefinitions: [[String: Any]]
+        toolDefinitions: [[String: Any]],
+        systemPrompt: String? = nil
     ) throws -> URLRequest {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -398,12 +432,93 @@ public class AIService {
             requestBody["tools"] = toolDefinitions
         }
 
+        if let system = systemPrompt, !system.isEmpty {
+            requestBody["system"] = system
+        }
+
         request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
         return request
     }
 
+    // MARK: - Agent Task (Multi-Agent Harness)
+
+    /// Send a request with an explicit system prompt and user prompt.
+    ///
+    /// Used by `MultiAgentHarness` to give each agent (planner, generator, evaluator)
+    /// its own specialised system prompt without affecting the general-purpose assistance
+    /// Sends a user prompt together with a system prompt to the Anthropic Messages API and returns the assistant's extracted text response.
+    /// - Parameters:
+    ///   - systemPrompt: System-level instructions to include in the request's `system` field.
+    ///   - userPrompt: The user-facing prompt sent as the single user message.
+    /// - Returns: The assistant-generated text extracted from the API response.
+    /// - Throws: `AIServiceError.invalidURL` if the configured API URL is invalid; `AIServiceError.invalidResponse` if the HTTP response is missing or malformed; `AIServiceError.apiError(statusCode:message:)` for non-200 HTTP responses; `AIServiceError.invalidResponseFormat` if the API response JSON or content blocks cannot be parsed.
+    public func performAgentTask(
+        systemPrompt: String,
+        userPrompt: String
+    ) async throws -> String {
+        guard let url = URL(string: apiURL) else {
+            throw AIServiceError.invalidURL
+        }
+
+        let messages: [[String: Any]] = [["role": "user", "content": userPrompt]]
+        let request = try buildAPIURLRequest(
+            url: url,
+            messages: messages,
+            toolDefinitions: [],
+            systemPrompt: systemPrompt
+        )
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AIServiceError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw AIServiceError.apiError(statusCode: httpResponse.statusCode, message: "Request failed")
+        }
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let content = json["content"] as? [[String: Any]] else {
+            throw AIServiceError.invalidResponseFormat
+        }
+
+        guard let text = extractText(from: content) else {
+            throw AIServiceError.invalidResponseFormat
+        }
+
+        return text
+    }
+
+    /// Send an agent task with a dedicated system prompt AND tool loop support.
+    ///
+    /// Combines the persona injection of `performAgentTask` with the iterative
+    /// Performs an agent task that may use external tools and returns the assistant's final response.
+    /// - Parameters:
+    ///   - systemPrompt: Instructions injected as the system-level prompt for the agent.
+    ///   - userPrompt: The user-facing prompt that starts the conversation.
+    ///   - tools: Definitions of tools the agent may invoke during the interaction.
+    ///   - toolExecutor: Executor responsible for running tool calls and returning their results.
+    ///   - maxIterations: Maximum number of tool-invocation/response cycles to allow before aborting.
+    /// - Returns: The assistant's generated response text.
+    public func performAgentTaskWithTools(
+        systemPrompt: String,
+        userPrompt: String,
+        tools: [ToolDefinition],
+        toolExecutor: AIToolExecutor,
+        maxIterations: Int = 10
+    ) async throws -> String {
+        return try await sendRequestWithToolLoop(
+            prompt: userPrompt,
+            tools: tools,
+            toolExecutor: toolExecutor,
+            maxIterations: maxIterations,
+            systemPrompt: systemPrompt
+        )
+    }
+
     /// Extracts joined text from a list of content blocks.
-    /// Returns nil if no text blocks are present.
+    /// Extracts and concatenated text blocks from a content array.
+    /// - Returns: The joined text of all blocks where `"type" == "text"`, or `nil` if no text blocks are present.
     private func extractText(from content: [[String: Any]]) -> String? {
         let textParts = content.compactMap { block -> String? in
             guard block["type"] as? String == "text" else { return nil }
@@ -436,6 +551,162 @@ public class AIService {
             }
         }
         return toolResults
+    }
+
+    // MARK: - JSON Parsing Helpers
+
+    /// Extracts and decodes JSON from Claude's response.
+    ///
+    /// Handles several common patterns:
+    /// - Bare JSON: `{"key": "value"}`
+    /// - Markdown code blocks: ` ```json\n{"key": "value"}\n``` `
+    /// - Wrapped text: `Here's the JSON:\n\n{"key": "value"}`
+    ///
+    /// - Parameters:
+    ///   - response: Raw response text from Claude
+    ///   - type: Type to decode into
+    /// - Returns: Decoded object of type T
+    /// - Throws: AIServiceError.invalidResponseFormat with details on parse failure
+    private func decodeJSON<T: Decodable>(
+        from response: String,
+        as type: T.Type
+    ) throws -> T {
+        // Try to extract JSON from markdown code block first
+        var jsonString = response
+
+        // Pattern 1: ```json ... ```
+        if let startIdx = response.range(of: "```json"),
+           let endIdx = response.range(of: "```", range: startIdx.upperBound..<response.endIndex) {
+            jsonString = String(response[startIdx.upperBound..<endIdx.lowerBound])
+        }
+        // Pattern 2: ``` ... ``` (generic code block)
+        else if response.contains("```") {
+            if let startIdx = response.range(of: "```"),
+               let endIdx = response.range(of: "```", range: startIdx.upperBound..<response.endIndex) {
+                jsonString = String(response[startIdx.upperBound..<endIdx.lowerBound])
+            }
+        }
+
+        // Trim whitespace
+        jsonString = jsonString.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Try to find JSON object/array if response has surrounding text
+        if !jsonString.starts(with: "{") && !jsonString.starts(with: "[") {
+            // Look for first { or [ and extract from there using depth-tracking
+            if let jsonStart = jsonString.firstIndex(where: { $0 == "{" || $0 == "[" }) {
+                let remaining = jsonString[jsonStart...]
+                let openChar: Character = remaining.first!
+                let closeChar: Character = openChar == "{" ? "}" : "]"
+
+                // Track depth to correctly handle nested structures
+                var depth = 0
+                var inString = false
+                var escapeNext = false
+                var endIndex: String.Index? = nil
+
+                for idx in remaining.indices {
+                    let ch = remaining[idx]
+                    if escapeNext {
+                        escapeNext = false
+                        continue
+                    }
+                    if ch == "\\" && inString {
+                        escapeNext = true
+                        continue
+                    }
+                    if ch == "\"" {
+                        inString.toggle()
+                        continue
+                    }
+                    if inString { continue }
+                    if ch == openChar { depth += 1 }
+                    else if ch == closeChar {
+                        depth -= 1
+                        if depth == 0 {
+                            endIndex = remaining.index(after: idx)
+                            break
+                        }
+                    }
+                }
+
+                if let end = endIndex {
+                    jsonString = String(remaining[..<end])
+                }
+            }
+        }
+
+        guard let data = jsonString.data(using: .utf8) else {
+            throw AIServiceError.invalidResponseFormat
+        }
+
+        let decoder = JSONDecoder()
+        do {
+            return try decoder.decode(type, from: data)
+        } catch {
+            throw AIServiceError.invalidResponseFormat
+        }
+    }
+
+    // MARK: - Vision Support
+
+    /// Get AI assistance with vision content (text + image)
+    ///
+    /// Sends a request to Claude with both text and image data. Useful for computer use,
+    /// screenshot analysis, and other vision-based tasks.
+    /// - Parameters:
+    ///   - text: The text prompt or instruction
+    ///   - imageBase64: Base64-encoded image data
+    ///   - mediaType: MIME type of the image (e.g., "image/png", "image/jpeg")
+    /// - Returns: The assistant's text response
+    public func getAssistanceWithVision(
+        text: String,
+        imageBase64: String,
+        mediaType: String = "image/png"
+    ) async throws -> String {
+        guard let url = URL(string: apiURL) else {
+            throw AIServiceError.invalidURL
+        }
+
+        let contentArray: [[String: Any]] = [
+            [
+                "type": "image",
+                "source": [
+                    "type": "base64",
+                    "media_type": mediaType,
+                    "data": imageBase64
+                ]
+            ],
+            [
+                "type": "text",
+                "text": text
+            ]
+        ]
+
+        let messages: [[String: Any]] = [
+            ["role": "user", "content": contentArray]
+        ]
+
+        let request = try buildAPIURLRequest(url: url, messages: messages, toolDefinitions: [])
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AIServiceError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw AIServiceError.apiError(statusCode: httpResponse.statusCode, message: "Request failed")
+        }
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let content = json["content"] as? [[String: Any]] else {
+            throw AIServiceError.invalidResponseFormat
+        }
+
+        guard let responseText = extractText(from: content) else {
+            throw AIServiceError.invalidResponseFormat
+        }
+
+        return responseText
     }
 
     // MARK: - Batch Operations
@@ -667,8 +938,8 @@ public class AIService {
                 currentEvidence = String(trimmed.dropFirst("evidence:".count)).trimmingCharacters(in: .whitespaces)
             } else if trimmed.lowercased().starts(with: "quote:") {
                 currentQuote = String(trimmed.dropFirst("quote:".count)).trimmingCharacters(in: .whitespaces)
-            } else if let claim = currentClaim, let evidence = currentEvidence {
-                currentEvidence = (currentEvidence ?? "") + " " + trimmed
+            } else if currentClaim != nil, let evidence = currentEvidence {
+                currentEvidence = evidence + " " + trimmed
             }
         }
 

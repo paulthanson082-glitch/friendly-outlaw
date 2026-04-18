@@ -1,0 +1,17 @@
+# Source maps must never be published to npm.
+# They embed the full original source code inside sourcesContent,
+# leaking proprietary logic to anyone who installs the package.
+# See: https://github.com/nicolo-ribaudo/tc39-source-map-leak
+dist/**/*.map
+dist/**/*.d.ts.map
+
+# Source files (only compiled output should ship)
+src/
+
+# Development / test artifacts
+*.test.ts
+*.spec.ts
+tests/
+coverage/
+.env
+.env.*
