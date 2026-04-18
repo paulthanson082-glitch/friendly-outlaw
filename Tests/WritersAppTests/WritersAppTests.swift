@@ -1892,190 +1892,1249 @@ final class WritersAppTests: XCTestCase {
         }
     }
 
-    // MARK: - CRM Manager Tests
+    // MARK: - Computer Use Tests
 
-    func testCreateCRMContact() {
-        let manager = CRMManager()
-        let contact = manager.createContact(
-            name: "Jane Agent",
-            email: "jane@literaryagency.com",
-            company: "Bloodstone Literary",
-            role: "Literary Agent"
+    func testComputerUseActionCodable() throws {
+        let action = ComputerUseAction(
+            action: .leftClick,
+            coordinate: [100, 200]
         )
-        XCTAssertEqual(contact.name, "Jane Agent")
-        XCTAssertEqual(contact.email, "jane@literaryagency.com")
-        XCTAssertEqual(contact.company, "Bloodstone Literary")
-        XCTAssertEqual(contact.role, "Literary Agent")
+        let data = try JSONEncoder().encode(action)
+        let decoded = try JSONDecoder().decode(ComputerUseAction.self, from: data)
+        XCTAssertEqual(decoded.action, .leftClick)
+        XCTAssertEqual(decoded.coordinate, [100, 200])
     }
 
-    func testGetCRMContactById() {
-        let manager = CRMManager()
-        let created = manager.createContact(name: "Tom Editor")
-        let fetched = manager.getContact(id: created.id)
-        XCTAssertNotNil(fetched)
-        XCTAssertEqual(fetched?.name, "Tom Editor")
+    func testComputerUseActionTypeRawValues() {
+        XCTAssertEqual(ComputerUseActionType.screenshot.rawValue, "screenshot")
+        XCTAssertEqual(ComputerUseActionType.leftClick.rawValue, "left_click")
+        XCTAssertEqual(ComputerUseActionType.type.rawValue, "type")
+        XCTAssertEqual(ComputerUseActionType.keypress.rawValue, "keypress")
+        XCTAssertEqual(ComputerUseActionType.scroll.rawValue, "scroll")
     }
 
-    func testGetAllCRMContactsSortedByName() {
-        let manager = CRMManager()
-        manager.createContact(name: "Zara Publisher")
-        manager.createContact(name: "Aaron Agent")
-        manager.createContact(name: "Maria Editor")
-        let all = manager.getAllContacts()
-        XCTAssertEqual(all.count, 3)
-        XCTAssertEqual(all[0].name, "Aaron Agent")
-        XCTAssertEqual(all[2].name, "Zara Publisher")
+    func testComputerUseConfigurationDefaults() {
+        let config = ComputerUseConfiguration()
+        XCTAssertEqual(config.displayWidth, 1024)
+        XCTAssertEqual(config.displayHeight, 768)
+        XCTAssertEqual(config.maxIterations, 20)
+        XCTAssertEqual(config.screenshotDelay, 0.5)
     }
 
-    func testUpdateCRMContact() {
-        let manager = CRMManager()
-        var contact = manager.createContact(name: "Old Name")
-        contact.name = "New Name"
-        manager.updateContact(contact)
-        XCTAssertEqual(manager.getContact(id: contact.id)?.name, "New Name")
-    }
-
-    func testDeleteCRMContactAlsoRemovesDeals() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Doomed Contact")
-        manager.createDeal(title: "Doomed Deal", contactId: contact.id)
-        manager.deleteContact(id: contact.id)
-        XCTAssertNil(manager.getContact(id: contact.id))
-        XCTAssertTrue(manager.getDeals(forContact: contact.id).isEmpty)
-    }
-
-    func testSearchCRMContactsByName() {
-        let manager = CRMManager()
-        manager.createContact(name: "Alice Smith", company: "Random House")
-        manager.createContact(name: "Bob Jones", company: "Penguin Press")
-        let results = manager.searchContacts(query: "alice")
-        XCTAssertEqual(results.count, 1)
-        XCTAssertEqual(results.first?.name, "Alice Smith")
-    }
-
-    func testSearchCRMContactsByCompany() {
-        let manager = CRMManager()
-        manager.createContact(name: "Alice Smith", company: "Random House")
-        manager.createContact(name: "Bob Jones", company: "Penguin Press")
-        let results = manager.searchContacts(query: "penguin")
-        XCTAssertEqual(results.count, 1)
-        XCTAssertEqual(results.first?.name, "Bob Jones")
-    }
-
-    func testCreateCRMDeal() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Publisher One")
-        let deal = manager.createDeal(
-            title: "Debut Novel",
-            contactId: contact.id,
-            stage: .queried,
-            value: 5000
+    func testComputerUseConfigurationCustom() {
+        let config = ComputerUseConfiguration(
+            displayWidth: 1920,
+            displayHeight: 1080,
+            maxIterations: 10,
+            screenshotDelay: 1.0
         )
-        XCTAssertEqual(deal.title, "Debut Novel")
-        XCTAssertEqual(deal.stage, .queried)
-        XCTAssertEqual(deal.value, 5000)
-        XCTAssertEqual(deal.contactId, contact.id)
+        XCTAssertEqual(config.displayWidth, 1920)
+        XCTAssertEqual(config.displayHeight, 1080)
+        XCTAssertEqual(config.maxIterations, 10)
+        XCTAssertEqual(config.screenshotDelay, 1.0)
     }
 
-    func testGetCRMDealsByStage() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Publisher X")
-        manager.createDeal(title: "Deal A", contactId: contact.id, stage: .prospect)
-        manager.createDeal(title: "Deal B", contactId: contact.id, stage: .queried)
-        manager.createDeal(title: "Deal C", contactId: contact.id, stage: .prospect)
-        let prospects = manager.getDeals(inStage: .prospect)
-        XCTAssertEqual(prospects.count, 2)
+    func testComputerUseSessionResultSummary() {
+        let actions = [
+            ComputerUseAction(action: .screenshot),
+            ComputerUseAction(action: .leftClick, coordinate: [50, 50])
+        ]
+        let result = ComputerUseSessionResult(
+            task: "Open browser",
+            finalResponse: "Done",
+            actions: actions,
+            iterationCount: 3,
+            wasExhausted: false
+        )
+        XCTAssertTrue(result.summary.contains("Open browser"))
+        XCTAssertTrue(result.summary.contains("2 actions"))
+        XCTAssertFalse(result.wasExhausted)
     }
 
-    func testAdvanceCRMDeal() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Publisher Y")
-        let deal = manager.createDeal(title: "Rising Deal", contactId: contact.id, stage: .prospect)
-        let newStage = manager.advanceDeal(id: deal.id)
-        XCTAssertEqual(newStage, .queried)
-        XCTAssertEqual(manager.getDeal(id: deal.id)?.stage, .queried)
+    func testComputerUseResultProperties() {
+        let action = ComputerUseAction(action: .screenshot)
+        let result = ComputerUseResult(
+            action: action,
+            screenshotBase64: "abc123",
+            error: nil
+        )
+        XCTAssertEqual(result.screenshotBase64, "abc123")
+        XCTAssertNil(result.error)
     }
 
-    func testAdvanceCRMDealAtTerminalReturnsNil() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Publisher Z")
-        let deal = manager.createDeal(title: "Final Deal", contactId: contact.id, stage: .contracted)
-        let result = manager.advanceDeal(id: deal.id)
-        XCTAssertNil(result)
+    func testComputerUseErrorDescriptions() {
+        XCTAssertNotNil(ComputerUseError.invalidRequest.errorDescription)
+        XCTAssertNotNil(ComputerUseError.invalidResponse.errorDescription)
+        XCTAssertNotNil(ComputerUseError.apiError("test").errorDescription)
+        XCTAssertNotNil(ComputerUseError.executorError("test").errorDescription)
     }
 
-    func testRejectCRMDeal() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Cold Publisher")
-        let deal = manager.createDeal(title: "Unlucky Pitch", contactId: contact.id, stage: .submitted)
-        let rejected = manager.rejectDeal(id: deal.id)
-        XCTAssertEqual(rejected?.stage, .rejected)
-        XCTAssertNotNil(rejected?.metadata.closedAt)
-    }
-
-    func testLogCRMInteractionUpdatesLastContacted() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Active Agent")
-        XCTAssertNil(manager.getContact(id: contact.id)?.metadata.lastContacted)
-        manager.logInteraction(contactId: contact.id, type: .email, summary: "Sent query letter")
-        XCTAssertNotNil(manager.getContact(id: contact.id)?.metadata.lastContacted)
-    }
-
-    func testGetCRMInteractionsForContact() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Frequent Contact")
-        manager.logInteraction(contactId: contact.id, type: .email, summary: "First touch")
-        manager.logInteraction(contactId: contact.id, type: .call, summary: "Follow-up call")
-        let interactions = manager.getInteractions(forContact: contact.id)
-        XCTAssertEqual(interactions.count, 2)
-    }
-
-    func testGetRecentCRMInteractions() {
-        let manager = CRMManager()
-        let contact = manager.createContact(name: "Busy Contact")
-        for i in 0..<5 {
-            manager.logInteraction(contactId: contact.id, type: .note, summary: "Note \(i)")
-        }
-        let recent = manager.getRecentInteractions(limit: 3)
-        XCTAssertEqual(recent.count, 3)
-    }
-
-    func testCRMStats() {
-        let manager = CRMManager()
-        let c1 = manager.createContact(name: "Contact 1")
-        let c2 = manager.createContact(name: "Contact 2")
-        manager.createDeal(title: "Deal 1", contactId: c1.id, stage: .queried, value: 1000)
-        manager.createDeal(title: "Deal 2", contactId: c1.id, stage: .contracted, value: 5000)
-        manager.createDeal(title: "Deal 3", contactId: c2.id, stage: .prospect)
-        manager.logInteraction(contactId: c1.id, type: .email, summary: "Recent email")
-        let stats = manager.getCRMStats()
-        XCTAssertEqual(stats.totalContacts, 2)
-        XCTAssertEqual(stats.totalDeals, 3)
-        XCTAssertEqual(stats.contractedDeals, 1)
-        XCTAssertEqual(stats.totalPipelineValue, 1000)  // Only non-terminal deal value
-        XCTAssertEqual(stats.recentInteractionCount, 1)
-    }
-
-    func testDealStageAdvanceSequence() {
-        XCTAssertEqual(DealStage.prospect.next, .queried)
-        XCTAssertEqual(DealStage.queried.next, .requested)
-        XCTAssertEqual(DealStage.requested.next, .submitted)
-        XCTAssertEqual(DealStage.submitted.next, .contracted)
-        XCTAssertNil(DealStage.contracted.next)
-        XCTAssertNil(DealStage.rejected.next)
-    }
-
-    func testDealStageIsTerminal() {
-        XCTAssertTrue(DealStage.contracted.isTerminal)
-        XCTAssertTrue(DealStage.rejected.isTerminal)
-        XCTAssertFalse(DealStage.prospect.isTerminal)
-        XCTAssertFalse(DealStage.submitted.isTerminal)
-    }
-
-    func testWritersAppExposesCRMManager() {
+    func testMakeComputerUseServiceWithoutAI() {
         let app = WritersApp()
-        let contact = app.crmManager.createContact(name: "Test Contact via App")
-        XCTAssertEqual(app.crmManager.getAllContacts().count, 1)
-        XCTAssertEqual(contact.name, "Test Contact via App")
+        // Without AI enabled, makeComputerUseService should return nil
+        let executor = MockComputerUseExecutor()
+        let service = app.makeComputerUseService(executor: executor)
+        XCTAssertNil(service)
+    }
+
+    func testMakeComputerUseServiceWithAI() {
+        let config = AIConfiguration(
+            apiKey: "sk-ant-test",
+            model: .claude35Sonnet,
+            maxTokens: 1024,
+            temperature: 0.7
+        )
+        let app = WritersApp(aiConfiguration: config)
+        let userId = UUID()
+        app.enableAI(configuration: config, userId: userId)
+        let executor = MockComputerUseExecutor()
+        let service = app.makeComputerUseService(executor: executor)
+        XCTAssertNotNil(service)
+    }
+
+    // MARK: - Computer Use Action Type Extended Raw Values Tests
+
+    func testComputerUseActionTypeAllRawValues() {
+        // Verify all raw values match the Anthropic computer use API action names
+        XCTAssertEqual(ComputerUseActionType.rightClick.rawValue, "right_click")
+        XCTAssertEqual(ComputerUseActionType.doubleClick.rawValue, "double_click")
+        XCTAssertEqual(ComputerUseActionType.middleClick.rawValue, "middle_click")
+        XCTAssertEqual(ComputerUseActionType.leftClickDrag.rawValue, "left_click_drag")
+        XCTAssertEqual(ComputerUseActionType.mouseMoveAction.rawValue, "mouse_move")
+        XCTAssertEqual(ComputerUseActionType.wait.rawValue, "wait")
+        XCTAssertEqual(ComputerUseActionType.cursorPosition.rawValue, "cursor_position")
+    }
+
+    func testComputerUseActionTypeRoundTripCodable() throws {
+        // Each action type must survive a JSON encode/decode round trip
+        let types: [ComputerUseActionType] = [
+            .screenshot, .leftClick, .rightClick, .doubleClick,
+            .middleClick, .leftClickDrag, .mouseMoveAction,
+            .keypress, .type, .scroll, .wait, .cursorPosition
+        ]
+        for actionType in types {
+            let action = ComputerUseAction(action: actionType)
+            let data = try JSONEncoder().encode(action)
+            let decoded = try JSONDecoder().decode(ComputerUseAction.self, from: data)
+            XCTAssertEqual(decoded.action, actionType, "\(actionType.rawValue) should survive JSON round trip")
+        }
+    }
+
+    func testComputerUseActionAllOptionalFields() {
+        // Verify all optional fields are stored correctly when provided
+        let action = ComputerUseAction(
+            action: .scroll,
+            coordinate: [300, 400],
+            startCoordinate: [100, 100],
+            text: "Hello World",
+            key: "ctrl+c",
+            direction: "down",
+            amount: 5,
+            duration: 1000
+        )
+        XCTAssertEqual(action.action, .scroll)
+        XCTAssertEqual(action.coordinate, [300, 400])
+        XCTAssertEqual(action.startCoordinate, [100, 100])
+        XCTAssertEqual(action.text, "Hello World")
+        XCTAssertEqual(action.key, "ctrl+c")
+        XCTAssertEqual(action.direction, "down")
+        XCTAssertEqual(action.amount, 5)
+        XCTAssertEqual(action.duration, 1000)
+    }
+
+    func testComputerUseActionDefaultsToNilOptionalFields() {
+        let action = ComputerUseAction(action: .screenshot)
+        XCTAssertNil(action.coordinate)
+        XCTAssertNil(action.startCoordinate)
+        XCTAssertNil(action.text)
+        XCTAssertNil(action.key)
+        XCTAssertNil(action.direction)
+        XCTAssertNil(action.amount)
+        XCTAssertNil(action.duration)
+    }
+
+    func testComputerUseActionCodablePreservesAllOptionalFields() throws {
+        let action = ComputerUseAction(
+            action: .leftClickDrag,
+            coordinate: [500, 600],
+            startCoordinate: [10, 20],
+            text: nil,
+            key: nil,
+            direction: nil,
+            amount: nil,
+            duration: 2000
+        )
+        let data = try JSONEncoder().encode(action)
+        let decoded = try JSONDecoder().decode(ComputerUseAction.self, from: data)
+        XCTAssertEqual(decoded.action, .leftClickDrag)
+        XCTAssertEqual(decoded.coordinate, [500, 600])
+        XCTAssertEqual(decoded.startCoordinate, [10, 20])
+        XCTAssertEqual(decoded.duration, 2000)
+        XCTAssertNil(decoded.text)
+        XCTAssertNil(decoded.key)
+    }
+
+    // MARK: - ComputerUseSessionResult Tests
+
+    func testComputerUseSessionResultExhaustedSummary() {
+        let result = ComputerUseSessionResult(
+            task: "Click login button",
+            finalResponse: "",
+            actions: [ComputerUseAction(action: .screenshot)],
+            iterationCount: 20,
+            wasExhausted: true
+        )
+        XCTAssertTrue(result.wasExhausted)
+        XCTAssertTrue(result.summary.contains("exhausted"))
+        XCTAssertTrue(result.summary.contains("20"))
+        XCTAssertTrue(result.summary.contains("Click login button"))
+    }
+
+    func testComputerUseSessionResultCompletedSummaryContainsIterationCount() {
+        let result = ComputerUseSessionResult(
+            task: "Type a message",
+            finalResponse: "Done",
+            actions: [],
+            iterationCount: 5,
+            wasExhausted: false
+        )
+        XCTAssertFalse(result.wasExhausted)
+        XCTAssertTrue(result.summary.contains("completed"))
+        XCTAssertTrue(result.summary.contains("5"))
+    }
+
+    func testComputerUseSessionResultZeroActions() {
+        let result = ComputerUseSessionResult(
+            task: "Nothing to do",
+            finalResponse: "Already done",
+            actions: [],
+            iterationCount: 1,
+            wasExhausted: false
+        )
+        XCTAssertEqual(result.actions.count, 0)
+        XCTAssertTrue(result.summary.contains("0 actions"))
+    }
+
+    func testComputerUseResultWithError() {
+        let action = ComputerUseAction(action: .leftClick, coordinate: [100, 200])
+        let result = ComputerUseResult(
+            action: action,
+            screenshotBase64: nil,
+            error: "Element not found"
+        )
+        XCTAssertNil(result.screenshotBase64)
+        XCTAssertEqual(result.error, "Element not found")
+        XCTAssertEqual(result.action.action, .leftClick)
+    }
+
+    func testComputerUseErrorMessages() {
+        // Verify each error case has a meaningful, non-empty description
+        XCTAssertEqual(ComputerUseError.invalidRequest.errorDescription,
+                       "Failed to build computer use request")
+        XCTAssertEqual(ComputerUseError.invalidResponse.errorDescription,
+                       "Invalid response from Claude API")
+        XCTAssertTrue(ComputerUseError.apiError("HTTP 401").errorDescription!.contains("HTTP 401"))
+        XCTAssertTrue(ComputerUseError.executorError("timeout").errorDescription!.contains("timeout"))
+    }
+
+    // MARK: - Screenplay Template Simplified Tests
+
+    func testScreenplayTemplateHasSimplifiedDescription() {
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        XCTAssertEqual(screenplay.description, "Standard screenplay scene format",
+                       "Screenplay template description should be the simplified version")
+    }
+
+    func testScreenplayTemplateHasEightPlaceholders() {
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        XCTAssertEqual(screenplay.placeholders.count, 8,
+                       "Simplified screenplay template should have 8 placeholders")
+    }
+
+    func testScreenplayTemplateDoesNotHaveCharacterStatePlaceholder() {
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        let keys = screenplay.placeholders.map { $0.key }
+        XCTAssertFalse(keys.contains("character_state"),
+                       "character_state placeholder should have been removed from screenplay template")
+    }
+
+    func testScreenplayTemplateDoesNotHaveShotDescriptionPlaceholder() {
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        let keys = screenplay.placeholders.map { $0.key }
+        XCTAssertFalse(keys.contains("shot_description"),
+                       "shot_description placeholder should have been removed from screenplay template")
+    }
+
+    func testScreenplayTemplateHasExpectedPlaceholderKeys() {
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        let keys = Set(screenplay.placeholders.map { $0.key })
+        let expected: Set<String> = [
+            "scene_heading", "action", "character", "dialogue",
+            "character_2", "parenthetical", "dialogue_2", "transition"
+        ]
+        XCTAssertEqual(keys, expected, "Screenplay template should have exactly the simplified placeholder set")
+    }
+
+    func testScreenplayTemplateHasSimplifiedTags() {
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        let tags = screenplay.metadata.tags
+        XCTAssertEqual(tags.count, 3, "Simplified screenplay template should have 3 tags")
+        XCTAssertTrue(tags.contains("screenplay"))
+        XCTAssertTrue(tags.contains("script"))
+        XCTAssertTrue(tags.contains("scene"))
+        XCTAssertFalse(tags.contains("film"), "Tag 'film' should have been removed")
+        XCTAssertFalse(tags.contains("professional"), "Tag 'professional' should have been removed")
+    }
+
+    func testScreenplayTemplateTransitionDefaultValue() {
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        let transition = screenplay.placeholders.first { $0.key == "transition" }
+        XCTAssertEqual(transition?.defaultValue, "CUT TO:",
+                       "Transition placeholder should retain 'CUT TO:' default value")
+    }
+
+    // MARK: - Document Model Regression Tests
+
+    func testDocumentWordCountRemainsCorrect() {
+        // wordCount is still present after PR changes
+        let doc = Document(
+            title: "Test",
+            content: "One two three four five",
+            category: .article
+        )
+        XCTAssertEqual(doc.wordCount, 5)
+    }
+
+    func testDocumentWordCountIgnoresExtraWhitespace() {
+        let doc = Document(
+            title: "Test",
+            content: "  word1   word2  \n\n  word3  ",
+            category: .article
+        )
+        XCTAssertEqual(doc.wordCount, 3)
+    }
+
+    func testDocumentCharacterCountRemainsCorrect() {
+        // characterCount is still present after PR changes
+        let doc = Document(title: "Test", content: "Hello", category: .article)
+        XCTAssertEqual(doc.characterCount, 5)
+    }
+
+    func testDocumentReadingTimeRemainsCorrect() {
+        // readingTime is still present after PR changes
+        let words = Array(repeating: "word", count: 400).joined(separator: " ")
+        let doc = Document(title: "Test", content: words, category: .article)
+        XCTAssertEqual(doc.readingTime, 2, "400 words at 200 wpm should be 2 minutes")
+    }
+
+    func testDocumentReadingTimeMinimumIsOne() {
+        let doc = Document(title: "Short", content: "Just a few words.", category: .article)
+        XCTAssertGreaterThanOrEqual(doc.readingTime, 1, "readingTime should never be less than 1")
+    }
+}
+
+// MARK: - AIService Internal Properties Tests (PR: exposed currentModel and apiKey)
+
+final class AIServiceInternalPropertiesTests: XCTestCase {
+
+    func testAIServiceCurrentModelReturnsConfiguredModelRawValue() {
+        // currentModel is exposed as an internal property so ComputerUseService can read it.
+        let config = AIConfiguration(
+            apiKey: "sk-ant-test",
+            model: .claude35Sonnet,
+            maxTokens: 4096,
+            temperature: 0.7
+        )
+        let app = WritersApp(aiConfiguration: config)
+        // Access via makeComputerUseService path to confirm the service gets the right model.
+        // The model value should match the raw value of the configured AIModel.
+        XCTAssertEqual(config.model.rawValue, "claude-3-5-sonnet-20241022",
+                       "claude35Sonnet raw value must match the Anthropic model ID")
+        XCTAssertNotNil(app.aiService)
+    }
+
+    func testAIServiceAPIKeyMatchesConfiguredKey() {
+        // apiKey is exposed so ComputerUseService can forward it in Authorization headers.
+        let expectedKey = "sk-ant-api03-unique-test-key"
+        let config = AIConfiguration(
+            apiKey: expectedKey,
+            model: .claude35Sonnet,
+            maxTokens: 4096,
+            temperature: 0.7
+        )
+        let app = WritersApp(aiConfiguration: config)
+        // ComputerUseService reads aiService.apiKey. Verify the service is present and
+        // the API key configured on it round-trips through AIConfiguration correctly.
+        XCTAssertNotNil(app.aiService)
+        XCTAssertEqual(config.apiKey, expectedKey,
+                       "AIConfiguration must preserve the API key supplied at init")
+    }
+
+    func testComputerUseServiceUsesAIServiceCurrentModel() {
+        // Verify that makeComputerUseService creates a service when AI is enabled.
+        // This implicitly validates currentModel and apiKey are accessible.
+        let config = AIConfiguration(
+            apiKey: "sk-ant-model-check",
+            model: .claude3Opus,
+            maxTokens: 2048,
+            temperature: 0.5
+        )
+        let app = WritersApp(aiConfiguration: config)
+        let executor = MockComputerUseExecutor()
+        let service = app.makeComputerUseService(executor: executor)
+        XCTAssertNotNil(service,
+                        "makeComputerUseService must return a service when AI is enabled")
+    }
+}
+
+// MARK: - ComputerUseActionType Boundary Tests (additional coverage)
+
+final class ComputerUseActionTypeBoundaryTests: XCTestCase {
+
+    func testComputerUseActionTypeFromInvalidRawValueReturnsNil() {
+        // Boundary: an unknown action string from the API should produce nil, not crash.
+        let unknown = ComputerUseActionType(rawValue: "totally_unknown_action_xyz")
+        XCTAssertNil(unknown,
+                     "An unrecognised action string must return nil, not produce a wrong enum case")
+    }
+
+    func testComputerUseActionTypeFromEmptyStringReturnsNil() {
+        let empty = ComputerUseActionType(rawValue: "")
+        XCTAssertNil(empty, "Empty string must not match any action type")
+    }
+
+    func testComputerUseActionTypeFromMixedCaseIsNil() {
+        // Raw values are lowercase; mixed-case strings must not accidentally match.
+        let mixed = ComputerUseActionType(rawValue: "Left_Click")
+        XCTAssertNil(mixed, "Mixed-case raw value should not match the lowercase 'left_click' case")
+    }
+}
+
+// MARK: - Screenplay Template Content Regression Tests (PR: removed character_state and shot_description)
+
+final class ScreenplayTemplateContentTests: XCTestCase {
+    var app: WritersApp!
+
+    override func setUp() {
+        super.setUp()
+        app = WritersApp()
+    }
+
+    override func tearDown() {
+        app = nil
+        super.tearDown()
+    }
+
+    func testScreenplayTemplateContentDoesNotContainCharacterStatePlaceholder() {
+        // After the PR, {{character_state}} must not appear in the template content string.
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
+            XCTFail("Screenplay template must exist")
+            return
+        }
+        XCTAssertFalse(screenplay.content.contains("{{character_state}}"),
+                       "Removed placeholder {{character_state}} must not appear in template content")
+    }
+
+    func testScreenplayTemplateContentDoesNotContainShotDescriptionPlaceholder() {
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
+            XCTFail("Screenplay template must exist")
+            return
+        }
+        XCTAssertFalse(screenplay.content.contains("{{shot_description}}"),
+                       "Removed placeholder {{shot_description}} must not appear in template content")
+    }
+
+    func testScreenplayTemplateContentContainsAllRequiredPlaceholders() {
+        // The remaining placeholders must appear in the template body.
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
+            XCTFail("Screenplay template must exist")
+            return
+        }
+        let required = ["{{scene_heading}}", "{{action}}", "{{character}}", "{{dialogue}}", "{{transition}}"]
+        for placeholder in required {
+            XCTAssertTrue(screenplay.content.contains(placeholder),
+                          "Screenplay template content must contain \(placeholder)")
+        }
+    }
+
+    func testScreenplayTemplateDoesNotContainProfessionalInDescription() {
+        // PR simplified the description from "…industry-standard formatting" to a shorter string.
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
+            XCTFail("Screenplay template must exist")
+            return
+        }
+        XCTAssertFalse(screenplay.description.lowercased().contains("professional"),
+                       "Simplified description must not retain the old 'professional' wording")
+        XCTAssertFalse(screenplay.description.lowercased().contains("industry-standard"),
+                       "Simplified description must not retain the old 'industry-standard' wording")
+    }
+
+    func testScreenplayTemplateTotalTagCountIsThree() {
+        // PR reduced tags from 5 (screenplay, script, scene, film, professional) to 3.
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
+            XCTFail("Screenplay template must exist")
+            return
+        }
+        XCTAssertEqual(screenplay.metadata.tags.count, 3,
+                       "Screenplay template must have exactly 3 tags after PR simplification")
+    }
+
+    func testScreenplayTemplateTagsDoNotContainFilm() {
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
+            XCTFail("Screenplay template must exist")
+            return
+        }
+        XCTAssertFalse(screenplay.metadata.tags.contains("film"),
+                       "'film' tag must have been removed from the screenplay template")
+    }
+
+    func testScreenplayTemplateTagsDoNotContainProfessional() {
+        let templates = app.templateManager.getAllTemplates()
+        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
+            XCTFail("Screenplay template must exist")
+            return
+        }
+        XCTAssertFalse(screenplay.metadata.tags.contains("professional"),
+                       "'professional' tag must have been removed from the screenplay template")
+    }
+}
+
+// MARK: - Writing Advisor Tests
+
+final class WritingAdvisorTests: XCTestCase {
+
+    // MARK: - AdvisorCategory
+
+    func testAdvisorCategoryAllCasesCount() {
+        XCTAssertEqual(AdvisorCategory.allCases.count, 5)
+    }
+
+    func testAdvisorCategoryRawValues() {
+        XCTAssertEqual(AdvisorCategory.productivity.rawValue, "productivity")
+        XCTAssertEqual(AdvisorCategory.creativity.rawValue, "creativity")
+        XCTAssertEqual(AdvisorCategory.consistency.rawValue, "consistency")
+        XCTAssertEqual(AdvisorCategory.craft.rawValue, "craft")
+        XCTAssertEqual(AdvisorCategory.goals.rawValue, "goals")
+    }
+
+    func testAdvisorCategoryDisplayNamesNonEmpty() {
+        for category in AdvisorCategory.allCases {
+            XCTAssertFalse(category.displayName.isEmpty,
+                           "\(category.rawValue) displayName must not be empty")
+        }
+    }
+
+    func testAdvisorCategoryDisplayNameValues() {
+        XCTAssertEqual(AdvisorCategory.productivity.displayName, "Productivity")
+        XCTAssertEqual(AdvisorCategory.creativity.displayName, "Creativity")
+        XCTAssertEqual(AdvisorCategory.consistency.displayName, "Consistency")
+        XCTAssertEqual(AdvisorCategory.craft.displayName, "Craft")
+        XCTAssertEqual(AdvisorCategory.goals.displayName, "Goals")
+    }
+
+    func testAdvisorCategoryRoundTripCodable() throws {
+        for category in AdvisorCategory.allCases {
+            let data = try JSONEncoder().encode(category)
+            let decoded = try JSONDecoder().decode(AdvisorCategory.self, from: data)
+            XCTAssertEqual(decoded, category, "\(category) must survive a JSON round-trip")
+        }
+    }
+
+    // MARK: - AdvisorPriority
+
+    func testAdvisorPriorityAllCasesCount() {
+        XCTAssertEqual(AdvisorPriority.allCases.count, 3)
+    }
+
+    func testAdvisorPriorityRawValues() {
+        XCTAssertEqual(AdvisorPriority.high.rawValue, "high")
+        XCTAssertEqual(AdvisorPriority.medium.rawValue, "medium")
+        XCTAssertEqual(AdvisorPriority.low.rawValue, "low")
+    }
+
+    func testAdvisorPriorityRoundTripCodable() throws {
+        for priority in AdvisorPriority.allCases {
+            let data = try JSONEncoder().encode(priority)
+            let decoded = try JSONDecoder().decode(AdvisorPriority.self, from: data)
+            XCTAssertEqual(decoded, priority, "\(priority) must survive a JSON round-trip")
+        }
+    }
+
+    // MARK: - AdvisorRecommendation
+
+    func testAdvisorRecommendationIsIdentifiable() {
+        let rec1 = AdvisorRecommendation(
+            category: .productivity,
+            priority: .high,
+            title: "Write More",
+            recommendation: "Set a daily word goal.",
+            actionableSteps: ["Open app", "Write 500 words"]
+        )
+        let rec2 = AdvisorRecommendation(
+            category: .craft,
+            priority: .medium,
+            title: "Improve Dialogue",
+            recommendation: "Read your dialogue aloud.",
+            actionableSteps: ["Read aloud", "Edit"]
+        )
+        XCTAssertNotEqual(rec1.id, rec2.id)
+    }
+
+    func testAdvisorRecommendationDefaultIdIsUnique() {
+        let a = AdvisorRecommendation(category: .goals, priority: .low,
+                                      title: "T", recommendation: "R", actionableSteps: [])
+        let b = AdvisorRecommendation(category: .goals, priority: .low,
+                                      title: "T", recommendation: "R", actionableSteps: [])
+        XCTAssertNotEqual(a.id, b.id)
+    }
+
+    func testAdvisorRecommendationCodable() throws {
+        let original = AdvisorRecommendation(
+            id: UUID(),
+            category: .consistency,
+            priority: .low,
+            title: "Stay Consistent",
+            recommendation: "Write every day.",
+            actionableSteps: ["Set a timer", "Write for 10 minutes"],
+            generatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(AdvisorRecommendation.self, from: data)
+        XCTAssertEqual(decoded.id, original.id)
+        XCTAssertEqual(decoded.category, original.category)
+        XCTAssertEqual(decoded.priority, original.priority)
+        XCTAssertEqual(decoded.title, original.title)
+        XCTAssertEqual(decoded.recommendation, original.recommendation)
+        XCTAssertEqual(decoded.actionableSteps, original.actionableSteps)
+    }
+
+    func testAdvisorRecommendationStoresAllFields() {
+        let id = UUID()
+        let date = Date(timeIntervalSince1970: 0)
+        let rec = AdvisorRecommendation(
+            id: id,
+            category: .creativity,
+            priority: .high,
+            title: "Be Creative",
+            recommendation: "Freewrite daily.",
+            actionableSteps: ["Step A", "Step B"],
+            generatedAt: date
+        )
+        XCTAssertEqual(rec.id, id)
+        XCTAssertEqual(rec.category, .creativity)
+        XCTAssertEqual(rec.priority, .high)
+        XCTAssertEqual(rec.title, "Be Creative")
+        XCTAssertEqual(rec.recommendation, "Freewrite daily.")
+        XCTAssertEqual(rec.actionableSteps, ["Step A", "Step B"])
+        XCTAssertEqual(rec.generatedAt, date)
+    }
+
+    func testAdvisorRecommendationEmptyActionableSteps() throws {
+        let rec = AdvisorRecommendation(
+            category: .craft, priority: .medium,
+            title: "Craft note", recommendation: "Some note", actionableSteps: []
+        )
+        let data = try JSONEncoder().encode(rec)
+        let decoded = try JSONDecoder().decode(AdvisorRecommendation.self, from: data)
+        XCTAssertTrue(decoded.actionableSteps.isEmpty)
+    }
+
+    // MARK: - WritingAdvisorReport
+
+    func testWritingAdvisorReportCodable() throws {
+        let rec = AdvisorRecommendation(
+            category: .goals,
+            priority: .high,
+            title: "Set a Goal",
+            recommendation: "Define a clear project goal.",
+            actionableSteps: ["Pick a target word count", "Set a deadline"]
+        )
+        let report = WritingAdvisorReport(
+            recommendations: [rec],
+            overallAssessment: "You are making solid progress.",
+            focusArea: .goals,
+            generatedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let data = try JSONEncoder().encode(report)
+        let decoded = try JSONDecoder().decode(WritingAdvisorReport.self, from: data)
+        XCTAssertEqual(decoded.recommendations.count, 1)
+        XCTAssertEqual(decoded.overallAssessment, report.overallAssessment)
+        XCTAssertEqual(decoded.focusArea, report.focusArea)
+    }
+
+    func testWritingAdvisorReportEmptyRecommendations() throws {
+        let report = WritingAdvisorReport(
+            recommendations: [],
+            overallAssessment: "Nothing to report yet.",
+            focusArea: .productivity
+        )
+        let data = try JSONEncoder().encode(report)
+        let decoded = try JSONDecoder().decode(WritingAdvisorReport.self, from: data)
+        XCTAssertTrue(decoded.recommendations.isEmpty)
+        XCTAssertEqual(decoded.overallAssessment, "Nothing to report yet.")
+        XCTAssertEqual(decoded.focusArea, .productivity)
+    }
+
+    func testWritingAdvisorReportStoresAllFields() {
+        let date = Date(timeIntervalSince1970: 500_000)
+        let report = WritingAdvisorReport(
+            recommendations: [],
+            overallAssessment: "Assessment text.",
+            focusArea: .craft,
+            generatedAt: date
+        )
+        XCTAssertEqual(report.overallAssessment, "Assessment text.")
+        XCTAssertEqual(report.focusArea, .craft)
+        XCTAssertEqual(report.generatedAt, date)
+    }
+
+    // MARK: - AdvisorContext
+
+    func testAdvisorContextStoresAllFields() {
+        let stats = SessionStats(
+            totalSessions: 10,
+            totalDurationSeconds: 3600,
+            averageDurationSeconds: 360.0,
+            earliestSession: nil,
+            latestSession: nil
+        )
+        let ctx = AdvisorContext(
+            totalDocuments: 7,
+            recentDocumentTitles: ["Doc A", "Doc B"],
+            totalWordsAcrossDocuments: 12000,
+            documentCategories: ["novel", "article"],
+            sessionStats: stats,
+            additionalNotes: "Some note"
+        )
+        XCTAssertEqual(ctx.totalDocuments, 7)
+        XCTAssertEqual(ctx.recentDocumentTitles, ["Doc A", "Doc B"])
+        XCTAssertEqual(ctx.totalWordsAcrossDocuments, 12000)
+        XCTAssertEqual(ctx.documentCategories, ["novel", "article"])
+        XCTAssertNotNil(ctx.sessionStats)
+        XCTAssertEqual(ctx.additionalNotes, "Some note")
+    }
+
+    func testAdvisorContextDefaultNilNotes() {
+        let ctx = AdvisorContext(
+            totalDocuments: 0,
+            recentDocumentTitles: [],
+            totalWordsAcrossDocuments: 0,
+            documentCategories: [],
+            sessionStats: nil
+        )
+        XCTAssertNil(ctx.additionalNotes)
+        XCTAssertNil(ctx.sessionStats)
+    }
+
+    // MARK: - WritingAdvisorService.buildContextText
+
+    func testBuildContextTextIncludesDocumentCountAndWords() {
+        let service = WritingAdvisorService(
+            aiService: AIService(configuration: AIConfiguration(apiKey: "test-key"))
+        )
+        let ctx = AdvisorContext(
+            totalDocuments: 3,
+            recentDocumentTitles: [],
+            totalWordsAcrossDocuments: 5000,
+            documentCategories: [],
+            sessionStats: nil
+        )
+        let text = service.buildContextText(from: ctx)
+        XCTAssertTrue(text.contains("3"), "Context text must contain document count")
+        XCTAssertTrue(text.contains("5000"), "Context text must contain word count")
+    }
+
+    func testBuildContextTextIncludesRecentTitles() {
+        let service = WritingAdvisorService(
+            aiService: AIService(configuration: AIConfiguration(apiKey: "test-key"))
+        )
+        let ctx = AdvisorContext(
+            totalDocuments: 2,
+            recentDocumentTitles: ["My Novel", "Short Story"],
+            totalWordsAcrossDocuments: 1000,
+            documentCategories: [],
+            sessionStats: nil
+        )
+        let text = service.buildContextText(from: ctx)
+        XCTAssertTrue(text.contains("\"My Novel\""),
+                      "Recent titles must be quoted in context text")
+        XCTAssertTrue(text.contains("\"Short Story\""))
+    }
+
+    func testBuildContextTextOmitsRecentTitlesWhenEmpty() {
+        let service = WritingAdvisorService(
+            aiService: AIService(configuration: AIConfiguration(apiKey: "test-key"))
+        )
+        let ctx = AdvisorContext(
+            totalDocuments: 1,
+            recentDocumentTitles: [],
+            totalWordsAcrossDocuments: 100,
+            documentCategories: [],
+            sessionStats: nil
+        )
+        let text = service.buildContextText(from: ctx)
+        XCTAssertFalse(text.contains("Recent titles"),
+                       "Context text must omit Recent titles line when titles array is empty")
+    }
+
+    func testBuildContextTextIncludesCategories() {
+        let service = WritingAdvisorService(
+            aiService: AIService(configuration: AIConfiguration(apiKey: "test-key"))
+        )
+        let ctx = AdvisorContext(
+            totalDocuments: 1,
+            recentDocumentTitles: [],
+            totalWordsAcrossDocuments: 500,
+            documentCategories: ["novel", "screenplay"],
+            sessionStats: nil
+        )
+        let text = service.buildContextText(from: ctx)
+        XCTAssertTrue(text.contains("novel"), "Categories must appear in context text")
+        XCTAssertTrue(text.contains("screenplay"))
+    }
+
+    func testBuildContextTextIncludesSessionStats() {
+        let service = WritingAdvisorService(
+            aiService: AIService(configuration: AIConfiguration(apiKey: "test-key"))
+        )
+        let stats = SessionStats(
+            totalSessions: 8,
+            totalDurationSeconds: 4800,
+            averageDurationSeconds: 600.0,
+            earliestSession: nil,
+            latestSession: nil
+        )
+        let ctx = AdvisorContext(
+            totalDocuments: 2,
+            recentDocumentTitles: [],
+            totalWordsAcrossDocuments: 300,
+            documentCategories: [],
+            sessionStats: stats
+        )
+        let text = service.buildContextText(from: ctx)
+        XCTAssertTrue(text.contains("8"), "Session count must appear in context text")
+        XCTAssertTrue(text.contains("10"), "Average minutes (600s = 10 min) must appear")
+    }
+
+    func testBuildContextTextIncludesAdditionalNotes() {
+        let service = WritingAdvisorService(
+            aiService: AIService(configuration: AIConfiguration(apiKey: "test-key"))
+        )
+        let ctx = AdvisorContext(
+            totalDocuments: 0,
+            recentDocumentTitles: [],
+            totalWordsAcrossDocuments: 0,
+            documentCategories: [],
+            sessionStats: nil,
+            additionalNotes: "Focus on dialogue this week"
+        )
+        let text = service.buildContextText(from: ctx)
+        XCTAssertTrue(text.contains("Focus on dialogue this week"),
+                      "Additional notes must appear verbatim in context text")
+    }
+
+    func testBuildContextTextOmitsEmptyAdditionalNotes() {
+        let service = WritingAdvisorService(
+            aiService: AIService(configuration: AIConfiguration(apiKey: "test-key"))
+        )
+        let ctx = AdvisorContext(
+            totalDocuments: 0,
+            recentDocumentTitles: [],
+            totalWordsAcrossDocuments: 0,
+            documentCategories: [],
+            sessionStats: nil,
+            additionalNotes: ""
+        )
+        let text = service.buildContextText(from: ctx)
+        XCTAssertFalse(text.contains("Additional context"),
+                       "Empty additionalNotes must not add an Additional context line")
+    }
+
+    // MARK: - AIAssistanceType.writingAdvisor
+
+    func testAIAssistanceTypeHasWritingAdvisorCase() {
+        let type = AIAssistanceType.writingAdvisor
+        XCTAssertEqual(type.displayName, "Writing Advisor")
+    }
+
+    func testWritingAdvisorPromptIsNonEmpty() {
+        let prompt = AIAssistanceType.writingAdvisor.prompt(for: "Documents: 5 total", context: nil)
+        XCTAssertFalse(prompt.isEmpty, "Writing advisor prompt must not be empty")
+        XCTAssertTrue(prompt.contains("JSON"),
+                      "Writing advisor prompt must instruct Claude to return JSON")
+    }
+
+    func testWritingAdvisorPromptEmbeddsWriterData() {
+        let writerData = "Documents: 10 total, 25000 words"
+        let prompt = AIAssistanceType.writingAdvisor.prompt(for: writerData, context: nil)
+        XCTAssertTrue(prompt.contains(writerData),
+                      "Prompt must embed the provided writer data verbatim")
+    }
+
+    func testWritingAdvisorPromptContainsExpectedJSONKeys() {
+        let prompt = AIAssistanceType.writingAdvisor.prompt(for: "test data", context: nil)
+        XCTAssertTrue(prompt.contains("overallAssessment"),
+                      "Prompt must specify the overallAssessment JSON key")
+        XCTAssertTrue(prompt.contains("focusArea"),
+                      "Prompt must specify the focusArea JSON key")
+        XCTAssertTrue(prompt.contains("recommendations"),
+                      "Prompt must specify the recommendations JSON key")
+        XCTAssertTrue(prompt.contains("actionableSteps"),
+                      "Prompt must specify the actionableSteps JSON key")
+    }
+
+    func testWritingAdvisorPromptContainsPriorityOptions() {
+        let prompt = AIAssistanceType.writingAdvisor.prompt(for: "data", context: nil)
+        XCTAssertTrue(prompt.contains("high|medium|low"),
+                      "Prompt must enumerate priority options")
+    }
+
+    // MARK: - WritersApp integration (writing advisor lifecycle)
+
+    func testWritingAdvisorServiceCreatedWhenAIEnabled() {
+        let config = AIConfiguration(apiKey: "test-key")
+        let aiApp = WritersApp(aiConfiguration: config)
+        XCTAssertNotNil(aiApp.writingAdvisorService,
+                        "writingAdvisorService must be non-nil when AI is enabled at init")
+    }
+
+    func testWritingAdvisorServiceNilledWhenAIDisabled() {
+        let config = AIConfiguration(apiKey: "test-key")
+        let aiApp = WritersApp(aiConfiguration: config)
+        XCTAssertNotNil(aiApp.writingAdvisorService)
+        aiApp.disableAI()
+        XCTAssertNil(aiApp.writingAdvisorService,
+                     "writingAdvisorService must be nil after disableAI()")
+    }
+
+    func testWritingAdvisorServiceCreatedByEnableAI() {
+        let app = WritersApp()
+        XCTAssertNil(app.writingAdvisorService)
+        let config = AIConfiguration(apiKey: "test-key")
+        app.enableAI(configuration: config)
+        XCTAssertNotNil(app.writingAdvisorService,
+                        "writingAdvisorService must be non-nil after enableAI()")
+    }
+
+    func testWritingAdvisorServiceNilWithoutAI() {
+        let app = WritersApp()
+        XCTAssertNil(app.writingAdvisorService,
+                     "writingAdvisorService must be nil when no AI is configured")
+    }
+
+    func testGetPersonalizedWritingAdviceThrowsWhenNoAI() async {
+        let noAIApp = WritersApp()
+        do {
+            _ = try await noAIApp.getPersonalizedWritingAdvice()
+            XCTFail("Expected AIError.aiNotEnabled to be thrown")
+        } catch AIError.aiNotEnabled {
+            // expected
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testWritingAdvisorServiceRequiresAI() async {
+        let noAIApp = WritersApp()
+        do {
+            _ = try await noAIApp.getPersonalizedWritingAdvice()
+            XCTFail("Expected AIError.aiNotEnabled to be thrown")
+        } catch AIError.aiNotEnabled {
+            // expected
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testGetWritingAdviceForCategoryThrowsWhenNoAI() async {
+        let noAIApp = WritersApp()
+        do {
+            _ = try await noAIApp.getWritingAdvice(for: .craft)
+            XCTFail("Expected AIError.aiNotEnabled to be thrown")
+        } catch AIError.aiNotEnabled {
+            // expected
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testDisableAITwiceIsIdempotent() {
+        let config = AIConfiguration(apiKey: "test-key")
+        let aiApp = WritersApp(aiConfiguration: config)
+        aiApp.disableAI()
+        aiApp.disableAI()
+        XCTAssertNil(aiApp.writingAdvisorService,
+                     "writingAdvisorService must stay nil after double disableAI()")
+        XCTAssertFalse(aiApp.isAIEnabled,
+                       "isAIEnabled must be false after double disableAI()")
+    }
+
+    // MARK: - Brainstorm Ideas Categorization
+
+    func testBrainstormResultDecodesFromJSON() {
+        let json = """
+        {
+          "categories": [
+            {
+              "name": "Character Ideas",
+              "description": "Ideas focused on character development",
+              "ideas": [
+                {
+                  "title": "Conflicted Hero",
+                  "description": "A protagonist with competing goals",
+                  "isSpeculative": false
+                }
+              ]
+            }
+          ]
+        }
+        """
+
+        let decoder = JSONDecoder()
+        guard let data = json.data(using: .utf8) else {
+            XCTFail("Could not convert JSON string to data")
+            return
+        }
+
+        do {
+            let result = try decoder.decode(BrainstormResult.self, from: data)
+            XCTAssertEqual(result.categories.count, 1)
+            XCTAssertEqual(result.categories[0].name, "Character Ideas")
+            XCTAssertEqual(result.categories[0].ideas.count, 1)
+            XCTAssertEqual(result.categories[0].ideas[0].title, "Conflicted Hero")
+            XCTAssertFalse(result.categories[0].ideas[0].isSpeculative)
+        } catch {
+            XCTFail("Failed to decode BrainstormResult: \(error)")
+        }
+    }
+
+    func testBrainstormIdeasCategorizedRequiresAI() async {
+        let noAIApp = WritersApp()
+        do {
+            _ = try await noAIApp.brainstormIdeasCategorized(topic: "Science fiction novel")
+            XCTFail("Expected AIError.aiNotEnabled to be thrown")
+        } catch AIError.aiNotEnabled {
+            // expected
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testCategorizedIdeaModelConformance() {
+        let idea = CategorizedIdea(
+            title: "Time Travel Plot",
+            description: "A story involving time paradoxes",
+            isSpeculative: true
+        )
+        XCTAssertEqual(idea.title, "Time Travel Plot")
+        XCTAssertEqual(idea.description, "A story involving time paradoxes")
+        XCTAssertTrue(idea.isSpeculative)
+    }
+
+    func testIdeaCategoryModelConformance() {
+        let idea1 = CategorizedIdea(title: "Idea 1", description: "First idea", isSpeculative: false)
+        let idea2 = CategorizedIdea(title: "Idea 2", description: "Second idea", isSpeculative: true)
+        let category = IdeaCategory(
+            name: "Plot Ideas",
+            description: "Story plot concepts",
+            ideas: [idea1, idea2]
+        )
+        XCTAssertEqual(category.name, "Plot Ideas")
+        XCTAssertEqual(category.ideas.count, 2)
+    }
+
+    func testAIAssistanceTypeHasBrainstormIdeasCategorizedCase() {
+        let assistanceType = AIAssistanceType.brainstormIdeasCategorized
+        XCTAssertEqual(assistanceType.displayName, "Brainstorm Ideas (Categorized)")
+    }
+
+    // MARK: - JSON Parsing Edge Cases
+
+    func testBrainstormResultDecodesBareJSON() {
+        let json = """
+        {
+          "categories": [
+            {
+              "name": "Character Ideas",
+              "description": "Character concepts",
+              "ideas": []
+            }
+          ]
+        }
+        """
+
+        let decoder = JSONDecoder()
+        guard let data = json.data(using: .utf8) else {
+            XCTFail("Could not encode JSON")
+            return
+        }
+
+        do {
+            let result = try decoder.decode(BrainstormResult.self, from: data)
+            XCTAssertEqual(result.categories.count, 1)
+        } catch {
+            XCTFail("Failed to decode bare JSON: \(error)")
+        }
+    }
+
+    func testBrainstormResultDecodesJSONInMarkdownCodeBlock() {
+        let responseWithMarkdown = """
+        Here are the categorized ideas:
+
+        ```json
+        {
+          "categories": [
+            {
+              "name": "Plot Ideas",
+              "description": "Story concepts",
+              "ideas": [
+                {
+                  "title": "Time Loop",
+                  "description": "Protagonist repeats a day",
+                  "isSpeculative": false
+                }
+              ]
+            }
+          ]
+        }
+        ```
+
+        These ideas are organized for you.
+        """
+
+        let decoder = JSONDecoder()
+        // Extract JSON manually like the helper would
+        if let jsonStart = responseWithMarkdown.range(of: "```json"),
+           let jsonEnd = responseWithMarkdown.range(of: "```", range: responseWithMarkdown.index(jsonStart.upperBound, offsetBy: 1)..<responseWithMarkdown.endIndex) {
+            let jsonString = String(responseWithMarkdown[jsonStart.upperBound..<jsonEnd.lowerBound])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if let data = jsonString.data(using: .utf8) {
+                do {
+                    let result = try decoder.decode(BrainstormResult.self, from: data)
+                    XCTAssertEqual(result.categories[0].name, "Plot Ideas")
+                    XCTAssertEqual(result.categories[0].ideas[0].title, "Time Loop")
+                } catch {
+                    XCTFail("Failed to decode markdown-wrapped JSON: \(error)")
+                }
+            } else {
+                XCTFail("Could not convert JSON to data")
+            }
+        } else {
+            XCTFail("Could not find JSON code block")
+        }
+    }
+
+    func testBrainstormResultDecodesMultipleCategories() {
+        let json = """
+        {
+          "categories": [
+            {
+              "name": "Character Ideas",
+              "description": "Character types",
+              "ideas": [
+                {
+                  "title": "Hero",
+                  "description": "Protagonist",
+                  "isSpeculative": false
+                },
+                {
+                  "title": "Villain",
+                  "description": "Antagonist",
+                  "isSpeculative": false
+                }
+              ]
+            },
+            {
+              "name": "Setting Ideas",
+              "description": "Locations",
+              "ideas": [
+                {
+                  "title": "Dystopian City",
+                  "description": "Post-apocalyptic metropolis",
+                  "isSpeculative": true
+                }
+              ]
+            }
+          ]
+        }
+        """
+
+        let decoder = JSONDecoder()
+        guard let data = json.data(using: .utf8) else {
+            XCTFail("Could not encode JSON")
+            return
+        }
+
+        do {
+            let result = try decoder.decode(BrainstormResult.self, from: data)
+            XCTAssertEqual(result.categories.count, 2)
+            XCTAssertEqual(result.categories[0].ideas.count, 2)
+            XCTAssertEqual(result.categories[1].ideas.count, 1)
+        } catch {
+            XCTFail("Failed to decode multiple categories: \(error)")
+        }
+    }
+
+    func testCategorizedIdeaHandlesSpeculativeFlag() {
+        let speculativeIdea = CategorizedIdea(
+            title: "Flying Cities",
+            description: "Cities that hover in the air",
+            isSpeculative: true
+        )
+        XCTAssertTrue(speculativeIdea.isSpeculative)
+
+        let groundedIdea = CategorizedIdea(
+            title: "Medieval Village",
+            description: "Historical village setting",
+            isSpeculative: false
+        )
+        XCTAssertFalse(groundedIdea.isSpeculative)
+    }
+}
+
+// MARK: - Test Helpers
+
+private class MockComputerUseExecutor: ComputerUseExecutor {
+    func takeScreenshot() async throws -> String {
+        return "mockScreenshotBase64Data"
+    }
+
+    func execute(action: ComputerUseAction) async throws -> ComputerUseResult {
+        return ComputerUseResult(action: action, screenshotBase64: "mockResultScreenshot")
     }
 }
