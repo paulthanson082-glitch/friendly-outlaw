@@ -1,3 +1,6 @@
+/**
+ * @jest-environment node
+ */
 import { POST, GET, PATCH } from '../route';
 import { NextRequest } from 'next/server';
 
@@ -20,7 +23,9 @@ const originalRandom = Math.random;
 describe('/api/simulate', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    Math.random = originalRandom;
+    // Default Math.random to 0.5 so memory generation (< 0.4) is skipped by default.
+    // Tests that exercise memory generation override this explicitly.
+    Math.random = jest.fn().mockReturnValue(0.5);
   });
 
   const createMockRequest = (body: any) => {

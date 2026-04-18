@@ -95,7 +95,9 @@ struct WritersAppCLI {
     /// - Initializes WritersApp and global analytics.
     /// - Parses and handles command-line flags for help, listing, opening documents, running focus sessions, GUI exports, trace analysis, and playful actions.
     /// - Enables optional features based on environment variables (Anthropic/Clother AI, gui.new, Ragie) and attempts to initialize the Claude memory plugin.
-    /// - Enters an interactive menu loop presenting document, AI, memory, plugin, productivity, issue, hardware board, gui.new export, and Ragie operations; dispatches user choices to the appropriate handlers and shuts down plugins on exit.
+    /// Application entry point that initializes global services, processes command-line flags, and runs the interactive CLI menu.
+    /// 
+    /// When invoked, this method initializes application-wide managers and analytics, parses and executes supported CLI options (which may perform one-off actions and exit), and—if no terminating CLI action is performed—performs interactive startup (provider/feature initialization) before entering the main menu loop that dispatches user-selected commands to the various handlers (document management, AI tools, plugins, productivity features, cowork mode, etc.).
     static func main() async {
         let app = WritersApp()
         analyticsService = ProductivityAnalytics(focusManager: focusManager, goalManager: goalManager)
@@ -286,6 +288,15 @@ struct WritersAppCLI {
             print("ⓘ Ragie disabled (set RAGIE_API_KEY to enable document retrieval)")
         }
 
+        // Initialize Gmail for Cowork Mode if OAuth token is present
+        if let gmailToken = ProcessInfo.processInfo.environment["GMAIL_OAUTH_TOKEN"], !gmailToken.isEmpty {
+            app.enableGmail(oauthToken: gmailToken)
+            print("✓ Cowork Mode: Gmail enabled")
+        } else {
+            print("ⓘ Cowork Mode: Gmail disabled (set GMAIL_OAUTH_TOKEN to enable)")
+        }
+        print("✓ Cowork Mode: Prospect database and browser research ready")
+
         // Initialize Claude Memory plugin
         do {
             try await app.enableMemoryPlugin()
@@ -399,6 +410,21 @@ struct WritersAppCLI {
                 print("97. List Ragie Documents")
                 print("98. Check Ragie Document Status")
             }
+
+            print("\nCowork Mode (Gmail + Prospects + Browser):")
+            print("100. Start Cowork Session")
+            print("101. End Cowork Session")
+            print("102. Add Prospect")
+            print("103. List Prospects")
+            print("104. Search Prospects")
+            print("105. Update Prospect Status")
+            print("106. Prospect Pipeline Stats")
+            if app.isGmailEnabled {
+                print("107. View Gmail Inbox")
+                print("108. Send Email")
+            }
+            print("109. Research URL (Browser)")
+            print("110. View Browsing History")
 
             print("\n0. Exit")
             print()
@@ -546,6 +572,28 @@ struct WritersAppCLI {
                 await listRagieDocuments(app: app)
             case 98:
                 await checkRagieDocumentStatus(app: app)
+            case 100:
+                startCoworkSession(app: app)
+            case 101:
+                endCoworkSession(app: app)
+            case 102:
+                addProspect(app: app)
+            case 103:
+                listProspects(app: app)
+            case 104:
+                searchProspects(app: app)
+            case 105:
+                updateProspectStatus(app: app)
+            case 106:
+                viewProspectPipelineStats(app: app)
+            case 107:
+                await viewGmailInbox(app: app)
+            case 108:
+                await sendGmail(app: app)
+            case 109:
+                await researchURL(app: app)
+            case 110:
+                viewBrowsingHistory(app: app)
             case 0:
                 await app.shutdownPlugins()
                 running = false
@@ -3969,7 +4017,9 @@ func moveKanbanTaskCLI(app: WritersApp) {
     print("\n✓ Task '\(task.title)' moved to \(targetColumn.displayName)")
 }
 
-/// Deletes a Kanban board and all its tasks.
+/// Interactively prompts the user to select and delete a Kanban board from the application.
+/// 
+/// Lists all Kanban boards with their task counts, prompts for a selection number, and asks for an explicit `y` confirmation before deleting the chosen board and its tasks. If there are no boards, the selection is skipped. Invalid selection or any confirmation other than `y` cancels the operation and prints a corresponding message.
 func deleteKanbanBoardCLI(app: WritersApp) {
     print("\n=== Delete Kanban Board ===\n")
     let boards = app.getAllKanbanBoards()
@@ -3994,4 +4044,331 @@ func deleteKanbanBoardCLI(app: WritersApp) {
     }
     app.deleteKanbanBoard(id: board.id)
     print("\n✓ Kanban board '\(board.name)' deleted.")
+}
+
+/// Starts a cowork session and displays its metadata and integration readiness.
+/// 
+/// Prints a short session identifier, the session start time, whether Gmail is enabled,
+/// and readiness indicators for prospects and browser integrations.
+
+func startCoworkSession(app: WritersApp) {
+    let session = app.startCoworkSession()
+    let formatter = DateFormatter()
+    formatter.dateStyle = .none
+    formatter.timeStyle = .short
+    print("\n=== Cowork Session Started ===")
+    print("Session ID: \(session.id.uuidString.prefix(8))...")
+    print("Started at: \(formatter.string(from: session.startedAt))")
+    print("Gmail:     \(app.isGmailEnabled ? "enabled" : "disabled")")
+    print("Prospects: ready")
+    print("Browser:   ready")
+}
+
+/// Ends the currently active cowork session (if any) and prints a concise summary to stdout.
+/// - Parameter app: The application instance used to end the session and retrieve the final session details.
+func endCoworkSession(app: WritersApp) {
+    guard let session = app.endCoworkSession() else {
+        print("\nNo active cowork session.")
+        return
+    }
+    print("\n=== Cowork Session Summary ===")
+    let mins = session.durationMinutes.map { String(format: "%.0f min", $0) } ?? "unknown"
+    print("Duration:            \(mins)")
+    print("Emails sent:         \(session.emailsSent)")
+    print("Prospects added:     \(session.prospectsAdded)")
+    print("Prospects contacted: \(session.prospectsContacted)")
+    print("Pages researched:    \(session.pagesResearched)")
+    print("\nSession ended. Great work!")
+}
+
+/// Prompts the user for prospect information (name, email, optional company, role, notes, and tags), validates required fields, creates the prospect via the provided app, and prints a confirmation or validation error.
+/// - Parameter app: The application instance used to persist the new prospect.
+func addProspect(app: WritersApp) {
+    print("\n=== Add Prospect ===\n")
+    print("Name: ", terminator: "")
+    guard let name = readLine(), !name.isEmpty else {
+        print("Name cannot be empty.")
+        return
+    }
+    print("Email: ", terminator: "")
+    guard let email = readLine(), !email.isEmpty, email.contains("@") else {
+        print("Invalid email address.")
+        return
+    }
+    print("Company (optional): ", terminator: "")
+    let company = readLine().flatMap { $0.isEmpty ? nil : $0 }
+    print("Role (e.g. publisher, agent, client): ", terminator: "")
+    let role = readLine().flatMap { $0.isEmpty ? nil : $0 }
+    print("Notes (optional): ", terminator: "")
+    let notes = readLine() ?? ""
+    print("Tags (comma-separated, optional): ", terminator: "")
+    let tagsInput = readLine() ?? ""
+    let tags = tagsInput.isEmpty ? [] : tagsInput.components(separatedBy: ",").map {
+        $0.trimmingCharacters(in: .whitespaces)
+    }
+
+    let prospect = app.addProspect(
+        name: name, email: email, company: company, role: role, notes: notes, tags: tags
+    )
+    print("\n✓ Prospect '\(prospect.name)' added (ID: \(prospect.id.uuidString.prefix(8))...)")
+}
+
+/// Prints a formatted list of all prospects and their metadata to standard output.
+/// - Parameters:
+///   - app: The application instance used to retrieve prospect data. The function fetches all prospects from `app` and renders each prospect's name, company, role, email, status, optional notes, tags, and last-contacted date.
+/// 
+/// If no prospects exist, prints a short message indicating the database is empty and how to add a prospect; always prints a final total count.
+func listProspects(app: WritersApp) {
+    print("\n=== Prospect Database ===\n")
+    let prospects = app.getAllProspects()
+    if prospects.isEmpty {
+        print("No prospects yet. Add some with option 102.")
+        return
+    }
+    for prospect in prospects {
+        let company = prospect.company.map { " @ \($0)" } ?? ""
+        let role = prospect.role.map { " [\($0)]" } ?? ""
+        print("• \(prospect.name)\(company)\(role)")
+        print("  Email:  \(prospect.email)")
+        print("  Status: \(prospect.status.displayName)")
+        if !prospect.notes.isEmpty {
+            print("  Notes:  \(prospect.notes)")
+        }
+        if !prospect.tags.isEmpty {
+            print("  Tags:   \(prospect.tags.joined(separator: ", "))")
+        }
+        if let contacted = prospect.lastContactedAt {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .short
+            formatter.timeStyle = .none
+            print("  Last contacted: \(formatter.string(from: contacted))")
+        }
+        print()
+    }
+    print("Total: \(prospects.count) prospect(s)")
+}
+
+/// Prompts the user for a search query and displays matching prospects.
+/// 
+/// Reads a line from standard input, validates it is non-empty, performs a search via the app's prospect index, and prints either a "no matches" message or a numbered summary of matching prospects (name, optional company, email, and status).
+/// 
+/// Side effects: reads from stdin and writes formatted results to stdout.
+func searchProspects(app: WritersApp) {
+    print("\n=== Search Prospects ===\n")
+    print("Search query: ", terminator: "")
+    guard let query = readLine(), !query.isEmpty else {
+        print("Query cannot be empty.")
+        return
+    }
+    let results = app.searchProspects(query: query)
+    if results.isEmpty {
+        print("No prospects match '\(query)'.")
+        return
+    }
+    print("\nFound \(results.count) result(s):\n")
+    for prospect in results {
+        let company = prospect.company.map { " @ \($0)" } ?? ""
+        print("• \(prospect.name)\(company) — \(prospect.email) [\(prospect.status.displayName)]")
+    }
+}
+
+/// Interactively update the status of a prospect selected from the application's prospect list.
+/// 
+/// Prompts the user to choose a prospect and a new status, applies the change via the provided application instance, and prints a success or error message.
+func updateProspectStatus(app: WritersApp) {
+    print("\n=== Update Prospect Status ===\n")
+    let prospects = app.getAllProspects()
+    if prospects.isEmpty {
+        print("No prospects found.")
+        return
+    }
+    for (i, p) in prospects.enumerated() {
+        print("\(i + 1). \(p.name) [\(p.status.displayName)]")
+    }
+    print("\nSelect prospect (1-\(prospects.count)): ", terminator: "")
+    guard let input = readLine(), let choice = Int(input),
+          choice >= 1, choice <= prospects.count else {
+        print("Invalid selection.")
+        return
+    }
+    let prospect = prospects[choice - 1]
+    let statuses = ProspectStatus.allCases
+    print("\nSelect new status:")
+    for (i, status) in statuses.enumerated() {
+        let marker = status == prospect.status ? " (current)" : ""
+        print("\(i + 1). \(status.displayName)\(marker)")
+    }
+    print("Choice (1-\(statuses.count)): ", terminator: "")
+    guard let statusInput = readLine(), let statusChoice = Int(statusInput),
+          statusChoice >= 1, statusChoice <= statuses.count else {
+        print("Invalid selection.")
+        return
+    }
+    let newStatus = statuses[statusChoice - 1]
+    do {
+        try app.updateProspectStatus(id: prospect.id, status: newStatus)
+        print("\n✓ \(prospect.name) status updated to \(newStatus.displayName)")
+    } catch {
+        print("Error: \(error.localizedDescription)")
+    }
+}
+
+/// Prints a textual prospect pipeline summary to standard output.
+/// 
+/// The summary lists each prospect status with a fixed-width label, a three-digit count, an ASCII bar proportional to the count, and a final total count. The statuses are printed in the order defined by `ProspectStatus.allCases`.
+func viewProspectPipelineStats(app: WritersApp) {
+    print("\n=== Prospect Pipeline ===\n")
+    let stats = app.getProspectStats()
+    let total = stats.values.reduce(0, +)
+    if total == 0 {
+        print("No prospects in the pipeline yet.")
+        return
+    }
+    for status in ProspectStatus.allCases {
+        let count = stats[status] ?? 0
+        let bar = String(repeating: "█", count: count)
+        let label = status.displayName.padding(toLength: 20, withPad: " ", startingAt: 0)
+        print("\(label) \(String(format: "%3d", count))  \(bar)")
+    }
+    print("\nTotal: \(total) prospect(s)")
+}
+
+/// Displays an interactive Gmail inbox listing.
+///
+/// Prompts the user for a maximum number of results (default 10) and an optional Gmail search query, then fetches messages and prints a formatted list. Each entry shows an unread marker, subject (or "(no subject)"), sender, short date, and a truncated snippet preview. If Gmail is not enabled the function prints a guidance message and returns. Errors encountered while fetching messages are caught and printed.
+func viewGmailInbox(app: WritersApp) async {
+    print("\n=== Gmail Inbox ===\n")
+    guard app.isGmailEnabled else {
+        print("Gmail is not enabled. Set GMAIL_OAUTH_TOKEN and restart.")
+        return
+    }
+    print("Max results (default 10): ", terminator: "")
+    let maxInput = readLine() ?? ""
+    let maxResults = Int(maxInput) ?? 10
+    print("Search query (optional, e.g. 'from:agent@example.com'): ", terminator: "")
+    let query = readLine().flatMap { $0.isEmpty ? nil : $0 }
+
+    do {
+        let messages = try await app.listGmailMessages(maxResults: maxResults, query: query)
+        if messages.isEmpty {
+            print("No messages found.")
+            return
+        }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        print("\nFetched \(messages.count) message(s):\n")
+        for (i, msg) in messages.enumerated() {
+            let readMarker = msg.isRead ? "  " : "● "
+            print("\(readMarker)\(i + 1). \(msg.subject.isEmpty ? "(no subject)" : msg.subject)")
+            print("     From: \(msg.from)")
+            print("     Date: \(formatter.string(from: msg.date))")
+            if !msg.snippet.isEmpty {
+                let preview = String(msg.snippet.prefix(80))
+                print("     \(preview)…")
+            }
+            print()
+        }
+    } catch {
+        print("Error fetching inbox: \(error.localizedDescription)")
+    }
+}
+
+/// Presents an interactive CLI flow to compose and send an email through the app's Gmail integration.
+/// 
+/// Prompts for recipient, subject, and a multi-line body (terminated by a line containing only `.`), validates the recipient contains `@`, asks for confirmation, and then sends the message using the app's Gmail service. If Gmail is not enabled the function returns early. Prints success with a shortened message ID or an error description on failure.
+func sendGmail(app: WritersApp) async {
+    print("\n=== Send Email via Gmail ===\n")
+    guard app.isGmailEnabled else {
+        print("Gmail is not enabled. Set GMAIL_OAUTH_TOKEN and restart.")
+        return
+    }
+    print("To: ", terminator: "")
+    guard let to = readLine(), !to.isEmpty, to.contains("@") else {
+        print("Invalid recipient address.")
+        return
+    }
+    print("Subject: ", terminator: "")
+    guard let subject = readLine(), !subject.isEmpty else {
+        print("Subject cannot be empty.")
+        return
+    }
+    print("Body (end with a line containing only '.'): ")
+    var lines: [String] = []
+    while let line = readLine() {
+        if line == "." { break }
+        lines.append(line)
+    }
+    let body = lines.joined(separator: "\n")
+    print("\nSend to \(to) with subject '\(subject)'? (y/N): ", terminator: "")
+    guard let confirm = readLine(), confirm.lowercased() == "y" else {
+        print("Send cancelled.")
+        return
+    }
+    let draft = GmailDraft(to: to, subject: subject, body: body)
+    do {
+        let sentId = try await app.sendGmail(draft: draft)
+        print("\n✓ Email sent (ID: \(sentId.prefix(16))...)")
+    } catch {
+        print("Error sending email: \(error.localizedDescription)")
+    }
+}
+
+/// Fetches a web page, prints a short preview of its text content, and records the page in browsing history.
+/// 
+/// Prompts the user for a URL, retrieves the page via the app, prints the page title, URL, and up to the first 40 text lines, and reports that the page was saved to browsing history. Errors encountered during fetching are printed to standard output.
+func researchURL(app: WritersApp) async {
+    print("\n=== Research URL ===\n")
+    print("Enter URL to fetch (https://...): ", terminator: "")
+    guard let urlString = readLine(), !urlString.isEmpty else {
+        print("URL cannot be empty.")
+        return
+    }
+    do {
+        print("Fetching \(urlString)...")
+        let page = try await app.browseURL(urlString)
+        print("\n--- \(page.title) ---")
+        print("URL: \(page.url)")
+        // Show first 40 non-empty lines
+        let lines = page.textContent.components(separatedBy: "\n").prefix(40)
+        for line in lines {
+            print(line)
+        }
+        let totalLines = page.textContent.components(separatedBy: "\n").count
+        if totalLines > 40 {
+            print("\n[... \(totalLines - 40) more lines — saved to browsing history]")
+        }
+        print("\n✓ Page saved to browsing history (\(page.textContent.count) chars)")
+    } catch {
+        print("Error: \(error.localizedDescription)")
+    }
+}
+
+/// Displays the current browsing history and prompts the user to optionally clear it.
+/// 
+/// Lists each visited page with its title, URL, fetched time, and character count, then shows the total number of pages. If the user confirms by entering `y`, the history is cleared.
+/// - Parameter app: The `WritersApp` instance used to retrieve and clear browsing history.
+func viewBrowsingHistory(app: WritersApp) {
+    print("\n=== Browsing History ===\n")
+    let history = app.getBrowsingHistory()
+    if history.isEmpty {
+        print("No pages browsed this session. Use option 109 to research a URL.")
+        return
+    }
+    let formatter = DateFormatter()
+    formatter.dateStyle = .none
+    formatter.timeStyle = .short
+    for (i, page) in history.enumerated() {
+        print("\(i + 1). \(page.title)")
+        print("   URL:     \(page.url)")
+        print("   Fetched: \(formatter.string(from: page.fetchedAt))")
+        print("   Size:    \(page.textContent.count) chars")
+        print()
+    }
+    print("Total: \(history.count) page(s)")
+    print("\nClear history? (y/N): ", terminator: "")
+    if let input = readLine(), input.lowercased() == "y" {
+        app.clearBrowsingHistory()
+        print("✓ Browsing history cleared.")
+    }
 }

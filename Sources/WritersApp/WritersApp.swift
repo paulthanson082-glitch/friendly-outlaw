@@ -11,13 +11,23 @@ public class WritersApp {
     public let pluginManager: PluginManager
     public let encouragementService: EncouragementService
     public let versionControl: DoltVersionControlService
+    public let giftCardManager: GiftCardManager
     public private(set) var guiService: GuiNewService?
     public private(set) var aiService: AIService?
     public private(set) var chatbotService: ChatbotService?
+    public private(set) var hermesService: HermesService?
     public private(set) var ragieService: RagieService?
+    public private(set) var writingAdvisorService: WritingAdvisorService?
     public private(set) var currentUserId: UUID?
     private var currentSessionId: UUID?
     private var memoryPlugin: ClaudeMemoryPlugin?
+    private(set) var appSettings: AppSettings
+
+    // MARK: - Cowork Mode
+    public let prospectDatabase: ProspectDatabase
+    public let browserService: BrowserService
+    public private(set) var gmailService: GmailService?
+    public private(set) var activeCoworkSession: CoworkSession?
 
     public convenience init() {
         self.init(databaseManager: DatabaseManager(), aiConfiguration: nil)
@@ -43,7 +53,13 @@ public class WritersApp {
         self.pluginManager = PluginManager.shared
         self.encouragementService = EncouragementService()
         self.versionControl = DoltVersionControlService(databaseManager: databaseManager)
+        self.giftCardManager = GiftCardManager(databaseManager: databaseManager)
         self.guiService = nil
+        self.appSettings = AppSettings()
+        self.prospectDatabase = ProspectDatabase()
+        self.browserService = BrowserService()
+        self.gmailService = nil
+        self.activeCoworkSession = nil
         let aiSvc = aiConfiguration.map { AIService(configuration: $0) }
         self.aiService = aiSvc
         if let svc = aiSvc {
@@ -52,13 +68,26 @@ public class WritersApp {
                 documentManager: self.documentManager,
                 templateManager: self.templateManager
             )
+            self.writingAdvisorService = WritingAdvisorService(aiService: svc)
+            self.hermesService = HermesService(
+                aiService: svc,
+                documentManager: self.documentManager,
+                templateManager: self.templateManager
+            )
+            self.writingAdvisorService = WritingAdvisorService(aiService: svc)
         } else {
             self.chatbotService = nil
+            self.writingAdvisorService = nil
+            self.hermesService = nil
+            self.writingAdvisorService = nil
         }
         try? databaseManager.initialize()
     }
 
-    /// Enable AI features by providing configuration
+    /// Enables the application's AI features by creating and wiring AI-related services.
+    /// - Parameters:
+    ///   - configuration: Configuration used to initialize the AI subsystem.
+    ///   - userId: Optional user identifier; when provided the AI configuration is associated with and persisted for that user.
     public func enableAI(configuration: AIConfiguration, userId: UUID? = nil) {
         let aiSvc = AIService(configuration: configuration)
         self.aiService = aiSvc
@@ -67,16 +96,28 @@ public class WritersApp {
             documentManager: self.documentManager,
             templateManager: self.templateManager
         )
+        self.writingAdvisorService = WritingAdvisorService(aiService: aiSvc)
+        self.hermesService = HermesService(
+            aiService: aiSvc,
+            documentManager: self.documentManager,
+            templateManager: self.templateManager
+        )
+        self.writingAdvisorService = WritingAdvisorService(aiService: aiSvc)
         if let uid = userId {
             self.currentUserId = uid
             try? self.databaseManager.saveAIConfiguration(userId: uid, configuration: configuration)
         }
     }
 
-    /// Disable AI features
+    /// Disables all AI features for the application.
+    ///
+    /// Clears the configured AI, chatbot, writing advisor, and Hermes service instances so AI-based functionality becomes unavailable.
     public func disableAI() {
         self.aiService = nil
         self.chatbotService = nil
+        self.writingAdvisorService = nil
+        self.hermesService = nil
+        self.writingAdvisorService = nil
     }
 
     /// Check if AI is available
@@ -188,6 +229,165 @@ public class WritersApp {
     /// Check if Jules is in adult mode
     public var isJulesAdultModeEnabled: Bool {
         return chatbotService?.isAdultModeEnabled ?? false
+    }
+
+    // MARK: - Hermes (Creative Idea Generator)
+
+    /// Start a new Hermes ideation session
+    ///
+    /// - Parameter context: Optional story context (genre, logline, characters, etc.)
+    /// Starts a new Hermes ideation session using the provided context.
+    /// - Parameter context: Configuration and seed data used to initialize the Hermes session. Defaults to an empty `HermesContext`.
+    /// - Returns: A newly created `HermesSession`.
+    /// - Throws: `HermesError.aiNotAvailable` if the Hermes service is not enabled.
+    public func startHermesSession(context: HermesContext = HermesContext()) throws -> HermesSession {
+        guard let service = hermesService else {
+            throw HermesError.aiNotAvailable
+        }
+        return service.startSession(context: context)
+    }
+
+    /// Send a creative prompt to Hermes and receive structured ideas
+    ///
+    /// - Parameters:
+    ///   - prompt: What the writer needs help with
+    ///   - session: The active Hermes session (mutated in place)
+    /// - Returns: A `HermesResponse` containing the raw message and parsed `[HermesIdea]`
+    /// Generates structured ideas from a prompt and updates the provided Hermes session.
+    /// - Parameters:
+    ///   - prompt: The textual prompt used to seed idea generation.
+    ///   - session: An inout `HermesSession` that will be mutated to reflect the generation state and any produced ideas.
+    /// - Returns: A `HermesResponse` containing the generated ideas and related metadata.
+    /// - Throws: `HermesError.aiNotAvailable` if the Hermes service is not enabled.
+    public func generateIdeas(
+        prompt: String,
+        in session: inout HermesSession
+    ) async throws -> HermesResponse {
+        guard let service = hermesService else {
+            throw HermesError.aiNotAvailable
+        }
+        return try await service.generateIdeas(prompt, in: &session)
+    }
+
+    /// Expand on a specific idea, generating deeper variations
+    ///
+    /// - Parameters:
+    ///   - ideaId: UUID of the idea to expand
+    ///   - session: The active Hermes session (mutated in place)
+    /// - Returns: A `HermesResponse` with expanded variations
+    /// Expands an existing idea into deeper variations within a Hermes session.
+    /// - Parameters:
+    ///   - ideaId: The identifier of the idea to expand.
+    ///   - session: The active `HermesSession` to update; mutated in place with expansion results.
+    /// - Returns: A `HermesResponse` containing the expansion output.
+    /// - Throws: `HermesError.aiNotAvailable` if the Hermes service is not enabled.
+    public func expandIdea(
+        ideaId: UUID,
+        in session: inout HermesSession
+    ) async throws -> HermesResponse {
+        guard let service = hermesService else {
+            throw HermesError.aiNotAvailable
+        }
+        return try await service.expandIdea(ideaId, in: &session)
+    }
+
+    /// Ends the active Hermes ideation session.
+    ///
+    /// If Hermes is not enabled or no session is active, this does nothing.
+    public func endHermesSession() {
+        hermesService?.endSession()
+    }
+
+    /// Returns all ideas generated in the session, optionally filtered by type.
+    /// - Parameters:
+    ///   - session: The session to query.
+    ///   - type: When non-nil, only ideas of this type are returned.
+    /// - Returns: A flat array of `HermesIdea` in chronological order.
+    public func getAllIdeas(from session: HermesSession, filteredBy type: HermesIdeaType? = nil) -> [HermesIdea] {
+        return hermesService?.getAllIdeas(from: session, filteredBy: type) ?? []
+    }
+
+    /// Returns all ideas the writer has marked as favourite in the session.
+    /// - Parameter session: The session to query.
+    /// - Returns: A flat array of favourite `HermesIdea` in chronological order.
+    public func getFavorites(from session: HermesSession) -> [HermesIdea] {
+        return hermesService?.getFavorites(from: session) ?? []
+    }
+
+    /// Marks a specific idea in the session as a favourite.
+    /// - Parameters:
+    ///   - ideaId: UUID of the idea to favourite.
+    ///   - session: The session containing the idea; mutated in place.
+    /// - Throws: `HermesError.aiNotAvailable` if Hermes is not enabled.
+    ///           `HermesError.ideaNotFound(id:)` if the idea does not exist.
+    public func favoriteIdea(ideaId: UUID, in session: inout HermesSession) throws {
+        guard let service = hermesService else { throw HermesError.aiNotAvailable }
+        try service.favoriteIdea(ideaId, in: &session)
+    }
+
+    /// Removes the favourite mark from a specific idea in the session.
+    /// - Parameters:
+    ///   - ideaId: UUID of the idea to un-favourite.
+    ///   - session: The session containing the idea; mutated in place.
+    /// - Throws: `HermesError.aiNotAvailable` if Hermes is not enabled.
+    ///           `HermesError.ideaNotFound(id:)` if the idea does not exist.
+    public func unfavoriteIdea(ideaId: UUID, in session: inout HermesSession) throws {
+        guard let service = hermesService else { throw HermesError.aiNotAvailable }
+        try service.unfavoriteIdea(ideaId, in: &session)
+    }
+
+    /// Computes aggregated statistics for a Hermes session.
+    /// - Parameter session: The session to analyse.
+    /// - Returns: A `HermesSessionStats` value, or `nil` if Hermes is not enabled.
+    public func getHermesSessionStats(from session: HermesSession) -> HermesSessionStats? {
+        return hermesService?.getSessionStats(from: session)
+    }
+
+    // MARK: - Settings Management
+
+    /// Toggle dark mode on/off
+    public func toggleDarkMode() {
+        appSettings.isDarkModeEnabled = !appSettings.isDarkModeEnabled
+    }
+
+    /// Set dark mode to specific state
+    public func setDarkMode(_ enabled: Bool) {
+        appSettings.isDarkModeEnabled = enabled
+    }
+
+    /// Get current dark mode state
+    public var isDarkModeEnabled: Bool {
+        return appSettings.isDarkModeEnabled
+    }
+
+    /// Set the app theme
+    public func setTheme(_ theme: AppTheme) {
+        appSettings.theme = theme
+    }
+
+    /// Update font size
+    public func setFontSize(_ size: Int) {
+        appSettings.fontSize = max(8, min(32, size))
+    }
+
+    /// Update default word count goal
+    public func setDefaultWordCountGoal(_ words: Int?) {
+        appSettings.defaultWordCountGoal = words
+    }
+
+    /// Enable/disable spell check
+    public func setSpellCheckEnabled(_ enabled: Bool) {
+        appSettings.spellCheckEnabled = enabled
+    }
+
+    /// Enable/disable grammar check
+    public func setGrammarCheckEnabled(_ enabled: Bool) {
+        appSettings.grammarCheckEnabled = enabled
+    }
+
+    /// Get current app settings
+    public func getAppSettings() -> AppSettings {
+        return appSettings
     }
 
     // MARK: - Plugin Management
@@ -782,7 +982,14 @@ public class WritersApp {
     ///
     /// This enables Claude to use built-in writing tools (word count, document search,
     /// template listing, reading time) during its response generation. The tool loop
-    /// continues until Claude produces a final text response.
+    /// Request AI assistance for a specific document using tool-enabled multi-step reasoning.
+    /// - Parameters:
+    ///   - documentId: The UUID of the document to analyze and assist with.
+    ///   - type: The kind of assistance to request (e.g., edit, brainstorm, outline).
+    ///   - context: Optional additional context to guide the AI.
+    ///   - maxIterations: Maximum number of tool-iteration cycles the AI may perform.
+    /// - Returns: An `AIResponse` containing the final assistant output and any tool results.
+    /// - Throws: `AIError.aiNotEnabled` if AI is not configured; `AIError.documentNotFound` if the document does not exist.
     public func getAIAssistanceWithTools(
         documentId: UUID,
         type: AIAssistanceType,
@@ -806,13 +1013,81 @@ public class WritersApp {
         )
     }
 
-    /// Brainstorm ideas for a topic
+    // MARK: - Writing Advisor
+
+    /// Returns a full personalized coaching report with 3-5 recommendations based on
+    /// Generate a personalized writing advisor report using the current documents and optional notes.
+    /// - Parameters:
+    ///   - notes: Optional additional notes to include in the advisor context.
+    /// - Returns: A `WritingAdvisorReport` containing personalized insights and recommendations.
+    /// - Throws: `AIError.aiNotEnabled` if the writing advisor service is not configured.
+    public func getPersonalizedWritingAdvice(notes: String? = nil) async throws -> WritingAdvisorReport {
+        guard let advisorService = writingAdvisorService else { throw AIError.aiNotEnabled }
+        let context = buildAdvisorContext(additionalNotes: notes)
+        return try await advisorService.getAdvisorReport(context: context)
+    }
+
+    /// Fetches a tailored writing recommendation for the specified advisor category using the current app context.
+    /// - Parameters:
+    ///   - category: The advisor category to request guidance for.
+    ///   - notes: Optional additional notes to include in the advisor context.
+    /// - Returns: An `AdvisorRecommendation` containing the advisor's recommendation for the given category.
+    /// - Throws: `AIError.aiNotEnabled` if the writing advisor service is not enabled.
+    public func getWritingAdvice(
+        for category: AdvisorCategory,
+        notes: String? = nil
+    ) async throws -> AdvisorRecommendation {
+        guard let advisorService = writingAdvisorService else { throw AIError.aiNotEnabled }
+        let context = buildAdvisorContext(additionalNotes: notes)
+        return try await advisorService.getRecommendation(for: category, context: context)
+    }
+
+    /// Builds an AdvisorContext summarizing the current document corpus and optional user session data.
+    /// - Parameter additionalNotes: Optional free-form notes to include in the returned context.
+    /// - Returns: An AdvisorContext containing:
+    ///   - totalDocuments: the number of documents,
+    ///   - recentDocumentTitles: up to five most recent document titles,
+    ///   - totalWordsAcrossDocuments: cumulative word count across all documents,
+    ///   - documentCategories: unique category identifiers from the documents,
+    ///   - sessionStats: session statistics for the current user if available,
+    ///   - additionalNotes: the provided notes.
+    private func buildAdvisorContext(additionalNotes: String?) -> AdvisorContext {
+        let docs = documentManager.getAllDocuments()
+        let totalWords = docs.reduce(0) { $0 + $1.wordCount }
+        let titles = Array(docs.prefix(5).map { $0.title })
+        let categories = Array(Set(docs.map { $0.category.rawValue }))
+        let stats = currentUserId.flatMap { try? databaseManager.getSessionStats(userId: $0) }
+        return AdvisorContext(
+            totalDocuments: docs.count,
+            recentDocumentTitles: titles,
+            totalWordsAcrossDocuments: totalWords,
+            documentCategories: categories,
+            sessionStats: stats,
+            additionalNotes: additionalNotes
+        )
+    }
+
+    /// Generates brainstorming suggestions for the given subject.
+    /// - Parameters:
+    ///   - topic: The subject or prompt to generate ideas about.
+    ///   - context: Optional contextual hints (tone, constraints, or additional prompts) to guide generation.
+    /// - Returns: A string containing AI-generated brainstorming suggestions for the provided topic.
+    /// - Throws: `AIError.aiNotEnabled` if the AI service is not configured.
     public func brainstormIdeas(
         topic: String,
         context: AIContext? = nil
     ) async throws -> String {
         guard let ai = aiService else { throw AIError.aiNotEnabled }
         return try await ai.brainstormIdeas(topic: topic, context: context)
+    }
+
+    /// Brainstorm ideas organized by category
+    public func brainstormIdeasCategorized(
+        topic: String,
+        context: AIContext? = nil
+    ) async throws -> BrainstormResult {
+        guard let ai = aiService else { throw AIError.aiNotEnabled }
+        return try await ai.brainstormIdeasCategorized(topic: topic, context: context)
     }
 
     /// Generate outline from concept
@@ -831,6 +1106,28 @@ public class WritersApp {
     ) async throws -> String {
         guard let ai = aiService else { throw AIError.aiNotEnabled }
         return try await ai.developCharacter(characterConcept: characterConcept, context: context)
+    }
+
+    // MARK: - Writing Advisor
+
+    /// Returns personalized writing advice for the current writer.
+    ///
+    /// - Parameter notes: Optional additional context or focus area for the advice.
+    /// - Returns: A `WritingAdvisorReport` with coaching recommendations.
+    /// - Throws: `AIError.aiNotEnabled` if AI has not been configured.
+    public func getPersonalizedWritingAdvice(notes: String? = nil) async throws -> WritingAdvisorReport {
+        guard let advisor = writingAdvisorService else { throw AIError.aiNotEnabled }
+        return try await advisor.getPersonalizedAdvice(notes: notes)
+    }
+
+    /// Returns writing advice focused on a specific advisor category.
+    ///
+    /// - Parameter category: The category of advice to generate.
+    /// - Returns: A `WritingAdvisorReport` focused on the requested category.
+    /// - Throws: `AIError.aiNotEnabled` if AI has not been configured.
+    public func getWritingAdvice(for category: AdvisorCategory) async throws -> WritingAdvisorReport {
+        guard let advisor = writingAdvisorService else { throw AIError.aiNotEnabled }
+        return try await advisor.getAdvice(for: category)
     }
 
     // MARK: - Hallucination Reduction Methods
@@ -1083,6 +1380,15 @@ public class WritersApp {
 
     // MARK: - Multi-Agent Harness
 
+    /// Create a `ComputerUseService` wired to the active AI service.
+    ///
+    /// - Parameter executor: The executor responsible for taking screenshots and performing actions.
+    /// - Returns: A configured `ComputerUseService`, or `nil` if AI has not been enabled.
+    public func makeComputerUseService(executor: ComputerUseExecutor) -> ComputerUseService? {
+        guard let ai = aiService else { return nil }
+        return ComputerUseService(aiService: ai, executor: executor)
+    }
+
     /// Create a `MultiAgentHarness` wired to the active AI service.
     ///
     /// - Parameter configuration: Harness settings (revision budget, quality threshold, model).
@@ -1127,13 +1433,255 @@ public class WritersApp {
         return try await harness.run(prompt: prompt)
     }
 
-    /// Run the generator–evaluator loop for an existing `WritingPlan` (skips the planner).
+    /// Executes a multi-agent harness using the provided writing plan.
+    /// - Parameters:
+    ///   - plan: The prepared `WritingPlan` to execute.
+    ///   - configuration: `HarnessConfiguration` to apply when creating the harness. Defaults to `.default`.
+    /// - Returns: A `HarnessResult` containing the outcome of running the harness.
+    /// - Throws: If AI is not enabled or the harness fails during creation or execution.
     public func runMultiAgentHarness(
         plan: WritingPlan,
         configuration: HarnessConfiguration = .default
     ) async throws -> HarnessResult {
         let harness = try createMultiAgentHarness(configuration: configuration)
         return try await harness.run(plan: plan)
+    }
+
+    // MARK: - Cowork Mode
+
+    /// Enable Gmail integration using the given OAuth 2.0 bearer token.
+    /// Enables Gmail integration for the app using the provided OAuth access token.
+    /// - Parameter oauthToken: OAuth access token used to authenticate requests to the Gmail API.
+    public func enableGmail(oauthToken: String) {
+        self.gmailService = GmailService(oauthToken: oauthToken)
+    }
+
+    /// Disables the Gmail integration and clears any existing Gmail service configuration.
+    /// After calling this, `isGmailEnabled` will return `false`.
+    public func disableGmail() {
+        self.gmailService = nil
+    }
+
+    /// Whether Gmail is available for this session.
+    public var isGmailEnabled: Bool {
+        return gmailService != nil
+    }
+
+    // MARK: Cowork session lifecycle
+
+    /// Creates and activates a new cowork session.
+    /// 
+    /// Sets this WritersApp's `activeCoworkSession` to the created session.
+    /// - Returns: The newly created `CoworkSession`.
+    @discardableResult
+    public func startCoworkSession() -> CoworkSession {
+        let session = CoworkSession()
+        self.activeCoworkSession = session
+        return session
+    }
+
+    /// Ends the currently active cowork session.
+    /// - Returns: The ended `CoworkSession` if a session was active, `nil` otherwise.
+    @discardableResult
+    public func endCoworkSession() -> CoworkSession? {
+        guard var session = activeCoworkSession else { return nil }
+        session.endedAt = Date()
+        self.activeCoworkSession = nil
+        return session
+    }
+
+    // MARK: Prospect facade
+
+    /// Creates a new prospect, saves it to the prospect database, and records the addition on the active cowork session if present.
+    /// 
+    /// The prospect is constructed from the provided fields and added to `prospectDatabase`. If an `activeCoworkSession` exists, its `prospectsAdded` counter is incremented.
+    /// - Returns: The created `Prospect`.
+    @discardableResult
+    public func addProspect(
+        name: String,
+        email: String,
+        company: String? = nil,
+        role: String? = nil,
+        notes: String = "",
+        tags: [String] = []
+    ) -> Prospect {
+        let prospect = Prospect(
+            name: name,
+            email: email,
+            company: company,
+            role: role,
+            notes: notes,
+            tags: tags
+        )
+        prospectDatabase.addProspect(prospect)
+        activeCoworkSession?.prospectsAdded += 1
+        return prospect
+    }
+
+    /// Fetches all prospects stored in the prospect database.
+    /// - Returns: An array containing every stored `Prospect`.
+    public func getAllProspects() -> [Prospect] {
+        return prospectDatabase.getAllProspects()
+    }
+
+    /// Retrieves all prospects that have the specified status.
+    /// - Parameter status: The prospect status to filter by.
+    /// - Returns: An array of `Prospect` objects whose status equals the provided `status`.
+    public func getProspects(withStatus status: ProspectStatus) -> [Prospect] {
+        return prospectDatabase.getProspects(withStatus: status)
+    }
+
+    /// Searches prospects using the provided query across common prospect fields (name, email, company, role, and notes).
+    /// - Parameter query: The search text to match against prospect fields.
+    /// - Returns: An array of `Prospect` objects that match the query.
+    public func searchProspects(query: String) -> [Prospect] {
+        return prospectDatabase.searchProspects(query: query)
+    }
+
+    /// Update the status of a prospect and, when applicable, increment the active cowork session's contacted count.
+    /// - Parameters:
+    ///   - id: The unique identifier of the prospect to update.
+    ///   - status: The new status to assign to the prospect.
+    /// - Throws: Any error produced while updating the prospect status in the prospect database.
+    /// - Note: If the new status is `.contacted`, `.replied`, or `.meeting`, increments `activeCoworkSession?.prospectsContacted` by 1.
+    public func updateProspectStatus(id: UUID, status: ProspectStatus) throws {
+        try prospectDatabase.updateProspectStatus(id: id, status: status)
+        if status == .contacted || status == .replied || status == .meeting {
+            activeCoworkSession?.prospectsContacted += 1
+        }
+    }
+
+    /// Deletes the prospect with the given identifier.
+    /// - Parameter id: The UUID of the prospect to remove.
+    public func deleteProspect(id: UUID) {
+        prospectDatabase.deleteProspect(id: id)
+    }
+
+    /// Counts prospects grouped by their status.
+    /// - Returns: A dictionary mapping each `ProspectStatus` to the number of prospects with that status.
+    public func getProspectStats() -> [ProspectStatus: Int] {
+        return prospectDatabase.getStats()
+    }
+
+    // MARK: Gmail facade
+
+    /// List Gmail inbox messages.
+    /// Retrieve Gmail messages from the configured Gmail service.
+    /// - Parameters:
+    ///   - maxResults: The maximum number of messages to return.
+    ///   - query: An optional Gmail search query to filter results (e.g., "is:unread").
+    /// - Returns: An array of `GmailMessage` objects matching the query, limited to `maxResults`.
+    /// - Throws: `CoworkError.gmailNotEnabled` if Gmail integration is not enabled.
+    public func listGmailMessages(maxResults: Int = 20, query: String? = nil) async throws -> [GmailMessage] {
+        guard let gmail = gmailService else { throw CoworkError.gmailNotEnabled }
+        return try await gmail.listMessages(maxResults: maxResults, query: query)
+    }
+
+    /// Send an email via Gmail and record it in the active cowork session.
+    /// Send an email draft using the configured Gmail service and increment the active cowork session's sent counter.
+    /// - Parameter draft: The `GmailDraft` to send.
+    /// - Returns: The sent message's identifier as a `String`.
+    /// - Throws: `CoworkError.gmailNotEnabled` if Gmail is not configured; rethrows errors produced by the underlying `GmailService` when sending fails.
+    @discardableResult
+    public func sendGmail(draft: GmailDraft) async throws -> String {
+        guard let gmail = gmailService else { throw CoworkError.gmailNotEnabled }
+        let sentId = try await gmail.sendMessage(draft: draft)
+        activeCoworkSession?.emailsSent += 1
+        return sentId
+    }
+
+    /// Mark a Gmail message as read.
+    /// Marks a Gmail message as read.
+    /// - Parameters:
+    ///   - id: The Gmail message identifier to mark as read.
+    /// - Throws: `CoworkError.gmailNotEnabled` if Gmail integration is not configured; rethrows errors from the `GmailService` if the mark-as-read operation fails.
+    public func markGmailAsRead(id: String) async throws {
+        guard let gmail = gmailService else { throw CoworkError.gmailNotEnabled }
+        try await gmail.markAsRead(id: id)
+    }
+
+    // MARK: Browser facade
+
+    /// Fetches the page at the given URL and increments the active cowork session's researched-pages counter.
+    /// - Parameter urlString: The URL string to fetch.
+    /// - Returns: The fetched `BrowsedPage`.
+    public func browseURL(_ urlString: String) async throws -> BrowsedPage {
+        let page = try await browserService.fetch(urlString: urlString)
+        activeCoworkSession?.pagesResearched += 1
+        return page
+    }
+
+    /// Retrieve the stored browsing history.
+    /// - Returns: An array of `BrowsedPage` entries held by the browser service.
+    public func getBrowsingHistory() -> [BrowsedPage] {
+        return browserService.history
+    }
+
+    /// Clears the browsing history maintained by the BrowserService.
+    public func clearBrowsingHistory() {
+        browserService.clearHistory()
+    }
+
+    // MARK: - Gift Card Bundle Management
+
+    @discardableResult
+    public func createGiftCardBundle(
+        name: String,
+        description: String,
+        price: Decimal,
+        bundleType: BundleType,
+        includedTemplateIds: [UUID] = [],
+        aiCredits: Int,
+        expirationDays: Int
+    ) throws -> GiftCardBundle {
+        return try giftCardManager.createBundle(
+            name: name,
+            description: description,
+            price: price,
+            bundleType: bundleType,
+            includedTemplateIds: includedTemplateIds,
+            aiCredits: aiCredits,
+            expirationDays: expirationDays
+        )
+    }
+
+    public func getGiftCardBundle(id: UUID) -> GiftCardBundle? {
+        return giftCardManager.getBundle(id: id)
+    }
+
+    public func getAllGiftCardBundles() -> [GiftCardBundle] {
+        return giftCardManager.getAllBundles()
+    }
+
+    public func updateGiftCardBundle(_ bundle: GiftCardBundle) throws {
+        try giftCardManager.updateBundle(bundle)
+    }
+
+    public func deleteGiftCardBundle(id: UUID) throws {
+        try giftCardManager.deleteBundle(id: id)
+    }
+
+    // MARK: - Gift Card Management
+
+    @discardableResult
+    public func generateGiftCard(bundleId: UUID) throws -> GiftCard {
+        return try giftCardManager.createGiftCard(bundleId: bundleId)
+    }
+
+    public func redeemGiftCard(code: String, userId: UUID) throws -> GiftCardBundle {
+        return try giftCardManager.redeemGiftCard(code: code, userId: userId)
+    }
+
+    public func getGiftCardByCode(_ code: String) -> GiftCard? {
+        return giftCardManager.getGiftCardByCode(code)
+    }
+
+    public func getGiftCardStatistics() -> GiftCardStats {
+        return giftCardManager.getGiftCardStats()
+    }
+
+    public func getGiftCardBundleStatistics() -> BundleStats {
+        return giftCardManager.getBundleStats()
     }
 }
 
