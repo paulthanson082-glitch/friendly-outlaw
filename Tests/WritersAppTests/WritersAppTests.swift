@@ -2902,6 +2902,229 @@ final class WritingAdvisorTests: XCTestCase {
         XCTAssertFalse(aiApp.isAIEnabled,
                        "isAIEnabled must be false after double disableAI()")
     }
+
+    // MARK: - Brainstorm Ideas Categorization
+
+    func testBrainstormResultDecodesFromJSON() {
+        let json = """
+        {
+          "categories": [
+            {
+              "name": "Character Ideas",
+              "description": "Ideas focused on character development",
+              "ideas": [
+                {
+                  "title": "Conflicted Hero",
+                  "description": "A protagonist with competing goals",
+                  "isSpeculative": false
+                }
+              ]
+            }
+          ]
+        }
+        """
+
+        let decoder = JSONDecoder()
+        guard let data = json.data(using: .utf8) else {
+            XCTFail("Could not convert JSON string to data")
+            return
+        }
+
+        do {
+            let result = try decoder.decode(BrainstormResult.self, from: data)
+            XCTAssertEqual(result.categories.count, 1)
+            XCTAssertEqual(result.categories[0].name, "Character Ideas")
+            XCTAssertEqual(result.categories[0].ideas.count, 1)
+            XCTAssertEqual(result.categories[0].ideas[0].title, "Conflicted Hero")
+            XCTAssertFalse(result.categories[0].ideas[0].isSpeculative)
+        } catch {
+            XCTFail("Failed to decode BrainstormResult: \(error)")
+        }
+    }
+
+    func testBrainstormIdeasCategorizedRequiresAI() async {
+        let noAIApp = WritersApp()
+        do {
+            _ = try await noAIApp.brainstormIdeasCategorized(topic: "Science fiction novel")
+            XCTFail("Expected AIError.aiNotEnabled to be thrown")
+        } catch AIError.aiNotEnabled {
+            // expected
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testCategorizedIdeaModelConformance() {
+        let idea = CategorizedIdea(
+            title: "Time Travel Plot",
+            description: "A story involving time paradoxes",
+            isSpeculative: true
+        )
+        XCTAssertEqual(idea.title, "Time Travel Plot")
+        XCTAssertEqual(idea.description, "A story involving time paradoxes")
+        XCTAssertTrue(idea.isSpeculative)
+    }
+
+    func testIdeaCategoryModelConformance() {
+        let idea1 = CategorizedIdea(title: "Idea 1", description: "First idea", isSpeculative: false)
+        let idea2 = CategorizedIdea(title: "Idea 2", description: "Second idea", isSpeculative: true)
+        let category = IdeaCategory(
+            name: "Plot Ideas",
+            description: "Story plot concepts",
+            ideas: [idea1, idea2]
+        )
+        XCTAssertEqual(category.name, "Plot Ideas")
+        XCTAssertEqual(category.ideas.count, 2)
+    }
+
+    func testAIAssistanceTypeHasBrainstormIdeasCategorizedCase() {
+        let assistanceType = AIAssistanceType.brainstormIdeasCategorized
+        XCTAssertEqual(assistanceType.displayName, "Brainstorm Ideas (Categorized)")
+    }
+
+    // MARK: - JSON Parsing Edge Cases
+
+    func testBrainstormResultDecodesBareJSON() {
+        let json = """
+        {
+          "categories": [
+            {
+              "name": "Character Ideas",
+              "description": "Character concepts",
+              "ideas": []
+            }
+          ]
+        }
+        """
+
+        let decoder = JSONDecoder()
+        guard let data = json.data(using: .utf8) else {
+            XCTFail("Could not encode JSON")
+            return
+        }
+
+        do {
+            let result = try decoder.decode(BrainstormResult.self, from: data)
+            XCTAssertEqual(result.categories.count, 1)
+        } catch {
+            XCTFail("Failed to decode bare JSON: \(error)")
+        }
+    }
+
+    func testBrainstormResultDecodesJSONInMarkdownCodeBlock() {
+        let responseWithMarkdown = """
+        Here are the categorized ideas:
+
+        ```json
+        {
+          "categories": [
+            {
+              "name": "Plot Ideas",
+              "description": "Story concepts",
+              "ideas": [
+                {
+                  "title": "Time Loop",
+                  "description": "Protagonist repeats a day",
+                  "isSpeculative": false
+                }
+              ]
+            }
+          ]
+        }
+        ```
+
+        These ideas are organized for you.
+        """
+
+        let decoder = JSONDecoder()
+        // Extract JSON manually like the helper would
+        if let jsonStart = responseWithMarkdown.range(of: "```json"),
+           let jsonEnd = responseWithMarkdown.range(of: "```", range: responseWithMarkdown.index(jsonStart.upperBound, offsetBy: 1)..<responseWithMarkdown.endIndex) {
+            let jsonString = String(responseWithMarkdown[jsonStart.upperBound..<jsonEnd.lowerBound])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if let data = jsonString.data(using: .utf8) {
+                do {
+                    let result = try decoder.decode(BrainstormResult.self, from: data)
+                    XCTAssertEqual(result.categories[0].name, "Plot Ideas")
+                    XCTAssertEqual(result.categories[0].ideas[0].title, "Time Loop")
+                } catch {
+                    XCTFail("Failed to decode markdown-wrapped JSON: \(error)")
+                }
+            } else {
+                XCTFail("Could not convert JSON to data")
+            }
+        } else {
+            XCTFail("Could not find JSON code block")
+        }
+    }
+
+    func testBrainstormResultDecodesMultipleCategories() {
+        let json = """
+        {
+          "categories": [
+            {
+              "name": "Character Ideas",
+              "description": "Character types",
+              "ideas": [
+                {
+                  "title": "Hero",
+                  "description": "Protagonist",
+                  "isSpeculative": false
+                },
+                {
+                  "title": "Villain",
+                  "description": "Antagonist",
+                  "isSpeculative": false
+                }
+              ]
+            },
+            {
+              "name": "Setting Ideas",
+              "description": "Locations",
+              "ideas": [
+                {
+                  "title": "Dystopian City",
+                  "description": "Post-apocalyptic metropolis",
+                  "isSpeculative": true
+                }
+              ]
+            }
+          ]
+        }
+        """
+
+        let decoder = JSONDecoder()
+        guard let data = json.data(using: .utf8) else {
+            XCTFail("Could not encode JSON")
+            return
+        }
+
+        do {
+            let result = try decoder.decode(BrainstormResult.self, from: data)
+            XCTAssertEqual(result.categories.count, 2)
+            XCTAssertEqual(result.categories[0].ideas.count, 2)
+            XCTAssertEqual(result.categories[1].ideas.count, 1)
+        } catch {
+            XCTFail("Failed to decode multiple categories: \(error)")
+        }
+    }
+
+    func testCategorizedIdeaHandlesSpeculativeFlag() {
+        let speculativeIdea = CategorizedIdea(
+            title: "Flying Cities",
+            description: "Cities that hover in the air",
+            isSpeculative: true
+        )
+        XCTAssertTrue(speculativeIdea.isSpeculative)
+
+        let groundedIdea = CategorizedIdea(
+            title: "Medieval Village",
+            description: "Historical village setting",
+            isSpeculative: false
+        )
+        XCTAssertFalse(groundedIdea.isSpeculative)
+    }
 }
 
 // MARK: - Test Helpers
