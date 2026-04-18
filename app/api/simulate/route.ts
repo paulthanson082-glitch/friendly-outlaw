@@ -12,7 +12,7 @@ import { generateBotResponse, generateMemory } from "@/lib/ai";
  *
  * @param request - Incoming request whose JSON body may include `exchanges` (number of exchanges to run; clamped to 1–3). If the world is paused or fewer than two bots exist, the handler returns an error response.
  * @returns An object with `tick` (the numeric world tick after increment) and `generated` (array of exchanges created this request). Each generated item has `from`, `to`, and `content`.
-
+ */
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const exchanges = Math.min(Number(body.exchanges ?? 1), 3); // 1-3 exchanges per tick
