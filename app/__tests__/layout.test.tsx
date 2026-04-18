@@ -141,3 +141,42 @@ describe('metadata', () => {
     expect(metadata.description.toLowerCase()).toContain('residents');
   });
 });
+
+describe('RootLayout DOM structure', () => {
+  it('document.documentElement always has lang="en" after render', () => {
+    render(
+      <RootLayout>
+        <span>Check lang</span>
+      </RootLayout>
+    );
+    // document.documentElement is the <html> node managed by jsdom;
+    // RootLayout sets lang="en" on it.
+    expect(document.documentElement).toHaveAttribute('lang', 'en');
+  });
+
+  it('document.body is always present after render', () => {
+    render(
+      <RootLayout>
+        <span>Check body</span>
+      </RootLayout>
+    );
+    expect(document.body).toBeInTheDocument();
+  });
+
+  it('rendered child content is accessible from document.body', () => {
+    render(
+      <RootLayout>
+        <p data-testid="inner">Inner content</p>
+      </RootLayout>
+    );
+    expect(document.body.querySelector('[data-testid="inner"]')).toBeInTheDocument();
+  });
+
+  it('multiple renders do not duplicate html/body elements', () => {
+    render(<RootLayout><span>First</span></RootLayout>);
+    render(<RootLayout><span>Second</span></RootLayout>);
+
+    // There should still be exactly one <html> element in the document
+    expect(document.querySelectorAll('html')).toHaveLength(1);
+  });
+});

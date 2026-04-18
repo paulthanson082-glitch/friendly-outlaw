@@ -1,26 +1,34 @@
 import { generateBotResponse, generateMemory, ConversationMessage, Memory } from '../ai';
 import { getCharacterByHandle } from '../characters';
 
-// Use jest.hoisted so mockCreate is available inside the hoisted jest.mock() factory
-const { mockCreate } = jest.hoisted(() => ({
-  mockCreate: jest.fn().mockResolvedValue({
+// Store mockCreate inside the factory and expose it on the MockAnthropic class.
+// This avoids the "Cannot access before initialization" TDZ issue that occurs
+// when a module-level const is closed over by a jest.mock() factory that gets
+// hoisted before the const is initialised (ts-jest does not apply the babel
+// hoisting transform that jest.hoisted() relies on).
+jest.mock('@anthropic-ai/sdk', () => {
+  const mockCreate = jest.fn().mockResolvedValue({
     content: [
       {
         type: 'text',
         text: 'This is a test response from Claude.',
       },
     ],
-  }),
-}));
-
-// Mock the Anthropic SDK
-jest.mock('@anthropic-ai/sdk', () => {
-  return jest.fn().mockImplementation(() => ({
+  });
+  const MockAnthropic = jest.fn().mockImplementation(() => ({
     messages: {
       create: mockCreate,
     },
   }));
+  // Attach mockCreate so tests can reference it via the mock module.
+  (MockAnthropic as any).mockCreate = mockCreate;
+  return MockAnthropic;
 });
+
+// Convenience accessor – must be called after jest.mock is evaluated.
+function getMockCreate(): jest.Mock {
+  return (require('@anthropic-ai/sdk') as any).mockCreate as jest.Mock;
+}
 
 // Mock characters module
 jest.mock('../characters');
@@ -488,6 +496,34 @@ describe('ai module', () => {
 
       expect(firstIndex).toBeLessThan(secondIndex);
       expect(secondIndex).toBeLessThan(thirdIndex);
+    });
+
+    it('should expose mockCreate via the mock module (factory-embedded mock pattern)', async () => {
+      // Verify the mock factory embeds mockCreate and attaches it to the
+      // MockAnthropic constructor so tests can inspect and override it.
+      const Anthropic = require('@anthropic-ai/sdk');
+      const mockInstance = new Anthropic();
+      const mockCreate = getMockCreate();
+
+      await generateBotResponse('pixel', 'sage', [], []);
+
+      // mockInstance.messages.create IS the embedded mockCreate
+      expect(mockInstance.messages.create).toBe(mockCreate);
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it('should allow overriding mockCreate return value per test', async () => {
+      const mockCreate = getMockCreate();
+      mockCreate.mockResolvedValueOnce({
+        content: [{ type: 'text', text: 'Custom override response' }],
+      });
+
+      const response = await generateBotResponse('pixel', 'sage', [], []);
+      expect(response).toBe('Custom override response');
+
+      // Next call uses the default resolved value again
+      const response2 = await generateBotResponse('pixel', 'sage', [], []);
+      expect(response2).toBe('This is a test response from Claude.');
     });
   });
 });

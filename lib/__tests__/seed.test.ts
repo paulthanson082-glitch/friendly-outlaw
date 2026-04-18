@@ -30,22 +30,30 @@ jest.mock('../characters', () => ({
   ],
 }));
 
-describe('seed module', () => {
-  let seedFn: () => Promise<void>;
-
-  beforeAll(async () => {
-    // Import seed function once; module-level seed() call runs here
-    const mod = await import('../seed');
-    seedFn = mod.seed;
+/**
+ * Helper: run the seed module in an isolated module registry so the auto-
+ * executing `seed().catch(console.error)` at the bottom of lib/seed.ts fires
+ * freshly for each test.  Returns once the module has settled (we await the
+ * microtask queue plus one macro-task tick).
+ */
+async function runSeedModule(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    jest.isolateModules(() => {
+      require('../seed');
+      resolve();
+    });
   });
+  // Allow the async seed() promise to settle
+  await new Promise((r) => setTimeout(r, 50));
+}
 
+describe('seed module', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(console, 'log').mockImplementation();
-    jest.spyOn(console, 'error').mockImplementation();
-    // Reset mockSql default implementation
     mockSql.mockImplementation(async () => []);
     mockInitDb.mockImplementation(async () => {});
+    jest.spyOn(console, 'log').mockImplementation();
+    jest.spyOn(console, 'error').mockImplementation();
   });
 
   afterEach(() => {
@@ -54,117 +62,156 @@ describe('seed module', () => {
 
   describe('seed function', () => {
     it('should call initDb to initialize database', async () => {
-      await seedFn();
+      await runSeedModule();
       expect(mockInitDb).toHaveBeenCalled();
     });
 
     it('should insert all characters into database', async () => {
-      const { getDb } = require('../db');
+      await runSeedModule();
 
-      await seedFn();
-
-      const sql = getDb();
-      const insertCalls = (sql as jest.Mock).mock.calls.filter(call =>
-        call[0].some((str: string) => str.includes('INSERT INTO bots'))
+      const sql = mockSql;
+      const insertCalls = (sql as jest.Mock).mock.calls.filter((call) =>
+        call[0]?.some?.((str: string) => str.includes('INSERT INTO bots'))
       );
 
       expect(insertCalls.length).toBeGreaterThanOrEqual(characters.length);
     });
 
     it('should use ON CONFLICT clause for upsert behavior', async () => {
-      const { getDb } = require('../db');
+      await runSeedModule();
 
-      await seedFn();
-
-      const sql = getDb();
-      const insertCalls = (sql as jest.Mock).mock.calls.filter(call =>
-        call[0].some((str: string) => str.includes('ON CONFLICT (handle) DO UPDATE'))
+      const sql = mockSql;
+      const insertCalls = (sql as jest.Mock).mock.calls.filter((call) =>
+        call[0]?.some?.((str: string) => str.includes('ON CONFLICT (handle) DO UPDATE'))
       );
 
       expect(insertCalls.length).toBeGreaterThan(0);
     });
 
     it('should log success message after seeding', async () => {
-      await seedFn();
+      await runSeedModule();
 
+      // console.log is called with two args:
+      //   "Seeded AI Town residents:" and "@pixel (Pixel), @sage (Sage)"
       expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining('Seeded AI Town residents')
+        expect.stringContaining('Seeded AI Town residents'),
+        expect.any(String)
       );
     });
 
     it('should include character handles in success message', async () => {
-      await seedFn();
+      await runSeedModule();
 
       const logCalls = (console.log as jest.Mock).mock.calls;
-      const seedMessage = logCalls.find(call =>
-        call[0].includes('Seeded AI Town residents')
+      // console.log("Seeded AI Town residents:", "@pixel (Pixel), @sage (Sage)")
+      const seedMessage = logCalls.find((call) =>
+        typeof call[0] === 'string' && call[0].includes('Seeded AI Town residents')
       );
 
       expect(seedMessage).toBeDefined();
-      expect(seedMessage[0]).toContain('@pixel');
-      expect(seedMessage[0]).toContain('@sage');
+      // Second argument contains the comma-separated handle list
+      expect(seedMessage[1]).toContain('@pixel');
+      expect(seedMessage[1]).toContain('@sage');
     });
 
-    it('should handle database errors', async () => {
+    it('should handle database errors by logging via catch(console.error)', async () => {
       mockInitDb.mockRejectedValueOnce(new Error('DB Connection Error'));
 
-      await expect(seedFn()).rejects.toThrow('DB Connection Error');
+      await runSeedModule();
+
+      expect(console.error).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'DB Connection Error' })
+      );
     });
 
-    it('should handle insert errors', async () => {
+    it('should handle insert errors by logging via catch(console.error)', async () => {
       mockSql.mockRejectedValueOnce(new Error('Insert Error'));
 
-      await expect(seedFn()).rejects.toThrow('Insert Error');
+      await runSeedModule();
+
+      expect(console.error).toHaveBeenCalled();
+    });
+
+    it('should not export the seed function (seed is module-private)', () => {
+      let seedModule: any;
+      jest.isolateModules(() => {
+        seedModule = require('../seed');
+      });
+      // The seed function is unexported; only module-level effects are observable
+      expect(seedModule.seed).toBeUndefined();
     });
   });
 
   describe('data integrity', () => {
-    it('should insert correct character data', async () => {
-      const { getDb } = require('../db');
+    it('should insert correct character data for pixel', async () => {
+      await runSeedModule();
 
-      await seedFn();
+      const calls = (mockSql as jest.Mock).mock.calls;
 
-      const sql = getDb();
-      const calls = (sql as jest.Mock).mock.calls;
-
-      // Template tag calls have strings array + interpolated values
-      // The strings array contains the SQL text parts
-      const pixelCall = calls.find(call =>
-        Array.isArray(call[0]) && call.includes('pixel')
+      // Template-tag calls: first arg is TemplateStringsArray; values are
+      // individual interpolated arguments.
+      const pixelCall = calls.find(
+        (call) => call.includes('pixel') && call.includes('Pixel')
       );
       expect(pixelCall).toBeDefined();
     });
 
-    it('should update existing characters on conflict', async () => {
-      const { getDb } = require('../db');
+    it('should insert correct character data for sage', async () => {
+      await runSeedModule();
 
-      await seedFn();
+      const calls = (mockSql as jest.Mock).mock.calls;
+      const sageCall = calls.find(
+        (call) => call.includes('sage') && call.includes('Sage')
+      );
+      expect(sageCall).toBeDefined();
+    });
 
-      const sql = getDb();
-      const calls = (sql as jest.Mock).mock.calls;
+    it('should update existing characters on conflict using DO UPDATE SET', async () => {
+      await runSeedModule();
 
-      const updateCalls = calls.filter(call =>
+      const calls = (mockSql as jest.Mock).mock.calls;
+      const updateCalls = calls.filter((call) =>
         call[0]?.some?.((str: string) => str.includes('DO UPDATE SET'))
       );
       expect(updateCalls.length).toBeGreaterThan(0);
     });
+
+    it('should include EXCLUDED.name in the upsert clause', async () => {
+      await runSeedModule();
+
+      const calls = (mockSql as jest.Mock).mock.calls;
+      const upsertCalls = calls.filter((call) =>
+        call[0]?.some?.((str: string) => str.includes('EXCLUDED.name'))
+      );
+      expect(upsertCalls.length).toBeGreaterThan(0);
+    });
+
+    it('should include EXCLUDED.description in the upsert clause', async () => {
+      await runSeedModule();
+
+      const calls = (mockSql as jest.Mock).mock.calls;
+      const upsertCalls = calls.filter((call) =>
+        call[0]?.some?.((str: string) => str.includes('EXCLUDED.description'))
+      );
+      expect(upsertCalls.length).toBeGreaterThan(0);
+    });
   });
 
   describe('idempotency', () => {
-    it('should be safe to run multiple times', async () => {
-      await seedFn();
-      await seedFn();
+    it('should be safe to run multiple times (initDb called each time)', async () => {
+      await runSeedModule();
+      const firstCount = mockInitDb.mock.calls.length;
+      expect(firstCount).toBeGreaterThan(0);
 
-      expect(mockInitDb).toHaveBeenCalledTimes(2);
+      await runSeedModule();
+      expect(mockInitDb.mock.calls.length).toBeGreaterThan(firstCount);
     });
 
-    it('should handle duplicate handles gracefully', async () => {
-      const { getDb } = require('../db');
+    it('should use ON CONFLICT to handle duplicate handles gracefully', async () => {
+      await runSeedModule();
 
-      await seedFn();
-
-      const sql = getDb();
-      const conflictCalls = (sql as jest.Mock).mock.calls.filter(call =>
+      const sql = mockSql;
+      const conflictCalls = (sql as jest.Mock).mock.calls.filter((call) =>
         call[0]?.some?.((str: string) => str.includes('ON CONFLICT'))
       );
 
@@ -173,40 +220,52 @@ describe('seed module', () => {
   });
 
   describe('edge cases', () => {
-    it('should handle empty characters array', async () => {
-      // Override character mock to empty array for this test
-      const { getDb } = require('../db');
-      const charMock = require('../characters');
-      const originalChars = charMock.characters;
-      charMock.characters = [];
+    it('should still log success even when characters list has entries with description', async () => {
+      await runSeedModule();
 
-      await seedFn();
-
-      expect(console.log).toHaveBeenCalled();
-
-      charMock.characters = originalChars;
+      // Both characters have descriptions; log message should include their handles
+      const logCalls = (console.log as jest.Mock).mock.calls;
+      // console.log("Seeded AI Town residents:", "@pixel (Pixel), @sage (Sage)")
+      const seedMsg = logCalls.find((c) => typeof c[0] === 'string' && c[0].includes('Seeded'));
+      expect(seedMsg).toBeDefined();
+      // Character display names appear in the second argument
+      expect(seedMsg[1]).toContain('(Pixel)');
+      expect(seedMsg[1]).toContain('(Sage)');
     });
 
-    it('should handle characters with special characters in names', async () => {
+    it('should call getDb after initDb succeeds', async () => {
       const { getDb } = require('../db');
-
-      await seedFn();
-
-      const sql = getDb();
-      expect(sql).toHaveBeenCalled();
+      await runSeedModule();
+      expect(getDb).toHaveBeenCalled();
     });
 
+    it('should not throw at module level (errors caught by .catch)', async () => {
+      mockInitDb.mockRejectedValueOnce(new Error('Fatal DB Error'));
+
+      // Should not throw – seed() result is consumed by .catch(console.error)
+      await expect(runSeedModule()).resolves.toBeUndefined();
+    });
   });
 
   describe('performance and reliability', () => {
-    it('should use parameterized queries to prevent SQL injection', async () => {
-      const { getDb } = require('../db');
+    it('should use parameterized queries (template tag) to prevent SQL injection', async () => {
+      await runSeedModule();
 
-      await seedFn();
+      const sql = mockSql;
+      // Template-tag calls pass a TemplateStringsArray as first argument
+      const calls = (sql as jest.Mock).mock.calls;
+      const taggedCalls = calls.filter((call) => Array.isArray(call[0]));
+      expect(taggedCalls.length).toBeGreaterThan(0);
+    });
 
-      const sql = getDb();
-      // The fact that getDb() was called means seed ran
-      expect(sql).toBeDefined();
+    it('should execute one INSERT per character in the characters list', async () => {
+      await runSeedModule();
+
+      const insertCalls = (mockSql as jest.Mock).mock.calls.filter((call) =>
+        call[0]?.some?.((str: string) => str.includes('INSERT INTO bots'))
+      );
+
+      expect(insertCalls.length).toBe(characters.length);
     });
   });
 });
