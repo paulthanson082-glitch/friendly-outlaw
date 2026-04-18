@@ -86,7 +86,7 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('AI Town')).toBeInTheDocument();
+        expect(screen.getByText(/AI Town/i)).toBeInTheDocument();
       });
     });
 
@@ -94,8 +94,8 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('Pixel')).toBeInTheDocument();
-        expect(screen.getByText('Sage')).toBeInTheDocument();
+        expect(screen.getAllByText('Pixel').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Sage').length).toBeGreaterThan(0);
       });
     });
 
@@ -150,8 +150,8 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('Pixel')).toBeInTheDocument();
-        expect(screen.getByText('Sage')).toBeInTheDocument();
+        expect(screen.getAllByText('Pixel').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Sage').length).toBeGreaterThan(0);
       });
     });
 
@@ -185,12 +185,8 @@ describe('Home Page', () => {
       const user = userEvent.setup({ delay: null });
       render(<Home />);
 
-      await waitFor(() => {
-        expect(screen.getByText('Pixel')).toBeInTheDocument();
-      });
-
-      const pixelButton = screen.getByText('Pixel').closest('button');
-      await user.click(pixelButton!);
+      const pixelButton = await screen.findByRole('button', { name: /Pixel/ });
+      await user.click(pixelButton);
 
       await waitFor(() => {
         expect(screen.getByText(/Conversations with @pixel/i)).toBeInTheDocument();
@@ -201,12 +197,8 @@ describe('Home Page', () => {
       const user = userEvent.setup({ delay: null });
       render(<Home />);
 
-      await waitFor(() => {
-        expect(screen.getByText('Pixel')).toBeInTheDocument();
-      });
-
-      const pixelButton = screen.getByText('Pixel').closest('button');
-      await user.click(pixelButton!);
+      const pixelButton = await screen.findByRole('button', { name: /Pixel/ });
+      await user.click(pixelButton);
 
       await waitFor(() => {
         expect(screen.getByText('Hello Sage!')).toBeInTheDocument();
@@ -459,7 +451,7 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText(/ago/i)).toBeInTheDocument();
+        expect(screen.getAllByText(/ago/i).length).toBeGreaterThan(0);
       });
     });
 
@@ -467,12 +459,8 @@ describe('Home Page', () => {
       const user = userEvent.setup({ delay: null });
       render(<Home />);
 
-      await waitFor(() => {
-        expect(screen.getByText('Pixel')).toBeInTheDocument();
-      });
-
-      const pixelButton = screen.getByText('Pixel').closest('button');
-      await user.click(pixelButton!);
+      const pixelButton = await screen.findByRole('button', { name: /Pixel/ });
+      await user.click(pixelButton);
 
       await waitFor(() => {
         expect(screen.getByText(/Conversations with @pixel/i)).toBeInTheDocument();
@@ -501,8 +489,8 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('🎨')).toBeInTheDocument(); // pixel
-        expect(screen.getByText('📚')).toBeInTheDocument(); // sage
+        expect(screen.getAllByText('🎨').length).toBeGreaterThan(0); // pixel
+        expect(screen.getAllByText('📚').length).toBeGreaterThan(0); // sage
       });
     });
   });
@@ -609,9 +597,17 @@ describe('Home Page', () => {
         expect(screen.getByText(/▶ Tick/i)).toBeInTheDocument();
       });
 
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        json: async () => ({ tick: 6, generated: [] }),
+      (global.fetch as jest.Mock).mockImplementation((url: string, options?: RequestInit) => {
+        if (options?.method === 'POST') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ tick: 6, generated: [] }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => mockTownData,
+        });
       });
 
       const tickButton = screen.getByText(/▶ Tick/i);
@@ -631,8 +627,8 @@ describe('Home Page', () => {
       render(<Home />);
 
       await waitFor(() => {
-        expect(screen.getByText('🎨')).toBeInTheDocument();
-        expect(screen.getByText('📚')).toBeInTheDocument();
+        expect(screen.getAllByText('🎨').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('📚').length).toBeGreaterThan(0);
       });
     });
   });
