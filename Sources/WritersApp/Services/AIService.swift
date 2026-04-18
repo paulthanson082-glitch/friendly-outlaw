@@ -572,13 +572,13 @@ public class AIService {
 
         // Pattern 1: ```json ... ```
         if let startIdx = response.range(of: "```json"),
-           let endIdx = response.range(of: "```", range: response.index(startIdx.upperBound, offsetBy: 1)..<response.endIndex) {
+           let endIdx = response.range(of: "```", range: startIdx.upperBound..<response.endIndex) {
             jsonString = String(response[startIdx.upperBound..<endIdx.lowerBound])
         }
         // Pattern 2: ``` ... ``` (generic code block)
         else if response.contains("```") {
             if let startIdx = response.range(of: "```"),
-               let endIdx = response.range(of: "```", range: response.index(startIdx.upperBound, offsetBy: 1)..<response.endIndex) {
+               let endIdx = response.range(of: "```", range: startIdx.upperBound..<response.endIndex) {
                 jsonString = String(response[startIdx.upperBound..<endIdx.lowerBound])
             }
         }
