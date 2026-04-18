@@ -110,7 +110,7 @@ const AppContent = () => {
     <NavigationContainer>
       <Stack.Navigator
         screenOptions={{
-          cardStyle: { backgroundColor: '#fff' },
+          contentStyle: { backgroundColor: '#fff' },
         }}
       >
         {!isAuthenticated ? (

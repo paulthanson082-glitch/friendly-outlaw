@@ -78,6 +78,14 @@ Powered by Claude API for intelligent writing assistance:
 - **Tone Adjustment**: Rewrite in different tones (professional, casual, etc.)
 - **Text Expansion/Simplification**: Adjust complexity as needed
 
+**Model Support:**
+- Claude 3.5 Sonnet (recommended for most tasks)
+- Claude 3 Opus (complex reasoning)
+- Claude 3 Sonnet (fast responses)
+- **Claude Mythos Preview** (autonomous coding, security audits, long-running tasks)
+
+For advanced use cases like autonomous feature development or security audits, see [MYTHOS.md](MYTHOS.md) for detailed guidance on Claude Mythos Preview.
+
 ### 💾 Database & Persistence (NEW!)
 SQLite-powered persistent storage for tracking and analytics:
 - **AI Suggestion History**: Complete log of all AI-generated suggestions
@@ -156,6 +164,18 @@ Extensible plugin architecture with Model Context Protocol (MCP) support:
 - **Multi-Server Support**: Connect to multiple MCP servers simultaneously
 
 See the plugin system in action through the CLI menu options or integrate MCP servers via `PluginManager` API.
+
+### 🔍 Sherlock Integration (NEW!)
+Integrated username and social media profile research for character development:
+- **Character Research**: Find existing social media profiles to study character personas
+- **Username Verification**: Verify username availability across 400+ social networks
+- **Author Pseudonym Checking**: Check if pen names are available or already registered
+- **Social Media Profile Study**: Research real profiles for authentic character voices
+- **MCP Server Integration**: Query Sherlock through the MCP protocol
+- **Batch Searching**: Research multiple usernames efficiently
+- **Multiple Output Formats**: JSON, CSV, and text results for flexible integration
+
+See [SHERLOCK.md](SHERLOCK.md) for complete documentation and [examples/sherlock_integration.md](examples/sherlock_integration.md) for practical use cases.
 
 ## Development Environment
 
@@ -571,6 +591,10 @@ When AI is enabled, additional menu options will appear:
 - Develop Character (AI)
 - Generate Outline (AI)
 
+**Advanced: Using Claude Mythos Preview**
+
+If you have access to Claude Mythos Preview for autonomous coding and security tasks, see [MYTHOS.md](MYTHOS.md) for integration instructions and best practices.
+
 #### Using Alternative LLM Providers with Clother (NEW!)
 
 The CLI integrates with [Clother](https://github.com/jolehuit/clother), enabling access to 100+ LLM providers without changing your code:
@@ -821,6 +845,14 @@ To use AI features, you'll need an Anthropic API key:
 4. Generate a new API key
 5. Set it as an environment variable: `export ANTHROPIC_API_KEY="your-key"`
 
+### Available Claude Models
+
+The app supports multiple Claude models:
+- **Claude 3.5 Sonnet** - Recommended for writing assistance and general tasks
+- **Claude 3 Opus** - For complex reasoning and analysis
+- **Claude 3 Sonnet** - Fast responses for real-time features
+- **Claude Mythos Preview** - For autonomous coding, security audits, and long-running tasks (see [MYTHOS.md](MYTHOS.md))
+
 AI features are completely optional - the app works fully without them.
 
 ## MCP Registry
@@ -863,14 +895,22 @@ When running as an MCP server, the following tools are available:
 
 ## Additional Resources
 
+### Core Documentation
 - [SETUP_VERIFICATION.md](SETUP_VERIFICATION.md) - Detailed setup verification and system requirements
 - [RUN_VERIFICATION.md](RUN_VERIFICATION.md) - Runtime verification and test results
 - [TECH_TIPS.md](TECH_TIPS.md) - Useful technical tips, hidden browser commands, and web developer tools
 - [DATABASE.md](DATABASE.md) - Complete database documentation
 - [QUICK_START.md](QUICK_START.md) - Quick start guide
 - [VSCODE_SETUP.md](VSCODE_SETUP.md) - VS Code setup guide
+
+### AI & Advanced Features
+- [MYTHOS.md](MYTHOS.md) - **Claude Mythos Preview** guide for autonomous coding, security audits, and long-running tasks
 - [CLOTHER.md](CLOTHER.md) - Using 100+ LLM providers with Clother
 - [CLOTHER_SETUP.md](CLOTHER_SETUP.md) - Contributor guide for Clother development
+
+### Integration Guides
+- [SHERLOCK.md](SHERLOCK.md) - Sherlock integration guide for character/author research
+- [examples/sherlock_integration.md](examples/sherlock_integration.md) - Practical Sherlock integration examples and use cases
 
 ## Containers/Orchestration
 
