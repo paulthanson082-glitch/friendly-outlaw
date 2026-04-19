@@ -1582,8 +1582,12 @@ public class WritersApp {
     /// - Throws: Any error produced while updating the prospect status in the prospect database.
     /// - Note: If the new status is `.contacted`, `.replied`, or `.meeting`, increments `activeCoworkSession?.prospectsContacted` by 1.
     public func updateProspectStatus(id: UUID, status: ProspectStatus) throws {
+        let isContactStatus: (ProspectStatus) -> Bool = {
+            $0 == .contacted || $0 == .replied || $0 == .meeting
+        }
+        let previousStatus = prospectDatabase.getProspect(id: id)?.status
         try prospectDatabase.updateProspectStatus(id: id, status: status)
-        if status == .contacted || status == .replied || status == .meeting {
+        if isContactStatus(status) && !(previousStatus.map(isContactStatus) ?? false) {
             activeCoworkSession?.prospectsContacted += 1
         }
     }
