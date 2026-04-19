@@ -2,6 +2,7 @@ import Foundation
 
 // MARK: - Enums
 
+/// Redemption status of a gift card
 public enum GiftCardStatus: String, Codable, CaseIterable {
     case unused
     case redeemed
@@ -19,6 +20,7 @@ public enum GiftCardStatus: String, Codable, CaseIterable {
     }
 }
 
+/// Tier of a gift card bundle
 public enum BundleType: String, Codable, CaseIterable {
     case starter
     case professional
@@ -41,6 +43,7 @@ public enum BundleType: String, Codable, CaseIterable {
 
 // MARK: - Metadata Structures
 
+/// Timestamps for a gift card bundle
 public struct BundleMetadata: Codable {
     public let created: Date
     public let modified: Date
@@ -51,6 +54,7 @@ public struct BundleMetadata: Codable {
     }
 }
 
+/// Timestamps and expiry details for a gift card
 public struct GiftCardMetadata: Codable {
     public let createdAt: Date
     public let expiresAt: Date?
@@ -63,6 +67,7 @@ public struct GiftCardMetadata: Codable {
 
 // MARK: - Gift Card Bundle
 
+/// A purchasable bundle that grants templates and AI credits via gift cards
 public struct GiftCardBundle: Codable, Identifiable {
     public let id: UUID
     public var name: String
@@ -99,6 +104,7 @@ public struct GiftCardBundle: Codable, Identifiable {
 
 // MARK: - Gift Card
 
+/// A single redeemable gift card tied to a bundle
 public struct GiftCard: Codable, Identifiable {
     public let id: UUID
     public var code: String
@@ -129,6 +135,7 @@ public struct GiftCard: Codable, Identifiable {
 
 // MARK: - Statistics
 
+/// Aggregate statistics for gift cards
 public struct GiftCardStats: Codable {
     public let totalCards: Int
     public let redeemedCards: Int
@@ -150,6 +157,7 @@ public struct GiftCardStats: Codable {
     }
 }
 
+/// Aggregate statistics for gift card bundles
 public struct BundleStats: Codable {
     public let totalBundles: Int
     public let totalRevenue: Decimal

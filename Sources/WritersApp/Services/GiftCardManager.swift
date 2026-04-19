@@ -1,5 +1,6 @@
 import Foundation
 
+/// Manages gift card bundles and individual gift cards, including creation, redemption, and statistics
 public class GiftCardManager {
     private var bundles: [UUID: GiftCardBundle] = [:]
     private var giftCards: [UUID: GiftCard] = [:]
@@ -74,6 +75,7 @@ public class GiftCardManager {
         }
     }
 
+    /// Removes a bundle and all gift cards belonging to it.
     public func deleteBundle(id: UUID) throws {
         bundles.removeValue(forKey: id)
         let cardsToDelete = giftCards.values.filter { $0.bundleId == id }
@@ -88,6 +90,9 @@ public class GiftCardManager {
 
     // MARK: - Gift Card CRUD
 
+    /// Creates a new gift card for the given bundle with an auto-generated unique code.
+    /// - Throws: `GiftCardError.bundleNotFound` if the bundle does not exist.
+    /// - Returns: The newly created `GiftCard`.
     @discardableResult
     public func createGiftCard(bundleId: UUID) throws -> GiftCard {
         guard bundles[bundleId] != nil else {
@@ -115,18 +120,22 @@ public class GiftCardManager {
         return giftCard
     }
 
+    /// Returns the gift card with the given ID, or `nil` if it does not exist.
     public func getGiftCard(id: UUID) -> GiftCard? {
         giftCards[id]
     }
 
+    /// Returns the gift card matching `code`, or `nil` if not found.
     public func getGiftCardByCode(_ code: String) -> GiftCard? {
         giftCards.values.first { $0.code == code }
     }
 
+    /// Returns all gift cards sorted newest-first by creation date.
     public func getAllGiftCards() -> [GiftCard] {
         Array(giftCards.values).sorted { $0.metadata.createdAt > $1.metadata.createdAt }
     }
 
+    /// Persists an updated gift card.
     public func updateGiftCard(_ card: GiftCard) throws {
         giftCards[card.id] = card
 
@@ -135,6 +144,7 @@ public class GiftCardManager {
         }
     }
 
+    /// Removes the gift card with the given ID.
     public func deleteGiftCard(id: UUID) throws {
         giftCards.removeValue(forKey: id)
 
@@ -145,6 +155,12 @@ public class GiftCardManager {
 
     // MARK: - Redemption & Business Logic
 
+    /// Marks a gift card as redeemed by the given user and returns the associated bundle.
+    /// - Throws: `GiftCardError.invalidCode` if the code is not found,
+    ///   `GiftCardError.alreadyRedeemed` if the card was already used,
+    ///   `GiftCardError.bundleNotFound` if the bundle no longer exists, or
+    ///   `GiftCardError.bundleExpired` if the card has expired.
+    /// - Returns: The `GiftCardBundle` unlocked by the redemption.
     public func redeemGiftCard(code: String, userId: UUID) throws -> GiftCardBundle {
         guard let giftCard = getGiftCardByCode(code) else {
             throw GiftCardError.invalidCode
@@ -172,6 +188,7 @@ public class GiftCardManager {
         return bundle
     }
 
+    /// Returns `true` if the gift card's expiry date has passed.
     public func isGiftCardExpired(_ card: GiftCard) -> Bool {
         guard let expiresAt = card.metadata.expiresAt else {
             return false
@@ -179,6 +196,8 @@ public class GiftCardManager {
         return Date() > expiresAt
     }
 
+    /// Validates that `code` is non-empty and matches a known gift card.
+    /// - Throws: `GiftCardError.invalidInput` if empty, or `GiftCardError.invalidCode` if not found.
     public func validateCode(_ code: String) throws {
         guard !code.trimmingCharacters(in: .whitespaces).isEmpty else {
             throw GiftCardError.invalidInput("Code cannot be empty")
@@ -191,6 +210,7 @@ public class GiftCardManager {
 
     // MARK: - Statistics
 
+    /// Returns aggregated redemption statistics across all gift cards.
     public func getGiftCardStats() -> GiftCardStats {
         let total = giftCards.count
         let redeemed = giftCards.values.filter { $0.status == .redeemed }.count
@@ -205,6 +225,7 @@ public class GiftCardManager {
         )
     }
 
+    /// Returns aggregated sales and credit statistics across all bundles.
     public func getBundleStats() -> BundleStats {
         let total = bundles.count
         var totalRevenue: Decimal = 0

@@ -40,6 +40,7 @@ public struct Prospect: Codable, Identifiable {
     }
 }
 
+/// The current relationship status of a prospect
 public enum ProspectStatus: String, Codable, CaseIterable {
     case new
     case contacted
@@ -188,6 +189,7 @@ public struct CoworkSession: Codable, Identifiable {
 
 // MARK: - Errors
 
+/// Errors thrown by the cowork service
 public enum CoworkError: Error, LocalizedError {
     case gmailNotEnabled
     case invalidOAuthToken

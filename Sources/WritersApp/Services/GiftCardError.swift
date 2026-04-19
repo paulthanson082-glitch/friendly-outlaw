@@ -1,5 +1,6 @@
 import Foundation
 
+/// Errors thrown by gift card operations
 public enum GiftCardError: Error, LocalizedError, Equatable {
     case invalidCode
     case bundleExpired

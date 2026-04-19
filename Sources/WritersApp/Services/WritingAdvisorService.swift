@@ -2,6 +2,7 @@ import Foundation
 
 // MARK: - WritingAdvisorService
 
+/// AI-powered service that analyzes a writer's context and returns personalized recommendations
 public class WritingAdvisorService {
 
     private let aiService: AIService
