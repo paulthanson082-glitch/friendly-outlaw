@@ -686,14 +686,12 @@ public struct ReasoningStep: Codable {
 // MARK: - Brainstorm Ideas Categorization
 
 /// A single idea in a brainstorm result
-public struct CategorizedIdea: Codable, Identifiable {
-    public let id: UUID
+public struct CategorizedIdea: Codable {
     public let title: String
     public let description: String
     public let isSpeculative: Bool
 
-    public init(id: UUID = UUID(), title: String, description: String, isSpeculative: Bool) {
-        self.id = id
+    public init(title: String, description: String, isSpeculative: Bool) {
         self.title = title
         self.description = description
         self.isSpeculative = isSpeculative
@@ -701,14 +699,12 @@ public struct CategorizedIdea: Codable, Identifiable {
 }
 
 /// A category containing related ideas
-public struct IdeaCategory: Codable, Identifiable {
-    public let id: UUID
+public struct IdeaCategory: Codable {
     public let name: String
     public let description: String
     public let ideas: [CategorizedIdea]
 
-    public init(id: UUID = UUID(), name: String, description: String, ideas: [CategorizedIdea]) {
-        self.id = id
+    public init(name: String, description: String, ideas: [CategorizedIdea]) {
         self.name = name
         self.description = description
         self.ideas = ideas
@@ -716,12 +712,10 @@ public struct IdeaCategory: Codable, Identifiable {
 }
 
 /// Result of brainstorming with categorized ideas
-public struct BrainstormResult: Codable, Identifiable {
-    public let id: UUID
+public struct BrainstormResult: Codable {
     public let categories: [IdeaCategory]
 
-    public init(id: UUID = UUID(), categories: [IdeaCategory]) {
-        self.id = id
+    public init(categories: [IdeaCategory]) {
         self.categories = categories
     }
 }

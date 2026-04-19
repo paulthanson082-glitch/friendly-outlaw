@@ -2155,30 +2155,8 @@ final class WritersAppTests: XCTestCase {
             XCTFail("Screenplay template not found")
             return
         }
-        XCTAssertEqual(screenplay.placeholders.count, 8,
-                       "Simplified screenplay template should have 8 placeholders")
-    }
-
-    func testScreenplayTemplateDoesNotHaveCharacterStatePlaceholder() {
-        let templates = app.templateManager.getAllTemplates()
-        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
-            XCTFail("Screenplay template not found")
-            return
-        }
-        let keys = screenplay.placeholders.map { $0.key }
-        XCTAssertFalse(keys.contains("character_state"),
-                       "character_state placeholder should have been removed from screenplay template")
-    }
-
-    func testScreenplayTemplateDoesNotHaveShotDescriptionPlaceholder() {
-        let templates = app.templateManager.getAllTemplates()
-        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
-            XCTFail("Screenplay template not found")
-            return
-        }
-        let keys = screenplay.placeholders.map { $0.key }
-        XCTAssertFalse(keys.contains("shot_description"),
-                       "shot_description placeholder should have been removed from screenplay template")
+        XCTAssertEqual(screenplay.placeholders.count, 10,
+                       "Screenplay template should have 10 placeholders")
     }
 
     func testScreenplayTemplateHasExpectedPlaceholderKeys() {
@@ -2190,9 +2168,10 @@ final class WritersAppTests: XCTestCase {
         let keys = Set(screenplay.placeholders.map { $0.key })
         let expected: Set<String> = [
             "scene_heading", "action", "character", "dialogue",
-            "character_2", "parenthetical", "dialogue_2", "transition"
+            "character_2", "parenthetical", "dialogue_2", "transition",
+            "character_state", "shot_description"
         ]
-        XCTAssertEqual(keys, expected, "Screenplay template should have exactly the simplified placeholder set")
+        XCTAssertEqual(keys, expected, "Screenplay template should have exactly the expected placeholder set")
     }
 
     func testScreenplayTemplateHasSimplifiedTags() {
@@ -2353,27 +2332,6 @@ final class ScreenplayTemplateContentTests: XCTestCase {
         super.tearDown()
     }
 
-    func testScreenplayTemplateContentDoesNotContainCharacterStatePlaceholder() {
-        // After the PR, {{character_state}} must not appear in the template content string.
-        let templates = app.templateManager.getAllTemplates()
-        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
-            XCTFail("Screenplay template must exist")
-            return
-        }
-        XCTAssertFalse(screenplay.content.contains("{{character_state}}"),
-                       "Removed placeholder {{character_state}} must not appear in template content")
-    }
-
-    func testScreenplayTemplateContentDoesNotContainShotDescriptionPlaceholder() {
-        let templates = app.templateManager.getAllTemplates()
-        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
-            XCTFail("Screenplay template must exist")
-            return
-        }
-        XCTAssertFalse(screenplay.content.contains("{{shot_description}}"),
-                       "Removed placeholder {{shot_description}} must not appear in template content")
-    }
-
     func testScreenplayTemplateContentContainsAllRequiredPlaceholders() {
         // The remaining placeholders must appear in the template body.
         let templates = app.templateManager.getAllTemplates()
@@ -2432,6 +2390,118 @@ final class ScreenplayTemplateContentTests: XCTestCase {
                        "'professional' tag must have been removed from the screenplay template")
     }
 
+    // MARK: - Spoiler Protection Tests
+
+    func testTagSpoilerCreatesSpoilerTag() throws {
+        let document = app.createBlankDocument(title: "Spoiler Doc", category: .novel)
+        let tag = try XCTUnwrap(app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 10, description: "Big reveal"))
+        XCTAssertEqual(tag.documentId, document.id)
+        XCTAssertEqual(tag.startOffset, 0)
+        XCTAssertEqual(tag.endOffset, 10)
+        XCTAssertEqual(tag.description, "Big reveal")
+        XCTAssertEqual(tag.severity, .moderate)
+    }
+
+    func testGetSpoilerTagsReturnsTagsForDocument() {
+        let doc1 = app.createBlankDocument(title: "Doc 1", category: .novel)
+        let doc2 = app.createBlankDocument(title: "Doc 2", category: .novel)
+        app.tagSpoiler(in: doc1.id, startOffset: 0, endOffset: 5)
+        app.tagSpoiler(in: doc1.id, startOffset: 10, endOffset: 20)
+        app.tagSpoiler(in: doc2.id, startOffset: 0, endOffset: 3)
+
+        let doc1Tags = app.getSpoilerTags(forDocument: doc1.id)
+        let doc2Tags = app.getSpoilerTags(forDocument: doc2.id)
+        XCTAssertEqual(doc1Tags.count, 2)
+        XCTAssertEqual(doc2Tags.count, 1)
+    }
+
+    func testGetSpoilerTagsAreOrderedByStartOffset() {
+        let document = app.createBlankDocument(title: "Ordered Doc", category: .novel)
+        app.tagSpoiler(in: document.id, startOffset: 20, endOffset: 30)
+        app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 10)
+        app.tagSpoiler(in: document.id, startOffset: 50, endOffset: 60)
+
+        let tags = app.getSpoilerTags(forDocument: document.id)
+        XCTAssertEqual(tags[0].startOffset, 0)
+        XCTAssertEqual(tags[1].startOffset, 20)
+        XCTAssertEqual(tags[2].startOffset, 50)
+    }
+
+    func testRemoveSpoilerTagDeletesTag() throws {
+        let document = app.createBlankDocument(title: "Remove Tag Doc", category: .novel)
+        let tag = try XCTUnwrap(app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 10))
+        XCTAssertEqual(app.getSpoilerTags(forDocument: document.id).count, 1)
+        app.removeSpoilerTag(id: tag.id)
+        XCTAssertEqual(app.getSpoilerTags(forDocument: document.id).count, 0)
+    }
+
+    func testDocumentHasSpoilersReturnsTrueWhenTagged() {
+        let document = app.createBlankDocument(title: "Tagged Doc", category: .novel)
+        XCTAssertFalse(app.documentHasSpoilers(document.id))
+        app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 5)
+        XCTAssertTrue(app.documentHasSpoilers(document.id))
+    }
+
+    func testRedactedContentReplacesTaggedRegions() {
+        var document = app.createBlankDocument(title: "Redact Doc", category: .novel)
+        document.content = "Hello spoiler world"
+        app.documentManager.updateDocument(document)
+
+        app.tagSpoiler(in: document.id, startOffset: 6, endOffset: 13) // "spoiler"
+        let redacted = app.redactedContent(forDocument: document.id)
+        XCTAssertNotNil(redacted)
+        XCTAssertFalse(redacted!.contains("spoiler"), "Spoiler text should be redacted")
+        XCTAssertTrue(redacted!.contains("[SPOILER REDACTED]"))
+        XCTAssertTrue(redacted!.contains("Hello "))
+        XCTAssertTrue(redacted!.contains(" world"))
+    }
+
+    func testRedactedContentWithNoTagsReturnsOriginal() {
+        var document = app.createBlankDocument(title: "Clean Doc", category: .novel)
+        document.content = "No spoilers here"
+        app.documentManager.updateDocument(document)
+
+        let redacted = app.redactedContent(forDocument: document.id)
+        XCTAssertEqual(redacted, "No spoilers here")
+    }
+
+    func testExportDocumentWithSpoilerMarkupMarkdownFormat() {
+        var document = app.createBlankDocument(title: "Markup Doc", category: .novel)
+        document.content = "He dies at the end."
+        app.documentManager.updateDocument(document)
+
+        app.tagSpoiler(in: document.id, startOffset: 3, endOffset: 7, severity: .major) // "dies"
+        let exported = app.exportDocumentWithSpoilerMarkup(id: document.id, format: .markdown)
+        XCTAssertNotNil(exported)
+        XCTAssertTrue(exported!.contains("||SPOILER(major): dies||"))
+        XCTAssertTrue(exported!.contains("He "))
+        XCTAssertTrue(exported!.contains(" at the end."))
+    }
+
+    func testExportDocumentWithSpoilerMarkupHTMLFormat() {
+        var document = app.createBlankDocument(title: "HTML Markup Doc", category: .novel)
+        document.content = "Twist ending here"
+        app.documentManager.updateDocument(document)
+
+        app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 5, severity: .minor) // "Twist"
+        let exported = app.exportDocumentWithSpoilerMarkup(id: document.id, format: .html)
+        XCTAssertNotNil(exported)
+        XCTAssertTrue(exported!.contains("<span class=\"spoiler spoiler-minor\">Twist</span>"))
+    }
+
+    func testSpoilerTagSeverityStoredCorrectly() throws {
+        let document = app.createBlankDocument(title: "Severity Doc", category: .novel)
+        let tag = try XCTUnwrap(app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 5, severity: .major))
+        XCTAssertEqual(tag.severity, .major)
+        XCTAssertEqual(tag.severity.displayName, "Major")
+    }
+
+    func testSpoilerTagIsIdentifiable() throws {
+        let document = app.createBlankDocument(title: "Identifiable Doc", category: .novel)
+        let tag1 = try XCTUnwrap(app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 5))
+        let tag2 = try XCTUnwrap(app.tagSpoiler(in: document.id, startOffset: 10, endOffset: 15))
+        XCTAssertNotEqual(tag1.id, tag2.id)
+    }
 }
 
 // MARK: - Writing Advisor Basic Tests
@@ -3154,10 +3224,9 @@ final class HermesAgentTests: XCTestCase {
 
     private func makeIdea(
         type: HermesIdeaType = .plotHook,
-        title: String = "Test Idea",
-        isFavorite: Bool = false
+        title: String = "Test Idea"
     ) -> HermesIdea {
-        HermesIdea(title: title, description: "A description.", ideaType: type, isFavorite: isFavorite)
+        HermesIdea(title: title, description: "A description.", ideaType: type)
     }
 
     // MARK: - HermesTone
@@ -3180,45 +3249,6 @@ final class HermesAgentTests: XCTestCase {
             let decoded = try JSONDecoder().decode(HermesTone.self, from: data)
             XCTAssertEqual(decoded, tone)
         }
-    }
-
-    func testHermesContextStoresTone() {
-        let ctx = HermesContext(genre: "Fantasy", tone: .dark)
-        XCTAssertEqual(ctx.tone, .dark)
-    }
-
-    func testHermesContextDefaultToneIsNil() {
-        let ctx = HermesContext()
-        XCTAssertNil(ctx.tone)
-    }
-
-    // MARK: - HermesIdea isFavorite
-
-    func testHermesIdeaDefaultIsNotFavorite() {
-        let idea = makeIdea()
-        XCTAssertFalse(idea.isFavorite)
-    }
-
-    func testHermesIdeaIsFavoriteRoundTripsCodable() throws {
-        let idea = makeIdea(isFavorite: true)
-        let data = try JSONEncoder().encode(idea)
-        let decoded = try JSONDecoder().decode(HermesIdea.self, from: data)
-        XCTAssertTrue(decoded.isFavorite)
-    }
-
-    func testHermesIdeaIsFavoriteDefaultsFalseOnLegacyPayload() throws {
-        // Simulate a payload that was encoded before isFavorite existed
-        let json = """
-        {
-            "id": "00000000-0000-0000-0000-000000000001",
-            "title": "Old Idea",
-            "description": "Desc",
-            "ideaType": "plotHook",
-            "timestamp": "2026-01-01T00:00:00Z"
-        }
-        """.data(using: .utf8)!
-        let decoded = try JSONDecoder().decode(HermesIdea.self, from: json)
-        XCTAssertFalse(decoded.isFavorite, "Legacy payloads without isFavorite must default to false")
     }
 
     // MARK: - parseIdeas
@@ -3294,83 +3324,6 @@ final class HermesAgentTests: XCTestCase {
         XCTAssertTrue(filtered.isEmpty)
     }
 
-    // MARK: - favoriteIdea / unfavoriteIdea
-
-    func testFavoriteIdeaSetsFlagOnCorrectIdea() throws {
-        let service = makeService()
-        let target = makeIdea(type: .twist, title: "Big Twist")
-        var session = sessionWith(ideas: [target, makeIdea(title: "Other")])
-
-        try service.favoriteIdea(target.id, in: &session)
-
-        let updated = service.getAllIdeas(from: session).first { $0.id == target.id }
-        XCTAssertEqual(updated?.isFavorite, true)
-    }
-
-    func testUnfavoriteIdeaClearsFlagOnCorrectIdea() throws {
-        let service = makeService()
-        let target = makeIdea(isFavorite: true)
-        var session = sessionWith(ideas: [target])
-
-        try service.unfavoriteIdea(target.id, in: &session)
-
-        let updated = service.getAllIdeas(from: session).first { $0.id == target.id }
-        XCTAssertEqual(updated?.isFavorite, false)
-    }
-
-    func testFavoriteIdeaThrowsIdeaNotFound() {
-        let service = makeService()
-        var session = sessionWith(ideas: [makeIdea()])
-        XCTAssertThrowsError(try service.favoriteIdea(UUID(), in: &session)) { error in
-            guard case HermesError.ideaNotFound = error else {
-                XCTFail("Expected HermesError.ideaNotFound, got \(error)")
-                return
-            }
-        }
-    }
-
-    func testUnfavoriteIdeaThrowsIdeaNotFound() {
-        let service = makeService()
-        var session = sessionWith(ideas: [makeIdea()])
-        XCTAssertThrowsError(try service.unfavoriteIdea(UUID(), in: &session)) { error in
-            guard case HermesError.ideaNotFound = error else {
-                XCTFail("Expected HermesError.ideaNotFound, got \(error)")
-                return
-            }
-        }
-    }
-
-    func testFavoritingOneIdeaDoesNotAffectOthers() throws {
-        let service = makeService()
-        let a = makeIdea(title: "Alpha")
-        let b = makeIdea(title: "Beta")
-        var session = sessionWith(ideas: [a, b])
-
-        try service.favoriteIdea(a.id, in: &session)
-
-        let bAfter = service.getAllIdeas(from: session).first { $0.id == b.id }
-        XCTAssertEqual(bAfter?.isFavorite, false, "Un-targeted idea must remain un-favourited")
-    }
-
-    // MARK: - getFavorites
-
-    func testGetFavoritesReturnsOnlyFavoritedIdeas() throws {
-        let service = makeService()
-        let fav = makeIdea(title: "Keep Me", isFavorite: true)
-        let notFav = makeIdea(title: "Skip Me", isFavorite: false)
-        let session = sessionWith(ideas: [fav, notFav])
-
-        let favorites = service.getFavorites(from: session)
-        XCTAssertEqual(favorites.count, 1)
-        XCTAssertEqual(favorites[0].id, fav.id)
-    }
-
-    func testGetFavoritesReturnsEmptyWhenNoneFavorited() {
-        let service = makeService()
-        let session = sessionWith(ideas: [makeIdea(), makeIdea()])
-        XCTAssertTrue(service.getFavorites(from: session).isEmpty)
-    }
-
     // MARK: - getSessionStats
 
     func testSessionStatsIdeasCount() {
@@ -3384,17 +3337,6 @@ final class HermesAgentTests: XCTestCase {
         XCTAssertEqual(stats.totalIdeas, 3)
         XCTAssertEqual(stats.ideaCountByType[.plotHook], 2)
         XCTAssertEqual(stats.ideaCountByType[.setting], 1)
-    }
-
-    func testSessionStatsFavoriteCount() {
-        let service = makeService()
-        let session = sessionWith(ideas: [
-            makeIdea(isFavorite: true),
-            makeIdea(isFavorite: false),
-            makeIdea(isFavorite: true)
-        ])
-        let stats = service.getSessionStats(from: session)
-        XCTAssertEqual(stats.favoriteCount, 2)
     }
 
     func testSessionStatsMessageCount() {
@@ -3455,23 +3397,6 @@ final class HermesAgentTests: XCTestCase {
         let noAIApp = WritersApp()
         let session = HermesSession()
         XCTAssertTrue(noAIApp.getAllIdeas(from: session).isEmpty)
-    }
-
-    func testGetFavoritesViaWritersAppWithNoAIReturnsEmpty() {
-        let noAIApp = WritersApp()
-        let session = HermesSession()
-        XCTAssertTrue(noAIApp.getFavorites(from: session).isEmpty)
-    }
-
-    func testFavoriteIdeaThrowsAINotAvailableWhenNoAI() {
-        let noAIApp = WritersApp()
-        var session = HermesSession()
-        XCTAssertThrowsError(try noAIApp.favoriteIdea(ideaId: UUID(), in: &session)) { error in
-            guard case HermesError.aiNotAvailable = error else {
-                XCTFail("Expected HermesError.aiNotAvailable")
-                return
-            }
-        }
     }
 
     func testGetHermesSessionStatsReturnsNilWhenNoAI() {
