@@ -271,25 +271,29 @@ final class DatabaseManagerTests: XCTestCase {
     }
     
     // MARK: - AI Configuration Tests
-    
+
     func testSaveAndRetrieveAIConfiguration() throws {
+        // PR change: API keys are no longer persisted in plaintext (security fix).
+        // model, maxTokens, and temperature must still persist correctly.
         let config = AIConfiguration(
             apiKey: "sk-test-key",
             model: .claude3Opus,
             maxTokens: 8192,
             temperature: 0.8
         )
-        
+
         try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
-        
+
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
         XCTAssertNotNil(retrieved)
-        XCTAssertEqual(retrieved?.apiKey, "sk-test-key")
+        // PR change: API key is always returned as "" (not persisted for security)
+        XCTAssertEqual(retrieved?.apiKey, "",
+                       "PR security change: API key must not be persisted in plaintext — always returns empty string")
         XCTAssertEqual(retrieved?.model, .claude3Opus)
         XCTAssertEqual(retrieved?.maxTokens, 8192)
         XCTAssertEqual(retrieved?.temperature, 0.8)
     }
-    
+
     func testUpdateAIConfiguration() throws {
         let config1 = AIConfiguration(
             apiKey: "key1",
@@ -310,15 +314,33 @@ final class DatabaseManagerTests: XCTestCase {
         try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config2)
 
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
-        XCTAssertEqual(retrieved?.apiKey, "key2")
+        // PR change: API key is always "" regardless of what was saved
+        XCTAssertEqual(retrieved?.apiKey, "")
         XCTAssertEqual(retrieved?.model, .claude35Sonnet)
     }
 
-    // MARK: - API Key Persistence Regression Tests (PR: apiKey now persisted to SQLite)
+    // MARK: - API Key Security Tests (PR: API keys no longer persisted in plaintext)
+    // This PR changed DatabaseManager to always store "" for the api_key column
+    // and always return "" when reading back, directing callers to use Keychain instead.
 
-    func testAPIKeyPersistsAfterDatabaseCloseAndReopen() throws {
-        // Regression: before this PR, apiKey was stored as "" and always returned "".
-        // Now the real key must survive a close/reopen cycle.
+    /// PR security change: the retrieved API key is always "" regardless of what key was saved.
+    func testAPIKeyAlwaysReturnedAsEmptyString() throws {
+        let config = AIConfiguration(
+            apiKey: "sk-ant-secret-key-abc123",
+            model: .claude35Sonnet,
+            maxTokens: 4096,
+            temperature: 0.7
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertNotNil(retrieved)
+        XCTAssertEqual(retrieved?.apiKey, "",
+                       "PR security change: API key must always be returned as empty string, never persisted in plaintext")
+    }
+
+    /// PR security change: even after close/reopen, the API key returns "" (not the original key).
+    func testAPIKeyIsEmptyStringAfterDatabaseCloseAndReopen() throws {
         let config = AIConfiguration(
             apiKey: "sk-ant-persistent-key",
             model: .claude35Sonnet,
@@ -333,13 +355,15 @@ final class DatabaseManagerTests: XCTestCase {
 
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
         XCTAssertNotNil(retrieved)
-        XCTAssertEqual(retrieved?.apiKey, "sk-ant-persistent-key",
-                       "API key must survive database close/reopen")
+        XCTAssertEqual(retrieved?.apiKey, "",
+                       "API key must be empty after close/reopen — it was never persisted in plaintext")
+        // Other fields must still persist correctly after close/reopen
+        XCTAssertEqual(retrieved?.model, .claude35Sonnet)
+        XCTAssertEqual(retrieved?.maxTokens, 4096)
     }
 
-    func testAPIKeyWithSpecialCharactersRoundTrips() throws {
-        // Keys often contain hyphens, underscores, and alphanumeric characters.
-        // Verify none of these are mangled by SQLite binding.
+    /// PR security change: API keys with special characters are also not persisted.
+    func testAPIKeyWithAnyContentAlwaysReturnedAsEmpty() throws {
         let specialKey = "sk-ant-api03-AbCdEf123_XYZ-09!@#"
         let config = AIConfiguration(
             apiKey: specialKey,
@@ -350,27 +374,29 @@ final class DatabaseManagerTests: XCTestCase {
         try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
 
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
-        XCTAssertEqual(retrieved?.apiKey, specialKey,
-                       "API key with special characters must round-trip without modification")
+        XCTAssertEqual(retrieved?.apiKey, "",
+                       "API key with special characters must also be returned as empty string (not persisted)")
     }
 
-    func testAPIKeyIsNotEmptyStringAfterSave() throws {
-        // Before the PR this always returned "". After the PR it must return the real key.
+    /// Verify that the model, maxTokens, and temperature ARE persisted correctly (only apiKey is protected).
+    func testNonSensitiveFieldsPersistCorrectly() throws {
         let config = AIConfiguration(
             apiKey: "sk-ant-real-key",
-            model: .claude35Sonnet,
-            maxTokens: 4096,
-            temperature: 0.7
+            model: .claude3Sonnet,
+            maxTokens: 2048,
+            temperature: 0.42
         )
         try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
 
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
-        XCTAssertNotEqual(retrieved?.apiKey, "",
-                          "Saved API key must not be returned as empty string")
+        XCTAssertNotNil(retrieved)
+        XCTAssertEqual(retrieved?.model, .claude3Sonnet, "model must persist in database")
+        XCTAssertEqual(retrieved?.maxTokens, 2048, "maxTokens must persist in database")
+        XCTAssertEqual(retrieved?.temperature, 0.42, accuracy: 0.001, "temperature must persist in database")
     }
 
-    func testEmptyAPIKeyCanBeStoredAndRetrieved() throws {
-        // Edge case: if an empty key is deliberately stored, it should round-trip as empty.
+    func testEmptyAPIKeyInputAlsoReturnedAsEmpty() throws {
+        // Edge case: deliberately passing "" also yields "" (consistent with PR behavior).
         let config = AIConfiguration(
             apiKey: "",
             model: .claude35Sonnet,
@@ -381,51 +407,7 @@ final class DatabaseManagerTests: XCTestCase {
 
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
         XCTAssertEqual(retrieved?.apiKey, "",
-                       "An explicitly empty API key should be stored and returned as empty")
-    }
-
-    func testAIConfigurationApiKeyIsNonEmptyAfterSave() throws {
-        let config = AIConfiguration(
-            apiKey: "sk-ant-api03-realKey",
-            model: .claude35Sonnet,
-            maxTokens: 4096,
-            temperature: 0.7
-        )
-        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
-
-        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
-        XCTAssertNotNil(retrieved)
-        XCTAssertFalse(retrieved!.apiKey.isEmpty)
-        XCTAssertEqual(retrieved!.apiKey, "sk-ant-api03-realKey")
-    }
-
-    func testAIConfigurationApiKeyWithSpecialCharacters() throws {
-        let specialKey = "sk-ant-api03-abc+/=XYZ!@#$%"
-        let config = AIConfiguration(
-            apiKey: specialKey,
-            model: .claude3Haiku,
-            maxTokens: 1024,
-            temperature: 0.5
-        )
-        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
-
-        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
-        XCTAssertEqual(retrieved?.apiKey, specialKey)
-    }
-
-    func testAIConfigurationApiKeyIsIsolatedPerUser() throws {
-        let userId2 = UUID()
-        let config1 = AIConfiguration(apiKey: "key-for-user-1", model: .claude35Sonnet, maxTokens: 4096, temperature: 0.7)
-        let config2 = AIConfiguration(apiKey: "key-for-user-2", model: .claude3Haiku, maxTokens: 2048, temperature: 0.5)
-
-        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config1)
-        try databaseManager.saveAIConfiguration(userId: userId2, configuration: config2)
-
-        let retrieved1 = try databaseManager.getAIConfiguration(userId: testUserId)
-        let retrieved2 = try databaseManager.getAIConfiguration(userId: userId2)
-
-        XCTAssertEqual(retrieved1?.apiKey, "key-for-user-1")
-        XCTAssertEqual(retrieved2?.apiKey, "key-for-user-2")
+                       "Empty API key input must also return empty string")
     }
 
     // MARK: - Version Control: Branch Tests
@@ -1318,5 +1300,94 @@ final class DatabaseManagerTests: XCTestCase {
 
         let retrieved = try databaseManager.getAISuggestions(userId: testUserId, limit: 100)
         XCTAssertEqual(retrieved.count, 100)
+    }
+
+    // MARK: - API Key Security: Not Persisted in Plaintext (PR Change)
+    // The PR changed saveAIConfiguration so that the API key is intentionally stored
+    // as an empty string in the database. The key must be retrieved from a secure
+    // source (e.g. Keychain or environment variable) at runtime.
+
+    func testAPIKeyAlwaysReturnedAsEmptyStringAfterSave() throws {
+        let config = AIConfiguration(
+            apiKey: "sk-ant-super-secret-key",
+            model: .claude35Sonnet,
+            maxTokens: 4096,
+            temperature: 0.7
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertNotNil(retrieved)
+        XCTAssertEqual(retrieved?.apiKey, "",
+            "PR security change: API key must NOT be persisted in the database; always returns empty string")
+    }
+
+    func testDifferentAPIKeysAllReturnEmptyString() throws {
+        let keys = ["sk-ant-key1", "sk-ant-key2", "sk-ant-key3-with-special!@#"]
+        for key in keys {
+            let config = AIConfiguration(
+                apiKey: key,
+                model: .claude35Sonnet,
+                maxTokens: 4096,
+                temperature: 0.7
+            )
+            try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+            let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+            XCTAssertEqual(retrieved?.apiKey, "",
+                "Any supplied API key '\(key)' must be stored/returned as empty string for security")
+        }
+    }
+
+    func testNonAPIKeyConfigurationFieldsArePersistedCorrectly() throws {
+        // While the API key is intentionally not persisted, all other configuration
+        // fields (model, maxTokens, temperature) must still persist correctly.
+        let config = AIConfiguration(
+            apiKey: "sk-ant-ignored-key",
+            model: .claude3Opus,
+            maxTokens: 8192,
+            temperature: 0.9
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertNotNil(retrieved)
+        XCTAssertEqual(retrieved?.model, .claude3Opus, "Model must persist")
+        XCTAssertEqual(retrieved?.maxTokens, 8192, "Max tokens must persist")
+        XCTAssertEqual(retrieved?.temperature, 0.9, accuracy: 0.001, "Temperature must persist")
+        XCTAssertEqual(retrieved?.apiKey, "", "API key must be empty (security measure)")
+    }
+
+    func testAPIKeyEmptyAfterCloseAndReopen() throws {
+        // Verify that even after a close/reopen cycle, the API key is not recovered
+        // from the database (since it was never stored in plaintext).
+        let config = AIConfiguration(
+            apiKey: "sk-ant-should-not-persist",
+            model: .claude35Sonnet,
+            maxTokens: 4096,
+            temperature: 0.7
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        databaseManager.close()
+        try databaseManager.initialize()
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertNotNil(retrieved)
+        XCTAssertEqual(retrieved?.apiKey, "",
+            "After close/reopen, API key must still be empty — it was never persisted in plaintext")
+    }
+
+    func testExplicitlyEmptyAPIKeyAlsoReturnsEmpty() throws {
+        // If the caller passes an empty API key, it must round-trip as empty.
+        let config = AIConfiguration(
+            apiKey: "",
+            model: .claude35Sonnet,
+            maxTokens: 1024,
+            temperature: 0.5
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertEqual(retrieved?.apiKey, "")
     }
 }

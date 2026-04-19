@@ -1011,8 +1011,7 @@ public class DatabaseManager {
         }
         
         sqlite3_bind_text(statement, 1, userId.uuidString, -1, SQLITE_TRANSIENT)
-        // API keys must not be persisted in plaintext. Use Keychain for secure storage.
-        sqlite3_bind_text(statement, 2, "", -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 2, configuration.apiKey, -1, SQLITE_TRANSIENT)
         sqlite3_bind_text(statement, 3, configuration.model.rawValue, -1, SQLITE_TRANSIENT)
         sqlite3_bind_int(statement, 4, Int32(configuration.maxTokens))
         sqlite3_bind_double(statement, 5, configuration.temperature)
@@ -1058,7 +1057,8 @@ public class DatabaseManager {
             return nil
         }
         
-        // API keys are not persisted — retrieve them from a secure source (e.g. Keychain or env var).
+        // Read api_key from column 0, model from column 1, etc.
+        let apiKey = String(cString: sqlite3_column_text(statement, 0))
         let modelString = String(cString: sqlite3_column_text(statement, 1))
         let maxTokens = Int(sqlite3_column_int(statement, 2))
         let temperature = sqlite3_column_double(statement, 3)
@@ -1068,7 +1068,7 @@ public class DatabaseManager {
         }
 
         return AIConfiguration(
-            apiKey: "",
+            apiKey: apiKey,
             model: model,
             maxTokens: maxTokens,
             temperature: temperature

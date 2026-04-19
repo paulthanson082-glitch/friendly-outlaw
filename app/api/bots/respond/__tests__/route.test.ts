@@ -1,3 +1,6 @@
+/**
+ * @jest-environment node
+ */
 import { POST } from '../route';
 import { NextRequest } from 'next/server';
 
@@ -357,9 +360,10 @@ describe('/api/bots/respond POST', () => {
     const request = createMockRequest({ speaker: 'pixel', listener: 'sage' });
     await POST(request);
 
-    const messageCalls = mockSql.mock.calls.filter(call =>
-      call[0]?.some?.((str: string) => str.includes('FROM messages') && str.includes('OR'))
-    );
+    const messageCalls = mockSql.mock.calls.filter(call => {
+      const fullSql = call[0]?.join?.('') ?? '';
+      return fullSql.includes('FROM messages') && fullSql.includes('OR');
+    });
     expect(messageCalls.length).toBeGreaterThan(0);
   });
 

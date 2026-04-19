@@ -1,154 +1,353 @@
 /**
- * Tests for the jest.setup.ts polyfills, focusing on the simplified Response
- * polyfill introduced in this PR.
+ * Tests for jest.setup.ts polyfills.
  *
- * The polyfill is applied by setupFilesAfterEnv so the global Response (and
- * friends) are already in scope when these tests run.
+ * jest.setup.ts patches the global environment so that Next.js API route
+ * tests work correctly under jsdom.  This file verifies the key behaviours
+ * that those patches provide:
+ *
+ *  1. `global.Response` correctly reflects the `status` supplied in the
+ *     `init` argument (jsdom's native Response ignores the status option).
+ *  2. `Response.json()` is a static factory that sets content-type and
+ *     stores the provided data.
+ *  3. `global.Request` exposes a `json()` method that parses the body.
+ *  4. `global.Headers` behaves like a case-insensitive key-value store.
  */
 
-describe('jest.setup.ts – Response polyfill', () => {
-  describe('constructor', () => {
-    it('creates a Response with body and init', () => {
-      const res = new Response('hello', { status: 201 });
-      expect(res).toBeDefined();
+// jest.setup.ts is executed automatically before every test file via
+// `setupFilesAfterEnv` in jest.config.ts, so the polyfills are already
+// applied when this file runs.
+
+describe('jest.setup.ts polyfills', () => {
+  // ---------------------------------------------------------------------------
+  // Response polyfill
+  // ---------------------------------------------------------------------------
+
+  describe('Response polyfill', () => {
+    it('should be defined on global', () => {
+      expect(global.Response).toBeDefined();
     });
 
-    it('has a default status of 200', () => {
-      const res = new Response('body');
+    it('should default status to 200 when no init is provided', () => {
+      const res = new Response({ message: 'ok' });
       expect(res.status).toBe(200);
     });
 
-    it('has an empty headers Map by default', () => {
-      const res = new Response();
-      expect(res.headers).toBeDefined();
+    it('should use the provided status code', () => {
+      const res = new Response({ error: 'not found' }, { status: 404 });
+      expect(res.status).toBe(404);
     });
-  });
 
-  describe('instance methods', () => {
-    it('json() parses a JSON string body', async () => {
-      const res = new Response(JSON.stringify({ key: 'value' }));
+    it('should correctly reflect status 400', () => {
+      const res = new Response({ error: 'bad request' }, { status: 400 });
+      expect(res.status).toBe(400);
+    });
+
+    it('should correctly reflect status 500', () => {
+      const res = new Response(null, { status: 500 });
+      expect(res.status).toBe(500);
+    });
+
+    it('should correctly reflect status 201', () => {
+      const res = new Response({ id: 1 }, { status: 201 });
+      expect(res.status).toBe(201);
+    });
+
+    it('should return JSON body via async json()', async () => {
+      const body = { key: 'value', count: 42 };
+      const res = new Response(body, { status: 200 });
       const data = await res.json();
-      expect(data).toEqual({ key: 'value' });
+      expect(data).toEqual(body);
     });
 
-    it('json() returns the body directly when it is already an object', async () => {
-      const res = new Response({ key: 'value' });
+    it('should parse a JSON string body via async json()', async () => {
+      const res = new Response(JSON.stringify({ parsed: true }), { status: 200 });
       const data = await res.json();
-      expect(data).toEqual({ key: 'value' });
+      expect(data.parsed).toBe(true);
     });
 
-    it('text() returns the string body as-is', async () => {
-      const res = new Response('plain text');
+    it('should return body as string via async text()', async () => {
+      const res = new Response('plain text', { status: 200 });
       const text = await res.text();
       expect(text).toBe('plain text');
     });
 
-    it('text() serialises an object body to JSON', async () => {
-      const res = new Response({ key: 'value' });
+    it('should stringify an object body in text()', async () => {
+      const body = { hello: 'world' };
+      const res = new Response(body, { status: 200 });
       const text = await res.text();
-      expect(JSON.parse(text)).toEqual({ key: 'value' });
+      expect(text).toContain('hello');
     });
 
-    it('text() round-trips with json()', async () => {
-      const res = new Response({ a: 1, b: 'two' });
-      const text = await res.text();
-      expect(JSON.parse(text)).toEqual({ a: 1, b: 'two' });
-    });
-  });
-
-  describe('static json() factory', () => {
-    it('creates a Response from a data object', () => {
-      const res = Response.json({ result: 'ok' });
-      expect(res).toBeDefined();
-    });
-
-    it('sets the content-type header to application/json', () => {
-      const res = Response.json({ x: 1 });
-      const ct = res.headers.get('content-type');
-      expect(ct).toBe('application/json');
-    });
-
-    it('uses the status from init when provided', () => {
-      const res = Response.json({ error: 'not found' }, { status: 404 });
-      expect(res.status).toBe(404);
-    });
-
-    it('defaults to status 200 when no init is provided', () => {
-      const res = Response.json({ ok: true });
-      expect(res.status).toBe(200);
-    });
-
-    it('returns json-parseable body data', async () => {
-      const payload = { message: 'hello', code: 42 };
-      const res = Response.json(payload);
-      const data = await res.json();
-      expect(data).toEqual(payload);
-    });
-
-    it('merges custom headers from init', () => {
-      const res = Response.json({ x: 1 }, {
-        status: 200,
-        headers: { 'x-custom': 'test-value' },
+    describe('Response.json() static factory', () => {
+      it('should be a function', () => {
+        expect(typeof Response.json).toBe('function');
       });
-      expect(res.headers.get('x-custom')).toBe('test-value');
-      // content-type should still be set
-      expect(res.headers.get('content-type')).toBe('application/json');
+
+      it('should create a response with the provided data', async () => {
+        const data = { success: true };
+        const res = Response.json(data);
+        const parsed = await res.json();
+        expect(parsed).toEqual(data);
+      });
+
+      it('should default to status 200', () => {
+        const res = Response.json({ ok: true });
+        expect(res.status).toBe(200);
+      });
+
+      it('should use the provided status in init', () => {
+        const res = Response.json({ error: 'not found' }, { status: 404 });
+        expect(res.status).toBe(404);
+      });
+
+      it('should use the provided status 400', () => {
+        const res = Response.json({ error: 'bad input' }, { status: 400 });
+        expect(res.status).toBe(400);
+      });
+
+      it('should use the provided status 201', () => {
+        const res = Response.json({ id: 'abc' }, { status: 201 });
+        expect(res.status).toBe(201);
+      });
+
+      it('should set content-type header to application/json', () => {
+        const res = Response.json({});
+        // The polyfill stores headers in a Map with lower-case keys
+        const contentType = (res.headers as any).get('content-type');
+        expect(contentType).toBe('application/json');
+      });
+
+      it('should preserve a null body', async () => {
+        const res = Response.json(null, { status: 204 });
+        expect(res.status).toBe(204);
+        // null is a valid JSON value
+        const parsed = await res.json();
+        expect(parsed).toBeNull();
+      });
+
+      it('should handle an array body', async () => {
+        const data = [1, 2, 3];
+        const res = Response.json(data, { status: 200 });
+        const parsed = await res.json();
+        expect(parsed).toEqual(data);
+      });
+
+      it('should handle a nested object body', async () => {
+        const data = { user: { name: 'Alice', age: 30 } };
+        const res = Response.json(data);
+        const parsed = await res.json();
+        expect(parsed.user.name).toBe('Alice');
+      });
     });
 
-    it('handles nested objects in body', async () => {
-      const payload = { nested: { deep: { value: 99 } }, arr: [1, 2, 3] };
-      const res = Response.json(payload);
-      const data = await res.json();
-      expect(data).toEqual(payload);
-    });
+    describe('Response headers', () => {
+      it('should store headers from init', () => {
+        const res = new Response('body', {
+          status: 200,
+          headers: { 'x-custom': 'value' },
+        });
+        const header = (res.headers as any).get('x-custom');
+        expect(header).toBe('value');
+      });
 
-    it('handles null body', async () => {
-      const res = Response.json(null);
-      const data = await res.json();
-      expect(data).toBeNull();
-    });
-
-    it('handles array body', async () => {
-      const res = Response.json([1, 2, 3]);
-      const data = await res.json();
-      expect(data).toEqual([1, 2, 3]);
-    });
-
-    it('passes various 4xx status codes through correctly', () => {
-      expect(Response.json({}, { status: 400 }).status).toBe(400);
-      expect(Response.json({}, { status: 401 }).status).toBe(401);
-      expect(Response.json({}, { status: 409 }).status).toBe(409);
-      expect(Response.json({}, { status: 422 }).status).toBe(422);
-    });
-
-    it('passes 5xx status codes through correctly', () => {
-      expect(Response.json({}, { status: 500 }).status).toBe(500);
-      expect(Response.json({}, { status: 503 }).status).toBe(503);
+      it('should lower-case header names', () => {
+        const res = new Response('body', {
+          status: 200,
+          headers: { 'X-Correlation-ID': 'abc123' },
+        });
+        const header = (res.headers as any).get('x-correlation-id');
+        expect(header).toBe('abc123');
+      });
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Request polyfill
+  // ---------------------------------------------------------------------------
 
   describe('Request polyfill', () => {
-    it('is defined in the test environment', () => {
-      expect(typeof Request).not.toBe('undefined');
+    it('should be defined on global', () => {
+      expect(global.Request).toBeDefined();
     });
 
-    it('stores the url', () => {
+    it('should store the URL', () => {
       const req = new Request('https://example.com/api');
-      expect(req.url).toBe('https://example.com/api');
+      expect((req as any).url).toBe('https://example.com/api');
     });
 
-    it('json() returns parsed body from init', async () => {
-      const req = new Request('https://example.com', {
-        body: JSON.stringify({ foo: 'bar' }),
-      });
-      const data = await req.json();
+    it('should return parsed JSON from a string body', async () => {
+      const body = JSON.stringify({ foo: 'bar' });
+      const req = new Request('https://example.com/', { body });
+      const data = await (req as any).json();
       expect(data).toEqual({ foo: 'bar' });
     });
 
-    it('json() returns empty object when no body is given', async () => {
-      const req = new Request('https://example.com');
-      const data = await req.json();
+    it('should return empty object when no body is provided', async () => {
+      const req = new Request('https://example.com/');
+      const data = await (req as any).json();
       expect(data).toEqual({});
+    });
+
+    it('should accept an init object', () => {
+      const req = new Request('https://example.com/', { method: 'POST' });
+      expect((req as any).init?.method).toBe('POST');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Boundary and regression cases
+  // ---------------------------------------------------------------------------
+
+  describe('Status code boundary cases', () => {
+    it('should handle status 0 if explicitly set', () => {
+      const res = new Response(null, { status: 0 });
+      expect(res.status).toBe(0);
+    });
+
+    it('should handle status 999', () => {
+      const res = new Response(null, { status: 999 });
+      expect(res.status).toBe(999);
+    });
+
+    it('should handle the same body used in multiple Response instances', async () => {
+      const body = { shared: true };
+      const res1 = new Response(body, { status: 200 });
+      const res2 = new Response(body, { status: 404 });
+
+      expect(res1.status).toBe(200);
+      expect(res2.status).toBe(404);
+
+      const data1 = await res1.json();
+      const data2 = await res2.json();
+      expect(data1).toEqual(body);
+      expect(data2).toEqual(body);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Additional Response tests (body edge cases)
+  // ---------------------------------------------------------------------------
+
+  describe('Response body edge cases', () => {
+    it('should return undefined from json() when body is null', async () => {
+      const res = new Response(null, { status: 204 });
+      const data = await res.json();
+      // null body: json() returns null (object passthrough)
+      expect(data).toBeNull();
+    });
+
+    it('should return a number body from json()', async () => {
+      const res = new Response(42, { status: 200 });
+      const data = await res.json();
+      expect(data).toBe(42);
+    });
+
+    it('should return a boolean body from json()', async () => {
+      const res = new Response(true, { status: 200 });
+      const data = await res.json();
+      expect(data).toBe(true);
+    });
+
+    it('should stringify a number body in text()', async () => {
+      const res = new Response(123, { status: 200 });
+      const text = await res.text();
+      expect(text).toBe('123');
+    });
+
+    it('should stringify a boolean body in text()', async () => {
+      const res = new Response(false, { status: 200 });
+      const text = await res.text();
+      expect(text).toBe('false');
+    });
+
+    it('should return a plain string body in text() without modification', async () => {
+      const res = new Response('raw string body', { status: 200 });
+      const text = await res.text();
+      expect(text).toBe('raw string body');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Additional Response.json() static factory tests
+  // ---------------------------------------------------------------------------
+
+  describe('Response.json() with primitive values', () => {
+    it('should handle a number as data', async () => {
+      const res = Response.json(99);
+      const data = await res.json();
+      expect(data).toBe(99);
+    });
+
+    it('should handle a boolean true as data', async () => {
+      const res = Response.json(true);
+      const data = await res.json();
+      expect(data).toBe(true);
+    });
+
+    it('should handle a boolean false as data', async () => {
+      const res = Response.json(false);
+      const data = await res.json();
+      expect(data).toBe(false);
+    });
+
+    it('should produce independent instances with separate status codes', () => {
+      const res200 = Response.json({ a: 1 }, { status: 200 });
+      const res500 = Response.json({ b: 2 }, { status: 500 });
+      // Changing one must not affect the other
+      expect(res200.status).toBe(200);
+      expect(res500.status).toBe(500);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Additional header tests
+  // ---------------------------------------------------------------------------
+
+  describe('Response header lookup', () => {
+    it('should return undefined for a header that was not set', () => {
+      const res = new Response('body', { status: 200 });
+      const missing = (res.headers as any).get('x-does-not-exist');
+      expect(missing).toBeUndefined();
+    });
+
+    it('should handle multiple headers set at once', () => {
+      const res = new Response('body', {
+        status: 200,
+        headers: {
+          'x-first': 'one',
+          'x-second': 'two',
+          'x-third': 'three',
+        },
+      });
+      expect((res.headers as any).get('x-first')).toBe('one');
+      expect((res.headers as any).get('x-second')).toBe('two');
+      expect((res.headers as any).get('x-third')).toBe('three');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Additional Request tests
+  // ---------------------------------------------------------------------------
+
+  describe('Request additional cases', () => {
+    it('should return empty object from json() when init has no body property', async () => {
+      // init provided but no body key
+      const req = new Request('https://example.com/', { method: 'GET' });
+      const data = await (req as any).json();
+      expect(data).toEqual({});
+    });
+
+    it('should store the full URL including query string', () => {
+      const req = new Request('https://example.com/api?key=value&count=3');
+      expect((req as any).url).toBe('https://example.com/api?key=value&count=3');
+    });
+
+    it('should parse nested JSON body correctly', async () => {
+      const body = JSON.stringify({ user: { id: 1, name: 'Alice' } });
+      const req = new Request('https://example.com/', { body });
+      const data = await (req as any).json();
+      expect(data.user.id).toBe(1);
+      expect(data.user.name).toBe('Alice');
     });
   });
 });

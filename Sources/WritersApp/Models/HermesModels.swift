@@ -70,27 +70,23 @@ public struct HermesIdea: Identifiable, Codable {
     public let description: String
     public let ideaType: HermesIdeaType
     public let timestamp: Date
-    /// Whether the writer has marked this idea as a favourite for later use
-    public var isFavorite: Bool
 
     public init(
         id: UUID = UUID(),
         title: String,
         description: String,
         ideaType: HermesIdeaType,
-        timestamp: Date = Date(),
-        isFavorite: Bool = false
+        timestamp: Date = Date()
     ) {
         self.id = id
         self.title = title
         self.description = description
         self.ideaType = ideaType
         self.timestamp = timestamp
-        self.isFavorite = isFavorite
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, title, description, ideaType, timestamp, isFavorite
+        case id, title, description, ideaType, timestamp
     }
 
     public init(from decoder: Decoder) throws {
@@ -102,8 +98,6 @@ public struct HermesIdea: Identifiable, Codable {
         let timestampString = try container.decode(String.self, forKey: .timestamp)
         let formatter = ISO8601DateFormatter()
         timestamp = formatter.date(from: timestampString) ?? Date()
-        // Backward-compatible: existing payloads without this key default to false
-        isFavorite = try container.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -114,7 +108,6 @@ public struct HermesIdea: Identifiable, Codable {
         try container.encode(ideaType, forKey: .ideaType)
         let formatter = ISO8601DateFormatter()
         try container.encode(formatter.string(from: timestamp), forKey: .timestamp)
-        try container.encode(isFavorite, forKey: .isFavorite)
     }
 }
 
@@ -126,8 +119,6 @@ public struct HermesContext: Codable {
     public let characters: [String]
     public let themes: [String]
     public let documentId: UUID?
-    /// Desired emotional tone for generated ideas. When set, Hermes adjusts its voice accordingly.
-    public let tone: HermesTone?
 
     public init(
         genre: String = "",
@@ -135,8 +126,7 @@ public struct HermesContext: Codable {
         currentScene: String = "",
         characters: [String] = [],
         themes: [String] = [],
-        documentId: UUID? = nil,
-        tone: HermesTone? = nil
+        documentId: UUID? = nil
     ) {
         self.genre = genre
         self.logline = logline
@@ -144,7 +134,6 @@ public struct HermesContext: Codable {
         self.characters = characters
         self.themes = themes
         self.documentId = documentId
-        self.tone = tone
     }
 }
 
