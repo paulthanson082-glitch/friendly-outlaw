@@ -47,14 +47,3 @@ fi
 if ! command -v firecrawl &>/dev/null; then
   npm install -g firecrawl-cli 2>&1 || true
 fi
-
-# Install Claude plugins
-claude plugin install context7@claude-plugins-official 2>&1 || true
-claude plugin install frontend-design@claude-plugins-official 2>&1 || true
-claude plugin install code-review@claude-plugins-official 2>&1 || true
-claude plugin install superpowers@claude-plugins-official 2>&1 || true
-claude plugin install github@claude-plugins-official 2>&1 || true
-claude plugin install feature-dev@claude-plugins-official 2>&1 || true
-claude plugin install code-simplifier@claude-plugins-official 2>&1 || true
-claude plugin install ralph-loop@claude-plugins-official 2>&1 || true
-claude plugin install typescript-lsp@claude-plugins-official 2>&1 || true
