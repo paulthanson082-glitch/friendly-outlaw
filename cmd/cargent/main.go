@@ -146,7 +146,13 @@ var tools = []toolDef{
 }
 
 // executeTool runs the named tool with the provided JSON input and returns
-// a result string.
+// executeTool parses rawInput JSON for the named built-in tool, executes the tool, and returns the resulting string or an error.
+// Supported tools:
+// - "word_count": returns the number of words in the "text" field using whitespace splitting.
+// - "char_count": returns the count of runes in "text" excluding Unicode whitespace.
+// - "reverse_text": returns the rune-reversed "text" string.
+// - "repeat_text": returns "text" repeated `times` times joined by "separator" (default: " "); `times` is clamped to the range 1–20.
+// Returns an error if the input JSON is invalid or the tool name is unknown.
 func executeTool(name string, rawInput json.RawMessage) (string, error) {
 	var input map[string]any
 	if err := json.Unmarshal(rawInput, &input); err != nil {
@@ -230,6 +236,12 @@ const (
 	maxIter  = 10
 )
 
+// callAPI sends the provided conversation messages and the package's tool definitions to the Anthropic
+// Messages API and returns the parsed API response.
+//
+// It uses the package-level model, token limit, and tools, includes the given apiKey and the required
+// headers, and honors ctx for cancellation; the HTTP client enforces a 60-second timeout. If the API
+// returns an error payload, callAPI returns an error containing the API error type and message.
 func callAPI(ctx context.Context, apiKey string, msgs []message) (*apiResponse, error) {
 	req := apiRequest{
 		Model:     model,
@@ -275,7 +287,15 @@ func callAPI(ctx context.Context, apiKey string, msgs []message) (*apiResponse, 
 
 // ---------------------------------------------------------------------------
 // Agent loop
-// ---------------------------------------------------------------------------
+// run executes the agent loop for the provided task using the Anthropic Messages API.
+// 
+// It starts the conversation with a single user message containing task, repeatedly
+// calls the API, and reacts to assistant responses that request tool executions.
+// If the assistant response does not request tools, any text content blocks are
+// printed to stdout and run returns nil. If tool executions are requested, each
+// tool is executed locally and its result is appended to the conversation as a
+// `tool_result` user message, after which the loop continues. The function returns
+// an error if an API call fails or if the loop exceeds the configured iteration limit.
 
 func run(ctx context.Context, apiKey, task string) error {
 	msgs := []message{
@@ -336,7 +356,7 @@ func run(ctx context.Context, apiKey, task string) error {
 
 // ---------------------------------------------------------------------------
 // Entry point
-// ---------------------------------------------------------------------------
+// main is the entry point of the cargent CLI. It reads ANTHROPIC_API_KEY, validates and formats the command-line task argument, invokes run with a background context, and prints usage or error messages to stderr and exits nonzero on failure.
 
 func main() {
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
