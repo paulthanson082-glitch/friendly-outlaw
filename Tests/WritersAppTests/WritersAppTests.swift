@@ -3493,6 +3493,130 @@ final class HermesAgentTests: XCTestCase {
         let issues = app.getIssues(forDocument: doc.id)
         XCTAssertTrue(issues.contains { $0.id == issue.id })
     }
+
+    // MARK: - TemplateCategory Additional Tests
+
+    func testTemplateCategoryContainsExpectedCases() {
+        let allCases = TemplateCategory.allCases
+        let rawValues = allCases.map { $0.rawValue }
+        let expected = ["Novel", "Short Story", "Screenplay", "Blog Post", "Article",
+                        "Essay", "Poetry", "Business Letter", "Proposal", "Resume", "Other"]
+        for e in expected {
+            XCTAssertTrue(rawValues.contains(e), "Expected category '\(e)' not found in TemplateCategory")
+        }
+    }
+
+    func testTemplateCategoryExactCaseCount() {
+        XCTAssertEqual(TemplateCategory.allCases.count, 11,
+                       "TemplateCategory should have exactly 11 cases")
+    }
+
+    func testTemplateCategoryRawValueRoundTrip() {
+        for category in TemplateCategory.allCases {
+            let decoded = TemplateCategory(rawValue: category.rawValue)
+            XCTAssertEqual(decoded, category,
+                           "TemplateCategory '\(category.rawValue)' should decode from its own rawValue")
+        }
+    }
+
+    func testTemplateCategoryOtherRemainsAfterRemoval() {
+        XCTAssertNotNil(TemplateCategory(rawValue: "Other"))
+    }
+
+    // MARK: - TemplateManager Default Templates Additional Tests
+
+    func testTemplateManagerDefaultTemplateCount() {
+        let all = app.templateManager.getAllTemplates()
+        XCTAssertEqual(all.count, 7,
+                       "Default templates should be exactly 7")
+    }
+
+    func testTemplateManagerRetainsCoreLiteraryTemplates() {
+        let all = app.templateManager.getAllTemplates()
+        let names = all.map { $0.name }
+        let required = ["Novel Chapter", "Short Story", "Screenplay", "Blog Post",
+                        "Article", "Poetry", "Business Letter"]
+        for name in required {
+            XCTAssertTrue(names.contains(name), "Core template '\(name)' should still be present")
+        }
+    }
+
+    func testTemplateManagerGetTemplatesForRemovedCategoryReturnsEmpty() {
+        let otherTemplates = app.templateManager.getTemplates(for: .other)
+        let legacyNames = [
+            "Morning Inbox Summary", "Weekly Status Report", "Daily Sales Dashboard"
+        ]
+        for name in legacyNames {
+            XCTAssertNil(otherTemplates.first { $0.name == name },
+                         "Legacy template '\(name)' should not appear in any category")
+        }
+    }
+
+    func testTemplateManagerSearchDoesNotFindRemovedTemplates() {
+        XCTAssertTrue(app.templateManager.searchTemplates(query: "Inbox Summary").isEmpty)
+        XCTAssertTrue(app.templateManager.searchTemplates(query: "Competitor News").isEmpty)
+        XCTAssertTrue(app.templateManager.searchTemplates(query: "Sales Dashboard").isEmpty)
+        XCTAssertTrue(app.templateManager.searchTemplates(query: "Content Writer Profile").isEmpty)
+    }
+
+    // MARK: - WritersApp Initializer Additional Tests
+
+    func testWritersAppDefaultInitCreatesManagersWithoutAI() {
+        let freshApp = WritersApp()
+        XCTAssertFalse(freshApp.isAIEnabled)
+        XCTAssertNil(freshApp.chatbotService)
+        XCTAssertNil(freshApp.aiService)
+    }
+
+    func testWritersAppDefaultInitHasTemplateManager() {
+        let freshApp = WritersApp()
+        XCTAssertGreaterThan(freshApp.templateManager.getAllTemplates().count, 0)
+    }
+
+    func testWritersAppDefaultInitHasDocumentManager() {
+        let freshApp = WritersApp()
+        XCTAssertEqual(freshApp.documentManager.getAllDocuments().count, 0)
+    }
+
+    func testWritersAppAIInitEnablesAIAndChatbot() {
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        let aiApp = WritersApp(aiConfiguration: config)
+        XCTAssertTrue(aiApp.isAIEnabled)
+        XCTAssertNotNil(aiApp.chatbotService)
+    }
+
+    func testWritersAppAIInitDoesNotExposeSeparateGuiService() {
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        let aiApp = WritersApp(aiConfiguration: config)
+        XCTAssertTrue(aiApp.isAIEnabled)
+    }
+
+    func testWritersAppEnableAIAfterDefaultInit() {
+        let freshApp = WritersApp()
+        XCTAssertFalse(freshApp.isAIEnabled)
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        freshApp.enableAI(configuration: config)
+        XCTAssertTrue(freshApp.isAIEnabled)
+        XCTAssertNotNil(freshApp.chatbotService)
+    }
+
+    func testWritersAppDisableAIAfterAIInit() {
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        let aiApp = WritersApp(aiConfiguration: config)
+        XCTAssertTrue(aiApp.isAIEnabled)
+        aiApp.disableAI()
+        XCTAssertFalse(aiApp.isAIEnabled)
+        XCTAssertNil(aiApp.aiService)
+        XCTAssertNil(aiApp.chatbotService)
+    }
+
+    func testWritersAppMultipleInitsAreIndependent() {
+        let app1 = WritersApp()
+        let app2 = WritersApp()
+        _ = app1.createBlankDocument(title: "Only in App1", category: .novel)
+        XCTAssertEqual(app1.documentManager.getAllDocuments().count, 1)
+        XCTAssertEqual(app2.documentManager.getAllDocuments().count, 0)
+    }
 }
 
 // MARK: - Test Helpers
