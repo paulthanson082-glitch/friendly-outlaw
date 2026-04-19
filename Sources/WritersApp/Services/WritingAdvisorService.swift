@@ -92,9 +92,9 @@ public class WritingAdvisorService {
         return report
     }
 
-    // MARK: - Private Parsing
+    // MARK: - JSON Parsing
 
-    private func parseReport(from content: String) throws -> WritingAdvisorReport {
+    func parseReport(from content: String) throws -> WritingAdvisorReport {
         // Attempt to decode JSON response from the model
         let jsonData: Data
         if let range = content.range(of: "{"),

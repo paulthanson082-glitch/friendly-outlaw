@@ -986,7 +986,7 @@ public class WritersApp {
 
     // MARK: - Writing Advisor
 
-    /// Returns writing advice personalised with real document statistics.
+    /// Returns writing advice personalised with real document and session statistics.
     ///
     /// - Parameter notes: Optional additional context or focus area for the advice.
     /// - Returns: A `WritingAdvisorReport` with coaching recommendations.
@@ -995,14 +995,18 @@ public class WritersApp {
         guard let advisor = writingAdvisorService else { throw AIError.aiNotEnabled }
         let stats = getStatistics()
         let allDocs = documentManager.getAllDocuments()
-        let recentTitles = Array(allDocs.prefix(5).map { $0.title })
+        let recentTitles = allDocs
+            .sorted { $0.metadata.modified > $1.metadata.modified }
+            .prefix(5)
+            .map(\.title)
         let categories = Array(Set(allDocs.map { $0.category.rawValue })).sorted()
+        let sessionStats = currentUserId.flatMap { try? getSessionStats(userId: $0) }
         let ctx = AdvisorContext(
             totalDocuments: stats.totalDocuments,
-            recentDocumentTitles: recentTitles,
+            recentDocumentTitles: Array(recentTitles),
             totalWordsAcrossDocuments: stats.totalWordCount,
             documentCategories: categories,
-            sessionStats: nil,
+            sessionStats: sessionStats,
             additionalNotes: notes
         )
         return try await advisor.getPersonalizedAdvice(context: ctx)

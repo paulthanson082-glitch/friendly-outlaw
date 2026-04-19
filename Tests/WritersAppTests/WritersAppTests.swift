@@ -2648,6 +2648,36 @@ final class WritingAdvisorTests: XCTestCase {
         XCTAssertEqual(ctx.additionalNotes, "Some note")
     }
 
+    func testWritingAdvisorServiceParseReportExtractsJSONFromProse() throws {
+        let config = AIConfiguration(apiKey: "test")
+        let aiService = AIService(configuration: config)
+        let advisorService = WritingAdvisorService(aiService: aiService)
+        let jsonBlob = """
+        {
+          "overallAssessment": "Excellent progress.",
+          "focusArea": "productivity",
+          "recommendations": [
+            {
+              "category": "productivity",
+              "priority": "high",
+              "title": "Daily Writing",
+              "recommendation": "Write every day.",
+              "actionableSteps": ["Set a time", "Track"]
+            }
+          ]
+        }
+        """
+        let wrappedInProse = "Claude says:\n\n\(jsonBlob)\n\nGood luck!"
+        let report = try advisorService.parseReport(from: wrappedInProse)
+
+        XCTAssertEqual(report.focusArea, .productivity)
+        XCTAssertEqual(report.recommendations.count, 1)
+        XCTAssertEqual(report.recommendations[0].title, "Daily Writing")
+        let encoded = try JSONEncoder().encode(report)
+        let decoded = try JSONDecoder().decode(WritingAdvisorReport.self, from: encoded)
+        XCTAssertEqual(decoded.recommendations[0].title, "Daily Writing")
+    }
+
     func testAdvisorContextDefaultNilNotes() {
         let ctx = AdvisorContext(
             totalDocuments: 0,
