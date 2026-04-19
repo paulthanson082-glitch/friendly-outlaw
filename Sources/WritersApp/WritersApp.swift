@@ -12,6 +12,7 @@ public class WritersApp {
     public let encouragementService: EncouragementService
     public let versionControl: DoltVersionControlService
     public let giftCardManager: GiftCardManager
+    public let crmManager: CRMManager
     public private(set) var guiService: GuiNewService?
     public private(set) var aiService: AIService?
     public private(set) var chatbotService: ChatbotService?
@@ -54,6 +55,7 @@ public class WritersApp {
         self.encouragementService = EncouragementService()
         self.versionControl = DoltVersionControlService(databaseManager: databaseManager)
         self.giftCardManager = GiftCardManager(databaseManager: databaseManager)
+        self.crmManager = CRMManager()
         self.guiService = nil
         self.appSettings = AppSettings()
         self.prospectDatabase = ProspectDatabase()
@@ -305,35 +307,6 @@ public class WritersApp {
     /// - Returns: A flat array of `HermesIdea` in chronological order.
     public func getAllIdeas(from session: HermesSession, filteredBy type: HermesIdeaType? = nil) -> [HermesIdea] {
         return hermesService?.getAllIdeas(from: session, filteredBy: type) ?? []
-    }
-
-    /// Returns all ideas the writer has marked as favourite in the session.
-    /// - Parameter session: The session to query.
-    /// - Returns: A flat array of favourite `HermesIdea` in chronological order.
-    public func getFavorites(from session: HermesSession) -> [HermesIdea] {
-        return hermesService?.getFavorites(from: session) ?? []
-    }
-
-    /// Marks a specific idea in the session as a favourite.
-    /// - Parameters:
-    ///   - ideaId: UUID of the idea to favourite.
-    ///   - session: The session containing the idea; mutated in place.
-    /// - Throws: `HermesError.aiNotAvailable` if Hermes is not enabled.
-    ///           `HermesError.ideaNotFound(id:)` if the idea does not exist.
-    public func favoriteIdea(ideaId: UUID, in session: inout HermesSession) throws {
-        guard let service = hermesService else { throw HermesError.aiNotAvailable }
-        try service.favoriteIdea(ideaId, in: &session)
-    }
-
-    /// Removes the favourite mark from a specific idea in the session.
-    /// - Parameters:
-    ///   - ideaId: UUID of the idea to un-favourite.
-    ///   - session: The session containing the idea; mutated in place.
-    /// - Throws: `HermesError.aiNotAvailable` if Hermes is not enabled.
-    ///           `HermesError.ideaNotFound(id:)` if the idea does not exist.
-    public func unfavoriteIdea(ideaId: UUID, in session: inout HermesSession) throws {
-        guard let service = hermesService else { throw HermesError.aiNotAvailable }
-        try service.unfavoriteIdea(ideaId, in: &session)
     }
 
     /// Computes aggregated statistics for a Hermes session.
@@ -1013,60 +986,6 @@ public class WritersApp {
         )
     }
 
-    // MARK: - Writing Advisor
-
-    /// Returns a full personalized coaching report with 3-5 recommendations based on
-    /// Generate a personalized writing advisor report using the current documents and optional notes.
-    /// - Parameters:
-    ///   - notes: Optional additional notes to include in the advisor context.
-    /// - Returns: A `WritingAdvisorReport` containing personalized insights and recommendations.
-    /// - Throws: `AIError.aiNotEnabled` if the writing advisor service is not configured.
-    public func getPersonalizedWritingAdvice(notes: String? = nil) async throws -> WritingAdvisorReport {
-        guard let advisorService = writingAdvisorService else { throw AIError.aiNotEnabled }
-        let context = buildAdvisorContext(additionalNotes: notes)
-        return try await advisorService.getAdvisorReport(context: context)
-    }
-
-    /// Fetches a tailored writing recommendation for the specified advisor category using the current app context.
-    /// - Parameters:
-    ///   - category: The advisor category to request guidance for.
-    ///   - notes: Optional additional notes to include in the advisor context.
-    /// - Returns: An `AdvisorRecommendation` containing the advisor's recommendation for the given category.
-    /// - Throws: `AIError.aiNotEnabled` if the writing advisor service is not enabled.
-    public func getWritingAdvice(
-        for category: AdvisorCategory,
-        notes: String? = nil
-    ) async throws -> AdvisorRecommendation {
-        guard let advisorService = writingAdvisorService else { throw AIError.aiNotEnabled }
-        let context = buildAdvisorContext(additionalNotes: notes)
-        return try await advisorService.getRecommendation(for: category, context: context)
-    }
-
-    /// Builds an AdvisorContext summarizing the current document corpus and optional user session data.
-    /// - Parameter additionalNotes: Optional free-form notes to include in the returned context.
-    /// - Returns: An AdvisorContext containing:
-    ///   - totalDocuments: the number of documents,
-    ///   - recentDocumentTitles: up to five most recent document titles,
-    ///   - totalWordsAcrossDocuments: cumulative word count across all documents,
-    ///   - documentCategories: unique category identifiers from the documents,
-    ///   - sessionStats: session statistics for the current user if available,
-    ///   - additionalNotes: the provided notes.
-    private func buildAdvisorContext(additionalNotes: String?) -> AdvisorContext {
-        let docs = documentManager.getAllDocuments()
-        let totalWords = docs.reduce(0) { $0 + $1.wordCount }
-        let titles = Array(docs.prefix(5).map { $0.title })
-        let categories = Array(Set(docs.map { $0.category.rawValue }))
-        let stats = currentUserId.flatMap { try? databaseManager.getSessionStats(userId: $0) }
-        return AdvisorContext(
-            totalDocuments: docs.count,
-            recentDocumentTitles: titles,
-            totalWordsAcrossDocuments: totalWords,
-            documentCategories: categories,
-            sessionStats: stats,
-            additionalNotes: additionalNotes
-        )
-    }
-
     /// Generates brainstorming suggestions for the given subject.
     /// - Parameters:
     ///   - topic: The subject or prompt to generate ideas about.
@@ -1502,6 +1421,7 @@ public class WritersApp {
         email: String,
         company: String? = nil,
         role: String? = nil,
+        status: ProspectStatus = .new,
         notes: String = "",
         tags: [String] = []
     ) -> Prospect {
@@ -1510,6 +1430,7 @@ public class WritersApp {
             email: email,
             company: company,
             role: role,
+            status: status,
             notes: notes,
             tags: tags
         )
