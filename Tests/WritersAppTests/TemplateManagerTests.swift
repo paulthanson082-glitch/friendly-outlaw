@@ -1,9 +1,11 @@
 import XCTest
 @testable import WritersApp
 
-/// Tests for TemplateManager, focused on the Screenplay Scene template's
-/// character_state and parenthetical placeholder configuration.
+/// Tests for TemplateManager PR changes:
+/// - Screenplay Scene template removed {{character_state}} and {{shot_description}} placeholders
+/// - Screenplay Scene template content no longer contains those placeholder markers
 final class TemplateManagerTests: XCTestCase {
+
     var templateManager: TemplateManager!
 
     override func setUp() {
@@ -16,214 +18,222 @@ final class TemplateManagerTests: XCTestCase {
         super.tearDown()
     }
 
+    // MARK: - Screenplay template exists
+
+    func testScreenplayTemplateIsPresent() {
+        let screenplay = getScreenplayTemplate()
+        XCTAssertNotNil(screenplay, "Screenplay Scene template should be available by default")
+    }
+
+    func testScreenplayTemplateHasCorrectCategory() {
+        let screenplay = getScreenplayTemplate()
+        XCTAssertEqual(screenplay?.category, .screenplay)
+    }
+
+    // MARK: - Removed placeholders (PR change)
+
+    func testScreenplayTemplateDoesNotHaveCharacterStatePlaceholder() {
+        guard let screenplay = getScreenplayTemplate() else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        let hasCharacterState = screenplay.placeholders.contains { $0.key == "character_state" }
+        XCTAssertFalse(hasCharacterState,
+                       "character_state placeholder should be removed from screenplay template")
+    }
+
+    func testScreenplayTemplateDoesNotHaveShotDescriptionPlaceholder() {
+        guard let screenplay = getScreenplayTemplate() else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        let hasShotDescription = screenplay.placeholders.contains { $0.key == "shot_description" }
+        XCTAssertFalse(hasShotDescription,
+                       "shot_description placeholder should be removed from screenplay template")
+    }
+
+    func testScreenplayTemplateContentDoesNotContainCharacterStateMarker() {
+        guard let screenplay = getScreenplayTemplate() else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        XCTAssertFalse(screenplay.content.contains("{{character_state}}"),
+                       "Screenplay template content must not reference {{character_state}}")
+    }
+
+    func testScreenplayTemplateContentDoesNotContainShotDescriptionMarker() {
+        guard let screenplay = getScreenplayTemplate() else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        XCTAssertFalse(screenplay.content.contains("{{shot_description}}"),
+                       "Screenplay template content must not reference {{shot_description}}")
+    }
+
+    // MARK: - Required placeholders still present
+
+    func testScreenplayTemplateHasSceneHeadingPlaceholder() {
+        guard let screenplay = getScreenplayTemplate() else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        XCTAssertTrue(screenplay.placeholders.contains { $0.key == "scene_heading" },
+                      "scene_heading placeholder must remain in screenplay template")
+    }
+
+    func testScreenplayTemplateHasActionPlaceholder() {
+        guard let screenplay = getScreenplayTemplate() else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        XCTAssertTrue(screenplay.placeholders.contains { $0.key == "action" },
+                      "action placeholder must remain in screenplay template")
+    }
+
+    func testScreenplayTemplateHasCharacterPlaceholder() {
+        guard let screenplay = getScreenplayTemplate() else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        XCTAssertTrue(screenplay.placeholders.contains { $0.key == "character" },
+                      "character placeholder must remain in screenplay template")
+    }
+
+    func testScreenplayTemplateHasDialoguePlaceholder() {
+        guard let screenplay = getScreenplayTemplate() else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        XCTAssertTrue(screenplay.placeholders.contains { $0.key == "dialogue" },
+                      "dialogue placeholder must remain in screenplay template")
+    }
+
+    func testScreenplayTemplateHasTransitionPlaceholder() {
+        guard let screenplay = getScreenplayTemplate() else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        XCTAssertTrue(screenplay.placeholders.contains { $0.key == "transition" },
+                      "transition placeholder must remain in screenplay template")
+    }
+
+    func testScreenplayTemplateHasOptionalSecondCharacterPlaceholder() {
+        guard let screenplay = getScreenplayTemplate() else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        XCTAssertTrue(screenplay.placeholders.contains { $0.key == "character_2" },
+                      "character_2 (optional) placeholder must remain in screenplay template")
+    }
+
+    func testScreenplayTemplateHasParentheticalPlaceholder() {
+        guard let screenplay = getScreenplayTemplate() else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        XCTAssertTrue(screenplay.placeholders.contains { $0.key == "parenthetical" },
+                      "parenthetical placeholder must remain in screenplay template")
+    }
+
+    func testScreenplayTemplateHasSecondDialoguePlaceholder() {
+        guard let screenplay = getScreenplayTemplate() else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        XCTAssertTrue(screenplay.placeholders.contains { $0.key == "dialogue_2" },
+                      "dialogue_2 placeholder must remain in screenplay template")
+    }
+
+    // MARK: - Placeholder count (8 after removing 2)
+
+    func testScreenplayTemplateHasExactlyEightPlaceholders() {
+        guard let screenplay = getScreenplayTemplate() else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        // scene_heading, action, character, dialogue, character_2, parenthetical, dialogue_2, transition
+        XCTAssertEqual(screenplay.placeholders.count, 8,
+                       "Screenplay template should have 8 placeholders after removing character_state and shot_description")
+    }
+
+    // MARK: - Content markers match placeholders
+
+    func testScreenplayTemplateContentContainsAllRemainingPlaceholderKeys() {
+        guard let screenplay = getScreenplayTemplate() else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        // All required (non-optional) placeholder keys should appear in content
+        let requiredKeys = ["scene_heading", "action", "character", "dialogue", "transition"]
+        for key in requiredKeys {
+            XCTAssertTrue(screenplay.content.contains("{{\(key)}}"),
+                          "Screenplay content must contain {{\(key)}}")
+        }
+    }
+
+    // MARK: - Transition placeholder has correct default value
+
+    func testScreenplayTransitionPlaceholderHasDefaultValue() {
+        guard let screenplay = getScreenplayTemplate() else {
+            XCTFail("Screenplay template not found")
+            return
+        }
+        let transition = screenplay.placeholders.first { $0.key == "transition" }
+        XCTAssertEqual(transition?.defaultValue, "CUT TO:",
+                       "Transition placeholder default value should be 'CUT TO:'")
+    }
+
+    // MARK: - Other templates unaffected
+
+    func testNovelChapterTemplateIsUnchanged() {
+        let novel = templateManager.getAllTemplates().first { $0.name == "Novel Chapter" }
+        XCTAssertNotNil(novel, "Novel Chapter template should still exist")
+    }
+
+    func testBlogPostTemplateIsUnchanged() {
+        let blog = templateManager.getAllTemplates().first { $0.name == "Blog Post" }
+        XCTAssertNotNil(blog, "Blog Post template should still exist")
+    }
+
+    func testTotalDefaultTemplateCount() {
+        // 7 default templates: Novel Chapter, Short Story, Screenplay Scene, Blog Post, Article, Poetry, Business Letter
+        XCTAssertGreaterThanOrEqual(templateManager.getAllTemplates().count, 7,
+                                    "At least 7 default templates expected")
+    }
+
+    // MARK: - TemplateManager CRUD basics
+
+    func testAddAndRetrieveCustomTemplate() {
+        let custom = Template(
+            name: "Custom Test",
+            category: .other,
+            description: "A custom template for testing",
+            content: "Hello {{name}}",
+            placeholders: [
+                Placeholder(key: "name", label: "Your Name")
+            ]
+        )
+        templateManager.addTemplate(custom)
+        let retrieved = templateManager.getTemplate(id: custom.id)
+        XCTAssertEqual(retrieved?.name, "Custom Test")
+    }
+
+    func testSearchTemplatesByName() {
+        let results = templateManager.searchTemplates(query: "Screenplay")
+        XCTAssertGreaterThanOrEqual(results.count, 1)
+        XCTAssertTrue(results.allSatisfy { $0.name.lowercased().contains("screenplay") ||
+                      $0.description.lowercased().contains("screenplay") })
+    }
+
+    func testGetTemplatesByCategory() {
+        let screenplayTemplates = templateManager.getTemplates(for: .screenplay)
+        XCTAssertGreaterThanOrEqual(screenplayTemplates.count, 1)
+        XCTAssertTrue(screenplayTemplates.allSatisfy { $0.category == .screenplay })
+    }
+
     // MARK: - Helpers
 
-    private func screenplayTemplate() throws -> Template {
-        let templates = templateManager.getTemplates(for: .screenplay)
-        guard let template = templates.first else {
-            XCTFail("No screenplay template found")
-            throw XCTestError(.failureWhileWaiting)
-        }
-        return template
-    }
-
-    private func placeholder(key: String, in template: Template) -> Placeholder? {
-        return template.placeholders.first { $0.key == key }
-    }
-
-    // MARK: - character_state placeholder
-
-    func testScreenplayCharacterStatePlaceholderKey() throws {
-        let template = try screenplayTemplate()
-        let ph = placeholder(key: "character_state", in: template)
-        XCTAssertNotNil(ph, "Screenplay template must contain a 'character_state' placeholder")
-        XCTAssertEqual(ph?.key, "character_state")
-    }
-
-    func testScreenplayCharacterStatePlaceholderLabel() throws {
-        let template = try screenplayTemplate()
-        let ph = placeholder(key: "character_state", in: template)
-        XCTAssertEqual(ph?.label, "Character State")
-    }
-
-    func testScreenplayCharacterStatePlaceholderDescription() throws {
-        let template = try screenplayTemplate()
-        let ph = placeholder(key: "character_state", in: template)
-        XCTAssertEqual(ph?.description, "Physical action or emotion")
-    }
-
-    func testScreenplayCharacterStatePlaceholderIsNotRequired() throws {
-        let template = try screenplayTemplate()
-        let ph = placeholder(key: "character_state", in: template)
-        XCTAssertEqual(ph?.required, false,
-                       "character_state should be optional (required: false)")
-    }
-
-    func testScreenplayCharacterStatePlaceholderDefaultValueIsEmptyString() throws {
-        let template = try screenplayTemplate()
-        let ph = placeholder(key: "character_state", in: template)
-        // defaultValue must be "" (empty string), not nil
-        XCTAssertNotNil(ph?.defaultValue,
-                        "character_state defaultValue should be set (empty string), not nil")
-        XCTAssertEqual(ph?.defaultValue, "",
-                       "character_state defaultValue should be an empty string")
-    }
-
-    // MARK: - parenthetical placeholder
-
-    func testScreenplayParentheticalPlaceholderKey() throws {
-        let template = try screenplayTemplate()
-        let ph = placeholder(key: "parenthetical", in: template)
-        XCTAssertNotNil(ph, "Screenplay template must contain a 'parenthetical' placeholder")
-        XCTAssertEqual(ph?.key, "parenthetical")
-    }
-
-    func testScreenplayParentheticalPlaceholderLabel() throws {
-        let template = try screenplayTemplate()
-        let ph = placeholder(key: "parenthetical", in: template)
-        XCTAssertEqual(ph?.label, "Parenthetical")
-    }
-
-    func testScreenplayParentheticalPlaceholderDescription() throws {
-        let template = try screenplayTemplate()
-        let ph = placeholder(key: "parenthetical", in: template)
-        XCTAssertEqual(ph?.description, "How the dialogue is delivered")
-    }
-
-    func testScreenplayParentheticalPlaceholderIsNotRequired() throws {
-        let template = try screenplayTemplate()
-        let ph = placeholder(key: "parenthetical", in: template)
-        XCTAssertEqual(ph?.required, false,
-                       "parenthetical should be optional (required: false)")
-    }
-
-    func testScreenplayParentheticalPlaceholderDefaultValueIsEmptyString() throws {
-        let template = try screenplayTemplate()
-        let ph = placeholder(key: "parenthetical", in: template)
-        // defaultValue must be "" (empty string), not nil
-        XCTAssertNotNil(ph?.defaultValue,
-                        "parenthetical defaultValue should be set (empty string), not nil")
-        XCTAssertEqual(ph?.defaultValue, "",
-                       "parenthetical defaultValue should be an empty string")
-    }
-
-    // MARK: - Distinguish from nil-default optional placeholders
-
-    func testScreenplayCharacterStatePlaceholderDefaultValueIsNotNil() throws {
-        // Regression: parameter reordering must not collapse defaultValue to its
-        // zero-value (nil). Verify the empty-string default is preserved.
-        let template = try screenplayTemplate()
-        let ph = placeholder(key: "character_state", in: template)
-        XCTAssertFalse(ph?.defaultValue == nil,
-                       "character_state defaultValue must not be nil after parameter reorder")
-    }
-
-    func testScreenplayParentheticalPlaceholderDefaultValueIsNotNil() throws {
-        // Regression: same guard for parenthetical.
-        let template = try screenplayTemplate()
-        let ph = placeholder(key: "parenthetical", in: template)
-        XCTAssertFalse(ph?.defaultValue == nil,
-                       "parenthetical defaultValue must not be nil after parameter reorder")
-    }
-
-    // MARK: - Contrast with optional-but-no-default placeholders
-
-    func testScreenplayCharacter2PlaceholderHasNilDefaultValue() throws {
-        // character_2 is optional but has no defaultValue — confirms our assertions
-        // above are discriminating and not trivially true for all optional placeholders.
-        let template = try screenplayTemplate()
-        let ph = placeholder(key: "character_2", in: template)
-        XCTAssertNotNil(ph, "Screenplay template must contain a 'character_2' placeholder")
-        XCTAssertEqual(ph?.required, false)
-        XCTAssertNil(ph?.defaultValue,
-                     "character_2 has no default value and should remain nil")
-    }
-
-    func testScreenplayDialogue2PlaceholderHasNilDefaultValue() throws {
-        // dialogue_2 is optional but has no defaultValue.
-        let template = try screenplayTemplate()
-        let ph = placeholder(key: "dialogue_2", in: template)
-        XCTAssertNotNil(ph, "Screenplay template must contain a 'dialogue_2' placeholder")
-        XCTAssertEqual(ph?.required, false)
-        XCTAssertNil(ph?.defaultValue,
-                     "dialogue_2 has no default value and should remain nil")
-    }
-
-    // MARK: - Contrast with non-empty default value placeholder
-
-    func testScreenplayTransitionPlaceholderDefaultValue() throws {
-        // transition has defaultValue "CUT TO:" — confirms defaultValue="" is meaningfully
-        // different from a non-empty default, and both survive the parameter ordering.
-        let template = try screenplayTemplate()
-        let ph = placeholder(key: "transition", in: template)
-        XCTAssertNotNil(ph, "Screenplay template must contain a 'transition' placeholder")
-        XCTAssertEqual(ph?.defaultValue, "CUT TO:",
-                       "transition defaultValue should be 'CUT TO:'")
-    }
-
-    // MARK: - Required placeholders are not accidentally made optional
-
-    func testScreenplayRequiredPlaceholdersRemainRequired() throws {
-        let template = try screenplayTemplate()
-        let requiredKeys = ["scene_heading", "action", "character", "dialogue"]
-        for key in requiredKeys {
-            let ph = placeholder(key: key, in: template)
-            XCTAssertNotNil(ph, "Expected required placeholder '\(key)' to exist")
-            XCTAssertEqual(ph?.required, true,
-                           "Placeholder '\(key)' should be required")
-        }
-    }
-
-    // MARK: - Placeholder ordering in template
-
-    func testScreenplayCharacterStatePrecedesDialogue() throws {
-        // Structural check: character_state appears before dialogue in the placeholder list,
-        // matching the screenplay scene order.
-        let template = try screenplayTemplate()
-        let keys = template.placeholders.map { $0.key }
-        guard let characterStateIndex = keys.firstIndex(of: "character_state"),
-              let dialogueIndex = keys.firstIndex(of: "dialogue") else {
-            XCTFail("Expected both 'character_state' and 'dialogue' placeholders")
-            return
-        }
-        XCTAssertLessThan(characterStateIndex, dialogueIndex,
-                          "character_state should appear before dialogue in placeholder list")
-    }
-
-    func testScreenplayParentheticalPrecedesDialogue2() throws {
-        // parenthetical appears before dialogue_2, matching screenplay scene structure.
-        let template = try screenplayTemplate()
-        let keys = template.placeholders.map { $0.key }
-        guard let parentheticalIndex = keys.firstIndex(of: "parenthetical"),
-              let dialogue2Index = keys.firstIndex(of: "dialogue_2") else {
-            XCTFail("Expected both 'parenthetical' and 'dialogue_2' placeholders")
-            return
-        }
-        XCTAssertLessThan(parentheticalIndex, dialogue2Index,
-                          "parenthetical should appear before dialogue_2 in placeholder list")
-    }
-
-    // MARK: - Total optional placeholder count in screenplay template
-
-    func testScreenplayTemplateOptionalPlaceholderCount() throws {
-        // The screenplay template defines exactly 5 optional placeholders:
-        // character_state, character_2, parenthetical, dialogue_2, shot_description.
-        let template = try screenplayTemplate()
-        let optionalPlaceholders = template.placeholders.filter { !$0.required }
-        XCTAssertEqual(optionalPlaceholders.count, 5,
-                       "Screenplay template should have exactly 5 optional placeholders")
-    }
-
-    func testScreenplayTemplateOptionalWithEmptyDefaultCount() throws {
-        // Exactly 2 optional placeholders have an explicit empty-string defaultValue:
-        // character_state and parenthetical.
-        let template = try screenplayTemplate()
-        let emptyDefaultOptional = template.placeholders.filter {
-            !$0.required && $0.defaultValue == ""
-        }
-        XCTAssertEqual(emptyDefaultOptional.count, 2,
-                       "Exactly character_state and parenthetical should be optional with empty defaultValue")
-        let keys = Set(emptyDefaultOptional.map { $0.key })
-        XCTAssertEqual(keys, ["character_state", "parenthetical"])
+    private func getScreenplayTemplate() -> Template? {
+        templateManager.getAllTemplates().first { $0.name == "Screenplay Scene" }
     }
 }

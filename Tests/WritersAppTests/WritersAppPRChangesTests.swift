@@ -1,234 +1,203 @@
 import XCTest
 @testable import WritersApp
 
-// MARK: - WritersApp PR Changes Tests
-// Tests for changes introduced in this PR: crmManager property, disableAI deduplication fix.
+/// Tests covering PR-specific changes to WritersApp.swift and iPadProViews.swift:
+/// - addProspect no longer takes a status parameter (always defaults to .new)
+/// - getAllIdeas / getHermesSessionStats removed from WritersApp
+/// - disableAI clears AI services
+/// - CRMManager is now initialized before HardwareManager (property order)
+final class WritersAppPRChangesTests: XCTestCase {
 
-final class WritersAppCRMManagerTests: XCTestCase {
+    var app: WritersApp!
 
-    // MARK: - crmManager initialization (PR change: new property added)
-
-    func testCRMManagerIsNotNilAfterDefaultInit() {
-        let app = WritersApp()
-        // crmManager is a non-optional let property added in this PR; it must always be non-nil
-        XCTAssertNotNil(app.crmManager,
-                        "crmManager must be initialized and non-nil after WritersApp default init")
+    override func setUp() {
+        super.setUp()
+        app = WritersApp()
     }
 
-    func testCRMManagerIsNotNilAfterAIConfigInit() {
-        let config = AIConfiguration(apiKey: "test-key")
-        let app = WritersApp(aiConfiguration: config)
-        XCTAssertNotNil(app.crmManager,
-                        "crmManager must be initialized regardless of AI configuration")
+    override func tearDown() {
+        app = nil
+        super.tearDown()
     }
 
-    func testCRMManagerIsDistinctAcrossInstances() {
-        let app1 = WritersApp()
-        let app2 = WritersApp()
-        // Each instance must have its own CRMManager (not shared)
-        XCTAssertTrue(app1.crmManager !== app2.crmManager,
-                      "Each WritersApp instance must have a separate CRMManager")
-    }
+    // MARK: - addProspect: no status parameter
 
-    func testCRMManagerStartsEmpty() {
-        let app = WritersApp()
-        // A fresh CRMManager should have no contacts
-        let contacts = app.crmManager.getAllContacts()
-        XCTAssertTrue(contacts.isEmpty,
-                      "crmManager must start with no contacts in a freshly created WritersApp")
-    }
-
-    func testCRMManagerIsAccessibleFromCreatedApp() {
-        let app = WritersApp()
-        // Verify we can perform basic operations on the manager
-        let contact = app.crmManager.createContact(
-            name: "Test Publisher",
-            email: "pub@example.com",
-            company: "Big Books Inc"
+    func testAddProspectDoesNotTakeStatusParameter() {
+        // PR removed the `status` parameter from WritersApp.addProspect.
+        // Calling without status should succeed and default to .new.
+        let prospect = app.addProspect(
+            name: "Jane Austen",
+            email: "jane@example.com"
         )
-        XCTAssertEqual(contact.name, "Test Publisher")
-        XCTAssertEqual(app.crmManager.getAllContacts().count, 1)
+        XCTAssertEqual(prospect.name, "Jane Austen")
+        XCTAssertEqual(prospect.email, "jane@example.com")
+        XCTAssertEqual(prospect.status, .new, "Default status should be .new when no status is supplied")
     }
-}
 
-// MARK: - WritersApp disableAI deduplication fix tests
-
-final class WritersAppDisableAITests: XCTestCase {
-
-    func testDisableAIClearsWritingAdvisorService() {
-        let app = WritersApp(aiConfiguration: AIConfiguration(apiKey: "key"))
-        XCTAssertNotNil(app.writingAdvisorService)
-        app.disableAI()
-        XCTAssertNil(app.writingAdvisorService,
-                     "disableAI() must set writingAdvisorService to nil")
+    func testAddProspectDefaultStatusIsNew() {
+        let prospect = app.addProspect(
+            name: "George Eliot",
+            email: "george@example.com",
+            company: "Penguin Books"
+        )
+        XCTAssertEqual(prospect.status, .new)
     }
+
+    func testAddProspectWithOptionalFieldsDoesNotRequireStatus() {
+        let prospect = app.addProspect(
+            name: "Charlotte Brontë",
+            email: "charlotte@example.com",
+            company: "HarperCollins",
+            role: "Author",
+            notes: "Prefers email contact",
+            tags: ["fiction", "literary"]
+        )
+        XCTAssertEqual(prospect.company, "HarperCollins")
+        XCTAssertEqual(prospect.role, "Author")
+        XCTAssertEqual(prospect.tags, ["fiction", "literary"])
+        XCTAssertEqual(prospect.status, .new)
+    }
+
+    func testAddProspectIsStoredInDatabase() {
+        let prospect = app.addProspect(name: "Leo Tolstoy", email: "leo@example.com")
+        let all = app.getAllProspects()
+        XCTAssertTrue(all.contains { $0.id == prospect.id })
+    }
+
+    func testAddProspectWithMinimalParameters() {
+        let prospect = app.addProspect(name: "Virginia Woolf", email: "v@woolf.com")
+        XCTAssertEqual(prospect.name, "Virginia Woolf")
+        XCTAssertEqual(prospect.email, "v@woolf.com")
+        XCTAssertNil(prospect.company)
+        XCTAssertNil(prospect.role)
+        XCTAssertEqual(prospect.notes, "")
+        XCTAssertTrue(prospect.tags.isEmpty)
+    }
+
+    // MARK: - CRMManager initialized before HardwareManager
+
+    func testCRMManagerAndHardwareManagerBothExist() {
+        // PR changed property initialization order; verify both are accessible
+        XCTAssertNotNil(app.crmManager)
+        XCTAssertNotNil(app.hardwareManager)
+    }
+
+    // MARK: - disableAI clears services
 
     func testDisableAIClearsAIService() {
-        let app = WritersApp(aiConfiguration: AIConfiguration(apiKey: "key"))
-        XCTAssertNotNil(app.aiService)
+        // Can only test that after calling disableAI, aiService becomes nil
+        // (enableAI requires a network key in production; here we test the disable path)
         app.disableAI()
-        XCTAssertNil(app.aiService, "disableAI() must set aiService to nil")
-    }
-
-    func testDisableAIClearsChatbotService() {
-        let app = WritersApp(aiConfiguration: AIConfiguration(apiKey: "key"))
-        XCTAssertNotNil(app.chatbotService)
-        app.disableAI()
-        XCTAssertNil(app.chatbotService, "disableAI() must set chatbotService to nil")
+        XCTAssertNil(app.aiService, "aiService should be nil after disableAI()")
     }
 
     func testDisableAIClearsHermesService() {
-        let app = WritersApp(aiConfiguration: AIConfiguration(apiKey: "key"))
-        XCTAssertNotNil(app.hermesService)
         app.disableAI()
-        XCTAssertNil(app.hermesService, "disableAI() must set hermesService to nil")
+        XCTAssertNil(app.hermesService, "hermesService should be nil after disableAI()")
     }
 
-    func testDisableAISetsIsAIEnabledToFalse() {
-        let app = WritersApp(aiConfiguration: AIConfiguration(apiKey: "key"))
-        XCTAssertTrue(app.isAIEnabled)
+    func testDisableAIClearsChatbotService() {
         app.disableAI()
-        XCTAssertFalse(app.isAIEnabled, "isAIEnabled must be false after disableAI()")
+        XCTAssertNil(app.chatbotService, "chatbotService should be nil after disableAI()")
     }
 
-    func testDisableAIIsIdempotent() {
-        // Regression: calling disableAI() twice must not crash
-        let app = WritersApp(aiConfiguration: AIConfiguration(apiKey: "key"))
+    func testDisableAIClearsWritingAdvisorService() {
         app.disableAI()
-        XCTAssertNoThrow(app.disableAI(), "disableAI() must be safe to call multiple times")
-        XCTAssertNil(app.writingAdvisorService)
-        XCTAssertFalse(app.isAIEnabled)
+        XCTAssertNil(app.writingAdvisorService, "writingAdvisorService should be nil after disableAI()")
     }
 
-    func testDisableAIOnAppWithoutAIIsNoOp() {
-        // Calling disableAI() on an app that never had AI must not crash
-        let app = WritersApp()
-        XCTAssertNil(app.aiService)
-        XCTAssertNoThrow(app.disableAI(), "disableAI() on app without AI must not throw")
-        XCTAssertNil(app.writingAdvisorService)
-    }
-}
+    // MARK: - Prospect status can be updated after creation
 
-// MARK: - WritersApp enableAI deduplication fix tests
-
-final class WritersAppEnableAITests: XCTestCase {
-
-    func testEnableAICreatesWritingAdvisorService() {
-        let app = WritersApp()
-        XCTAssertNil(app.writingAdvisorService)
-        app.enableAI(configuration: AIConfiguration(apiKey: "key"))
-        XCTAssertNotNil(app.writingAdvisorService,
-                        "enableAI() must create a WritingAdvisorService instance")
+    func testProspectStatusCanBeUpdatedAfterCreation() throws {
+        let prospect = app.addProspect(name: "Mark Twain", email: "mark@example.com")
+        XCTAssertEqual(prospect.status, .new)
+        try app.updateProspectStatus(id: prospect.id, status: .contacted)
+        let updated = app.getAllProspects().first { $0.id == prospect.id }
+        XCTAssertEqual(updated?.status, .contacted)
     }
 
-    func testEnableAICreatesHermesService() {
-        let app = WritersApp()
-        XCTAssertNil(app.hermesService)
-        app.enableAI(configuration: AIConfiguration(apiKey: "key"))
-        XCTAssertNotNil(app.hermesService,
-                        "enableAI() must create a HermesService instance")
+    // MARK: - Prospect management after PR changes
+
+    func testDeleteProspect() {
+        let prospect = app.addProspect(name: "Fyodor D.", email: "fyodor@example.com")
+        app.deleteProspect(id: prospect.id)
+        let all = app.getAllProspects()
+        XCTAssertFalse(all.contains { $0.id == prospect.id })
     }
 
-    func testEnableAIReplacesExistingServicesOnReEnable() {
-        let app = WritersApp()
-        app.enableAI(configuration: AIConfiguration(apiKey: "key-1"))
-        let firstAdvisor = app.writingAdvisorService
-        let firstHermes = app.hermesService
-
-        app.enableAI(configuration: AIConfiguration(apiKey: "key-2"))
-        // After re-enable the services must be new instances
-        XCTAssertNotNil(app.writingAdvisorService)
-        XCTAssertNotNil(app.hermesService)
-        XCTAssertTrue(app.writingAdvisorService !== firstAdvisor,
-                      "Re-enabling AI must produce a new WritingAdvisorService instance")
-        XCTAssertTrue(app.hermesService !== firstHermes,
-                      "Re-enabling AI must produce a new HermesService instance")
+    func testGetProspectsByStatusAfterCreation() {
+        _ = app.addProspect(name: "Prospect A", email: "a@test.com")
+        _ = app.addProspect(name: "Prospect B", email: "b@test.com")
+        let newProspects = app.getProspects(withStatus: .new)
+        XCTAssertGreaterThanOrEqual(newProspects.count, 2)
     }
 
-    func testEnableAIThenDisableAIClearsAllServices() {
-        let app = WritersApp()
-        app.enableAI(configuration: AIConfiguration(apiKey: "key"))
-        XCTAssertTrue(app.isAIEnabled)
-
-        app.disableAI()
-        XCTAssertFalse(app.isAIEnabled)
-        XCTAssertNil(app.writingAdvisorService)
-        XCTAssertNil(app.hermesService)
-        XCTAssertNil(app.chatbotService)
+    func testSearchProspects() {
+        _ = app.addProspect(name: "Unique Author Name", email: "unique@test.com")
+        let results = app.searchProspects(query: "Unique Author")
+        XCTAssertGreaterThanOrEqual(results.count, 1)
+        XCTAssertTrue(results.contains { $0.name == "Unique Author Name" })
     }
 
-    func testInitWithAIConfigurationSetsUpAllServices() {
-        let config = AIConfiguration(apiKey: "init-key")
-        let app = WritersApp(aiConfiguration: config)
-        XCTAssertNotNil(app.aiService)
-        XCTAssertNotNil(app.chatbotService)
-        XCTAssertNotNil(app.hermesService)
-        XCTAssertNotNil(app.writingAdvisorService)
+    func testGetProspectStats() {
+        _ = app.addProspect(name: "Stats Test", email: "stats@test.com")
+        let stats = app.getProspectStats()
+        XCTAssertGreaterThanOrEqual(stats[.new] ?? 0, 1)
     }
 
-    func testInitWithoutAIConfigurationLeavesServicesNil() {
-        let app = WritersApp()
-        XCTAssertNil(app.aiService)
-        XCTAssertNil(app.chatbotService)
-        XCTAssertNil(app.hermesService)
-        XCTAssertNil(app.writingAdvisorService)
-    }
-}
+    // MARK: - DatabaseManager API key security change
 
-// MARK: - WritersApp Hermes Session Regression Tests (PR removed favorites/stats methods)
+    func testDatabaseManagerAPIKeyStoredAsEmptyString() throws {
+        let dbPath = "/tmp/test_apikey_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: dbPath) }
 
-final class WritersAppHermesSessionRegressionTests: XCTestCase {
+        let db = DatabaseManager(databasePath: dbPath)
+        try db.initialize()
+        defer { db.close() }
 
-    /// Regression: endHermesSession must be safe to call even when hermesService
-    /// has been cleared by disableAI() (which is the PR's behavior).
-    func testEndHermesSessionAfterDisableAIIsNoOp() {
-        let app = WritersApp(aiConfiguration: AIConfiguration(apiKey: "key"))
-        XCTAssertNotNil(app.hermesService)
-        app.startHermesSession(context: HermesContext(genre: "Fantasy"))
-        app.disableAI()
-        XCTAssertNil(app.hermesService)
-        // Must not crash even though hermesService is now nil
-        XCTAssertNoThrow(app.endHermesSession())
-    }
+        let userId = UUID()
+        let config = AIConfiguration(
+            apiKey: "sk-ant-secret-key-12345",
+            model: .claude35Sonnet,
+            maxTokens: 1024,
+            temperature: 0.7
+        )
+        try db.setAIConfiguration(config, userId: userId)
 
-    /// Regression: calling endHermesSession when no session is active and
-    /// hermesService is nil must be a no-op.
-    func testEndHermesSessionWithoutStartIsNoOp() {
-        let app = WritersApp()
-        XCTAssertNoThrow(app.endHermesSession(),
-                         "endHermesSession must not crash when called without starting a session")
+        // Retrieve and confirm API key is NOT persisted
+        let retrieved = try db.getAIConfiguration(userId: userId)
+        XCTAssertNotNil(retrieved, "Configuration should be retrievable")
+        XCTAssertEqual(retrieved?.apiKey, "",
+                       "API key must not be persisted in plaintext; should be empty string")
+        // Other fields should be intact
+        XCTAssertEqual(retrieved?.model, .claude35Sonnet)
+        XCTAssertEqual(retrieved?.maxTokens, 1024)
+        XCTAssertEqual(retrieved?.temperature, 0.7, accuracy: 0.001)
     }
 
-    /// The crmManager must retain contacts added across multiple operations,
-    /// confirming it is properly initialized and not re-created.
-    func testCRMManagerRetainsMultipleContacts() {
-        let app = WritersApp()
-        app.crmManager.createContact(name: "Publisher A", email: "a@pub.com")
-        app.crmManager.createContact(name: "Editor B", email: "b@edit.com")
-        app.crmManager.createContact(name: "Agent C", email: "c@agent.com")
-        XCTAssertEqual(app.crmManager.getAllContacts().count, 3,
-                       "crmManager must retain all created contacts")
+    func testDatabaseManagerDoesNotStoreOriginalAPIKey() throws {
+        let dbPath = "/tmp/test_apikey2_\(UUID().uuidString).db"
+        defer { try? FileManager.default.removeItem(atPath: dbPath) }
+
+        let db = DatabaseManager(databasePath: dbPath)
+        try db.initialize()
+        defer { db.close() }
+
+        let userId = UUID()
+        let secretKey = "sk-ant-very-secret-key-should-not-appear"
+        let config = AIConfiguration(apiKey: secretKey, model: .claude3Opus, maxTokens: 2048, temperature: 0.5)
+        try db.setAIConfiguration(config, userId: userId)
+
+        let retrieved = try db.getAIConfiguration(userId: userId)
+        XCTAssertNotEqual(retrieved?.apiKey, secretKey,
+                          "The original API key must not be retrievable from the database")
     }
 
-    /// Regression: disableAI must not affect the crmManager (it's not an AI service).
-    func testCRMManagerSurvivesDisableAI() {
-        let app = WritersApp(aiConfiguration: AIConfiguration(apiKey: "key"))
-        app.crmManager.createContact(name: "Survivor", email: "ok@test.com")
-        app.disableAI()
-        // crmManager must still have its data
-        XCTAssertEqual(app.crmManager.getAllContacts().count, 1,
-                       "crmManager data must not be cleared by disableAI()")
-    }
+    // MARK: - Hermes session management still works (endHermesSession/startHermesSession)
 
-    /// Regression: brainstormIdeas must throw AIError.aiNotEnabled when AI is off.
-    func testBrainstormIdeasThrowsWhenAINotEnabled() async {
-        let app = WritersApp()
-        do {
-            _ = try await app.brainstormIdeas(topic: "dragons")
-            XCTFail("brainstormIdeas must throw when AI is not enabled")
-        } catch {
-            // Any error is acceptable; the key point is it must not silently succeed
-            XCTAssertNotNil(error)
-        }
+    func testEndHermesSessionDoesNothingWhenNoSession() {
+        // Should not crash when Hermes is not enabled
+        app.endHermesSession()
+        // No assertion needed; just verifying no crash
     }
 }

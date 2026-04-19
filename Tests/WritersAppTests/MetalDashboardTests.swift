@@ -269,5 +269,29 @@ final class MetalDashboardTests: XCTestCase {
             XCTAssertFalse(icon.isEmpty, "Focus type \(type.rawValue) should have an icon")
         }
     }
+
+    // MARK: - PR Change: nonisolated init
+
+    func testViewModelInitIsCallableOnMainActor() {
+        // The init is now `nonisolated`, making it callable from non-actor-isolated contexts.
+        // This test verifies the VM initializes with correct default state regardless of
+        // actor context (we call it here from @MainActor which also works).
+        let vm = MetalDashboardViewModel()
+        XCTAssertNotNil(vm, "MetalDashboardViewModel should initialize successfully")
+        XCTAssertEqual(vm.totalDocuments, 0)
+        XCTAssertEqual(vm.totalWords, 0)
+    }
+
+    func testViewModelNonisolatedInitWithCustomDependencies() {
+        // Verifies that custom dependencies can be injected via the nonisolated init.
+        let app = WritersApp()
+        let focusManager = FocusSessionManager()
+        let goalManager = WritingGoalManager()
+        let vm = MetalDashboardViewModel(app: app, focusSessionManager: focusManager, goalManager: goalManager)
+        XCTAssertNotNil(vm)
+        // After loading, templates should be present
+        vm.loadDashboard()
+        XCTAssertGreaterThan(vm.totalTemplates, 0)
+    }
 }
 #endif

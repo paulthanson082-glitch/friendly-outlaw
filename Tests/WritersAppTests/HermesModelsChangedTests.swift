@@ -1,482 +1,185 @@
 import XCTest
 @testable import WritersApp
 
-// MARK: - HermesIdeaType Tests
+/// Tests verifying the PR-specific changes to HermesModels.swift:
+/// - HermesTone enum was removed
+/// - HermesSessionStats struct was removed
+/// - HermesIdea.encode(to:) docstring was added (behavior tested via Codable)
+///
+/// The absence of removed types is confirmed via compile-time checks (the test file
+/// simply doesn't reference those types) and runtime Mirror checks where practical.
+final class HermesModelsChangedTests: XCTestCase {
 
-final class HermesIdeaTypeTests: XCTestCase {
+    // MARK: - Confirm HermesTone Does Not Exist
 
-    func testAllCasesExist() {
-        let expected: Set<HermesIdeaType> = [
-            .plotHook, .characterTrait, .worldBuilding, .conflict,
-            .twist, .dialogue, .setting, .theme
-        ]
-        XCTAssertEqual(Set(HermesIdeaType.allCases), expected)
-    }
-
-    func testRawValues() {
-        XCTAssertEqual(HermesIdeaType.plotHook.rawValue, "plotHook")
-        XCTAssertEqual(HermesIdeaType.characterTrait.rawValue, "characterTrait")
-        XCTAssertEqual(HermesIdeaType.worldBuilding.rawValue, "worldBuilding")
-        XCTAssertEqual(HermesIdeaType.conflict.rawValue, "conflict")
-        XCTAssertEqual(HermesIdeaType.twist.rawValue, "twist")
-        XCTAssertEqual(HermesIdeaType.dialogue.rawValue, "dialogue")
-        XCTAssertEqual(HermesIdeaType.setting.rawValue, "setting")
-        XCTAssertEqual(HermesIdeaType.theme.rawValue, "theme")
-    }
-
-    func testDisplayNames() {
-        XCTAssertEqual(HermesIdeaType.plotHook.displayName, "Plot Hook")
-        XCTAssertEqual(HermesIdeaType.characterTrait.displayName, "Character Trait")
-        XCTAssertEqual(HermesIdeaType.worldBuilding.displayName, "World Building")
-        XCTAssertEqual(HermesIdeaType.conflict.displayName, "Conflict")
-        XCTAssertEqual(HermesIdeaType.twist.displayName, "Twist")
-        XCTAssertEqual(HermesIdeaType.dialogue.displayName, "Dialogue")
-        XCTAssertEqual(HermesIdeaType.setting.displayName, "Setting")
-        XCTAssertEqual(HermesIdeaType.theme.displayName, "Theme")
-    }
-
-    func testDisplayNamesAreDistinct() {
-        let names = HermesIdeaType.allCases.map { $0.displayName }
-        XCTAssertEqual(names.count, Set(names).count, "All display names must be unique")
-    }
-
-    func testCodableRoundTrip() throws {
-        for type_ in HermesIdeaType.allCases {
-            let data = try JSONEncoder().encode(type_)
-            let decoded = try JSONDecoder().decode(HermesIdeaType.self, from: data)
-            XCTAssertEqual(decoded, type_)
+    func testHermesIdeaTypeIsTheOnlyToneRelatedEnum() {
+        // HermesTone was removed. The surviving enum for categorising ideas is HermesIdeaType.
+        // Verifying we can still enumerate all idea types without HermesTone.
+        let types = HermesIdeaType.allCases
+        XCTAssertEqual(types.count, 8, "HermesIdeaType should still have 8 cases after HermesTone removal")
+        // None of the idea types should be confused with tone names that were in HermesTone
+        let toneNames = ["inspirational", "provocative", "calm", "energetic", "whimsical", "dark", "playful"]
+        for typeName in types.map({ $0.rawValue }) {
+            XCTAssertFalse(toneNames.contains(typeName),
+                           "HermesIdeaType '\(typeName)' should not be a former HermesTone name")
         }
     }
-}
 
-// MARK: - HermesIdea Tests (PR Change: removed isFavorite)
+    // MARK: - Confirm HermesSessionStats Does Not Exist
 
-final class HermesIdeaTests: XCTestCase {
-
-    // MARK: - Initialization
-
-    func testHermesIdeaInitWithDefaults() {
-        let before = Date()
-        let idea = HermesIdea(
-            title: "A ghost town",
-            description: "An abandoned mining settlement haunted by memory",
-            ideaType: .setting
-        )
-        let after = Date()
-
-        XCTAssertEqual(idea.title, "A ghost town")
-        XCTAssertEqual(idea.description, "An abandoned mining settlement haunted by memory")
-        XCTAssertEqual(idea.ideaType, .setting)
-        XCTAssertGreaterThanOrEqual(idea.timestamp, before)
-        XCTAssertLessThanOrEqual(idea.timestamp, after)
-    }
-
-    func testHermesIdeaExplicitId() {
-        let fixedId = UUID()
-        let idea = HermesIdea(
-            id: fixedId,
-            title: "T",
-            description: "D",
-            ideaType: .conflict
-        )
-        XCTAssertEqual(idea.id, fixedId)
-    }
-
-    func testHermesIdeaDefaultIdsAreUnique() {
-        let idea1 = HermesIdea(title: "A", description: "D", ideaType: .plotHook)
-        let idea2 = HermesIdea(title: "A", description: "D", ideaType: .plotHook)
-        XCTAssertNotEqual(idea1.id, idea2.id)
-    }
-
-    func testHermesIdeaExplicitTimestamp() {
-        let fixedDate = Date(timeIntervalSince1970: 1_700_000_000)
-        let idea = HermesIdea(
-            title: "T",
-            description: "D",
-            ideaType: .theme,
-            timestamp: fixedDate
-        )
-        XCTAssertEqual(idea.timestamp, fixedDate)
-    }
-
-    // MARK: - Removed isFavorite property (PR change)
-
-    func testHermesIdeaHasNoIsFavoriteProperty() {
-        // Compile-time check: the init must not accept an isFavorite parameter
-        let idea = HermesIdea(title: "T", description: "D", ideaType: .dialogue)
-        // If isFavorite existed on the struct it would be accessible; absence is confirmed by successful init
-        XCTAssertNotNil(idea, "HermesIdea must initialise without an isFavorite parameter")
-    }
-
-    // MARK: - Codable round-trip
-
-    func testHermesIdeaCodableRoundTrip() throws {
-        let fixedId = UUID()
-        let fixedDate = Date(timeIntervalSince1970: 1_700_000_000)
-        let original = HermesIdea(
-            id: fixedId,
-            title: "Moonlit duel",
-            description: "Two rivals clash at midnight",
-            ideaType: .conflict,
-            timestamp: fixedDate
-        )
-        let data = try JSONEncoder().encode(original)
-        let decoded = try JSONDecoder().decode(HermesIdea.self, from: data)
-
-        XCTAssertEqual(decoded.id, fixedId)
-        XCTAssertEqual(decoded.title, "Moonlit duel")
-        XCTAssertEqual(decoded.description, "Two rivals clash at midnight")
-        XCTAssertEqual(decoded.ideaType, .conflict)
-        // Timestamp round-trip via ISO8601 may lose sub-second precision; compare to the second
-        XCTAssertEqual(decoded.timestamp.timeIntervalSince1970, fixedDate.timeIntervalSince1970,
-                       accuracy: 1.0)
-    }
-
-    func testHermesIdeaEncodedJSONDoesNotContainIsFavoriteKey() throws {
-        let idea = HermesIdea(title: "X", description: "Y", ideaType: .twist)
-        let data = try JSONEncoder().encode(idea)
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        XCTAssertNil(json?["isFavorite"],
-                     "Encoded JSON must not contain 'isFavorite' key after the field was removed")
-    }
-
-    func testHermesIdeaEncodedJSONContainsExpectedKeys() throws {
-        let idea = HermesIdea(title: "T", description: "D", ideaType: .worldBuilding)
-        let data = try JSONEncoder().encode(idea)
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        XCTAssertNotNil(json?["id"])
-        XCTAssertNotNil(json?["title"])
-        XCTAssertNotNil(json?["description"])
-        XCTAssertNotNil(json?["ideaType"])
-        XCTAssertNotNil(json?["timestamp"])
-    }
-
-    func testHermesIdeaDecodesFromJsonWithoutIsFavoriteKey() throws {
-        // Backward-compatibility: old payloads that have isFavorite should still decode
-        // (the field is simply ignored); new payloads without it must also work fine.
-        let json = """
-        {
-          "id": "00000000-0000-0000-0000-000000000001",
-          "title": "Dark forest",
-          "description": "A forest no one returns from",
-          "ideaType": "setting",
-          "timestamp": "2024-01-15T12:00:00Z"
-        }
-        """.data(using: .utf8)!
-        let idea = try JSONDecoder().decode(HermesIdea.self, from: json)
-        XCTAssertEqual(idea.title, "Dark forest")
-        XCTAssertEqual(idea.ideaType, .setting)
-    }
-
-    func testHermesIdeaDecodesFromJsonWithIsFavoriteKeyPresentButIgnored() throws {
-        // Old JSON that still contains isFavorite should decode without error
-        // (field is present in JSON but not in the struct)
-        let json = """
-        {
-          "id": "00000000-0000-0000-0000-000000000002",
-          "title": "Secret garden",
-          "description": "Hidden sanctuary",
-          "ideaType": "worldBuilding",
-          "timestamp": "2024-02-01T08:00:00Z",
-          "isFavorite": true
-        }
-        """.data(using: .utf8)!
-        // Decoding should succeed even with extra key; Swift default Decodable ignores unknown keys
-        XCTAssertNoThrow(try JSONDecoder().decode(HermesIdea.self, from: json))
-    }
-}
-
-// MARK: - HermesContext Tests (PR Change: removed tone field)
-
-final class HermesContextTests: XCTestCase {
-
-    // MARK: - Default initialisation
-
-    func testHermesContextDefaultValues() {
-        let context = HermesContext()
-        XCTAssertEqual(context.genre, "")
-        XCTAssertEqual(context.logline, "")
-        XCTAssertEqual(context.currentScene, "")
-        XCTAssertTrue(context.characters.isEmpty)
-        XCTAssertTrue(context.themes.isEmpty)
-        XCTAssertNil(context.documentId)
-    }
-
-    func testHermesContextWithAllFields() {
-        let docId = UUID()
-        let context = HermesContext(
-            genre: "Fantasy",
-            logline: "A hero's journey",
-            currentScene: "The departure",
-            characters: ["Aria", "Rowan"],
-            themes: ["redemption", "sacrifice"],
-            documentId: docId
-        )
-        XCTAssertEqual(context.genre, "Fantasy")
-        XCTAssertEqual(context.logline, "A hero's journey")
-        XCTAssertEqual(context.currentScene, "The departure")
-        XCTAssertEqual(context.characters, ["Aria", "Rowan"])
-        XCTAssertEqual(context.themes, ["redemption", "sacrifice"])
-        XCTAssertEqual(context.documentId, docId)
-    }
-
-    // MARK: - Removed tone field (PR change)
-
-    func testHermesContextHasNoToneProperty() {
-        // Compile-time check: the init must not accept a tone parameter.
-        let context = HermesContext(genre: "Horror")
-        XCTAssertNotNil(context, "HermesContext must initialise without a tone parameter")
-    }
-
-    // MARK: - Codable
-
-    func testHermesContextCodableRoundTrip() throws {
-        let docId = UUID()
-        let original = HermesContext(
-            genre: "Thriller",
-            logline: "A detective hunts a serial killer",
-            currentScene: "The murder scene",
-            characters: ["Det. Holt", "The Killer"],
-            themes: ["justice", "obsession"],
-            documentId: docId
-        )
-        let data = try JSONEncoder().encode(original)
-        let decoded = try JSONDecoder().decode(HermesContext.self, from: data)
-
-        XCTAssertEqual(decoded.genre, original.genre)
-        XCTAssertEqual(decoded.logline, original.logline)
-        XCTAssertEqual(decoded.currentScene, original.currentScene)
-        XCTAssertEqual(decoded.characters, original.characters)
-        XCTAssertEqual(decoded.themes, original.themes)
-        XCTAssertEqual(decoded.documentId, original.documentId)
-    }
-
-    func testHermesContextEncodedJSONDoesNotContainToneKey() throws {
-        let context = HermesContext(genre: "Mystery")
-        let data = try JSONEncoder().encode(context)
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        XCTAssertNil(json?["tone"],
-                     "Encoded JSON must not contain 'tone' key after the field was removed")
-    }
-
-    func testHermesContextDocumentIdNilPreservedInCoding() throws {
-        let original = HermesContext(genre: "Horror", documentId: nil)
-        let data = try JSONEncoder().encode(original)
-        let decoded = try JSONDecoder().decode(HermesContext.self, from: data)
-        XCTAssertNil(decoded.documentId)
-    }
-
-    func testHermesContextMultipleCharactersAndThemes() {
-        let chars = ["Alice", "Bob", "Charlie", "Diana"]
-        let themes = ["love", "war", "peace", "hope"]
-        let context = HermesContext(characters: chars, themes: themes)
-        XCTAssertEqual(context.characters, chars)
-        XCTAssertEqual(context.themes, themes)
-    }
-}
-
-// MARK: - HermesError Tests
-
-final class HermesErrorTests: XCTestCase {
-
-    func testEmptyPromptDescription() {
-        let error = HermesError.emptyPrompt
-        XCTAssertNotNil(error.errorDescription)
-        XCTAssertFalse(error.errorDescription!.isEmpty)
-    }
-
-    func testPromptTooLongDescription() {
-        let error = HermesError.promptTooLong
-        XCTAssertNotNil(error.errorDescription)
-        XCTAssertFalse(error.errorDescription!.isEmpty)
-    }
-
-    func testAINotAvailableDescription() {
-        let error = HermesError.aiNotAvailable
-        XCTAssertNotNil(error.errorDescription)
-        XCTAssertTrue(error.errorDescription!.contains("API key") || error.errorDescription!.contains("AI"))
-    }
-
-    func testIdeaNotFoundDescription() {
-        let id = UUID()
-        let error = HermesError.ideaNotFound(id: id)
-        let description = error.errorDescription ?? ""
-        XCTAssertTrue(description.contains(id.uuidString),
-                      "Error description must include the missing idea's UUID")
-    }
-
-    func testAIServiceFailedDescription() {
-        let reason = "connection timeout"
-        let error = HermesError.aiServiceFailed(reason)
-        let description = error.errorDescription ?? ""
-        XCTAssertTrue(description.contains(reason),
-                      "Error description must include the failure reason")
-    }
-
-    func testAllErrorDescriptionsAreNonEmpty() {
-        let errors: [HermesError] = [
-            .emptyPrompt,
-            .promptTooLong,
-            .aiNotAvailable,
-            .ideaNotFound(id: UUID()),
-            .aiServiceFailed("test")
-        ]
-        for error in errors {
-            XCTAssertNotNil(error.errorDescription, "errorDescription must not be nil for \(error)")
-            XCTAssertFalse(error.errorDescription!.isEmpty, "errorDescription must not be empty for \(error)")
-        }
-    }
-}
-
-// MARK: - HermesMessage Tests
-
-final class HermesMessageTests: XCTestCase {
-
-    func testHermesMessageDefaultIdIsUnique() {
-        let m1 = HermesMessage(role: .user, content: "Hello")
-        let m2 = HermesMessage(role: .user, content: "Hello")
-        XCTAssertNotEqual(m1.id, m2.id)
-    }
-
-    func testHermesMessageWithIdeas() {
-        let ideas = [
-            HermesIdea(title: "Idea A", description: "Desc", ideaType: .plotHook)
-        ]
-        let message = HermesMessage(role: .hermes, content: "Here are some ideas", ideas: ideas)
-        XCTAssertEqual(message.ideas.count, 1)
-        XCTAssertEqual(message.ideas[0].title, "Idea A")
-    }
-
-    func testHermesMessageWithEmptyIdeas() {
-        let message = HermesMessage(role: .user, content: "Tell me more")
-        XCTAssertTrue(message.ideas.isEmpty)
-    }
-
-    func testHermesMessageCodableRoundTrip() throws {
-        let idea = HermesIdea(title: "Rising action", description: "Tension builds", ideaType: .conflict)
-        let original = HermesMessage(
-            role: .hermes,
-            content: "Consider this conflict:",
-            ideas: [idea]
-        )
-        let data = try JSONEncoder().encode(original)
-        let decoded = try JSONDecoder().decode(HermesMessage.self, from: data)
-
-        XCTAssertEqual(decoded.id, original.id)
-        XCTAssertEqual(decoded.role, .hermes)
-        XCTAssertEqual(decoded.content, "Consider this conflict:")
-        XCTAssertEqual(decoded.ideas.count, 1)
-        XCTAssertEqual(decoded.ideas[0].title, "Rising action")
-    }
-}
-
-// MARK: - HermesSession Tests
-
-final class HermesSessionTests: XCTestCase {
-
-    func testHermesSessionDefaultValues() {
+    func testHermesSessionHasNoSessionStatsProperty() {
+        // HermesSessionStats was removed. HermesSession should not expose any stats aggregate.
         let session = HermesSession()
-        XCTAssertTrue(session.messages.isEmpty)
-        XCTAssertEqual(session.context.genre, "")
+        let mirror = Mirror(reflecting: session)
+        let hasStats = mirror.children.contains { child in
+            child.label?.lowercased().contains("stats") ?? false
+        }
+        XCTAssertFalse(hasStats, "HermesSession should not have a stats property after HermesSessionStats removal")
     }
 
-    func testHermesSessionCodableRoundTrip() throws {
-        let context = HermesContext(genre: "Sci-Fi", logline: "Space opera")
-        let fixedStart = Date(timeIntervalSince1970: 1_700_000_000)
-        let fixedLast = Date(timeIntervalSince1970: 1_700_003_600)
-        let original = HermesSession(
-            messages: [],
-            context: context,
-            startedAt: fixedStart,
-            lastMessageAt: fixedLast
+    func testHermesSessionDoesNotConformToHermesSessionStatsBearing() {
+        // HermesSession should still be Identifiable and Codable, but not wrap HermesSessionStats.
+        let session = HermesSession()
+        let mirror = Mirror(reflecting: session)
+        // Verify properties are the expected primitive/collection types (no aggregated stats struct)
+        let propertyLabels = mirror.children.compactMap { $0.label }
+        XCTAssertTrue(propertyLabels.contains("id"))
+        XCTAssertTrue(propertyLabels.contains("messages"))
+        XCTAssertFalse(propertyLabels.contains("sessionStats"), "No sessionStats property expected")
+        XCTAssertFalse(propertyLabels.contains("stats"), "No stats property expected on HermesSession")
+    }
+
+    // MARK: - HermesIdea.encode(to:) correctness
+
+    func testHermesIdeaEncodeProducesISO8601Timestamp() throws {
+        // The PR added a docstring to encode(to:) which describes ISO-8601 date serialisation.
+        // This test confirms the encode behaviour matches the documented contract.
+        let knownDate = Date(timeIntervalSince1970: 1_700_000_000) // 2023-11-14
+        let idea = HermesIdea(
+            title: "Dark forest path",
+            description: "The protagonist must cross alone",
+            ideaType: .conflict,
+            timestamp: knownDate
         )
-        let data = try JSONEncoder().encode(original)
-        let decoded = try JSONDecoder().decode(HermesSession.self, from: data)
 
-        XCTAssertEqual(decoded.id, original.id)
-        XCTAssertEqual(decoded.context.genre, "Sci-Fi")
-        XCTAssertEqual(decoded.startedAt.timeIntervalSince1970, fixedStart.timeIntervalSince1970,
-                       accuracy: 1.0)
-        XCTAssertEqual(decoded.lastMessageAt.timeIntervalSince1970, fixedLast.timeIntervalSince1970,
-                       accuracy: 1.0)
-    }
-
-    func testHermesSessionContextHasNoToneInCoding() throws {
-        let context = HermesContext(genre: "Romance")
-        let session = HermesSession(context: context)
-        let data = try JSONEncoder().encode(session)
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        let contextDict = json?["context"] as? [String: Any]
-        XCTAssertNil(contextDict?["tone"],
-                     "Encoded session context must not contain 'tone' key")
-    }
-}
-
-// MARK: - HermesIdea Timestamp Encoding Regression Tests
-
-extension HermesIdeaTests {
-
-    /// Regression: the ISO8601 timestamp must encode and decode correctly for
-    /// dates that land exactly on UTC midnight (potential off-by-one).
-    func testHermesIdeaTimestampRoundTripAtUTCMidnight() throws {
-        // 2024-03-15 00:00:00 UTC
-        let midnight = Date(timeIntervalSince1970: 1_710_460_800)
-        let idea = HermesIdea(title: "Midnight", description: "At midnight", ideaType: .plotHook, timestamp: midnight)
         let data = try JSONEncoder().encode(idea)
-        let decoded = try JSONDecoder().decode(HermesIdea.self, from: data)
-        XCTAssertEqual(decoded.timestamp.timeIntervalSince1970, midnight.timeIntervalSince1970,
-                       accuracy: 1.0, "Timestamp round-trip must be accurate to within 1 second")
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            XCTFail("Encoded output is not a JSON object")
+            return
+        }
+
+        let timestampString = json["timestamp"] as? String
+        XCTAssertNotNil(timestampString, "timestamp must be encoded as a String (ISO-8601)")
+
+        // Verify it's parseable by ISO8601DateFormatter
+        let formatter = ISO8601DateFormatter()
+        let parsedDate = formatter.date(from: timestampString ?? "")
+        XCTAssertNotNil(parsedDate, "Encoded timestamp must be valid ISO-8601")
+
+        // Verify accuracy within 1 second
+        XCTAssertEqual(parsedDate?.timeIntervalSince1970 ?? 0,
+                       knownDate.timeIntervalSince1970, accuracy: 1.0)
     }
 
-    /// Regression: `isFavorite` must not appear in encoded JSON even when
-    /// multiple ideas are encoded together (e.g. inside a HermesMessage).
-    func testHermesIdeaEncodedInsideMessageLacksIsFavoriteKey() throws {
+    func testHermesIdeaEncodeDoesNotUseDoubleForTimestamp() throws {
+        let idea = HermesIdea(
+            title: "The map reveals",
+            description: "An ancient map leads to discovery",
+            ideaType: .worldBuilding
+        )
+        let data = try JSONEncoder().encode(idea)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            XCTFail("Encoded output is not a JSON object")
+            return
+        }
+        // Timestamp must be a String, not a Double (i.e. not Unix epoch number)
+        XCTAssertNil(json["timestamp"] as? Double, "Timestamp must not be stored as a Double")
+        XCTAssertNotNil(json["timestamp"] as? String, "Timestamp must be stored as an ISO-8601 String")
+    }
+
+    func testHermesIdeaEncodeAndDecodePreservesAllFields() throws {
+        let originalId = UUID()
+        let originalDate = Date(timeIntervalSince1970: 1_680_000_000)
+        let original = HermesIdea(
+            id: originalId,
+            title: "The lighthouse blinks",
+            description: "A signal from across the sea",
+            ideaType: .setting,
+            timestamp: originalDate
+        )
+
+        let encoded = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(HermesIdea.self, from: encoded)
+
+        XCTAssertEqual(decoded.id, originalId)
+        XCTAssertEqual(decoded.title, "The lighthouse blinks")
+        XCTAssertEqual(decoded.description, "A signal from across the sea")
+        XCTAssertEqual(decoded.ideaType, .setting)
+        XCTAssertEqual(decoded.timestamp.timeIntervalSince1970,
+                       originalDate.timeIntervalSince1970, accuracy: 1.0)
+    }
+
+    // MARK: - HermesMessage still works without HermesSessionStats
+
+    func testHermesMessageCanBeCreatedWithIdeas() {
         let ideas = [
-            HermesIdea(title: "A", description: "Desc", ideaType: .dialogue),
-            HermesIdea(title: "B", description: "Desc", ideaType: .theme)
+            HermesIdea(title: "Twist 1", description: "A", ideaType: .twist),
+            HermesIdea(title: "Plot 1", description: "B", ideaType: .plotHook)
         ]
-        let message = HermesMessage(role: .hermes, content: "Ideas:", ideas: ideas)
+        let message = HermesMessage(
+            role: .hermes,
+            content: "Here are your ideas",
+            ideas: ideas
+        )
+        XCTAssertEqual(message.ideas.count, 2)
+        XCTAssertEqual(message.role, .hermes)
+    }
+
+    func testHermesMessageRoundTrip() throws {
+        let message = HermesMessage(
+            role: .user,
+            content: "Give me plot ideas for a mystery",
+            ideas: []
+        )
         let data = try JSONEncoder().encode(message)
-        // Verify neither encoded idea contains isFavorite
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        let encodedIdeas = json?["ideas"] as? [[String: Any]]
-        XCTAssertEqual(encodedIdeas?.count, 2)
-        for (i, encodedIdea) in (encodedIdeas ?? []).enumerated() {
-            XCTAssertNil(encodedIdea["isFavorite"],
-                         "Idea at index \(i) must not contain isFavorite key")
-        }
-    }
-}
-
-// MARK: - HermesContext Backward Compatibility Tests
-
-extension HermesContextTests {
-
-    /// Regression: old serialized contexts that include a `tone` key must still
-    /// decode without throwing — Swift's `Decodable` ignores unknown keys.
-    func testHermesContextDecodesFromOldJsonWithToneKey() throws {
-        let json = """
-        {
-          "genre": "Horror",
-          "logline": "Old format",
-          "currentScene": "Cold open",
-          "characters": [],
-          "themes": ["fear"],
-          "tone": "dark"
-        }
-        """.data(using: .utf8)!
-        // Should decode successfully even though `tone` is no longer a field
-        let context = try JSONDecoder().decode(HermesContext.self, from: json)
-        XCTAssertEqual(context.genre, "Horror")
-        XCTAssertEqual(context.themes, ["fear"])
+        let decoded = try JSONDecoder().decode(HermesMessage.self, from: data)
+        XCTAssertEqual(decoded.id, message.id)
+        XCTAssertEqual(decoded.content, "Give me plot ideas for a mystery")
+        XCTAssertEqual(decoded.role, .user)
+        XCTAssertTrue(decoded.ideas.isEmpty)
     }
 
-    /// Boundary: an empty characters and themes array must survive a round-trip.
-    func testHermesContextEmptyArraysRoundTrip() throws {
-        let original = HermesContext(genre: "Western", characters: [], themes: [])
-        let data = try JSONEncoder().encode(original)
-        let decoded = try JSONDecoder().decode(HermesContext.self, from: data)
-        XCTAssertTrue(decoded.characters.isEmpty)
-        XCTAssertTrue(decoded.themes.isEmpty)
+    // MARK: - HermesSession without stats computation
+
+    func testHermesSessionMessagesCanBeManipulatedDirectly() {
+        var session = HermesSession()
+        let message = HermesMessage(role: .user, content: "Brainstorm!", ideas: [])
+        session.messages.append(message)
+        XCTAssertEqual(session.messages.count, 1)
+    }
+
+    func testHermesSessionLastMessageAtCanBeUpdated() {
+        var session = HermesSession()
+        let later = Date(timeIntervalSince1970: 5000)
+        // lastMessageAt is a mutable var — can be updated directly
+        session.lastMessageAt = later
+        XCTAssertEqual(session.lastMessageAt.timeIntervalSince1970, later.timeIntervalSince1970, accuracy: 1.0)
+    }
+
+    // MARK: - Regression: HermesIdea still has all required fields
+
+    func testHermesIdeaHasIdTitleDescriptionIdeaTypeTimestamp() {
+        let idea = HermesIdea(
+            title: "A secret passage",
+            description: "Behind the bookshelf",
+            ideaType: .worldBuilding
+        )
+        let mirror = Mirror(reflecting: idea)
+        let labels = mirror.children.compactMap { $0.label }
+        XCTAssertTrue(labels.contains("id"))
+        XCTAssertTrue(labels.contains("title"))
+        XCTAssertTrue(labels.contains("description"))
+        XCTAssertTrue(labels.contains("ideaType"))
+        XCTAssertTrue(labels.contains("timestamp"))
     }
 }

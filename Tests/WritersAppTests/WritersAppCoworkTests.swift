@@ -1,281 +1,13 @@
 import XCTest
 @testable import WritersApp
 
-// MARK: - WritersApp.crmManager Tests
-// Tests for the new crmManager property added to WritersApp in this PR.
-
-final class WritersAppCRMManagerTests: XCTestCase {
-
-    var app: WritersApp!
-
-    override func setUp() {
-        super.setUp()
-        app = WritersApp()
-    }
-
-    override func tearDown() {
-        app = nil
-        super.tearDown()
-    }
-
-    func testCRMManagerIsInitializedOnAppInit() {
-        // crmManager should be a non-nil CRMManager after WritersApp init
-        // (The property is a public let, so we just verify it's accessible.)
-        let manager = app.crmManager
-        XCTAssertNotNil(manager, "WritersApp.crmManager should be initialized on app creation")
-    }
-
-    func testCRMManagerIsIndependentPerAppInstance() {
-        let app2 = WritersApp()
-        // Each WritersApp instance should have its own independent crmManager
-        XCTAssertFalse(app.crmManager === app2.crmManager,
-                       "Each WritersApp instance should have an independent CRMManager")
-    }
-
-    func testCRMManagerCanCreateContacts() {
-        let contact = app.crmManager.createContact(name: "Jane Editor", email: "jane@publisher.com")
-        XCTAssertEqual(contact.name, "Jane Editor")
-        XCTAssertEqual(contact.email, "jane@publisher.com")
-    }
-
-    func testCRMManagerContactsAreIsolatedFromOtherAppInstances() {
-        let app2 = WritersApp()
-        app.crmManager.createContact(name: "Contact In App1", email: "a@example.com")
-        let contactsInApp2 = app2.crmManager.getAllContacts()
-        XCTAssertEqual(contactsInApp2.count, 0,
-                       "Contacts added to one WritersApp instance should not appear in another")
-    }
-}
-
-// MARK: - ProspectDatabase Tests
-// Tests for ProspectDatabase CRUD operations (the docstrings were removed in this PR
-// but the behavior remains; these tests verify correctness).
-
-final class ProspectDatabaseTests: XCTestCase {
-
-    var db: ProspectDatabase!
-
-    override func setUp() {
-        super.setUp()
-        db = ProspectDatabase()
-    }
-
-    override func tearDown() {
-        db = nil
-        super.tearDown()
-    }
-
-    // MARK: - addProspect / getProspect
-
-    func testAddAndGetProspect() {
-        let prospect = Prospect(name: "Alice", email: "alice@example.com")
-        db.addProspect(prospect)
-        let retrieved = db.getProspect(id: prospect.id)
-        XCTAssertNotNil(retrieved)
-        XCTAssertEqual(retrieved?.name, "Alice")
-        XCTAssertEqual(retrieved?.email, "alice@example.com")
-    }
-
-    func testGetProspectReturnsNilForUnknownId() {
-        let retrieved = db.getProspect(id: UUID())
-        XCTAssertNil(retrieved)
-    }
-
-    func testAddProspectOverwritesExistingEntry() {
-        let prospect = Prospect(name: "Bob", email: "bob@example.com")
-        db.addProspect(prospect)
-        // Add again (same id) with the same data – should overwrite
-        db.addProspect(prospect)
-        XCTAssertEqual(db.getAllProspects().count, 1)
-    }
-
-    // MARK: - getAllProspects
-
-    func testGetAllProspectsReturnsAllEntries() {
-        let p1 = Prospect(name: "Alice", email: "alice@example.com")
-        let p2 = Prospect(name: "Bob", email: "bob@example.com")
-        db.addProspect(p1)
-        db.addProspect(p2)
-        XCTAssertEqual(db.getAllProspects().count, 2)
-    }
-
-    func testGetAllProspectsEmptyWhenNoneAdded() {
-        XCTAssertTrue(db.getAllProspects().isEmpty)
-    }
-
-    func testGetAllProspectsSortedNewestFirst() {
-        let earlier = Date(timeIntervalSince1970: 1000)
-        let later = Date(timeIntervalSince1970: 2000)
-        let p1 = Prospect(name: "Alice", email: "alice@example.com", createdAt: earlier)
-        let p2 = Prospect(name: "Bob", email: "bob@example.com", createdAt: later)
-        db.addProspect(p1)
-        db.addProspect(p2)
-        let all = db.getAllProspects()
-        XCTAssertEqual(all.first?.name, "Bob", "Newest prospect should appear first")
-        XCTAssertEqual(all.last?.name, "Alice", "Oldest prospect should appear last")
-    }
-
-    // MARK: - getProspects(withStatus:)
-
-    func testGetProspectsWithStatusFiltersCorrectly() {
-        let p1 = Prospect(name: "Lead", email: "lead@example.com", status: .new)
-        let p2 = Prospect(name: "Active", email: "active@example.com", status: .contacted)
-        db.addProspect(p1)
-        db.addProspect(p2)
-        let newProspects = db.getProspects(withStatus: .new)
-        XCTAssertEqual(newProspects.count, 1)
-        XCTAssertEqual(newProspects.first?.name, "Lead")
-    }
-
-    func testGetProspectsWithStatusReturnsEmptyForNoMatch() {
-        let p1 = Prospect(name: "Alice", email: "a@example.com", status: .new)
-        db.addProspect(p1)
-        let meetings = db.getProspects(withStatus: .meeting)
-        XCTAssertTrue(meetings.isEmpty)
-    }
-
-    // MARK: - updateProspect
-
-    func testUpdateProspectReplacesEntry() {
-        let prospect = Prospect(name: "Old Name", email: "old@example.com")
-        db.addProspect(prospect)
-        let updated = Prospect(id: prospect.id, name: "New Name", email: "old@example.com")
-        db.updateProspect(updated)
-        let retrieved = db.getProspect(id: prospect.id)
-        XCTAssertEqual(retrieved?.name, "New Name")
-    }
-
-    // MARK: - updateProspectStatus
-
-    func testUpdateProspectStatusChangesStatus() throws {
-        let prospect = Prospect(name: "Charlie", email: "charlie@example.com", status: .new)
-        db.addProspect(prospect)
-        try db.updateProspectStatus(id: prospect.id, status: .contacted)
-        let retrieved = db.getProspect(id: prospect.id)
-        XCTAssertEqual(retrieved?.status, .contacted)
-    }
-
-    func testUpdateProspectStatusThrowsForUnknownId() {
-        XCTAssertThrowsError(try db.updateProspectStatus(id: UUID(), status: .contacted))
-    }
-
-    func testUpdateProspectStatusToContactedSetsLastContactedAt() throws {
-        let prospect = Prospect(name: "Dave", email: "dave@example.com", status: .new)
-        db.addProspect(prospect)
-        let before = Date()
-        try db.updateProspectStatus(id: prospect.id, status: .contacted)
-        let after = Date()
-        let retrieved = db.getProspect(id: prospect.id)
-        XCTAssertNotNil(retrieved?.lastContactedAt)
-        if let lca = retrieved?.lastContactedAt {
-            XCTAssertGreaterThanOrEqual(lca, before)
-            XCTAssertLessThanOrEqual(lca, after)
-        }
-    }
-
-    func testUpdateProspectStatusToRepliedSetsLastContactedAt() throws {
-        let prospect = Prospect(name: "Eve", email: "eve@example.com", status: .contacted)
-        db.addProspect(prospect)
-        try db.updateProspectStatus(id: prospect.id, status: .replied)
-        let retrieved = db.getProspect(id: prospect.id)
-        XCTAssertNotNil(retrieved?.lastContactedAt)
-    }
-
-    func testUpdateProspectStatusToMeetingSetsLastContactedAt() throws {
-        let prospect = Prospect(name: "Frank", email: "frank@example.com", status: .replied)
-        db.addProspect(prospect)
-        try db.updateProspectStatus(id: prospect.id, status: .meeting)
-        let retrieved = db.getProspect(id: prospect.id)
-        XCTAssertNotNil(retrieved?.lastContactedAt)
-    }
-
-    // MARK: - deleteProspect
-
-    func testDeleteProspectRemovesEntry() {
-        let prospect = Prospect(name: "Grace", email: "grace@example.com")
-        db.addProspect(prospect)
-        db.deleteProspect(id: prospect.id)
-        XCTAssertNil(db.getProspect(id: prospect.id))
-        XCTAssertEqual(db.getAllProspects().count, 0)
-    }
-
-    func testDeleteProspectOnUnknownIdDoesNotThrow() {
-        // Deleting a non-existent prospect should be a no-op
-        XCTAssertNoThrow(db.deleteProspect(id: UUID()))
-    }
-
-    // MARK: - searchProspects
-
-    func testSearchProspectsByName() {
-        let p1 = Prospect(name: "Alice Wonder", email: "alice@example.com")
-        let p2 = Prospect(name: "Bob Smith", email: "bob@example.com")
-        db.addProspect(p1)
-        db.addProspect(p2)
-        let results = db.searchProspects(query: "alice")
-        XCTAssertEqual(results.count, 1)
-        XCTAssertEqual(results.first?.name, "Alice Wonder")
-    }
-
-    func testSearchProspectsByEmail() {
-        let p1 = Prospect(name: "Alice", email: "alice@publisher.com")
-        let p2 = Prospect(name: "Bob", email: "bob@agency.com")
-        db.addProspect(p1)
-        db.addProspect(p2)
-        let results = db.searchProspects(query: "publisher")
-        XCTAssertEqual(results.count, 1)
-        XCTAssertEqual(results.first?.email, "alice@publisher.com")
-    }
-
-    func testSearchProspectsCaseInsensitive() {
-        let p1 = Prospect(name: "UPPERCASE PERSON", email: "upper@example.com")
-        db.addProspect(p1)
-        let results = db.searchProspects(query: "uppercase")
-        XCTAssertEqual(results.count, 1)
-    }
-
-    func testSearchProspectsReturnsEmptyForNoMatch() {
-        let p1 = Prospect(name: "Alice", email: "alice@example.com")
-        db.addProspect(p1)
-        let results = db.searchProspects(query: "zzz_no_match_zzz")
-        XCTAssertTrue(results.isEmpty)
-    }
-
-    // MARK: - getStats
-
-    func testGetStatsReturnsAllStatuses() {
-        let stats = db.getStats()
-        // All ProspectStatus cases should appear in the stats dictionary
-        for status in ProspectStatus.allCases {
-            XCTAssertNotNil(stats[status], "Stats should include entry for status: \(status)")
-        }
-    }
-
-    func testGetStatsCountsCorrectly() {
-        let p1 = Prospect(name: "A", email: "a@example.com", status: .new)
-        let p2 = Prospect(name: "B", email: "b@example.com", status: .new)
-        let p3 = Prospect(name: "C", email: "c@example.com", status: .contacted)
-        db.addProspect(p1)
-        db.addProspect(p2)
-        db.addProspect(p3)
-        let stats = db.getStats()
-        XCTAssertEqual(stats[.new], 2)
-        XCTAssertEqual(stats[.contacted], 1)
-    }
-
-    func testGetStatsReturnsZeroForEmptyStatuses() {
-        let p1 = Prospect(name: "A", email: "a@example.com", status: .new)
-        db.addProspect(p1)
-        let stats = db.getStats()
-        // Statuses with no prospects should be 0
-        XCTAssertEqual(stats[.meeting], 0)
-        XCTAssertEqual(stats[.declined], 0)
-        XCTAssertEqual(stats[.converted], 0)
-    }
-}
-
-// MARK: - CoworkSession Lifecycle Tests (WritersApp facade)
-
-final class WritersAppCoworkSessionTests: XCTestCase {
+/// Tests for WritersApp Cowork Mode functionality as changed in this PR:
+/// - addProspect no longer takes a status parameter
+/// - Cowork session counters (prospectsAdded, prospectsContacted) still work
+/// - ProspectDatabase CRUD operations
+/// - GmailService guard (gmailNotEnabled error)
+/// - BrowserService history management
+final class WritersAppCoworkTests: XCTestCase {
 
     var app: WritersApp!
 
@@ -289,25 +21,33 @@ final class WritersAppCoworkSessionTests: XCTestCase {
         super.tearDown()
     }
 
-    func testStartCoworkSessionCreatesActiveSession() {
+    // MARK: - Cowork session lifecycle
+
+    func testStartCoworkSessionCreatesSession() {
         let session = app.startCoworkSession()
+        XCTAssertNotNil(session.id)
+        XCTAssertNil(session.endedAt)
+    }
+
+    func testStartCoworkSessionSetsActiveSession() {
+        _ = app.startCoworkSession()
         XCTAssertNotNil(app.activeCoworkSession)
-        XCTAssertEqual(app.activeCoworkSession?.id, session.id)
     }
 
     func testEndCoworkSessionReturnsSession() {
-        app.startCoworkSession()
+        _ = app.startCoworkSession()
         let ended = app.endCoworkSession()
         XCTAssertNotNil(ended)
+        XCTAssertNotNil(ended?.endedAt)
     }
 
     func testEndCoworkSessionClearsActiveSession() {
-        app.startCoworkSession()
-        app.endCoworkSession()
+        _ = app.startCoworkSession()
+        _ = app.endCoworkSession()
         XCTAssertNil(app.activeCoworkSession)
     }
 
-    func testEndCoworkSessionWithNoActiveSessionReturnsNil() {
+    func testEndCoworkSessionWithoutActiveSessionReturnsNil() {
         let result = app.endCoworkSession()
         XCTAssertNil(result)
     }
@@ -319,140 +59,171 @@ final class WritersAppCoworkSessionTests: XCTestCase {
         XCTAssertEqual(app.activeCoworkSession?.id, second.id)
     }
 
-    // MARK: - Prospect facade via WritersApp
+    // MARK: - addProspect increments cowork session prospectsAdded
 
-    func testAddProspectReturnsCreatedProspect() {
-        let prospect = app.addProspect(name: "Writer Agent", email: "agent@lit.com")
-        XCTAssertEqual(prospect.name, "Writer Agent")
-        XCTAssertEqual(prospect.email, "agent@lit.com")
+    func testAddProspectIncrementsProspectsAddedWhenSessionActive() {
+        _ = app.startCoworkSession()
+        let initialCount = app.activeCoworkSession?.prospectsAdded ?? 0
+        _ = app.addProspect(name: "Test Prospect", email: "test@example.com")
+        XCTAssertEqual(app.activeCoworkSession?.prospectsAdded, initialCount + 1)
     }
 
-    func testGetAllProspectsReflectsAddedProspects() {
-        app.addProspect(name: "P1", email: "p1@example.com")
-        app.addProspect(name: "P2", email: "p2@example.com")
-        let all = app.getAllProspects()
-        XCTAssertEqual(all.count, 2)
+    func testAddMultipleProspectsIncrementsByOne() {
+        _ = app.startCoworkSession()
+        _ = app.addProspect(name: "Prospect 1", email: "p1@example.com")
+        _ = app.addProspect(name: "Prospect 2", email: "p2@example.com")
+        _ = app.addProspect(name: "Prospect 3", email: "p3@example.com")
+        XCTAssertEqual(app.activeCoworkSession?.prospectsAdded, 3)
     }
 
-    func testGetProspectsWithStatusFilter() throws {
-        let p = app.addProspect(name: "New Prospect", email: "new@example.com")
-        app.addProspect(name: "Contacted Prospect", email: "contacted@example.com")
-        // Promote one to contacted
-        try app.updateProspectStatus(id: p.id, status: .contacted)
-        let contactedProspects = app.getProspects(withStatus: .contacted)
-        XCTAssertEqual(contactedProspects.count, 1)
-        XCTAssertEqual(contactedProspects.first?.name, "New Prospect")
+    func testAddProspectWithoutSessionDoesNotCrash() {
+        // No active session — should still add prospect to database without crash
+        let prospect = app.addProspect(name: "No Session", email: "nosession@test.com")
+        XCTAssertNotNil(prospect.id)
     }
 
-    func testSearchProspects() {
-        app.addProspect(name: "Unique Name XYZ", email: "unique@example.com")
-        app.addProspect(name: "Other Person", email: "other@example.com")
-        let results = app.searchProspects(query: "unique")
-        XCTAssertEqual(results.count, 1)
-        XCTAssertEqual(results.first?.name, "Unique Name XYZ")
-    }
+    // MARK: - updateProspectStatus increments prospectsContacted
 
-    func testUpdateProspectStatusChangesStatus() throws {
-        let prospect = app.addProspect(name: "Status Test", email: "status@example.com", status: .new)
+    func testUpdateStatusToContactedIncrementsCoworkSessionCounter() throws {
+        _ = app.startCoworkSession()
+        let prospect = app.addProspect(name: "Contacted Person", email: "c@example.com")
+        let initialContacted = app.activeCoworkSession?.prospectsContacted ?? 0
         try app.updateProspectStatus(id: prospect.id, status: .contacted)
-        let updated = app.getAllProspects().first(where: { $0.id == prospect.id })
-        XCTAssertEqual(updated?.status, .contacted)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, initialContacted + 1)
     }
 
-    func testUpdateProspectStatusIncrementsSessionContactedCount() throws {
-        app.startCoworkSession()
-        let prospect = app.addProspect(name: "Contact Test", email: "ct@example.com", status: .new)
-        let countBefore = app.activeCoworkSession?.prospectsContacted ?? 0
-        try app.updateProspectStatus(id: prospect.id, status: .contacted)
-        let countAfter = app.activeCoworkSession?.prospectsContacted ?? 0
-        XCTAssertEqual(countAfter, countBefore + 1)
+    func testUpdateStatusToRepliedIncrementsCoworkSessionCounter() throws {
+        _ = app.startCoworkSession()
+        let prospect = app.addProspect(name: "Replied Person", email: "r@example.com")
+        let initialContacted = app.activeCoworkSession?.prospectsContacted ?? 0
+        try app.updateProspectStatus(id: prospect.id, status: .replied)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, initialContacted + 1)
     }
 
-    func testUpdateProspectStatusWithoutActiveSessionDoesNotCrash() throws {
-        let prospect = app.addProspect(name: "No Session", email: "ns@example.com", status: .new)
-        XCTAssertNoThrow(try app.updateProspectStatus(id: prospect.id, status: .contacted))
+    func testUpdateStatusToMeetingIncrementsCoworkSessionCounter() throws {
+        _ = app.startCoworkSession()
+        let prospect = app.addProspect(name: "Meeting Person", email: "m@example.com")
+        let initialContacted = app.activeCoworkSession?.prospectsContacted ?? 0
+        try app.updateProspectStatus(id: prospect.id, status: .meeting)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, initialContacted + 1)
     }
 
-    func testDeleteProspectRemovesFromList() {
-        let prospect = app.addProspect(name: "Delete Me", email: "del@example.com")
-        app.deleteProspect(id: prospect.id)
-        XCTAssertTrue(app.getAllProspects().isEmpty)
+    func testUpdateStatusToDeclinedDoesNotIncrementCoworkSessionCounter() throws {
+        _ = app.startCoworkSession()
+        let prospect = app.addProspect(name: "Declined Person", email: "d@example.com")
+        let initialContacted = app.activeCoworkSession?.prospectsContacted ?? 0
+        try app.updateProspectStatus(id: prospect.id, status: .declined)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, initialContacted,
+                       "declined status should not increment prospectsContacted")
     }
 
-    func testGetProspectStatsReturnsAllStatuses() {
-        let stats = app.getProspectStats()
-        for status in ProspectStatus.allCases {
-            XCTAssertNotNil(stats[status])
+    func testUpdateStatusToConvertedDoesNotIncrementCoworkSessionCounter() throws {
+        _ = app.startCoworkSession()
+        let prospect = app.addProspect(name: "Converted Person", email: "cv@example.com")
+        let initialContacted = app.activeCoworkSession?.prospectsContacted ?? 0
+        try app.updateProspectStatus(id: prospect.id, status: .converted)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, initialContacted,
+                       "converted status should not increment prospectsContacted")
+    }
+
+    // MARK: - ProspectDatabase: default status after addProspect
+
+    func testNewProspectHasStatusNew() {
+        let prospect = app.addProspect(name: "Fresh", email: "fresh@example.com")
+        XCTAssertEqual(prospect.status, .new)
+    }
+
+    // MARK: - Gmail guard
+
+    func testListGmailMessagesThrowsWhenGmailNotEnabled() async {
+        do {
+            _ = try await app.listGmailMessages()
+            XCTFail("Expected CoworkError.gmailNotEnabled")
+        } catch CoworkError.gmailNotEnabled {
+            // Expected
+        } catch {
+            XCTFail("Expected CoworkError.gmailNotEnabled, got \(error)")
         }
     }
 
-    func testAddProspectIncrementsActiveSessionCount() {
-        app.startCoworkSession()
-        let countBefore = app.activeCoworkSession?.prospectsAdded ?? 0
-        app.addProspect(name: "Session Counter", email: "sc@example.com")
-        let countAfter = app.activeCoworkSession?.prospectsAdded ?? 0
-        XCTAssertEqual(countAfter, countBefore + 1)
-    }
-
-    // MARK: - Gmail facade
-
-    func testGmailIsDisabledByDefault() {
+    func testIsGmailEnabledFalseByDefault() {
         XCTAssertFalse(app.isGmailEnabled)
     }
 
-    func testEnableGmailSetsEnabledFlag() {
-        app.enableGmail(oauthToken: "mock-token-123")
+    func testEnableAndDisableGmail() {
+        app.enableGmail(oauthToken: "test-token")
         XCTAssertTrue(app.isGmailEnabled)
-    }
-
-    func testDisableGmailClearsEnabledFlag() {
-        app.enableGmail(oauthToken: "mock-token-123")
         app.disableGmail()
         XCTAssertFalse(app.isGmailEnabled)
     }
 
-    func testListGmailMessagesThrowsWhenNotEnabled() async {
-        do {
-            _ = try await app.listGmailMessages()
-            XCTFail("Should have thrown CoworkError.gmailNotEnabled")
-        } catch CoworkError.gmailNotEnabled {
-            // Expected
-        } catch {
-            XCTFail("Unexpected error: \(error)")
-        }
-    }
-
-    func testSendGmailThrowsWhenNotEnabled() async {
-        let draft = GmailDraft(to: "test@example.com", subject: "Test", body: "Hello")
+    func testSendGmailThrowsWhenGmailNotEnabled() async {
+        let draft = GmailDraft(to: "x@x.com", subject: "Hi", body: "Hello")
         do {
             _ = try await app.sendGmail(draft: draft)
-            XCTFail("Should have thrown CoworkError.gmailNotEnabled")
+            XCTFail("Expected CoworkError.gmailNotEnabled")
         } catch CoworkError.gmailNotEnabled {
             // Expected
         } catch {
-            XCTFail("Unexpected error: \(error)")
+            XCTFail("Expected CoworkError.gmailNotEnabled, got \(error)")
         }
     }
 
-    func testMarkGmailAsReadThrowsWhenNotEnabled() async {
-        do {
-            try await app.markGmailAsRead(id: "msg123")
-            XCTFail("Should have thrown CoworkError.gmailNotEnabled")
-        } catch CoworkError.gmailNotEnabled {
-            // Expected
-        } catch {
-            XCTFail("Unexpected error: \(error)")
-        }
+    // MARK: - Browser service
+
+    func testGetBrowsingHistoryEmptyByDefault() {
+        let history = app.getBrowsingHistory()
+        XCTAssertTrue(history.isEmpty)
     }
 
-    // MARK: - Browser facade
-
-    func testGetBrowsingHistoryEmptyAtStart() {
-        XCTAssertTrue(app.getBrowsingHistory().isEmpty)
-    }
-
-    func testClearBrowsingHistoryDoesNotCrash() {
+    func testClearBrowsingHistory() async throws {
+        // We can't easily fetch real URLs in unit tests, so just test clear on empty
         app.clearBrowsingHistory()
         XCTAssertTrue(app.getBrowsingHistory().isEmpty)
+    }
+
+    func testBrowseURLInvalidSchemeThrows() async {
+        do {
+            _ = try await app.browseURL("ftp://invalid.example.com")
+            XCTFail("Expected error for invalid scheme")
+        } catch {
+            // Expected — BrowserService requires http/https
+        }
+    }
+
+    // MARK: - ProspectDatabase CRUD
+
+    func testGetProspectsWithStatusFiltersCorrectly() throws {
+        let p1 = app.addProspect(name: "New Guy", email: "new@test.com")
+        let p2 = app.addProspect(name: "Old Guy", email: "old@test.com")
+        try app.updateProspectStatus(id: p2.id, status: .contacted)
+
+        let newOnes = app.getProspects(withStatus: .new)
+        let contactedOnes = app.getProspects(withStatus: .contacted)
+
+        XCTAssertTrue(newOnes.contains { $0.id == p1.id })
+        XCTAssertTrue(contactedOnes.contains { $0.id == p2.id })
+        XCTAssertFalse(contactedOnes.contains { $0.id == p1.id })
+    }
+
+    func testProspectStatsReflectActualCounts() throws {
+        _ = app.addProspect(name: "Stats A", email: "sa@test.com")
+        _ = app.addProspect(name: "Stats B", email: "sb@test.com")
+        let stats = app.getProspectStats()
+        XCTAssertGreaterThanOrEqual(stats[.new] ?? 0, 2)
+        // All ProspectStatus cases should have an entry
+        for status in ProspectStatus.allCases {
+            XCTAssertNotNil(stats[status], "Stats should include entry for \(status)")
+        }
+    }
+
+    func testUpdateNonexistentProspectThrows() {
+        let fakeId = UUID()
+        XCTAssertThrowsError(try app.updateProspectStatus(id: fakeId, status: .contacted)) { error in
+            guard case CoworkError.prospectNotFound(_) = error else {
+                XCTFail("Expected CoworkError.prospectNotFound, got \(error)")
+                return
+            }
+        }
     }
 }
