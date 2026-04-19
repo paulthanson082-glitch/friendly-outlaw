@@ -3427,6 +3427,72 @@ final class HermesAgentTests: XCTestCase {
         XCTAssertEqual(stats.sessionDuration, 120.0, accuracy: 0.001)
         XCTAssertEqual(stats.averageIdeasPerMessage, 2.0, accuracy: 0.001)
     }
+
+    // MARK: - WritersApp Post-CRM Tests
+
+    func testWritersAppInitializesSuccessfully() {
+        let app = WritersApp()
+        XCTAssertNotNil(app)
+    }
+
+    func testWritersAppCoreManagersPresent() {
+        let app = WritersApp()
+        XCTAssertNotNil(app.templateManager)
+        XCTAssertNotNil(app.documentManager)
+        XCTAssertNotNil(app.issueManager)
+        XCTAssertNotNil(app.kanbanManager)
+        XCTAssertNotNil(app.databaseManager)
+    }
+
+    func testWritersAppDocumentOperationsWork() {
+        let app = WritersApp()
+        let doc = app.createBlankDocument(title: "Test Doc", category: .article)
+        XCTAssertEqual(doc.title, "Test Doc")
+        XCTAssertEqual(doc.category, .article)
+        let retrieved = app.documentManager.getDocument(id: doc.id)
+        XCTAssertNotNil(retrieved)
+    }
+
+    func testWritersAppStatisticsWork() {
+        let app = WritersApp()
+        let stats = app.getStatistics()
+        XCTAssertGreaterThanOrEqual(stats.totalDocuments, 0)
+        XCTAssertGreaterThanOrEqual(stats.totalTemplates, 0)
+    }
+
+    func testWritersAppIsNotAIEnabledByDefault() {
+        let app = WritersApp()
+        XCTAssertFalse(app.isAIEnabled)
+    }
+
+    func testWritersAppCoworkComponentsInitialize() {
+        let app = WritersApp()
+        XCTAssertNotNil(app.encouragementService)
+        XCTAssertNotNil(app.versionControl)
+    }
+
+    func testWritersAppVersionControlAccessible() {
+        let app = WritersApp()
+        let vc = app.versionControl
+        XCTAssertNotNil(vc)
+    }
+
+    func testWritersAppKanbanFunctional() {
+        let app = WritersApp()
+        let board = app.createKanbanBoard(name: "Sprint", description: "Sprint board")
+        XCTAssertEqual(board.name, "Sprint")
+        let boards = app.getAllKanbanBoards()
+        XCTAssertTrue(boards.contains { $0.id == board.id })
+    }
+
+    func testWritersAppIssueManagerOperational() {
+        let app = WritersApp()
+        let doc = app.createBlankDocument(title: "Issue Doc", category: .other)
+        let issue = app.createIssue(documentId: doc.id, title: "Bug", description: "A bug", status: .open, priority: .medium)
+        XCTAssertEqual(issue.title, "Bug")
+        let issues = app.getIssues(forDocument: doc.id)
+        XCTAssertTrue(issues.contains { $0.id == issue.id })
+    }
 }
 
 // MARK: - Test Helpers
