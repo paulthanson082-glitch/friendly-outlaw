@@ -2390,6 +2390,118 @@ final class ScreenplayTemplateContentTests: XCTestCase {
                        "'professional' tag must have been removed from the screenplay template")
     }
 
+    // MARK: - Spoiler Protection Tests
+
+    func testTagSpoilerCreatesSpoilerTag() throws {
+        let document = app.createBlankDocument(title: "Spoiler Doc", category: .novel)
+        let tag = try XCTUnwrap(app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 10, description: "Big reveal"))
+        XCTAssertEqual(tag.documentId, document.id)
+        XCTAssertEqual(tag.startOffset, 0)
+        XCTAssertEqual(tag.endOffset, 10)
+        XCTAssertEqual(tag.description, "Big reveal")
+        XCTAssertEqual(tag.severity, .moderate)
+    }
+
+    func testGetSpoilerTagsReturnsTagsForDocument() {
+        let doc1 = app.createBlankDocument(title: "Doc 1", category: .novel)
+        let doc2 = app.createBlankDocument(title: "Doc 2", category: .novel)
+        app.tagSpoiler(in: doc1.id, startOffset: 0, endOffset: 5)
+        app.tagSpoiler(in: doc1.id, startOffset: 10, endOffset: 20)
+        app.tagSpoiler(in: doc2.id, startOffset: 0, endOffset: 3)
+
+        let doc1Tags = app.getSpoilerTags(forDocument: doc1.id)
+        let doc2Tags = app.getSpoilerTags(forDocument: doc2.id)
+        XCTAssertEqual(doc1Tags.count, 2)
+        XCTAssertEqual(doc2Tags.count, 1)
+    }
+
+    func testGetSpoilerTagsAreOrderedByStartOffset() {
+        let document = app.createBlankDocument(title: "Ordered Doc", category: .novel)
+        app.tagSpoiler(in: document.id, startOffset: 20, endOffset: 30)
+        app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 10)
+        app.tagSpoiler(in: document.id, startOffset: 50, endOffset: 60)
+
+        let tags = app.getSpoilerTags(forDocument: document.id)
+        XCTAssertEqual(tags[0].startOffset, 0)
+        XCTAssertEqual(tags[1].startOffset, 20)
+        XCTAssertEqual(tags[2].startOffset, 50)
+    }
+
+    func testRemoveSpoilerTagDeletesTag() throws {
+        let document = app.createBlankDocument(title: "Remove Tag Doc", category: .novel)
+        let tag = try XCTUnwrap(app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 10))
+        XCTAssertEqual(app.getSpoilerTags(forDocument: document.id).count, 1)
+        app.removeSpoilerTag(id: tag.id)
+        XCTAssertEqual(app.getSpoilerTags(forDocument: document.id).count, 0)
+    }
+
+    func testDocumentHasSpoilersReturnsTrueWhenTagged() {
+        let document = app.createBlankDocument(title: "Tagged Doc", category: .novel)
+        XCTAssertFalse(app.documentHasSpoilers(document.id))
+        app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 5)
+        XCTAssertTrue(app.documentHasSpoilers(document.id))
+    }
+
+    func testRedactedContentReplacesTaggedRegions() {
+        var document = app.createBlankDocument(title: "Redact Doc", category: .novel)
+        document.content = "Hello spoiler world"
+        app.documentManager.updateDocument(document)
+
+        app.tagSpoiler(in: document.id, startOffset: 6, endOffset: 13) // "spoiler"
+        let redacted = app.redactedContent(forDocument: document.id)
+        XCTAssertNotNil(redacted)
+        XCTAssertFalse(redacted!.contains("spoiler"), "Spoiler text should be redacted")
+        XCTAssertTrue(redacted!.contains("[SPOILER REDACTED]"))
+        XCTAssertTrue(redacted!.contains("Hello "))
+        XCTAssertTrue(redacted!.contains(" world"))
+    }
+
+    func testRedactedContentWithNoTagsReturnsOriginal() {
+        var document = app.createBlankDocument(title: "Clean Doc", category: .novel)
+        document.content = "No spoilers here"
+        app.documentManager.updateDocument(document)
+
+        let redacted = app.redactedContent(forDocument: document.id)
+        XCTAssertEqual(redacted, "No spoilers here")
+    }
+
+    func testExportDocumentWithSpoilerMarkupMarkdownFormat() {
+        var document = app.createBlankDocument(title: "Markup Doc", category: .novel)
+        document.content = "He dies at the end."
+        app.documentManager.updateDocument(document)
+
+        app.tagSpoiler(in: document.id, startOffset: 3, endOffset: 7, severity: .major) // "dies"
+        let exported = app.exportDocumentWithSpoilerMarkup(id: document.id, format: .markdown)
+        XCTAssertNotNil(exported)
+        XCTAssertTrue(exported!.contains("||SPOILER(major): dies||"))
+        XCTAssertTrue(exported!.contains("He "))
+        XCTAssertTrue(exported!.contains(" at the end."))
+    }
+
+    func testExportDocumentWithSpoilerMarkupHTMLFormat() {
+        var document = app.createBlankDocument(title: "HTML Markup Doc", category: .novel)
+        document.content = "Twist ending here"
+        app.documentManager.updateDocument(document)
+
+        app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 5, severity: .minor) // "Twist"
+        let exported = app.exportDocumentWithSpoilerMarkup(id: document.id, format: .html)
+        XCTAssertNotNil(exported)
+        XCTAssertTrue(exported!.contains("<span class=\"spoiler spoiler-minor\">Twist</span>"))
+    }
+
+    func testSpoilerTagSeverityStoredCorrectly() throws {
+        let document = app.createBlankDocument(title: "Severity Doc", category: .novel)
+        let tag = try XCTUnwrap(app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 5, severity: .major))
+        XCTAssertEqual(tag.severity, .major)
+        XCTAssertEqual(tag.severity.displayName, "Major")
+    }
+
+    func testSpoilerTagIsIdentifiable() throws {
+        let document = app.createBlankDocument(title: "Identifiable Doc", category: .novel)
+        let tag1 = try XCTUnwrap(app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 5))
+        let tag2 = try XCTUnwrap(app.tagSpoiler(in: document.id, startOffset: 10, endOffset: 15))
+        XCTAssertNotEqual(tag1.id, tag2.id)
+    }
 }
 
 // MARK: - Writing Advisor Basic Tests
