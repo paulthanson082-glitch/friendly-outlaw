@@ -89,3 +89,4 @@ wheels/
 .installed.cfg
 *.egg
 bin/
+cmd/cargent/cargent
