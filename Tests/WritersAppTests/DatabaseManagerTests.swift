@@ -1275,4 +1275,93 @@ final class DatabaseManagerTests: XCTestCase {
         let retrieved = try databaseManager.getAISuggestions(userId: testUserId, limit: 100)
         XCTAssertEqual(retrieved.count, 100)
     }
+
+    // MARK: - API Key Security: Not Persisted in Plaintext (PR Change)
+    // The PR changed saveAIConfiguration so that the API key is intentionally stored
+    // as an empty string in the database. The key must be retrieved from a secure
+    // source (e.g. Keychain or environment variable) at runtime.
+
+    func testAPIKeyAlwaysReturnedAsEmptyStringAfterSave() throws {
+        let config = AIConfiguration(
+            apiKey: "sk-ant-super-secret-key",
+            model: .claude35Sonnet,
+            maxTokens: 4096,
+            temperature: 0.7
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertNotNil(retrieved)
+        XCTAssertEqual(retrieved?.apiKey, "",
+            "PR security change: API key must NOT be persisted in the database; always returns empty string")
+    }
+
+    func testDifferentAPIKeysAllReturnEmptyString() throws {
+        let keys = ["sk-ant-key1", "sk-ant-key2", "sk-ant-key3-with-special!@#"]
+        for key in keys {
+            let config = AIConfiguration(
+                apiKey: key,
+                model: .claude35Sonnet,
+                maxTokens: 4096,
+                temperature: 0.7
+            )
+            try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+            let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+            XCTAssertEqual(retrieved?.apiKey, "",
+                "Any supplied API key '\(key)' must be stored/returned as empty string for security")
+        }
+    }
+
+    func testNonAPIKeyConfigurationFieldsArePersistedCorrectly() throws {
+        // While the API key is intentionally not persisted, all other configuration
+        // fields (model, maxTokens, temperature) must still persist correctly.
+        let config = AIConfiguration(
+            apiKey: "sk-ant-ignored-key",
+            model: .claude3Opus,
+            maxTokens: 8192,
+            temperature: 0.9
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertNotNil(retrieved)
+        XCTAssertEqual(retrieved?.model, .claude3Opus, "Model must persist")
+        XCTAssertEqual(retrieved?.maxTokens, 8192, "Max tokens must persist")
+        XCTAssertEqual(retrieved?.temperature, 0.9, accuracy: 0.001, "Temperature must persist")
+        XCTAssertEqual(retrieved?.apiKey, "", "API key must be empty (security measure)")
+    }
+
+    func testAPIKeyEmptyAfterCloseAndReopen() throws {
+        // Verify that even after a close/reopen cycle, the API key is not recovered
+        // from the database (since it was never stored in plaintext).
+        let config = AIConfiguration(
+            apiKey: "sk-ant-should-not-persist",
+            model: .claude35Sonnet,
+            maxTokens: 4096,
+            temperature: 0.7
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        databaseManager.close()
+        try databaseManager.initialize()
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertNotNil(retrieved)
+        XCTAssertEqual(retrieved?.apiKey, "",
+            "After close/reopen, API key must still be empty — it was never persisted in plaintext")
+    }
+
+    func testExplicitlyEmptyAPIKeyAlsoReturnsEmpty() throws {
+        // If the caller passes an empty API key, it must round-trip as empty.
+        let config = AIConfiguration(
+            apiKey: "",
+            model: .claude35Sonnet,
+            maxTokens: 1024,
+            temperature: 0.5
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertEqual(retrieved?.apiKey, "")
+    }
 }
