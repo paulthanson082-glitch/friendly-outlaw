@@ -97,7 +97,9 @@ struct WritersAppCLI {
     /// - Enables optional features based on environment variables (Anthropic/Clother AI, gui.new, Ragie) and attempts to initialize the Claude memory plugin.
     /// Application entry point that initializes global services, processes command-line flags, and runs the interactive CLI menu.
     /// 
-    /// When invoked, this method initializes application-wide managers and analytics, parses and executes supported CLI options (which may perform one-off actions and exit), and—if no terminating CLI action is performed—performs interactive startup (provider/feature initialization) before entering the main menu loop that dispatches user-selected commands to the various handlers (document management, AI tools, plugins, productivity features, cowork mode, etc.).
+    /// Application entry point that initializes services, parses command-line flags, and runs the interactive CLI loop.
+    /// 
+    /// The function initializes the application and analytics services, detects and enables optional integrations (AI, gui.new, Ragie, Gmail, Claude Memory), processes one-off CLI flags (help, list, open, run, trace analysis, dance, gui exports) and executes the corresponding actions (which may exit early). When no terminating flag is provided it prints a startup banner, displays LLM provider information, configures optional features based on environment variables, attempts to enable the memory plugin, and enters the interactive main menu loop that dispatches user-selected commands until the user exits.
     static func main() async {
         let app = WritersApp()
         analyticsService = ProductivityAnalytics(focusManager: focusManager, goalManager: goalManager)
@@ -4168,7 +4170,13 @@ func viewProspectPipelineStats(app: WritersApp) {
 
 /// Displays an interactive Gmail inbox listing.
 ///
-/// Prompts the user for a maximum number of results (default 10) and an optional Gmail search query, then fetches messages and prints a formatted list. Each entry shows an unread marker, subject (or "(no subject)"), sender, short date, and a truncated snippet preview. If Gmail is not enabled the function prints a guidance message and returns. Errors encountered while fetching messages are caught and printed.
+/// Displays the user's Gmail inbox in the CLI, prompting for a maximum result count and an optional search query.
+/// 
+/// Prompts:
+/// - Max results (defaults to 10; must be between 1 and 100).
+/// - Optional search query (e.g. `from:agent@example.com`).
+/// 
+/// If Gmail is not enabled, prints an explanatory message and returns. Fetches messages via the app, then prints each message with a read/unread marker, subject (or “(no subject)”), sender, formatted date, and a short snippet preview. Prints a message when no messages are found and reports fetch errors when they occur.
 func viewGmailInbox(app: WritersApp) async {
     print("\n=== Gmail Inbox ===\n")
     guard app.isGmailEnabled else {
@@ -4216,6 +4224,9 @@ func viewGmailInbox(app: WritersApp) async {
     }
 }
 
+/// Marks a Gmail message as read based on a user-provided message ID.
+/// 
+/// Prompts the user to enter a message ID, verifies that Gmail integration is enabled, and requests the app to mark that message as read. On success prints a shortened confirmation containing the message ID prefix; on failure prints the error description. If Gmail is not enabled or the provided message ID is empty, the function prints an explanatory message and returns without performing an action.
 func markGmailMessageAsRead(app: WritersApp) async {
     print("\n=== Mark Email as Read ===\n")
     guard app.isGmailEnabled else {
@@ -4237,7 +4248,11 @@ func markGmailMessageAsRead(app: WritersApp) async {
 
 /// Presents an interactive CLI flow to compose and send an email through the app's Gmail integration.
 ///
-/// Prompts for recipient, subject, and a multi-line body (terminated by a line containing only `.`), validates the recipient contains `@`, asks for confirmation, and then sends the message using the app's Gmail service. If Gmail is not enabled the function returns early. Prints success with a shortened message ID or an error description on failure.
+/// Presents an interactive flow to compose and send an email through the app's Gmail integration.
+/// 
+/// Prompts the user for a recipient (must contain `@`), a non-empty subject, and a multi-line body terminated by a line containing only a single `.`. After confirmation, sends the message via the app and prints a short success message with the sent message ID or an error description.
+/// 
+/// Requires Gmail to be enabled in the app; if not enabled, prints an informational message and returns.
 func sendGmail(app: WritersApp) async {
     print("\n=== Send Email via Gmail ===\n")
     guard app.isGmailEnabled else {

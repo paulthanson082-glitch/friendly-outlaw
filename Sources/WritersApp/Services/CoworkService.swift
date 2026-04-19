@@ -117,7 +117,12 @@ public class GmailService {
     ///   - maxResults: Maximum number of message metadata entries to request (also bounds how many full messages are fetched).
     ///   - query: Optional Gmail search query string (percent-encoded); when provided, the server filters messages by this query.
     /// - Returns: An array of `GmailMessage` objects for messages found (up to `maxResults`); individual messages that fail to fetch are skipped.
-    /// - Throws: `CoworkError.invalidURL` if the request URL cannot be constructed; propagates errors thrown by the network request and message fetch operations.
+    /// Fetches message IDs from the Gmail list API (optionally filtered by a Gmail `q` query) and returns the corresponding full `GmailMessage` objects in the same order the list API returned them.
+    /// - Parameters:
+    ///   - maxResults: The maximum number of messages to request and return.
+    ///   - query: An optional Gmail search query string (`q` parameter). If `nil` or empty, no query filter is applied.
+    /// - Returns: An array of `GmailMessage` instances corresponding to the listed messages, ordered to match the list response.
+    /// - Throws: `CoworkError.invalidURL` if the request URL cannot be constructed; other errors produced by `performRequest` or `getMessage` (network, authorization, or parsing errors) are propagated.
     public func listMessages(maxResults: Int = 20, query: String? = nil) async throws -> [GmailMessage] {
         var components = URLComponents(string: "\(baseURL)/messages")
         var queryItems: [URLQueryItem] = [
@@ -438,7 +443,8 @@ public class BrowserService {
     /// 
     /// The result preserves meaningful block breaks as newline-separated lines, decodes common HTML entities (e.g. `&amp;`, `&nbsp;`), and omits empty lines.
     /// - Parameter html: The HTML input to convert.
-    /// - Returns: A plain-text string with tags removed, entities decoded, and consecutive whitespace collapsed into non-empty newline-separated lines.
+    /// Converts an HTML string into plain text by removing script/style/head blocks and all HTML tags, decoding a set of common HTML entities, and collapsing whitespace into non-empty trimmed lines separated by single newlines.
+    /// - Returns: A plain-text representation of `html` with tags removed, common entities decoded, and consecutive/empty lines collapsed into single newline-separated lines.
     private func stripHTML(_ html: String) -> String {
         var text = html
 
