@@ -1779,3 +1779,38 @@ public enum RagieError: LocalizedError, Equatable {
         }
     }
 }
+// MARK: - Document Safety Guardrails
+
+extension WritersApp {
+
+    @discardableResult
+    public func updateDocumentSafely(_ document: Document) throws -> DocumentBackup {
+        return try documentManager.updateDocumentSafely(document)
+    }
+
+    @discardableResult
+    public func deleteDocumentSafely(id: UUID) throws -> DocumentBackup {
+        return try documentManager.deleteDocumentSafely(id: id)
+    }
+
+    @discardableResult
+    public func restoreDocumentFromBackup(backupId: UUID) throws -> Document {
+        return try documentManager.restoreFromBackup(backupId: backupId)
+    }
+
+    public func getDocumentBackups(documentId: UUID) -> [DocumentBackup] {
+        return documentManager.getBackups(forDocument: documentId)
+    }
+
+    public func enableDocumentWriteProtection(documentId: UUID) {
+        documentManager.enableWriteProtection(for: documentId)
+    }
+
+    public func disableDocumentWriteProtection(documentId: UUID) {
+        documentManager.disableWriteProtection(for: documentId)
+    }
+
+    public func isDocumentWriteProtected(documentId: UUID) -> Bool {
+        return documentManager.isWriteProtected(id: documentId)
+    }
+}
