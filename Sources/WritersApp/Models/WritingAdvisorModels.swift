@@ -39,6 +39,10 @@ public struct AdvisorRecommendation: Codable, Identifiable, Equatable {
     public let actionableSteps: [String]
     public let generatedAt: Date
 
+    enum CodingKeys: String, CodingKey {
+        case id, category, priority, title, recommendation, actionableSteps, generatedAt
+    }
+
     public init(
         id: UUID = UUID(),
         category: AdvisorCategory,
@@ -68,6 +72,17 @@ public struct AdvisorRecommendation: Codable, Identifiable, Equatable {
         actionableSteps = try c.decode([String].self, forKey: .actionableSteps)
         generatedAt = try c.decodeIfPresent(Date.self, forKey: .generatedAt) ?? Date()
     }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(category, forKey: .category)
+        try c.encode(priority, forKey: .priority)
+        try c.encode(title, forKey: .title)
+        try c.encode(recommendation, forKey: .recommendation)
+        try c.encode(actionableSteps, forKey: .actionableSteps)
+        try c.encode(generatedAt, forKey: .generatedAt)
+    }
 }
 
 // MARK: - WritingAdvisorReport
@@ -77,6 +92,10 @@ public struct WritingAdvisorReport: Codable, Equatable {
     public let overallAssessment: String
     public let focusArea: AdvisorCategory
     public let generatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case recommendations, overallAssessment, focusArea, generatedAt
+    }
 
     public init(
         recommendations: [AdvisorRecommendation],
@@ -97,6 +116,14 @@ public struct WritingAdvisorReport: Codable, Equatable {
         overallAssessment = try c.decode(String.self, forKey: .overallAssessment)
         focusArea = try c.decode(AdvisorCategory.self, forKey: .focusArea)
         generatedAt = try c.decodeIfPresent(Date.self, forKey: .generatedAt) ?? Date()
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(recommendations, forKey: .recommendations)
+        try c.encode(overallAssessment, forKey: .overallAssessment)
+        try c.encode(focusArea, forKey: .focusArea)
+        try c.encode(generatedAt, forKey: .generatedAt)
     }
 }
 
