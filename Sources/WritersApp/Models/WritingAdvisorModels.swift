@@ -39,7 +39,7 @@ public struct AdvisorRecommendation: Codable, Identifiable, Equatable {
     public let actionableSteps: [String]
     public let generatedAt: Date
 
-    enum CodingKeys: String, CodingKey {
+    private enum CodingKeys: String, CodingKey {
         case id, category, priority, title, recommendation, actionableSteps, generatedAt
     }
 
@@ -93,7 +93,7 @@ public struct WritingAdvisorReport: Codable, Equatable {
     public let focusArea: AdvisorCategory
     public let generatedAt: Date
 
-    enum CodingKeys: String, CodingKey {
+    private enum CodingKeys: String, CodingKey {
         case recommendations, overallAssessment, focusArea, generatedAt
     }
 

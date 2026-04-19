@@ -986,7 +986,7 @@ public class WritersApp {
 
     // MARK: - Writing Advisor
 
-    /// Returns writing advice personalised with real document and session stats.
+    /// Returns writing advice personalised with real document statistics.
     ///
     /// - Parameter notes: Optional additional context or focus area for the advice.
     /// - Returns: A `WritingAdvisorReport` with coaching recommendations.
@@ -995,8 +995,8 @@ public class WritersApp {
         guard let advisor = writingAdvisorService else { throw AIError.aiNotEnabled }
         let stats = getStatistics()
         let allDocs = documentManager.getAllDocuments()
-        let recentTitles = Array(allDocs.suffix(5).map { $0.title })
-        let categories = Array(Set(allDocs.map { $0.category.rawValue }))
+        let recentTitles = Array(allDocs.prefix(5).map { $0.title })
+        let categories = Array(Set(allDocs.map { $0.category.rawValue })).sorted()
         let ctx = AdvisorContext(
             totalDocuments: stats.totalDocuments,
             recentDocumentTitles: recentTitles,
