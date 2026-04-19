@@ -13,6 +13,7 @@ public class WritersApp {
     public let versionControl: DoltVersionControlService
     public let giftCardManager: GiftCardManager
     public let crmManager: CRMManager
+    public let spoilerProtection: SpoilerProtectionService
     public private(set) var guiService: GuiNewService?
     public private(set) var aiService: AIService?
     public private(set) var chatbotService: ChatbotService?

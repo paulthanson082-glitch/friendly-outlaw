@@ -213,7 +213,7 @@ final class CoworkModeTests: XCTestCase {
         XCTAssertEqual(ProspectStatus.meeting.displayName, "Meeting Scheduled")
         XCTAssertEqual(ProspectStatus.declined.displayName, "Declined")
         XCTAssertEqual(ProspectStatus.converted.displayName, "Converted")
-        XCTAssertEqual(ProspectStatus.allCases.count, 6)
+        XCTAssertEqual(ProspectStatus.allCases.count, 7)
     }
 
     // MARK: - GmailDraft Model

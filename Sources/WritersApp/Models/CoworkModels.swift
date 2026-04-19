@@ -46,6 +46,7 @@ public enum ProspectStatus: String, Codable, CaseIterable {
     case replied
     case meeting
     case declined
+    case rejected
     case converted
 
     public var displayName: String {
@@ -55,6 +56,7 @@ public enum ProspectStatus: String, Codable, CaseIterable {
         case .replied:   return "Replied"
         case .meeting:   return "Meeting Scheduled"
         case .declined:  return "Declined"
+        case .rejected:  return "Rejected"
         case .converted: return "Converted"
         }
     }
