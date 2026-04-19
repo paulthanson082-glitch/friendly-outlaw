@@ -47,7 +47,8 @@ public struct Document: Codable, Identifiable {
         return max(1, wordCount / wordsPerMinute)
     }
 
-    /// Enhanced word count with filtering for hyphenated words and special characters
+    /// Counts whitespace- and newline-separated tokens that contain at least one letter or digit.
+    /// - Returns: The number of tokens (excluding empty tokens and tokens made only of punctuation).
     public func enhancedWordCount() -> Int {
         let components = content.components(separatedBy: .whitespacesAndNewlines)
         return components.filter { word in
@@ -56,19 +57,22 @@ public struct Document: Codable, Identifiable {
         }.count
     }
 
-    /// Count sentences in the document
+    /// Counts sentences by splitting on `.`, `!`, and `?` and counting non-empty segments after trimming whitespace.
+    /// - Returns: The number of sentences found in `content`.
     public func sentenceCount() -> Int {
         let sentences = content.components(separatedBy: CharacterSet(charactersIn: ".!?"))
         return sentences.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
     }
 
-    /// Count paragraphs in the document
+    /// Counts non-empty paragraphs separated by `"\n\n"` after trimming whitespace.
+    /// - Returns: The number of non-empty paragraphs.
     public func paragraphCount() -> Int {
         let paragraphs = content.components(separatedBy: "\n\n")
         return paragraphs.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
     }
 
-    /// Progress towards word count goal as percentage
+    /// Progress toward the word count goal as a ratio between 0.0 and 1.0.
+    /// - Returns: 0.0 if no positive goal is set; otherwise `wordCount / goal`, clamped to 1.0.
     public func wordCountProgress() -> Double {
         guard let goal = metadata.wordCountGoal, goal > 0 else { return 0.0 }
         return min(1.0, Double(wordCount) / Double(goal))
