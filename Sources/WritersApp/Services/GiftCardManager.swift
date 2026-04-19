@@ -11,6 +11,9 @@ public class GiftCardManager {
 
     // MARK: - Bundle CRUD
 
+    /// Creates and stores a new gift card bundle.
+    /// - Throws: `GiftCardError.invalidInput` if name is empty, aiCredits ≤ 0, or expirationDays ≤ 0.
+    /// - Returns: The newly created `GiftCardBundle`.
     @discardableResult
     public func createBundle(
         name: String,
@@ -50,14 +53,17 @@ public class GiftCardManager {
         return bundle
     }
 
+    /// Returns the bundle matching `id`, or `nil` if none exists.
     public func getBundle(id: UUID) -> GiftCardBundle? {
         bundles[id]
     }
 
+    /// Returns all bundles sorted newest-first by creation date.
     public func getAllBundles() -> [GiftCardBundle] {
         Array(bundles.values).sorted { $0.metadata.created > $1.metadata.created }
     }
 
+    /// Replaces the stored bundle and updates its modification timestamp.
     public func updateBundle(_ bundle: GiftCardBundle) throws {
         var updated = bundle
         updated.metadata = BundleMetadata(created: bundle.metadata.created, modified: Date())
