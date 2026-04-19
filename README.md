@@ -165,6 +165,31 @@ Extensible plugin architecture with Model Context Protocol (MCP) support:
 
 See the plugin system in action through the CLI menu options or integrate MCP servers via `PluginManager` API.
 
+### 🤖 cargent — Go Claude AI Agent (NEW!)
+
+A minimal Go-based Claude AI agent CLI (`cmd/cargent`) that drives the Anthropic tool-use loop entirely from Go's standard library — no external dependencies required.
+
+**Built-in tools:**
+- `word_count` — count words in a string
+- `char_count` — count characters (excluding spaces) in a string
+- `reverse_text` — reverse the characters in a string
+- `repeat_text` — repeat a string N times with a separator
+
+**Usage:**
+```bash
+cd cmd/cargent
+ANTHROPIC_API_KEY="sk-ant-..." go run . "How many words are in 'the quick brown fox'?"
+```
+
+**Build:**
+```bash
+cd cmd/cargent
+go build -o cargent .
+ANTHROPIC_API_KEY="sk-ant-..." ./cargent "Reverse the word: hello"
+```
+
+The agent runs a tool loop (up to 10 iterations) — Claude can call any combination of the built-in tools before returning a final text answer.
+
 ### 🔍 Sherlock Integration (NEW!)
 Integrated username and social media profile research for character development:
 - **Character Research**: Find existing social media profiles to study character personas
