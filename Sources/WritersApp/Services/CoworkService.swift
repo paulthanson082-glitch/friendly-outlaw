@@ -119,12 +119,15 @@ public class GmailService {
     /// - Returns: An array of `GmailMessage` objects for messages found (up to `maxResults`); individual messages that fail to fetch are skipped.
     /// - Throws: `CoworkError.invalidURL` if the request URL cannot be constructed; propagates errors thrown by the network request and message fetch operations.
     public func listMessages(maxResults: Int = 20, query: String? = nil) async throws -> [GmailMessage] {
-        var urlString = "\(baseURL)/messages?maxResults=\(maxResults)"
+        var components = URLComponents(string: "\(baseURL)/messages")
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "maxResults", value: String(maxResults))
+        ]
         if let q = query, !q.isEmpty {
-            let encoded = q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q
-            urlString += "&q=\(encoded)"
+            queryItems.append(URLQueryItem(name: "q", value: q))
         }
-        guard let url = URL(string: urlString) else { throw CoworkError.invalidURL }
+        components?.queryItems = queryItems
+        guard let url = components?.url else { throw CoworkError.invalidURL }
 
         let listData = try await performRequest(url: url, method: "GET")
         guard let json = try JSONSerialization.jsonObject(with: listData) as? [String: Any],
@@ -132,14 +135,25 @@ public class GmailService {
             return []
         }
 
-        var messages: [GmailMessage] = []
-        for item in messageList.prefix(maxResults) {
-            if let msgId = item["id"] as? String,
-               let msg = try? await getMessage(id: msgId) {
-                messages.append(msg)
+        let limitedMessages = Array(messageList.prefix(maxResults))
+        var messagesByIndex: [(Int, GmailMessage)] = []
+        messagesByIndex.reserveCapacity(limitedMessages.count)
+
+        try await withThrowingTaskGroup(of: (Int, GmailMessage).self) { group in
+            for (index, item) in limitedMessages.enumerated() {
+                guard let msgId = item["id"] as? String else { continue }
+                group.addTask {
+                    let message = try await self.getMessage(id: msgId)
+                    return (index, message)
+                }
+            }
+            for try await result in group {
+                messagesByIndex.append(result)
             }
         }
-        return messages
+
+        messagesByIndex.sort { $0.0 < $1.0 }
+        return messagesByIndex.map { $0.1 }
     }
 
     // MARK: Get single message
@@ -436,7 +450,7 @@ public class BrowserService {
                       options: .caseInsensitive,
                       range: start.lowerBound..<text.endIndex
                   ) {
-                text.removeSubrange(start.lowerBound...end.upperBound)
+                text.removeSubrange(start.lowerBound..<end.upperBound)
             }
         }
 
