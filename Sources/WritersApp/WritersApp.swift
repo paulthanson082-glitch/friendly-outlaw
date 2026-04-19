@@ -986,14 +986,26 @@ public class WritersApp {
 
     // MARK: - Writing Advisor
 
-    /// Returns personalized writing advice for the current writer.
+    /// Returns writing advice personalised with real document and session stats.
     ///
     /// - Parameter notes: Optional additional context or focus area for the advice.
     /// - Returns: A `WritingAdvisorReport` with coaching recommendations.
     /// - Throws: `AIError.aiNotEnabled` if AI has not been configured.
     public func getPersonalizedWritingAdvice(notes: String? = nil) async throws -> WritingAdvisorReport {
         guard let advisor = writingAdvisorService else { throw AIError.aiNotEnabled }
-        return try await advisor.getPersonalizedAdvice(notes: notes)
+        let stats = getStatistics()
+        let allDocs = documentManager.getAllDocuments()
+        let recentTitles = Array(allDocs.suffix(5).map { $0.title })
+        let categories = Array(Set(allDocs.map { $0.category.rawValue }))
+        let ctx = AdvisorContext(
+            totalDocuments: stats.totalDocuments,
+            recentDocumentTitles: recentTitles,
+            totalWordsAcrossDocuments: stats.totalWordCount,
+            documentCategories: categories,
+            sessionStats: nil,
+            additionalNotes: notes
+        )
+        return try await advisor.getPersonalizedAdvice(context: ctx)
     }
 
     /// Returns writing advice focused on a specific advisor category.

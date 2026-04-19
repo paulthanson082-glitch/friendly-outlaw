@@ -56,6 +56,18 @@ public struct AdvisorRecommendation: Codable, Identifiable, Equatable {
         self.actionableSteps = actionableSteps
         self.generatedAt = generatedAt
     }
+
+    // The AI response schema omits `id` and `generatedAt`; supply defaults when absent.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        category = try c.decode(AdvisorCategory.self, forKey: .category)
+        priority = try c.decode(AdvisorPriority.self, forKey: .priority)
+        title = try c.decode(String.self, forKey: .title)
+        recommendation = try c.decode(String.self, forKey: .recommendation)
+        actionableSteps = try c.decode([String].self, forKey: .actionableSteps)
+        generatedAt = try c.decodeIfPresent(Date.self, forKey: .generatedAt) ?? Date()
+    }
 }
 
 // MARK: - WritingAdvisorReport
@@ -76,6 +88,15 @@ public struct WritingAdvisorReport: Codable, Equatable {
         self.overallAssessment = overallAssessment
         self.focusArea = focusArea
         self.generatedAt = generatedAt
+    }
+
+    // The AI response schema omits `generatedAt`; supply a default when absent.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        recommendations = try c.decode([AdvisorRecommendation].self, forKey: .recommendations)
+        overallAssessment = try c.decode(String.self, forKey: .overallAssessment)
+        focusArea = try c.decode(AdvisorCategory.self, forKey: .focusArea)
+        generatedAt = try c.decodeIfPresent(Date.self, forKey: .generatedAt) ?? Date()
     }
 }
 

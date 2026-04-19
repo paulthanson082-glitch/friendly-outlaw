@@ -2798,7 +2798,7 @@ final class WritingAdvisorTests: XCTestCase {
                       "Writing advisor prompt must instruct Claude to return JSON")
     }
 
-    func testWritingAdvisorPromptEmbeddsWriterData() {
+    func testWritingAdvisorPromptEmbedsWriterData() {
         let writerData = "Documents: 10 total, 25000 words"
         let prompt = AIAssistanceType.writingAdvisor.prompt(for: writerData, context: nil)
         XCTAssertTrue(prompt.contains(writerData),
@@ -2857,18 +2857,6 @@ final class WritingAdvisorTests: XCTestCase {
     }
 
     func testGetPersonalizedWritingAdviceThrowsWhenNoAI() async {
-        let noAIApp = WritersApp()
-        do {
-            _ = try await noAIApp.getPersonalizedWritingAdvice()
-            XCTFail("Expected AIError.aiNotEnabled to be thrown")
-        } catch AIError.aiNotEnabled {
-            // expected
-        } catch {
-            XCTFail("Unexpected error: \(error)")
-        }
-    }
-
-    func testWritingAdvisorServiceRequiresAI() async {
         let noAIApp = WritersApp()
         do {
             _ = try await noAIApp.getPersonalizedWritingAdvice()

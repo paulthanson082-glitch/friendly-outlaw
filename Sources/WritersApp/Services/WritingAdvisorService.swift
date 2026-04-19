@@ -42,7 +42,18 @@ public class WritingAdvisorService {
 
     // MARK: - Advice Generation
 
-    /// Generates personalized writing advice.
+    /// Generates personalized writing advice using a pre-built context.
+    public func getPersonalizedAdvice(context: AdvisorContext) async throws -> WritingAdvisorReport {
+        let writerData = buildContextText(from: context)
+        let response = try await aiService.getAssistance(
+            text: writerData,
+            type: .writingAdvisor,
+            context: nil
+        )
+        return try parseReport(from: response.generatedContent)
+    }
+
+    /// Generates personalized writing advice with optional notes (uses empty context).
     public func getPersonalizedAdvice(notes: String? = nil) async throws -> WritingAdvisorReport {
         let ctx = AdvisorContext(
             totalDocuments: 0,
@@ -52,13 +63,7 @@ public class WritingAdvisorService {
             sessionStats: nil,
             additionalNotes: notes
         )
-        let writerData = buildContextText(from: ctx)
-        let response = try await aiService.getAssistance(
-            text: writerData,
-            type: .writingAdvisor,
-            context: nil
-        )
-        return try parseReport(from: response.generatedContent)
+        return try await getPersonalizedAdvice(context: ctx)
     }
 
     /// Generates writing advice focused on a specific category.
@@ -94,7 +99,7 @@ public class WritingAdvisorService {
         let jsonData: Data
         if let range = content.range(of: "{"),
            let endRange = content.range(of: "}", options: .backwards) {
-            let jsonString = String(content[range.lowerBound...endRange.upperBound])
+            let jsonString = String(content[range.lowerBound..<endRange.upperBound])
             jsonData = Data(jsonString.utf8)
         } else {
             jsonData = Data(content.utf8)
