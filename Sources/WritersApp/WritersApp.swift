@@ -1580,7 +1580,11 @@ public class WritersApp {
     ///   - id: The unique identifier of the prospect to update.
     ///   - status: The new status to assign to the prospect.
     /// - Throws: Any error produced while updating the prospect status in the prospect database.
-    /// - Note: If the new status is `.contacted`, `.replied`, or `.meeting`, increments `activeCoworkSession?.prospectsContacted` by 1.
+    /// Update a prospect's status and, if the status transitions into a contacted-like state (`.contacted`, `.replied`, or `.meeting`), increment the active cowork session's `prospectsContacted` counter.
+    /// - Parameters:
+    ///   - id: The UUID of the prospect to update.
+    ///   - status: The new `ProspectStatus` to apply.
+    /// - Throws: Any error thrown by `prospectDatabase.updateProspectStatus(id:status:)`.
     public func updateProspectStatus(id: UUID, status: ProspectStatus) throws {
         let isContactStatus: (ProspectStatus) -> Bool = {
             $0 == .contacted || $0 == .replied || $0 == .meeting
