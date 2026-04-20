@@ -3,7 +3,7 @@ import XCTest
 
 // MARK: - CategorizedIdea Tests (PR Change: removed Identifiable, changed init)
 
-final class CategorizedIdeaTests: XCTestCase {
+final class CategorizedIdeaPRChangeTests: XCTestCase {
 
     // MARK: - Initialization
 
@@ -85,7 +85,7 @@ final class CategorizedIdeaTests: XCTestCase {
 
 // MARK: - IdeaCategory Tests (PR Change: removed Identifiable, changed init)
 
-final class IdeaCategoryTests: XCTestCase {
+final class IdeaCategoryPRChangeTests: XCTestCase {
 
     private func makeIdea(title: String = "Idea", speculative: Bool = false) -> CategorizedIdea {
         return CategorizedIdea(title: title, description: "Desc for \(title)", isSpeculative: speculative)
@@ -155,7 +155,7 @@ final class IdeaCategoryTests: XCTestCase {
 
 // MARK: - BrainstormResult Tests (PR Change: removed Identifiable, changed init)
 
-final class BrainstormResultTests: XCTestCase {
+final class BrainstormResultPRChangeTests: XCTestCase {
 
     private func makeCategory(name: String, ideaCount: Int = 0) -> IdeaCategory {
         let ideas = (0..<ideaCount).map {

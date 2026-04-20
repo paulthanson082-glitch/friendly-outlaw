@@ -12,6 +12,7 @@ public class WritersApp {
     public let encouragementService: EncouragementService
     public let versionControl: DoltVersionControlService
     public let giftCardManager: GiftCardManager
+    public let spoilerProtection: SpoilerProtectionService
     public let crmManager: CRMManager
     public private(set) var guiService: GuiNewService?
     public private(set) var aiService: AIService?
