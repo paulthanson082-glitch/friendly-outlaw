@@ -92,10 +92,10 @@ final class InteractionTypeTests: XCTestCase {
     }
 
     func testInteractionTypeCodableRoundTrip() throws {
-        for type_ in InteractionType.allCases {
-            let encoded = try JSONEncoder().encode(type_)
+        for interactionType in InteractionType.allCases {
+            let encoded = try JSONEncoder().encode(interactionType)
             let decoded = try JSONDecoder().decode(InteractionType.self, from: encoded)
-            XCTAssertEqual(decoded, type_)
+            XCTAssertEqual(decoded, interactionType)
         }
     }
 }
