@@ -206,8 +206,8 @@ final class GiftCardErrorTests: XCTestCase {
                 XCTFail("Expected GiftCardError.invalidInput, got \(error)")
                 return
             }
-            // Message must reflect the wording for negative values.
-            XCTAssertTrue(msg.contains("Expiration days") && (msg.contains("0") || msg.contains("equal")))
+            // Message must reflect the exact wording for negative values.
+            XCTAssertEqual(msg, "Expiration days must be greater than or equal to 0")
         }
     }
 

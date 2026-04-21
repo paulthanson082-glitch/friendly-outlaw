@@ -385,7 +385,9 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertNotNil(retrieved)
         XCTAssertEqual(retrieved?.model, .claude3Sonnet, "model must persist in database")
         XCTAssertEqual(retrieved?.maxTokens, 2048, "maxTokens must persist in database")
-        XCTAssertEqual(retrieved?.temperature ?? -1, 0.42, accuracy: 0.001, "temperature must persist in database")
+        let expectedTemperature = 0.42
+        XCTAssertEqual(retrieved?.temperature ?? Double.nan, expectedTemperature, accuracy: 0.001,
+                       "temperature must persist in database")
     }
 
     func testEmptyAPIKeyInputAlsoReturnedAsEmpty() throws {
@@ -1343,7 +1345,8 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertNotNil(retrieved)
         XCTAssertEqual(retrieved?.model, .claude3Opus, "Model must persist")
         XCTAssertEqual(retrieved?.maxTokens, 8192, "Max tokens must persist")
-        XCTAssertEqual(retrieved?.temperature ?? -1, 0.9, accuracy: 0.001, "Temperature must persist")
+        let expectedTemp = 0.9
+        XCTAssertEqual(retrieved?.temperature ?? Double.nan, expectedTemp, accuracy: 0.001, "Temperature must persist")
         XCTAssertEqual(retrieved?.apiKey, "sk-ant-ignored-key", "API key must be persisted")
     }
 
