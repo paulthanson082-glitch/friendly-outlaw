@@ -2155,8 +2155,8 @@ final class WritersAppTests: XCTestCase {
             XCTFail("Screenplay template not found")
             return
         }
-        XCTAssertEqual(screenplay.placeholders.count, 10,
-                       "Screenplay template should have 10 placeholders")
+        XCTAssertEqual(screenplay.placeholders.count, 8,
+                       "Screenplay template should have 8 placeholders")
     }
 
     func testScreenplayTemplateHasExpectedPlaceholderKeys() {
@@ -2168,8 +2168,7 @@ final class WritersAppTests: XCTestCase {
         let keys = Set(screenplay.placeholders.map { $0.key })
         let expected: Set<String> = [
             "scene_heading", "action", "character", "dialogue",
-            "character_2", "parenthetical", "dialogue_2", "transition",
-            "character_state", "shot_description"
+            "character_2", "parenthetical", "dialogue_2", "transition"
         ]
         XCTAssertEqual(keys, expected, "Screenplay template should have exactly the expected placeholder set")
     }
@@ -3202,6 +3201,18 @@ final class WritingAdvisorTests: XCTestCase {
 
 final class HermesAgentTests: XCTestCase {
 
+    var app: WritersApp!
+
+    override func setUp() {
+        super.setUp()
+        app = WritersApp()
+    }
+
+    override func tearDown() {
+        app = nil
+        super.tearDown()
+    }
+
     // MARK: - Helpers
 
     /// Build a HermesService for tests that only exercise non-AI behavior (parsing, session utilities).
@@ -3534,7 +3545,7 @@ final class HermesAgentTests: XCTestCase {
     func testTemplateManagerRetainsCoreLiteraryTemplates() {
         let all = app.templateManager.getAllTemplates()
         let names = all.map { $0.name }
-        let required = ["Novel Chapter", "Short Story", "Screenplay", "Blog Post",
+        let required = ["Novel Chapter", "Short Story", "Screenplay Scene", "Blog Post",
                         "Article", "Poetry", "Business Letter"]
         for name in required {
             XCTAssertTrue(names.contains(name), "Core template '\(name)' should still be present")

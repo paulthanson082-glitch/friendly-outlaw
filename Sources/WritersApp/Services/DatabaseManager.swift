@@ -1011,7 +1011,7 @@ public class DatabaseManager {
         }
         
         sqlite3_bind_text(statement, 1, userId.uuidString, -1, SQLITE_TRANSIENT)
-        sqlite3_bind_text(statement, 2, configuration.apiKey, -1, SQLITE_TRANSIENT)
+        sqlite3_bind_text(statement, 2, "", -1, SQLITE_TRANSIENT)
         sqlite3_bind_text(statement, 3, configuration.model.rawValue, -1, SQLITE_TRANSIENT)
         sqlite3_bind_int(statement, 4, Int32(configuration.maxTokens))
         sqlite3_bind_double(statement, 5, configuration.temperature)
@@ -1068,7 +1068,7 @@ public class DatabaseManager {
         }
 
         return AIConfiguration(
-            apiKey: apiKey,
+            apiKey: "",
             model: model,
             maxTokens: maxTokens,
             temperature: temperature
