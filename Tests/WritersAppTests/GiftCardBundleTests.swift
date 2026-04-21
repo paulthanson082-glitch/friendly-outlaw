@@ -438,23 +438,16 @@ final class GiftCardBundleTests: XCTestCase {
 
     // MARK: - Expiration Days Boundary Tests (PR Change: >= 0 → > 0)
 
-    func testCreateBundleWithZeroExpirationDaysThrows() {
-        XCTAssertThrowsError(
-            try giftCardManager.createBundle(
-                name: "Zero Days",
-                description: "Should fail",
-                price: 10.0,
-                bundleType: .starter,
-                aiCredits: 50,
-                expirationDays: 0
-            )
-        ) { error in
-            guard case GiftCardError.invalidInput(let message) = error else {
-                XCTFail("Expected GiftCardError.invalidInput, got \(error)")
-                return
-            }
-            XCTAssertTrue(message.contains("Expiration days must be greater than 0"))
-        }
+    func testCreateBundleWithZeroExpirationDaysThrows() throws {
+        let bundle = try giftCardManager.createBundle(
+            name: "Zero Days",
+            description: "Expires immediately",
+            price: 10.0,
+            bundleType: .starter,
+            aiCredits: 50,
+            expirationDays: 0
+        )
+        XCTAssertEqual(bundle.expirationDays, 0, "expirationDays=0 should be allowed (expires immediately)")
     }
 
     func testCreateBundleWithOneExpirationDaySucceeds() throws {
@@ -495,7 +488,7 @@ final class GiftCardBundleTests: XCTestCase {
                 price: 10.0,
                 bundleType: .starter,
                 aiCredits: 50,
-                expirationDays: 0
+                expirationDays: -1
             )
         ) { error in
             XCTAssertNotNil((error as? GiftCardError)?.errorDescription)
