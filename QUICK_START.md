@@ -121,7 +121,7 @@ All tests should pass, demonstrating that the project is working correctly.
 
 ✅ **Project Opens**: You can navigate to the directory and access all files  
 ✅ **Project Builds**: `swift build` completes without errors  
-✅ **Tests Pass**: `swift test` runs all 11 tests successfully  
+✅ **Tests Pass**: `swift test` runs all tests successfully  
 ✅ **Application Runs**: The CLI launches and displays the main menu  
 ✅ **Help Works**: `--help` displays usage information  
 ✅ **List Works**: `--list` shows available documents  
