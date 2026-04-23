@@ -19,6 +19,7 @@ public class WritersApp {
     public private(set) var hermesService: HermesService?
     public private(set) var ragieService: RagieService?
     public private(set) var writingAdvisorService: WritingAdvisorService?
+    public private(set) var spoilerProtection: SpoilerProtectionService
     public private(set) var currentUserId: UUID?
     private var currentSessionId: UUID?
     private var memoryPlugin: ClaudeMemoryPlugin?
@@ -77,12 +78,10 @@ public class WritersApp {
                 documentManager: self.documentManager,
                 templateManager: self.templateManager
             )
-            self.writingAdvisorService = WritingAdvisorService(aiService: svc)
         } else {
             self.chatbotService = nil
             self.writingAdvisorService = nil
             self.hermesService = nil
-            self.writingAdvisorService = nil
         }
         try? databaseManager.initialize()
     }
@@ -105,7 +104,6 @@ public class WritersApp {
             documentManager: self.documentManager,
             templateManager: self.templateManager
         )
-        self.writingAdvisorService = WritingAdvisorService(aiService: aiSvc)
         if let uid = userId {
             self.currentUserId = uid
             try? self.databaseManager.saveAIConfiguration(userId: uid, configuration: configuration)
@@ -120,7 +118,6 @@ public class WritersApp {
         self.chatbotService = nil
         self.writingAdvisorService = nil
         self.hermesService = nil
-        self.writingAdvisorService = nil
     }
 
     /// Check if AI is available

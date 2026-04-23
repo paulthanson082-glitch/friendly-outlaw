@@ -87,7 +87,12 @@ export async function POST(request: NextRequest) {
     // Occasionally generate a memory after the exchange
     if (Math.random() < 0.4) {
       const allMessages = [
-        ...recentMessages,
+        ...recentMessages.map((m) => ({
+          from: m.from as string,
+          to: m.to as string,
+          content: m.content as string,
+          timestamp: m.timestamp as string,
+        })),
         { from: speaker, to: listener, content: responseText, timestamp: new Date().toISOString() },
       ];
       try {

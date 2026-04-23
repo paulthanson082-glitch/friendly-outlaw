@@ -15,15 +15,33 @@ if (typeof Request === 'undefined') {
 {
   class PolyfillResponse {
     private _status: number;
-    private _body: any;
+    private _jsonString: string | undefined;
     readonly headers: Map<string, string>;
 
     constructor(body?: any, init?: any) {
       this._status = init?.status ?? 200;
-      this._body = body;
+      // Normalise the body to a JSON string. Next.js passes response.body
+      // (a ReadableStream from our own static json()) as the body of NextResponse,
+      // so we must be able to round-trip through our body getter.
+      if (body === undefined) {
+        this._jsonString = undefined;
+      } else if (body === null) {
+        this._jsonString = 'null';
+      } else if (typeof body === 'string') {
+        this._jsonString = body;
+      } else if (typeof (body as any).getReader === 'function') {
+        // ReadableStream — read synchronously via our own body getter
+        this._jsonString = (body as any)._jsonString;
+      } else {
+        this._jsonString = JSON.stringify(body);
+      }
       this.headers = new Map();
       if (init?.headers) {
-        Object.entries(init.headers as Record<string, string>).forEach(([k, v]) => {
+        const h = init.headers;
+        const entries = typeof h.entries === 'function'
+          ? [...h.entries()]
+          : Object.entries(h as Record<string, string>);
+        entries.forEach(([k, v]: [string, string]) => {
           this.headers.set(k.toLowerCase(), v);
         });
       }
@@ -33,16 +51,23 @@ if (typeof Request === 'undefined') {
       return this._status;
     }
 
-    async json() {
-      return typeof this._body === 'string' ? JSON.parse(this._body) : this._body;
+    // Expose body as a ReadableStream-like object so NextResponse.json() can
+    // access response.body and forward it to the NextResponse constructor.
+    get body(): any {
+      const s = this._jsonString;
+      return { _jsonString: s, getReader: () => null };
     }
 
-    async text() {
-      return typeof this._body === 'string' ? this._body : JSON.stringify(this._body);
+    async json(): Promise<any> {
+      return this._jsonString !== undefined ? JSON.parse(this._jsonString) : undefined;
+    }
+
+    async text(): Promise<string> {
+      return this._jsonString ?? '';
     }
 
     static json(data: any, init?: any) {
-      const response = new PolyfillResponse(data, init);
+      const response = new PolyfillResponse(JSON.stringify(data), init);
       response.headers.set('content-type', 'application/json');
       return response;
     }
