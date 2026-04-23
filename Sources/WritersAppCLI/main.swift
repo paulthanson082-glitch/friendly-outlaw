@@ -223,7 +223,7 @@ struct WritersAppCLI {
             
             // Handle --run alone
             if let runSessionArg = runArg {
-                startFocusSessionDirect(
+                await startFocusSessionDirect(
                     app: app,
                     sessionTypeName: runSessionArg.isEmpty ? nil : runSessionArg
                 )
@@ -1833,7 +1833,7 @@ func startFocusSession(app: WritersApp) {
     print("\nHappy writing! Use option 42 to end your session.\n")
 }
 
-func startFocusSessionDirect(app: WritersApp, sessionTypeName: String?) {
+func startFocusSessionDirect(app: WritersApp, sessionTypeName: String?) async {
     // Check if session is already active
     if focusManager.getCurrentSession() != nil {
         print("Error: A focus session is already active.")
@@ -1873,11 +1873,81 @@ func startFocusSessionDirect(app: WritersApp, sessionTypeName: String?) {
     
     print("\n✓ Focus session started!")
     print("  Type: \(session.type.displayName)")
+    
     if session.targetDuration > 0 {
+        // Timed session: run a live countdown timer
+        let totalSeconds = Int(session.targetDuration)
+        let oneSecondNs: UInt64 = 1_000_000_000
         print("  Duration: \(FocusSessionManager.formatTimeRemaining(session.targetDuration))")
+        print("\nPress Ctrl+C to stop early.\n")
+        print("  ⏱  Time remaining: \(formatCountdown(totalSeconds))", terminator: "")
+        fflush(stdout)
+        var interrupted = false
+        for elapsed in 1...totalSeconds {
+            do {
+                try await Task.sleep(nanoseconds: oneSecondNs)
+            } catch {
+                print("\r  ⚠️  Session interrupted.\u{1B}[K")
+                interrupted = true
+                break
+            }
+            let remaining = totalSeconds - elapsed
+            print("\r  ⏱  Time remaining: \(formatCountdown(remaining))\u{1B}[K", terminator: "")
+            fflush(stdout)
+        }
+        let timerCompleted = !interrupted
+        if timerCompleted {
+            print("\r  ✅ Time's up!\u{1B}[K")
+        }
+        let finalWordCount = promptForWordCount()
+        let ended = focusManager.endSession(id: session.id, finalWordCount: finalWordCount, completed: timerCompleted)
+        printSessionSummary(ended)
+    } else {
+        // Free write: block until user presses Enter
+        print("\n  Free write — no time limit.")
+        print("  Press Enter when you're done writing.\n")
+        _ = readLine()
+        let finalWordCount = promptForWordCount()
+        let ended = focusManager.endSession(id: session.id, finalWordCount: finalWordCount, completed: true)
+        printSessionSummary(ended)
     }
-    print("\nHappy writing! The session is now running in the background.")
-    print("Run 'WritersAppCLI' in interactive mode to view or end your session.\n")
+}
+
+/// Prompts the user for words written this session and returns a validated count.
+func promptForWordCount() -> Int {
+    print("\nWords written during this session (press Enter to skip): ", terminator: "")
+    fflush(stdout)
+    if let input = readLine(), let count = Int(input.trimmingCharacters(in: .whitespaces)) {
+        if count < 0 {
+            print("Word count cannot be negative. Recording 0 words instead.")
+            return 0
+        }
+        return count
+    }
+    return 0
+}
+
+/// Prints the session-complete banner with key stats.
+func printSessionSummary(_ ended: FocusSession?) {
+    print()
+    print("╔═══════════════════════════════════════╗")
+    print("║         Session Complete! ✍️           ║")
+    print("╚═══════════════════════════════════════╝")
+    if let s = ended {
+        print("  Type     : \(s.type.displayName)")
+        print("  Duration : \(FocusSessionManager.formatDuration(s.actualDuration))")
+        if s.wordsWritten > 0 {
+            print("  Words    : \(s.wordsWritten)")
+        }
+    }
+    print()
+}
+
+/// Format a number of seconds as MM:SS for the countdown display.
+func formatCountdown(_ seconds: Int) -> String {
+    let m = seconds / 60
+    let s = seconds % 60
+    return String(format: "%02d:%02d", m, s)
 }
 
 func openDocumentAndStartSession(app: WritersApp, searchTerm: String, sessionTypeName: String?) async {
