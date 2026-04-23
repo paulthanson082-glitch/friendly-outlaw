@@ -89,7 +89,10 @@ public class WritersApp {
     /// Enables the application's AI features by creating and wiring AI-related services.
     /// - Parameters:
     ///   - configuration: Configuration used to initialize the AI subsystem.
-    ///   - userId: Optional user identifier; when provided the AI configuration is associated with and persisted for that user.
+    /// Enables AI features and wires AI-related services into the application.
+    /// - Parameters:
+    ///   - configuration: The AI configuration to initialize AI services with.
+    ///   - userId: Optional user identifier; when provided, sets the current user and persists the AI configuration for that user.
     public func enableAI(configuration: AIConfiguration, userId: UUID? = nil) {
         let aiSvc = AIService(configuration: configuration)
         self.aiService = aiSvc
@@ -112,7 +115,9 @@ public class WritersApp {
 
     /// Disables all AI features for the application.
     ///
-    /// Clears the configured AI, chatbot, writing advisor, and Hermes service instances so AI-based functionality becomes unavailable.
+    /// Disables all AI-related services for the application.
+    /// 
+    /// Clears the AIService, ChatbotService, WritingAdvisorService, and HermesService so AI functionality is unavailable until AI is re-enabled.
     public func disableAI() {
         self.aiService = nil
         self.chatbotService = nil
