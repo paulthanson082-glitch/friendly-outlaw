@@ -1,0 +1,51 @@
+name: "Copilot Setup Steps"
+
+# Run automatically when this file changes, and allow manual triggering from the Actions tab.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  # Job name MUST be `copilot-setup-steps` for Copilot cloud agent to pick it up.
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── Swift ──────────────────────────────────────────────────────────────
+      - name: Set up Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "5.10"
+
+      - name: Install SQLite3 development libraries
+        run: sudo apt-get install -y libsqlite3-dev
+
+      - name: Resolve Swift package dependencies
+        run: swift package resolve
+
+      # ── Node.js ────────────────────────────────────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install root npm dependencies
+        run: npm ci
+
+      - name: Install backend npm dependencies
+        run: cd backend && npm ci
+
+      - name: Install frontend npm dependencies
+        run: cd frontend && npm ci --legacy-peer-deps
