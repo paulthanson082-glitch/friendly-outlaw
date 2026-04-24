@@ -134,14 +134,14 @@ final class WritersAppCoworkTests: XCTestCase {
             "Setting status to .new must not increment prospectsContacted")
     }
 
-    func testUpdateProspectStatusRejectedDoesNotIncrementContactCounter() throws {
+    func testUpdateProspectStatusDeclinedDoesNotIncrementContactCounter() throws {
         let _ = app.startCoworkSession()
-        let prospect = app.addProspect(name: "Rejected", email: "rej@example.com")
-        try app.updateProspectStatus(id: prospect.id, status: .rejected)
+        let prospect = app.addProspect(name: "Declined", email: "rej@example.com")
+        try app.updateProspectStatus(id: prospect.id, status: .declined)
 
         let ended = app.endCoworkSession()
         XCTAssertEqual(ended?.prospectsContacted, 0,
-            "Setting status to .rejected must not increment prospectsContacted")
+            "Setting status to .declined must not increment prospectsContacted")
     }
 
     // MARK: - ProspectDatabase Directly (unit tests for ProspectDatabase class)
