@@ -35,7 +35,12 @@ let package = Package(
         // WritersApp targets
         .systemLibrary(
             name: "CSQLite",
-            pkgConfig: "sqlite3"),
+            pkgConfig: "sqlite3",
+            providers: [
+                .brew(["sqlite"]),
+                .apt(["libsqlite3-dev"]),
+                .yum(["sqlite-devel"])
+            ]),
         .target(
             name: "WritersApp",
             dependencies: ["CSQLite"]),

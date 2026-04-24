@@ -261,9 +261,9 @@ WritersApp/
 │   │   └── WritersApp.swift                  # Main entry point / facade class
 │   └── WritersAppCLI/
 │       └── main.swift                        # Interactive CLI
-└── Tests/
-    └── WritersAppTests/
-        ├── WritersAppTests.swift             # Core template/document/tool loop tests
+├── Tests/
+│   └── WritersAppTests/
+│       ├── WritersAppTests.swift             # Core template/document/tool loop tests
         ├── AIServiceTests.swift              # AIService unit tests
         ├── DatabaseManagerTests.swift        # DatabaseManager persistence tests
         ├── DocumentManagerTests.swift        # DocumentManager CRUD tests
@@ -279,7 +279,17 @@ WritersApp/
         ├── ProductivityAnalyticsTests.swift  # Analytics aggregation tests
         ├── WritingGoalManagerTests.swift     # Goal tracking tests
         └── iPadProFeaturesTests.swift        # iPad Pro feature tests
+└── examples/
+    ├── python_ai_service.py         # Python SDK examples
+    ├── requirements.txt             # Python dependencies
+    └── README.md                    # Python examples guide
 ```
+
+## Python Examples
+
+For developers preferring Python, comprehensive examples are available in the `examples/` directory using the official Anthropic Python SDK.
+
+See [examples/README.md](examples/README.md) for usage examples for all major features, setup instructions, and comparison with the Swift implementation.
 
 ## Usage
 
@@ -1019,9 +1029,11 @@ sudo dnf install sqlite-devel
 
 macOS users with Homebrew (if system SQLite is not found):
 ```bash
-brew install sqlite3
-# Ensure pkg-config can find it
-export PKG_CONFIG_PATH="/opt/homebrew/opt/sqlite/lib/pkgconfig"
+brew install sqlite
+# Ensure pkg-config can find it (Apple Silicon default prefix)
+export PKG_CONFIG_PATH="/opt/homebrew/opt/sqlite/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+# For Intel macOS Homebrew installs, use:
+# export PKG_CONFIG_PATH="/usr/local/opt/sqlite/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 ```
 
 For detailed setup verification steps and system requirements, see [SETUP_VERIFICATION.md](SETUP_VERIFICATION.md).
