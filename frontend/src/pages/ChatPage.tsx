@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from '../hooks/useChat';
 import { useAuth } from '../context/AuthContext';
+import { UserProfile } from '../components/UserProfile/UserProfile';
 import styles from './ChatPage.module.css';
 
 interface Message {
@@ -61,8 +62,13 @@ export const ChatPage: React.FC = () => {
   return (
     <div className={styles.chatContainer}>
       <header className={styles.header}>
-        <h1>Jules - Your AI Writing Assistant</h1>
-        <p className={styles.subtitle}>Chat with AI to improve your writing</p>
+        <div className={styles.headerContent}>
+          <div>
+            <h1>Jules - Your AI Writing Assistant</h1>
+            <p className={styles.subtitle}>Chat with AI to improve your writing</p>
+          </div>
+          <UserProfile />
+        </div>
       </header>
 
       <div className={styles.messagesContainer}>
