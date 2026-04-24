@@ -11,6 +11,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url().optional(),
   DATABASE_USE_SQLITE: z.coerce.boolean().default(false),
   SQLITE_PATH: z.string().default('./data/writers_app.db'),
+  MONGODB_URI: z.string().optional(),
   JWT_SECRET: z
     .string()
     .min(32, 'JWT_SECRET must be at least 32 characters')
