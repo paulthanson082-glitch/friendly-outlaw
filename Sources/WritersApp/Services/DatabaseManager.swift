@@ -984,7 +984,9 @@ public class DatabaseManager {
     
     // MARK: - AI Configurations Operations
     
-    /// Saves or updates an AI configuration
+    /// Saves or updates an AI configuration. The API key is intentionally not persisted to SQLite
+    /// for security reasons (API keys must be supplied per-session via environment variable or configuration).
+    /// `getAIConfiguration` will always return an empty string for `apiKey`.
     public func saveAIConfiguration(userId: UUID, configuration: AIConfiguration) throws {
         
         guard isInitialized, let db = db else {
