@@ -81,6 +81,9 @@ public class MetalDashboardViewModel: ObservableObject {
 
     public func loadRecentDocuments() {
         recentDocuments = app.documentManager.getRecentDocuments(limit: 6)
+        if selectedDocument == nil {
+            selectedDocument = recentDocuments.first
+        }
     }
 
     public func loadGoals() {

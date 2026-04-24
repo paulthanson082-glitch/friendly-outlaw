@@ -49,6 +49,7 @@ struct AdaptiveLayoutView: View {
             HStack(spacing: 0) {
                 // Document Editor
                 DocumentEditorView(viewModel: viewModel)
+                    .id(viewModel.currentDocumentId)
                     .frame(maxWidth: layout.editorMaxWidth)
 
                 // AI Panel
@@ -172,6 +173,11 @@ struct DocumentEditorView: View {
             EditorStatusBarView(viewModel: viewModel)
         }
         .background(Color(uiColor: .systemBackground))
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if viewModel.showFindReplaceBar {
+                FindReplaceBarView(viewModel: viewModel)
+            }
+        }
         .sheet(isPresented: $viewModel.showWordCountSheet) {
             WordCountDetailView(viewModel: viewModel)
         }
@@ -179,6 +185,57 @@ struct DocumentEditorView: View {
             if let svm = viewModel.spoilerPanelVM {
                 SpoilerManagerView(viewModel: svm)
             }
+        }
+    }
+}
+
+// MARK: - Find & Replace Bar View
+
+/// Inline bar for finding and replacing text in the document
+@available(iOS 16.0, macOS 13.0, *)
+struct FindReplaceBarView: View {
+    @ObservedObject var viewModel: WritersAppViewModel
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.secondary)
+
+                TextField("Find", text: $viewModel.findText)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 200)
+
+                Image(systemName: "arrow.right.arrow.left")
+                    .foregroundColor(.secondary)
+
+                TextField("Replace", text: $viewModel.replaceText)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 200)
+
+                Toggle("Aa", isOn: $viewModel.isCaseSensitiveSearch)
+                    .toggleStyle(.button)
+                    .font(.system(size: 13, weight: .medium))
+                    .help("Case Sensitive")
+
+                Button("Replace All") {
+                    viewModel.findAndReplace()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(viewModel.findText.isEmpty)
+
+                Spacer()
+
+                Button(action: { viewModel.toggleFindReplace() }) {
+                    Image(systemName: "xmark")
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color(uiColor: .secondarySystemBackground))
+
+            Divider()
         }
     }
 }
@@ -320,6 +377,12 @@ struct EditorToolbarView: View {
                 Label("AI Assistant", systemImage: "sparkles")
             }
             .keyboardShortcut("a", modifiers: [.command, .option])
+
+            // Find & Replace button
+            Button(action: { viewModel.toggleFindReplace() }) {
+                Image(systemName: "magnifyingglass")
+            }
+            .keyboardShortcut("f", modifiers: [.command, .option])
 
             // Focus mode button
             Button(action: { viewModel.toggleFocusMode() }) {
@@ -839,6 +902,13 @@ public class WritersAppViewModel: ObservableObject {
     @Published public var aiResponse: String = ""
     @Published public var showWordCountSheet: Bool = false
     @Published public var showDocumentInfoSheet: Bool = false
+    @Published public var currentDocumentId: UUID? = nil
+
+    // Find & Replace
+    @Published public var showFindReplaceBar: Bool = false
+    @Published public var findText: String = ""
+    @Published public var replaceText: String = ""
+    @Published public var isCaseSensitiveSearch: Bool = false
 
     // Statistics
     @Published public var wordCount: Int = 0
@@ -873,14 +943,22 @@ public class WritersAppViewModel: ObservableObject {
 
     public func initialize() {
         writersApp = WritersApp()
-        updateStatistics()
-        
+
         // Initialize a demo user session for testing database features
         // NOTE: In production, this should use a stable user identifier
         // from authentication/user management system
         let demoUserId = UUID()
         writersApp?.startSession(userId: demoUserId, multitaskingMode: "Split View")
-        
+
+        // Open the most recent document on launch, or create a blank one
+        if let existing = writersApp?.documentManager.getRecentDocuments(limit: 1).first {
+            openDocument(existing)
+        } else {
+            createNewDocument()
+        }
+
+        updateStatistics()
+
         // Load initial data
         loadRecentSuggestions()
         loadToolUsageStats()
@@ -890,8 +968,17 @@ public class WritersAppViewModel: ObservableObject {
 
     public func createNewDocument() {
         currentDocument = writersApp?.createBlankDocument(title: "Untitled", category: .other)
+        currentDocumentId = currentDocument?.id
         currentDocumentTitle = currentDocument?.title ?? "Untitled"
         currentDocumentContent = currentDocument?.content ?? ""
+        updateStatistics()
+    }
+
+    public func openDocument(_ doc: Document) {
+        currentDocument = doc
+        currentDocumentId = doc.id
+        currentDocumentTitle = doc.title
+        currentDocumentContent = doc.content
         updateStatistics()
     }
 
@@ -1103,6 +1190,30 @@ public class WritersAppViewModel: ObservableObject {
         withAnimation {
             isFocusMode.toggle()
         }
+    }
+
+    public func toggleFindReplace() {
+        withAnimation {
+            showFindReplaceBar.toggle()
+        }
+        if !showFindReplaceBar {
+            findText = ""
+            replaceText = ""
+        }
+    }
+
+    public func findAndReplace() {
+        guard !findText.isEmpty else { return }
+        if isCaseSensitiveSearch {
+            currentDocumentContent = currentDocumentContent.replacingOccurrences(of: findText, with: replaceText)
+        } else {
+            currentDocumentContent = currentDocumentContent.replacingOccurrences(
+                of: findText,
+                with: replaceText,
+                options: .caseInsensitive
+            )
+        }
+        updateStatistics()
     }
 
     // MARK: - AI Operations

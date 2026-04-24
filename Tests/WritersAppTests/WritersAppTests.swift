@@ -52,6 +52,28 @@ final class WritersAppTests: XCTestCase {
         XCTAssertEqual(document.wordCount, 10)
     }
 
+    func testDocumentHashable() {
+        let doc1 = Document(title: "A", content: "Hello", category: .article)
+        let doc2 = Document(title: "A", content: "Hello", category: .article)
+        // Same id ⇒ same hash
+        let sameId = Document(id: doc1.id, title: "A", content: "Hello", category: .article)
+        XCTAssertEqual(doc1.hashValue, sameId.hashValue)
+        // Documents can be stored in Sets
+        var set = Set<Document>()
+        set.insert(doc1)
+        set.insert(doc2)
+        XCTAssertEqual(set.count, 2)
+        set.insert(sameId)
+        XCTAssertEqual(set.count, 2, "Duplicate id should not increase set size")
+    }
+
+    func testDocumentReadingTimeNeverZero() {
+        let empty = Document(title: "T", content: "", category: .other)
+        XCTAssertGreaterThanOrEqual(empty.readingTime, 1, "Reading time must be at least 1 min")
+        let short = Document(title: "T", content: "Hello", category: .other)
+        XCTAssertGreaterThanOrEqual(short.readingTime, 1)
+    }
+
     func testTemplateSearch() {
         let results = app.templateManager.searchTemplates(query: "novel")
         XCTAssertGreaterThan(results.count, 0, "Should find novel templates")
