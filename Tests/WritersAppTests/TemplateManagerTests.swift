@@ -23,11 +23,11 @@ final class TemplateManagerTests: XCTestCase {
     // MARK: - Screenplay Template: Removed Placeholders (PR Change)
 
     private func screenplayTemplate() -> Template? {
-        return manager.getAllTemplates().first { $0.name == "Screenplay Scene" }
+        return manager.getAllTemplates().first { $0.name == "Screenplay" }
     }
 
     func testScreenplayTemplateExists() {
-        XCTAssertNotNil(screenplayTemplate(), "Screenplay Scene template must exist in defaults")
+        XCTAssertNotNil(screenplayTemplate(), "Screenplay template must exist in defaults")
     }
 
     /// PR change: character_state placeholder was removed from the screenplay template.
@@ -189,11 +189,11 @@ final class TemplateManagerTests: XCTestCase {
 
     func testSearchTemplateByName() {
         let results = manager.searchTemplates(query: "Screenplay")
-        XCTAssertTrue(results.contains { $0.name == "Screenplay Scene" })
+        XCTAssertTrue(results.contains { $0.name == "Screenplay" })
     }
 
     func testGetTemplatesByCategory() {
         let results = manager.getTemplates(for: .screenplay)
-        XCTAssertTrue(results.contains { $0.name == "Screenplay Scene" })
+        XCTAssertTrue(results.contains { $0.name == "Screenplay" })
     }
 }
