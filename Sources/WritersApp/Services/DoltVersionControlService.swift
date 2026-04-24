@@ -65,7 +65,8 @@ public class DoltVersionControlService {
             guard try db.getVCBranch(name: name) == nil else {
                 throw VersionControlError.branchAlreadyExists(name)
             }
-            let newBranch = VCBranch(name: name, isActive: true)
+            let baseCommitId = try currentBranch()?.headCommitId
+            let newBranch = VCBranch(name: name, baseCommitId: baseCommitId, isActive: true)
             try db.insertVCBranch(newBranch)
             try db.setActiveBranch(id: newBranch.id)
             return newBranch
@@ -321,7 +322,7 @@ public class DoltVersionControlService {
                              diffCount: sourceSnapshots.count, success: true)
     }
 
-    /// Applies source changes onto the target branch using last-writer-wins for conflicts.
+    /// Applies source changes onto the target branch using LCA-based three-way merge.
     private func performThreeWayMerge(
         targetBranch: inout VCBranch,
         sourceHeadId: UUID,
@@ -329,10 +330,13 @@ public class DoltVersionControlService {
         fromBranch: String,
         intoBranch: String
     ) throws -> VCMergeResult {
+        let lcaId = try findLCA(a: sourceHeadId, b: targetHeadId)
+        let baseSnapshots = try lcaId.map { try db.getVCSnapshots(commitId: $0) } ?? []
         let sourceSnapshots = try db.getVCSnapshots(commitId: sourceHeadId)
         let targetSnapshots = try db.getVCSnapshots(commitId: targetHeadId)
 
         let (mergedSnapshots, changedCount) = buildMergedSnapshots(
+            baseSnapshots: baseSnapshots,
             sourceSnapshots: sourceSnapshots,
             targetSnapshots: targetSnapshots
         )
@@ -365,32 +369,57 @@ public class DoltVersionControlService {
                              diffCount: changedCount, success: true)
     }
 
-    /// Combines source and target snapshots using last-writer-wins for conflicting documents.
-    /// - Returns: The merged snapshot array and the count of documents changed from the target state.
+    /// Three-way merge: applies changes from source relative to LCA base onto target.
+    /// Only documents that changed in source (vs base) are merged in; unchanged source docs don't overwrite target edits.
     private func buildMergedSnapshots(
+        baseSnapshots: [VCDocumentSnapshot],
         sourceSnapshots: [VCDocumentSnapshot],
         targetSnapshots: [VCDocumentSnapshot]
     ) -> (snapshots: [VCDocumentSnapshot], changedCount: Int) {
+        let baseMap = Dictionary(uniqueKeysWithValues: baseSnapshots.map { ($0.documentId, $0) })
         let targetMap = Dictionary(uniqueKeysWithValues: targetSnapshots.map { ($0.documentId, $0) })
         var mergedSnapshots: [VCDocumentSnapshot] = Array(targetSnapshots)
         var changedCount = 0
 
         for sourceSnap in sourceSnapshots {
-            if let targetSnap = targetMap[sourceSnap.documentId] {
-                // Take the source version if content differs (last-writer-wins strategy)
-                if sourceSnap.content != targetSnap.content,
-                   let idx = mergedSnapshots.firstIndex(where: { $0.documentId == sourceSnap.documentId }) {
+            let baseSnap = baseMap[sourceSnap.documentId]
+            let sourceChangedFromBase = baseSnap.map { $0.content != sourceSnap.content } ?? true
+
+            guard sourceChangedFromBase else { continue }
+
+            if let idx = mergedSnapshots.firstIndex(where: { $0.documentId == sourceSnap.documentId }) {
+                let targetSnap = targetMap[sourceSnap.documentId]
+                let targetChangedFromBase = targetSnap.map { snap in
+                    baseSnap.map { $0.content != snap.content } ?? true
+                } ?? false
+                // Both sides changed: source wins (last-writer-wins fallback)
+                if sourceSnap.content != mergedSnapshots[idx].content || targetChangedFromBase {
                     mergedSnapshots[idx] = sourceSnap
                     changedCount += 1
                 }
             } else {
-                // Document only in source — bring it over
                 mergedSnapshots.append(sourceSnap)
                 changedCount += 1
             }
         }
 
         return (mergedSnapshots, changedCount)
+    }
+
+    /// Finds the Lowest Common Ancestor commit of two commits by walking parent chains.
+    private func findLCA(a: UUID, b: UUID) throws -> UUID? {
+        var ancestors = Set<UUID>()
+        var cursor: UUID? = a
+        while let current = cursor {
+            ancestors.insert(current)
+            cursor = try db.getVCCommitById(id: current)?.parentCommitId
+        }
+        cursor = b
+        while let current = cursor {
+            if ancestors.contains(current) { return current }
+            cursor = try db.getVCCommitById(id: current)?.parentCommitId
+        }
+        return nil
     }
 
     /// Get the head commit identifier for the specified branch.
