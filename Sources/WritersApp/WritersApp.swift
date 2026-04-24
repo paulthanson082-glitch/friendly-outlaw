@@ -1396,7 +1396,7 @@ public class WritersApp {
     /// - Returns: A `GuiCanvas` containing the shareable URL.
     public func exportDocumentToGui(id: UUID) async throws -> GuiCanvas {
         guard let svc = guiService else { throw GuiNewError.notConfigured }
-        guard let document = documentManager.getDocument(id: id) else { throw AIError.documentNotFound }
+        guard let document = documentManager.getDocument(id: id) else { throw GuiNewError.documentNotFound }
         return try await svc.createDocumentCanvas(document: document)
     }
 
@@ -1411,7 +1411,7 @@ public class WritersApp {
     public func exportKanbanBoardToGui(boardId: UUID) async throws -> GuiCanvas {
         guard let svc = guiService else { throw GuiNewError.notConfigured }
         guard let board = kanbanManager.getBoard(id: boardId) else {
-            throw GuiNewError.notConfigured
+            throw GuiNewError.boardNotFound
         }
         let tasks = kanbanManager.getTasks(forBoard: boardId)
         return try await svc.createKanbanCanvas(board: board, tasks: tasks)
