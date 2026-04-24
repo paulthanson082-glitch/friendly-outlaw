@@ -107,7 +107,7 @@ final class GiftCardErrorTests: XCTestCase {
                 price: 10.0,
                 bundleType: .starter,
                 aiCredits: 50,
-                expirationDays: 0
+                expirationDays: -1
             )
         ) { error in
             guard case GiftCardError.invalidInput(let msg) = error else {

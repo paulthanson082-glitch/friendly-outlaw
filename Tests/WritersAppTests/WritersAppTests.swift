@@ -3375,6 +3375,13 @@ final class WritingAdvisorTests: XCTestCase {
 
 final class HermesAgentTests: XCTestCase {
 
+    var app: WritersApp!
+
+    override func setUp() {
+        super.setUp()
+        app = WritersApp()
+    }
+
     // MARK: - Helpers
 
     /// Build a HermesService for tests that only exercise non-AI behavior (parsing, session utilities).
