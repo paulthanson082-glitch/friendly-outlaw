@@ -121,7 +121,8 @@ struct WritersAppCLI {
             var guiDocArg: String? = nil
             var guiStats = false
             var guiKanbanArg: String? = nil
-            
+            var shouldShowStatus = false
+
             var i = 1
             while i < arguments.count {
                 let arg = arguments[i]
@@ -150,6 +151,9 @@ struct WritersAppCLI {
                         runArg = "" // Empty string means freewrite (default)
                         i += 1
                     }
+                case "--status", "-s":
+                    shouldShowStatus = true
+                    i += 1
                 case "--analyze-traces":
                     analyzeTraces = true
                     i += 1
@@ -192,6 +196,11 @@ struct WritersAppCLI {
             
             if listDocs {
                 listDocuments(app: app)
+                return
+            }
+
+            if shouldShowStatus {
+                showRunStatus(app: app)
                 return
             }
 
@@ -1833,6 +1842,49 @@ func startFocusSession(app: WritersApp) {
     print("\nHappy writing! Use option 42 to end your session.\n")
 }
 
+func showRunStatus(app: WritersApp) {
+    print("\n=== Writers App Status ===\n")
+
+    if let session = focusManager.getCurrentSession() {
+        let elapsed: TimeInterval
+        let stateLabel: String
+        if session.state == .paused {
+            elapsed = Date().timeIntervalSince(session.startTime) - session.pausedTime
+            stateLabel = "⏸  Focus session paused"
+        } else {
+            elapsed = Date().timeIntervalSince(session.startTime) - session.pausedTime
+            stateLabel = "▶  Focus session active"
+        }
+        let elapsedStr = FocusSessionManager.formatTimeRemaining(elapsed)
+
+        print(stateLabel)
+        print("   Type:    \(session.type.displayName)")
+        print("   Elapsed: \(elapsedStr)")
+        if session.targetDuration > 0 {
+            let remaining = max(0, session.targetDuration - elapsed)
+            print("   Remaining: \(FocusSessionManager.formatTimeRemaining(remaining))")
+        }
+        if let docId = session.documentId,
+           let doc = app.documentManager.getDocument(id: docId) {
+            print("   Document: \(doc.title)")
+        }
+    } else {
+        print("○  No active focus session")
+        print("   Start one with: --run [type]")
+        print("   Session types: freewrite, pomodoro, sprint, deepwork, marathon")
+    }
+
+    let docs = app.documentManager.getAllDocuments()
+    print("\n   Documents: \(docs.count)")
+
+    let todaySessions = focusManager.getTodaySessions()
+    if !todaySessions.isEmpty {
+        print("   Sessions today: \(todaySessions.count)")
+    }
+
+    print()
+}
+
 func startFocusSessionDirect(app: WritersApp, sessionTypeName: String?) async {
     // Check if session is already active
     if focusManager.getCurrentSession() != nil {
@@ -2506,6 +2558,7 @@ func showHelp() {
         --list, -l              List all documents
         --open, -o <id|title>   Open a document by ID or title
         --run, -r [type]        Start a focus session (types: freewrite, pomodoro, sprint, deepwork, marathon)
+        --status, -s            Show current focus session status and app overview
         --analyze-traces        Run trace analysis report (productivity by session length, tool usage)
         --dance                 Make Claude dance ♪
         --gui-stats             Export writing statistics dashboard to gui.new (prints shareable URL)
@@ -2519,6 +2572,7 @@ func showHelp() {
     EXAMPLES:
         WritersAppCLI                              # Start interactive mode
         WritersAppCLI --list                       # List all documents
+        WritersAppCLI --status                     # Show current session status
         WritersAppCLI --open "My Story"            # Open document by title
         WritersAppCLI --open <document-id>         # Open document by ID
         WritersAppCLI --run pomodoro               # Start a 25-minute Pomodoro session
