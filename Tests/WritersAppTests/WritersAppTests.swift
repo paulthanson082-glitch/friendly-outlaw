@@ -2306,8 +2306,8 @@ final class WritersAppTests: XCTestCase {
             XCTFail("Screenplay template not found")
             return
         }
-        XCTAssertEqual(screenplay.placeholders.count, 10,
-                       "Screenplay template should have 10 placeholders")
+        XCTAssertEqual(screenplay.placeholders.count, 8,
+                       "Screenplay template should have 8 placeholders")
     }
 
     func testScreenplayTemplateHasExpectedPlaceholderKeys() {
@@ -2319,8 +2319,7 @@ final class WritersAppTests: XCTestCase {
         let keys = Set(screenplay.placeholders.map { $0.key })
         let expected: Set<String> = [
             "scene_heading", "action", "character", "dialogue",
-            "character_2", "parenthetical", "dialogue_2", "transition",
-            "character_state", "shot_description"
+            "character_2", "parenthetical", "dialogue_2", "transition"
         ]
         XCTAssertEqual(keys, expected, "Screenplay template should have exactly the expected placeholder set")
     }
@@ -3677,15 +3676,17 @@ final class HermesAgentTests: XCTestCase {
     // MARK: - TemplateManager Default Templates Additional Tests
 
     func testTemplateManagerDefaultTemplateCount() {
+        let app = WritersApp()
         let all = app.templateManager.getAllTemplates()
         XCTAssertEqual(all.count, 7,
                        "Default templates should be exactly 7")
     }
 
     func testTemplateManagerRetainsCoreLiteraryTemplates() {
+        let app = WritersApp()
         let all = app.templateManager.getAllTemplates()
         let names = all.map { $0.name }
-        let required = ["Novel Chapter", "Short Story", "Screenplay", "Blog Post",
+        let required = ["Novel Chapter", "Short Story", "Screenplay Scene", "Blog Post",
                         "Article", "Poetry", "Business Letter"]
         for name in required {
             XCTAssertTrue(names.contains(name), "Core template '\(name)' should still be present")
@@ -3693,6 +3694,7 @@ final class HermesAgentTests: XCTestCase {
     }
 
     func testTemplateManagerGetTemplatesForRemovedCategoryReturnsEmpty() {
+        let app = WritersApp()
         let otherTemplates = app.templateManager.getTemplates(for: .other)
         let legacyNames = [
             "Morning Inbox Summary", "Weekly Status Report", "Daily Sales Dashboard"
@@ -3704,6 +3706,7 @@ final class HermesAgentTests: XCTestCase {
     }
 
     func testTemplateManagerSearchDoesNotFindRemovedTemplates() {
+        let app = WritersApp()
         XCTAssertTrue(app.templateManager.searchTemplates(query: "Inbox Summary").isEmpty)
         XCTAssertTrue(app.templateManager.searchTemplates(query: "Competitor News").isEmpty)
         XCTAssertTrue(app.templateManager.searchTemplates(query: "Sales Dashboard").isEmpty)
