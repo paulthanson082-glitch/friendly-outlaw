@@ -941,6 +941,9 @@ public class WritersAppViewModel: ObservableObject {
 
     public init() {}
 
+    /// Initializes the view model's runtime state and loads startup data.
+    /// 
+    /// Creates the `WritersApp` instance, starts a demo user session (for testing), opens the most recent document if available or creates a new blank document, updates document statistics, and loads initial AI suggestions and tool usage statistics.
     public func initialize() {
         writersApp = WritersApp()
 
@@ -964,7 +967,11 @@ public class WritersAppViewModel: ObservableObject {
         loadToolUsageStats()
     }
 
-    // MARK: - Document Operations
+    /// Creates a new blank document and makes it the active document in the view model.
+    /// 
+    /// The new document becomes the current document: `currentDocument`, `currentDocumentId`,
+    /// `currentDocumentTitle`, and `currentDocumentContent` are updated (title defaults to "Untitled"
+    /// and content to an empty string when necessary). Document statistics are recalculated afterwards.
 
     public func createNewDocument() {
         currentDocument = writersApp?.createBlankDocument(title: "Untitled", category: .other)
@@ -974,6 +981,9 @@ public class WritersAppViewModel: ObservableObject {
         updateStatistics()
     }
 
+    /// Makes the provided document the active document and updates editor state.
+    /// Sets the view model's current document, id, title, and content to `doc` and recomputes word/character/reading-time statistics.
+    /// - Parameter doc: The document to open and make current.
     public func openDocument(_ doc: Document) {
         currentDocument = doc
         currentDocumentId = doc.id
@@ -982,6 +992,11 @@ public class WritersAppViewModel: ObservableObject {
         updateStatistics()
     }
 
+    /// Updates the active document with the view model's title and content and marks the document as saving.
+    /// 
+    /// If there is no active document, the method returns without action. When a document exists, its
+    /// title, content, and modified timestamp are updated and `isSaving` is set to `true` to indicate
+    /// a save is in progress; `isSaving` is cleared shortly thereafter to reflect completion.
     public func saveDocument() {
         guard var doc = currentDocument else { return }
         doc.title = currentDocumentTitle
@@ -1186,12 +1201,15 @@ public class WritersAppViewModel: ObservableObject {
         }
     }
 
+    /// Toggles the editor's focus (distraction-free) mode using an animated transition.
     public func toggleFocusMode() {
         withAnimation {
             isFocusMode.toggle()
         }
     }
 
+    /// Shows or hides the inline Find & Replace bar in the editor.
+    /// When the bar is hidden, clears the current find and replace text fields.
     public func toggleFindReplace() {
         withAnimation {
             showFindReplaceBar.toggle()
@@ -1202,6 +1220,11 @@ public class WritersAppViewModel: ObservableObject {
         }
     }
 
+    /// Replaces occurrences of the current find text with the replacement text in the active document content.
+    /// 
+    /// Performs replacements according to the current case-sensitivity setting and updates document statistics afterwards.
+    /// If `findText` is empty, the method returns without modifying the document.
+    /// - Note: Matching respects `isCaseSensitiveSearch`; when false, replacements are performed case-insensitively.
     public func findAndReplace() {
         guard !findText.isEmpty else { return }
         if isCaseSensitiveSearch {
@@ -1216,7 +1239,9 @@ public class WritersAppViewModel: ObservableObject {
         updateStatistics()
     }
 
-    // MARK: - AI Operations
+    /// Requests an AI continuation for the current document and stores the result in `aiResponse`.
+    /// 
+    /// If no current document is available, the method does nothing. On success, `aiResponse` is set to the AI-generated text; on failure, `aiResponse` is set to `"Error: <localizedDescription>"`.
 
     public func aiContinueWriting() {
         guard let doc = currentDocument else { return }
