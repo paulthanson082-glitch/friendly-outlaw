@@ -533,6 +533,7 @@ The `.claude/` directory organises all Claude Code extensions for this project.
 | `build-and-test` | Building the project and running the full test suite |
 | `add-version-control-op` | Extending `DoltVersionControlService` with new operations |
 | `firecrawl` | Scraping URLs, searching the web, crawling sites, or browsing interactive pages |
+| `generate-skill-from-url` | Generating a new Claude skill file from any documentation URL using Firecrawl |
 
 ## Knowledge System
 

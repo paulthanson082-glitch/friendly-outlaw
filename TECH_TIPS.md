@@ -20,6 +20,14 @@ Chrome has several hidden internal pages that can be accessed via special URLs:
 
 ## Web Tools
 
+### Encoders/Decoders and Regex Testing
+
+Tools for encoding, decoding, testing regular expressions, and general developer utilities:
+
+- [BeginThings](https://beginthings.com) - free, browser-based toolkit with 96+ developer and freelancer tools including encoders/decoders, regex tester, formatters, and productivity utilities — no signup required, runs entirely in the browser
+- [Regex101](https://regex101.com) - online regex tester and debugger with real-time match highlighting, detailed explanations, and support for multiple regex flavors
+- [CyberChef](https://gchq.github.io/CyberChef/) - web app for encryption, encoding, compression, and data analysis — known as "The Cyber Swiss Army Knife"
+
 ### Performance
 
 Tools for analyzing and measuring website performance:
