@@ -33,12 +33,11 @@ public struct Template: Codable, Identifiable {
         var processedContent = content
 
         for placeholder in placeholders {
-            if let value = values[placeholder.key] {
-                processedContent = processedContent.replacingOccurrences(
-                    of: "{{\(placeholder.key)}}",
-                    with: value
-                )
-            }
+            let value = values[placeholder.key] ?? placeholder.defaultValue ?? ""
+            processedContent = processedContent.replacingOccurrences(
+                of: "{{\(placeholder.key)}}",
+                with: value
+            )
         }
 
         return Document(
