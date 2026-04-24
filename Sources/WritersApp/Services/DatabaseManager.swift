@@ -1011,6 +1011,7 @@ public class DatabaseManager {
         }
         
         sqlite3_bind_text(statement, 1, userId.uuidString, -1, SQLITE_TRANSIENT)
+        // Security: API key is not persisted to the database to prevent plaintext exposure.
         sqlite3_bind_text(statement, 2, "", -1, SQLITE_TRANSIENT)
         sqlite3_bind_text(statement, 3, configuration.model.rawValue, -1, SQLITE_TRANSIENT)
         sqlite3_bind_int(statement, 4, Int32(configuration.maxTokens))

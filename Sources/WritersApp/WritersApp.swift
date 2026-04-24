@@ -1582,7 +1582,9 @@ public class WritersApp {
     ///   - id: The unique identifier of the prospect to update.
     ///   - status: The new status to assign to the prospect.
     /// - Throws: Any error produced while updating the prospect status in the prospect database.
-    /// Update a prospect's status and, if the status transitions into a contacted-like state (`.contacted`, `.replied`, or `.meeting`), increment the active cowork session's `prospectsContacted` counter.
+    /// Update a prospect's status and, if the status is a contacted-like state (`.contacted`, `.replied`, or `.meeting`),
+    /// increment the active cowork session's `prospectsContacted` counter.
+    /// Each contact-status update is counted independently (not just the first transition).
     /// - Parameters:
     ///   - id: The UUID of the prospect to update.
     ///   - status: The new `ProspectStatus` to apply.
