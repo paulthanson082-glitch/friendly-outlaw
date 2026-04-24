@@ -119,6 +119,157 @@ final class WritersAppTests: XCTestCase {
         XCTAssertEqual(document.content, "Hello John, you are 30 years old.")
     }
 
+    func testTemplatePlaceholderDefaultValue() {
+        let template = Template(
+            name: "Default Test",
+            category: .other,
+            description: "Test",
+            content: "Hello {{name}}, state: ({{state}})",
+            placeholders: [
+                Placeholder(key: "name", label: "Name"),
+                Placeholder(key: "state", label: "State", defaultValue: "", required: false)
+            ]
+        )
+        let document = template.createDocument(with: ["name": "Alice"])
+        XCTAssertEqual(document.content, "Hello Alice, state: ()")
+        XCTAssertFalse(document.content.contains("{{state}}"))
+    }
+
+    func testTemplatePlaceholderNilDefaultValue() {
+        let template = Template(
+            name: "Nil Default Test",
+            category: .other,
+            description: "Test",
+            content: "{{a}} and {{b}}",
+            placeholders: [
+                Placeholder(key: "a", label: "A"),
+                Placeholder(key: "b", label: "B", defaultValue: nil, required: false)
+            ]
+        )
+        let document = template.createDocument(with: ["a": "foo"])
+        XCTAssertEqual(document.content, "foo and ")
+        XCTAssertFalse(document.content.contains("{{b}}"))
+    }
+
+    // MARK: - Document Analytics Tests
+
+    func testCharacterCountWithoutSpaces() {
+        let document = Document(title: "Test", content: "Hello World", category: .article)
+        XCTAssertEqual(document.characterCountWithoutSpaces, 10)
+    }
+
+    func testCharacterCountWithoutSpacesNoSpaces() {
+        let document = Document(title: "Test", content: "HelloWorld", category: .article)
+        XCTAssertEqual(document.characterCountWithoutSpaces, 10)
+    }
+
+    func testEnhancedWordCountFiltersPunctuation() {
+        let document = Document(title: "Test", content: "Hello, world! --- This is a test.", category: .article)
+        let count = document.enhancedWordCount()
+        XCTAssertEqual(count, 6)
+    }
+
+    func testEnhancedWordCountEmpty() {
+        let document = Document(title: "Test", content: "", category: .article)
+        XCTAssertEqual(document.enhancedWordCount(), 0)
+    }
+
+    func testSentenceCount() {
+        let document = Document(title: "Test", content: "Hello world. How are you? I am fine!", category: .article)
+        XCTAssertEqual(document.sentenceCount(), 3)
+    }
+
+    func testParagraphCount() {
+        let document = Document(title: "Test", content: "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.", category: .article)
+        XCTAssertEqual(document.paragraphCount(), 3)
+    }
+
+    func testWordCountProgressNoGoal() {
+        let document = Document(title: "Test", content: "One two three", category: .article)
+        XCTAssertEqual(document.wordCountProgress(), 0.0)
+    }
+
+    func testWordCountProgressHalfway() {
+        var metadata = DocumentMetadata()
+        metadata.wordCountGoal = 6
+        let document = Document(title: "Test", content: "One two three", category: .article, metadata: metadata)
+        XCTAssertEqual(document.wordCountProgress(), 0.5, accuracy: 0.001)
+    }
+
+    func testWordCountProgressClampsAt1() {
+        var metadata = DocumentMetadata()
+        metadata.wordCountGoal = 2
+        let document = Document(title: "Test", content: "One two three four", category: .article, metadata: metadata)
+        XCTAssertEqual(document.wordCountProgress(), 1.0)
+    }
+
+    // MARK: - AppSettings Tests
+
+    func testAppSettingsFontSizeClampedInInit() {
+        let tooSmall = AppSettings(fontSize: 2)
+        XCTAssertEqual(tooSmall.fontSize, 8)
+
+        let tooLarge = AppSettings(fontSize: 100)
+        XCTAssertEqual(tooLarge.fontSize, 32)
+
+        let valid = AppSettings(fontSize: 16)
+        XCTAssertEqual(valid.fontSize, 16)
+    }
+
+    func testToggleDarkMode() {
+        XCTAssertFalse(app.isDarkModeEnabled)
+        app.toggleDarkMode()
+        XCTAssertTrue(app.isDarkModeEnabled)
+        app.toggleDarkMode()
+        XCTAssertFalse(app.isDarkModeEnabled)
+    }
+
+    func testSetDarkMode() {
+        app.setDarkMode(true)
+        XCTAssertTrue(app.isDarkModeEnabled)
+        app.setDarkMode(false)
+        XCTAssertFalse(app.isDarkModeEnabled)
+    }
+
+    func testSetTheme() {
+        app.setTheme(.dark)
+        XCTAssertEqual(app.getAppSettings().theme, .dark)
+        app.setTheme(.light)
+        XCTAssertEqual(app.getAppSettings().theme, .light)
+        app.setTheme(.system)
+        XCTAssertEqual(app.getAppSettings().theme, .system)
+    }
+
+    func testSetFontSizeClampsViaWritersApp() {
+        app.setFontSize(5)
+        XCTAssertEqual(app.getAppSettings().fontSize, 8)
+        app.setFontSize(50)
+        XCTAssertEqual(app.getAppSettings().fontSize, 32)
+        app.setFontSize(18)
+        XCTAssertEqual(app.getAppSettings().fontSize, 18)
+    }
+
+    func testSetDefaultWordCountGoal() {
+        app.setDefaultWordCountGoal(1000)
+        XCTAssertEqual(app.getAppSettings().defaultWordCountGoal, 1000)
+        app.setDefaultWordCountGoal(nil)
+        XCTAssertNil(app.getAppSettings().defaultWordCountGoal)
+    }
+
+    func testSetSpellCheckEnabled() {
+        app.setSpellCheckEnabled(false)
+        XCTAssertFalse(app.getAppSettings().spellCheckEnabled)
+        app.setSpellCheckEnabled(true)
+        XCTAssertTrue(app.getAppSettings().spellCheckEnabled)
+    }
+
+    func testSetGrammarCheckEnabled() {
+        app.setGrammarCheckEnabled(false)
+        XCTAssertFalse(app.getAppSettings().grammarCheckEnabled)
+        app.setGrammarCheckEnabled(true)
+        XCTAssertTrue(app.getAppSettings().grammarCheckEnabled)
+    }
+
     // MARK: - Tool Loop Types Tests
 
     func testToolDefinitionToDict() {
