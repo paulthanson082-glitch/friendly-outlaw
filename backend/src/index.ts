@@ -10,11 +10,12 @@ import templateRoutes from './routes/templates.js';
 import kanbanRoutes from './routes/kanban.js';
 import goalRoutes from './routes/goals.js';
 import { initializeDatabase } from './db/connection.js';
+import { connectMongoose } from './db/mongoose.js';
 import { templateService } from './services/templateService.js';
 
 const app: Express = express();
 
-// Initialize database
+// Initialize SQLite database
 try {
   const dbPath = config.NODE_ENV === 'test' ? ':memory:' : (config.SQLITE_PATH || './data/writers_app.db');
   initializeDatabase(dbPath);
@@ -23,6 +24,13 @@ try {
 } catch (error) {
   logger.error('Failed to initialize database:', error);
   process.exit(1);
+}
+
+// Connect to MongoDB via Mongoose (optional)
+if (config.MONGODB_URI) {
+  connectMongoose(config.MONGODB_URI).catch((err) => {
+    logger.warn('Mongoose connection failed — continuing without MongoDB:', err.message);
+  });
 }
 
 // Middleware
