@@ -1,5 +1,5 @@
-# This workflow will build a Swift project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-swift
+# Builds and tests the Swift library + CLI on both macOS and Linux.
+# See: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-swift
 
 name: Swift
 
@@ -13,13 +13,26 @@ permissions:
   contents: read
 
 jobs:
-  build:
-
+  macos:
     runs-on: macos-latest
-
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: swift build -v
-    - name: Run tests
-      run: swift test -v
+      - uses: actions/checkout@v4
+      - name: Build
+        run: swift build -v
+      - name: Run tests
+        run: swift test -v
+
+  linux:
+    runs-on: ubuntu-latest
+    container:
+      image: swift:6.0-jammy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SQLite dev files
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends libsqlite3-dev pkg-config
+      - name: Build
+        run: swift build -v
+      - name: Run tests
+        run: swift test -v
