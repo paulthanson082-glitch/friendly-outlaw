@@ -1582,7 +1582,7 @@ public class WritersApp {
     ///   - id: The unique identifier of the prospect to update.
     ///   - status: The new status to assign to the prospect.
     /// - Throws: Any error produced while updating the prospect status in the prospect database.
-    /// Update a prospect's status and, if the status transitions into a contacted-like state (`.contacted`, `.replied`, or `.meeting`), increment the active cowork session's `prospectsContacted` counter.
+    /// Update a prospect's status and, if the new status is a contacted-like state (`.contacted`, `.replied`, or `.meeting`), increment the active cowork session's `prospectsContacted` counter.
     /// - Parameters:
     ///   - id: The UUID of the prospect to update.
     ///   - status: The new `ProspectStatus` to apply.
@@ -1591,9 +1591,8 @@ public class WritersApp {
         let isContactStatus: (ProspectStatus) -> Bool = {
             $0 == .contacted || $0 == .replied || $0 == .meeting
         }
-        let previousStatus = prospectDatabase.getProspect(id: id)?.status
         try prospectDatabase.updateProspectStatus(id: id, status: status)
-        if isContactStatus(status) && !(previousStatus.map(isContactStatus) ?? false) {
+        if isContactStatus(status) {
             activeCoworkSession?.prospectsContacted += 1
         }
     }
