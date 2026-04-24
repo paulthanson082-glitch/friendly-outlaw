@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents a writing document created from a template or from scratch
-public struct Document: Codable, Identifiable {
+public struct Document: Codable, Identifiable, Hashable {
     public let id: UUID
     public var title: String
     public var content: String
@@ -75,7 +75,7 @@ public struct Document: Codable, Identifiable {
 }
 
 /// Metadata for documents
-public struct DocumentMetadata: Codable {
+public struct DocumentMetadata: Codable, Hashable {
     public var created: Date
     public var modified: Date
     public var lastOpened: Date?
