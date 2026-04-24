@@ -7,16 +7,6 @@ const server = await MongoMemoryServer.create({
     port: 27017,
     dbName: 'writers_app',
   },
-  binary: {
-    version: '7.0.14',
-    platform: 'linux',
-    arch: 'x86_64',
-    os: {
-      os: 'linux',
-      dist: 'ubuntu',
-      release: '22.04',
-    },
-  },
 });
 
 const uri = server.getUri();

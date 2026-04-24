@@ -7,7 +7,7 @@ export interface ITemplate extends Document {
   category: string;
   description?: string;
   content: string;
-  placeholders: unknown[];
+  placeholders: Array<{ key: string; description: string; defaultValue?: string }>;
   metadata: Record<string, unknown>;
   isDefault: boolean;
   createdAt: Date;
@@ -22,7 +22,7 @@ const templateSchema = new Schema<ITemplate>(
     category: { type: String, required: true },
     description: { type: String },
     content: { type: String, required: true },
-    placeholders: { type: [Schema.Types.Mixed], default: [] },
+    placeholders: { type: Schema.Types.Mixed, default: [] },
     metadata: { type: Schema.Types.Mixed, default: {} },
     isDefault: { type: Boolean, default: false },
     modifiedAt: { type: Date, default: Date.now },

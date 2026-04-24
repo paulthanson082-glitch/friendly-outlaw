@@ -1,40 +1,45 @@
 import mongoose from 'mongoose';
 import logger from '../utils/logger.js';
 
-let isConnected = false;
+let connectionPromise: Promise<void> | null = null;
 
 export const connectMongoose = async (uri: string): Promise<void> => {
-  if (isConnected) return;
+  if (mongoose.connection.readyState === 1) return;
 
-  mongoose.set('strictQuery', false);
+  if (!connectionPromise) {
+    connectionPromise = (async () => {
+      mongoose.set('strictQuery', false);
 
-  mongoose.connection.on('connected', () => {
-    logger.info('MongoDB connected via Mongoose');
-  });
+      mongoose.connection.on('connected', () => {
+        logger.info('MongoDB connected via Mongoose');
+      });
 
-  mongoose.connection.on('error', (err) => {
-    logger.error('MongoDB connection error:', err);
-  });
+      mongoose.connection.on('error', (err) => {
+        logger.error('MongoDB connection error:', err);
+      });
 
-  mongoose.connection.on('disconnected', () => {
-    logger.warn('MongoDB disconnected');
-    isConnected = false;
-  });
+      mongoose.connection.on('disconnected', () => {
+        logger.warn('MongoDB disconnected');
+        connectionPromise = null;
+      });
 
-  await mongoose.connect(uri, {
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 45000,
-  });
+      await mongoose.connect(uri, {
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
+      });
+    })();
+  }
 
-  isConnected = true;
+  return connectionPromise;
 };
 
 export const disconnectMongoose = async (): Promise<void> => {
-  if (!isConnected) return;
+  if (mongoose.connection.readyState === 0) return;
   await mongoose.disconnect();
-  isConnected = false;
+  connectionPromise = null;
 };
 
-export const isMongooseConnected = (): boolean => isConnected;
+export const isMongooseConnected = (): boolean =>
+  mongoose.connection.readyState === 1;
 
 export default mongoose;
