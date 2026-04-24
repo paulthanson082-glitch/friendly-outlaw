@@ -10,7 +10,8 @@ public struct AISuggestion: Codable, Identifiable {
     public let response: String
     public let timestamp: Date
     public var isApplied: Bool
-    
+    public var project: String?
+
     public init(
         id: UUID = UUID(),
         userId: UUID,
@@ -19,7 +20,8 @@ public struct AISuggestion: Codable, Identifiable {
         prompt: String,
         response: String,
         timestamp: Date = Date(),
-        isApplied: Bool = false
+        isApplied: Bool = false,
+        project: String? = nil
     ) {
         self.id = id
         self.userId = userId
@@ -29,6 +31,7 @@ public struct AISuggestion: Codable, Identifiable {
         self.response = response
         self.timestamp = timestamp
         self.isApplied = isApplied
+        self.project = project
     }
 }
 
@@ -42,7 +45,8 @@ public struct UserSession: Codable, Identifiable {
     public var wordsWritten: Int
     public var aiInteractions: Int
     public var multitaskingMode: String?
-    
+    public var project: String?
+
     public init(
         id: UUID = UUID(),
         userId: UUID,
@@ -51,7 +55,8 @@ public struct UserSession: Codable, Identifiable {
         durationSeconds: Int? = nil,
         wordsWritten: Int = 0,
         aiInteractions: Int = 0,
-        multitaskingMode: String? = nil
+        multitaskingMode: String? = nil,
+        project: String? = nil
     ) {
         self.id = id
         self.userId = userId
@@ -61,6 +66,7 @@ public struct UserSession: Codable, Identifiable {
         self.wordsWritten = wordsWritten
         self.aiInteractions = aiInteractions
         self.multitaskingMode = multitaskingMode
+        self.project = project
     }
 }
 

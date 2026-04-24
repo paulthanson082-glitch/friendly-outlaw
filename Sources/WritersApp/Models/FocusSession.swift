@@ -3,6 +3,7 @@ import Foundation
 /// Type of focus session
 public enum FocusSessionType: String, Codable, CaseIterable {
     case freeWrite = "free_write"
+    case openRun = "open_run"
     case pomodoro = "pomodoro"
     case sprint = "sprint"
     case deepWork = "deep_work"
@@ -11,6 +12,7 @@ public enum FocusSessionType: String, Codable, CaseIterable {
     public var displayName: String {
         switch self {
         case .freeWrite: return "Free Write"
+        case .openRun: return "Open Run"
         case .pomodoro: return "Pomodoro (25 min)"
         case .sprint: return "Writing Sprint"
         case .deepWork: return "Deep Work (90 min)"
@@ -22,6 +24,7 @@ public enum FocusSessionType: String, Codable, CaseIterable {
     public var defaultDuration: TimeInterval {
         switch self {
         case .freeWrite: return 0 // No time limit
+        case .openRun: return 0 // No time limit
         case .pomodoro: return 25 * 60 // 25 minutes
         case .sprint: return 15 * 60 // 15 minutes
         case .deepWork: return 90 * 60 // 90 minutes
@@ -33,6 +36,7 @@ public enum FocusSessionType: String, Codable, CaseIterable {
     public var breakDuration: TimeInterval {
         switch self {
         case .freeWrite: return 0
+        case .openRun: return 0
         case .pomodoro: return 5 * 60 // 5 minutes
         case .sprint: return 3 * 60 // 3 minutes
         case .deepWork: return 15 * 60 // 15 minutes

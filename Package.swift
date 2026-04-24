@@ -14,6 +14,9 @@ let package = Package(
         .executable(
             name: "WritersAppCLI",
             targets: ["WritersAppCLI"]),
+        .executable(
+            name: "StatuslineCounter",
+            targets: ["StatuslineCounter"]),
         .library(
             name: "MockerKit",
             targets: ["MockerKit"]),
@@ -39,6 +42,9 @@ let package = Package(
         .executableTarget(
             name: "WritersAppCLI",
             dependencies: ["WritersApp"]),
+        .executableTarget(
+            name: "StatuslineCounter",
+            dependencies: ["CSQLite"]),
         .testTarget(
             name: "WritersAppTests",
             dependencies: ["WritersApp"]),

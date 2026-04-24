@@ -330,6 +330,7 @@ struct WritersAppCLI {
             print("6. Search Templates")
             print("7. Search Documents")
             print("8. Open Document")
+            print("9. Open Document & Start Focus Session")
 
             if app.isAIEnabled {
                 print("\nAI Features:")
@@ -466,6 +467,8 @@ struct WritersAppCLI {
                 searchDocuments(app: app)
             case 8:
                 await openDocument(app: app)
+            case 9:
+                openDocumentAndStartFocusSession(app: app)
             case 10:
                 await continueWritingWithAI(app: app)
             case 11:
@@ -918,6 +921,69 @@ func openDocument(app: WritersApp) async {
     
     let documentId = documents[choice - 1].id
     await viewDocumentInteractive(app: app, documentId: documentId)
+}
+
+func openDocumentAndStartFocusSession(app: WritersApp) {
+    print("\n=== Open Document & Start Focus Session ===\n")
+
+    let documents = app.documentManager.getAllDocuments()
+    if documents.isEmpty {
+        print("No documents found. Create one to get started!")
+        return
+    }
+
+    print("Select a document:")
+    for (index, document) in documents.enumerated() {
+        print("\(index + 1). \(document.title)")
+        print("   Category: \(document.category.rawValue)")
+        print("   Words: \(document.wordCount)")
+        print()
+    }
+
+    print("Enter document number (0 to cancel): ", terminator: "")
+    guard let input = readLine(), let choice = Int(input) else {
+        print("Invalid input.")
+        return
+    }
+    if choice == 0 { return }
+    guard choice > 0 && choice <= documents.count else {
+        print("Invalid document number.")
+        return
+    }
+
+    let selectedDocument = documents[choice - 1]
+
+    print("\nSelect session type:")
+    for (index, sessionType) in FocusSessionType.allCases.enumerated() {
+        let duration = sessionType.defaultDuration > 0 ? " (\(Int(sessionType.defaultDuration / 60)) min)" : " (no time limit)"
+        print("\(index + 1). \(sessionType.displayName)\(duration)")
+    }
+
+    print("\nSession type: ", terminator: "")
+    guard let typeInput = readLine(),
+          let typeIndex = Int(typeInput),
+          typeIndex > 0,
+          typeIndex <= FocusSessionType.allCases.count else {
+        print("Invalid selection.")
+        return
+    }
+
+    let sessionType = FocusSessionType.allCases[typeIndex - 1]
+    let session = focusManager.startSession(
+        type: sessionType,
+        documentId: selectedDocument.id,
+        currentWordCount: selectedDocument.wordCount
+    )
+
+    print("\n✓ Focus session started!")
+    print("  Document: \(selectedDocument.title)")
+    print("  Type: \(session.type.displayName)")
+    if session.targetDuration > 0 {
+        print("  Duration: \(FocusSessionManager.formatTimeRemaining(session.targetDuration))")
+    }
+    print("  Starting word count: \(selectedDocument.wordCount)")
+    print("\nHappy writing! Use option 42 to end your session.")
+    print("Tip: Use option 8 to view and edit your document.\n")
 }
 
 func viewStatistics(app: WritersApp) {

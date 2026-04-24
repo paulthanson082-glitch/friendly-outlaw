@@ -1,0 +1,36 @@
+name: "Copilot Setup Steps"
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  # The job MUST be named 'copilot-setup-steps'
+  copilot-setup-steps:
+    runs-on: macos-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Swift dependencies
+        run: |
+          # Install sqlite development libraries if needed
+          brew list sqlite || brew install sqlite
+
+      - name: Build project
+        run: |
+          swift build
+
+      - name: Verify build
+        run: |
+          swift --version
+          swift build --show-bin-path
