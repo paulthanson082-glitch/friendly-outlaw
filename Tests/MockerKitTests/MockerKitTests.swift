@@ -131,11 +131,12 @@ final class MockerKitTests: XCTestCase {
     }
 
     // MARK: - ImageInfo.shortId: bare sha256 prefix (no colon)
+    //
+    // PR change: IDs that start with "sha256" but have no colon now return the first 14
+    // characters of the full ID instead of falling through to the 12-character default.
 
-    /// IDs that start with "sha256" but have no colon must return the first 14 characters of the
-    /// full ID (new branch added in this PR).
+    /// Normal case: ID starts with "sha256" (no colon) and is long enough → first 14 chars returned.
     func testImageInfoShortId_sha256BarePrefix_returns14Chars() {
-        // "sha256" (6) + 8 hex chars = 14 chars total; verifies the new branch is taken.
         let image = ImageInfo(
             id: "sha256abcdef12345678901234",
             repository: "myapp",
@@ -148,7 +149,7 @@ final class MockerKitTests: XCTestCase {
     /// Boundary: ID is exactly 14 characters starting with "sha256" → full ID returned.
     func testImageInfoShortId_sha256BarePrefix_exactlyFourteenChars() {
         let image = ImageInfo(
-            id: "sha256abcdefgh",  // exactly 14 chars
+            id: "sha256abcdefgh",   // exactly 14 chars
             repository: "alpine",
             tag: "edge"
         )
@@ -159,7 +160,7 @@ final class MockerKitTests: XCTestCase {
     /// Boundary: ID is shorter than 14 characters starting with "sha256" → returns all available chars.
     func testImageInfoShortId_sha256BarePrefix_shorterThanFourteen() {
         let image = ImageInfo(
-            id: "sha256abc",  // 9 chars < 14
+            id: "sha256abc",   // 9 chars < 14
             repository: "minimal",
             tag: "latest"
         )
@@ -186,7 +187,7 @@ final class MockerKitTests: XCTestCase {
             "Non-sha256 IDs must still use the standard Docker 12-character short-ID convention")
     }
 
-    /// Regression: an ID that starts with "sha256" should NOT be treated as the colon-variant.
+    /// Regression: an ID starting with "sha256" (no colon) must NOT be treated as the colon variant.
     func testImageInfoShortId_sha256BarePrefix_doesNotConfuseWithColonVariant() {
         // "sha256:" is 7 chars; this ID has "sha256" (6 chars) followed by non-colon content.
         let image = ImageInfo(
@@ -195,21 +196,10 @@ final class MockerKitTests: XCTestCase {
             tag: "20"
         )
         let short = image.shortId
-        // Must start with "sha256xyz1" (first 14 chars), not "xyz12345678901" (what colon-variant would give)
-        XCTAssertEqual(short, "sha256xyz12345")
+        XCTAssertEqual(short, "sha256xyz12345",
+            "Bare 'sha256' prefix must return first 14 chars, not strip the prefix like the colon variant")
         XCTAssertFalse(short.hasPrefix("xyz"),
             "Bare 'sha256' prefix must not be treated as the colon-variant and strip the prefix")
-    }
-
-    /// Boundary: ID with exactly "sha256" (no trailing chars) returns only "sha256" (6 chars).
-    func testImageInfoShortId_sha256BarePrefix_emptyAfterPrefix() {
-        let image = ImageInfo(
-            id: "sha256",
-            repository: "edge",
-            tag: "latest"
-        )
-        XCTAssertEqual(image.shortId, "sha256",
-            "ID equal to 'sha256' with no trailing chars must return the full 6-char string")
     }
 
     // MARK: - ContainerStore Tests
@@ -497,5 +487,121 @@ final class MockerKitTests: XCTestCase {
         XCTAssertTrue(TableFormatter.relativeTime(now.addingTimeInterval(-120)).contains("minutes"))
         XCTAssertTrue(TableFormatter.relativeTime(now.addingTimeInterval(-7200)).contains("hours"))
         XCTAssertTrue(TableFormatter.relativeTime(now.addingTimeInterval(-172800)).contains("days"))
+    }
+}
+
+// MARK: - ImageInfo.shortId: bare sha256 prefix (no colon)
+//
+// PR change: IDs that start with "sha256" but have no colon (i.e. no "sha256:" digest form)
+// now return the first 14 characters of the full ID, instead of falling through to
+// the default 12-character short-ID convention.
+
+final class ImageInfoShortIdBarePrefixTests: XCTestCase {
+
+    // MARK: - New branch: bare "sha256" prefix without colon returns first 14 characters
+
+    /// Standard case: ID longer than 14 chars starting with "sha256" (no colon).
+    func testShortId_sha256BarePrefix_returns14Chars() {
+        let image = ImageInfo(
+            id: "sha256abcdef12345678901234",
+            repository: "myapp",
+            tag: "v1"
+        )
+        XCTAssertEqual(image.shortId, "sha256abcdef12",
+            "Bare 'sha256' prefix without colon must return exactly the first 14 characters")
+    }
+
+    /// Boundary: ID is exactly 14 characters starting with "sha256" → full ID returned unchanged.
+    func testShortId_sha256BarePrefix_exactlyFourteenCharsReturnsFullId() {
+        let image = ImageInfo(
+            id: "sha256abcdefgh",  // exactly 14 chars
+            repository: "alpine",
+            tag: "edge"
+        )
+        XCTAssertEqual(image.shortId, "sha256abcdefgh",
+            "When the bare-prefix ID is exactly 14 characters, shortId must equal the full ID")
+    }
+
+    /// Boundary: ID shorter than 14 characters starting with "sha256" → all available chars returned.
+    func testShortId_sha256BarePrefix_shorterThanFourteen_returnsAll() {
+        let image = ImageInfo(
+            id: "sha256abc",  // 9 chars < 14
+            repository: "minimal",
+            tag: "latest"
+        )
+        XCTAssertEqual(image.shortId, "sha256abc",
+            "When bare-prefix ID is shorter than 14 chars, shortId must return all available characters")
+    }
+
+    /// Boundary: ID is exactly 15 characters → first 14 returned.
+    func testShortId_sha256BarePrefix_fifteenChars_returns14() {
+        let image = ImageInfo(
+            id: "sha256abcdef123",  // 15 chars
+            repository: "redis",
+            tag: "7"
+        )
+        XCTAssertEqual(image.shortId, "sha256abcdef12",
+            "A 15-char bare-prefix ID must return the first 14 characters")
+    }
+
+    /// Regression: the "sha256:" digest form (with colon) must NOT be affected by the new branch.
+    func testShortId_sha256ColonPrefix_stillReturns12HexCharsAfterColon() {
+        let image = ImageInfo(
+            id: "sha256:abcdef123456789012345678",
+            repository: "postgres",
+            tag: "15"
+        )
+        XCTAssertEqual(image.shortId, "abcdef123456",
+            "Digest-form 'sha256:' prefix must still return first 12 hex characters after the colon")
+    }
+
+    /// Regression: non-sha256 IDs must continue using the 12-char short-ID convention.
+    func testShortId_nonSha256Id_stillReturns12Chars() {
+        let image = ImageInfo(
+            id: "abcdef1234567890abcdef12",
+            repository: "redis",
+            tag: "7"
+        )
+        XCTAssertEqual(image.shortId, "abcdef123456",
+            "Non-sha256 IDs must still use the standard Docker 12-character short-ID convention")
+    }
+
+    /// Bare "sha256" prefix must NOT strip the prefix as the colon-variant does.
+    func testShortId_sha256BarePrefix_doesNotStripPrefix() {
+        let image = ImageInfo(
+            id: "sha256xyz1234567890abcdef",
+            repository: "node",
+            tag: "20"
+        )
+        let short = image.shortId
+        XCTAssertEqual(short, "sha256xyz12345",
+            "Bare 'sha256' prefix must return first 14 chars including the 'sha256' text")
+        XCTAssertTrue(short.hasPrefix("sha256"),
+            "Short ID must retain the 'sha256' prefix – it must not be stripped like in the colon-variant")
+    }
+
+    /// The returned shortId for bare-prefix IDs must always start with "sha256".
+    func testShortId_sha256BarePrefix_resultStartsWithSha256() {
+        let ids = [
+            "sha256ffffffff000000aabbcc",
+            "sha256aabbccddeeff112233",
+            "sha256000000000000111111"
+        ]
+        for id in ids {
+            let image = ImageInfo(id: id, repository: "test", tag: "latest")
+            XCTAssertTrue(image.shortId.hasPrefix("sha256"),
+                "shortId for bare-prefix ID '\(id)' must start with 'sha256'")
+        }
+    }
+
+    /// shortId length for a long bare-prefix ID must be exactly 14.
+    func testShortId_sha256BarePrefix_lengthIsAlways14ForLongId() {
+        let image = ImageInfo(
+            id: "sha256" + String(repeating: "a", count: 40),
+            repository: "img",
+            tag: "latest"
+        )
+        XCTAssertEqual(image.shortId.count, 14,
+            "shortId for a long bare-prefix ID must have exactly 14 characters")
     }
 }

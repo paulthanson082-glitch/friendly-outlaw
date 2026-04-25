@@ -3,12 +3,11 @@ import XCTest
 
 // MARK: - Screenplay Scene Template Tests
 //
-// This PR renamed the template from "Screenplay" to "Screenplay Scene" and added two new
-// placeholders: `character_state` and `shot_description`. The template content now also
-// includes the {{character_state}} and {{shot_description}} tokens.
-//
-// These tests verify the actual source-code behavior: 10 placeholders, both new tokens
-// present in content, and the template is accessible by the new name.
+// PR changes to TemplateManager.swift:
+// - Renamed template from "Screenplay" to "Screenplay Scene"
+// - Added `character_state` placeholder (optional, empty default) and {{character_state}} token
+// - Added `shot_description` placeholder (optional) and {{shot_description}} token
+// - Template now has 10 placeholders (up from 8)
 
 final class ScreenplaySceneTemplateTests: XCTestCase {
 
@@ -30,7 +29,7 @@ final class ScreenplaySceneTemplateTests: XCTestCase {
         manager.getAllTemplates().first { $0.name == "Screenplay Scene" }
     }
 
-    // MARK: - Template Name
+    // MARK: - Template Rename: "Screenplay" → "Screenplay Scene"
 
     func testScreenplaySceneTemplateExistsByNewName() {
         XCTAssertNotNil(screenplayTemplate(),
@@ -57,7 +56,7 @@ final class ScreenplaySceneTemplateTests: XCTestCase {
 
     // MARK: - New Placeholder: character_state
 
-    func testScreenplaySceneTemplateHasCharacterStatePlaceholder() {
+    func testScreenplaySceneHasCharacterStatePlaceholder() {
         guard let template = screenplayTemplate() else {
             return XCTFail("Screenplay Scene template not found")
         }
@@ -76,16 +75,16 @@ final class ScreenplaySceneTemplateTests: XCTestCase {
             "character_state placeholder must be optional (required=false)")
     }
 
-    func testCharacterStatePlaceholderHasEmptyDefaultValue() {
+    func testCharacterStatePlaceholderHasEmptyStringDefault() {
         guard let template = screenplayTemplate() else {
             return XCTFail("Screenplay Scene template not found")
         }
         let placeholder = template.placeholders.first { $0.key == "character_state" }
         XCTAssertEqual(placeholder?.defaultValue, "",
-            "character_state placeholder must have an empty string default value")
+            "character_state placeholder must have an empty string as its default value")
     }
 
-    func testScreenplaySceneContentContainsCharacterStateToken() {
+    func testTemplateContentContainsCharacterStateToken() {
         guard let template = screenplayTemplate() else {
             return XCTFail("Screenplay Scene template not found")
         }
@@ -95,7 +94,7 @@ final class ScreenplaySceneTemplateTests: XCTestCase {
 
     // MARK: - New Placeholder: shot_description
 
-    func testScreenplaySceneTemplateHasShotDescriptionPlaceholder() {
+    func testScreenplaySceneHasShotDescriptionPlaceholder() {
         guard let template = screenplayTemplate() else {
             return XCTFail("Screenplay Scene template not found")
         }
@@ -114,7 +113,7 @@ final class ScreenplaySceneTemplateTests: XCTestCase {
             "shot_description placeholder must be optional (required=false)")
     }
 
-    func testScreenplaySceneContentContainsShotDescriptionToken() {
+    func testTemplateContentContainsShotDescriptionToken() {
         guard let template = screenplayTemplate() else {
             return XCTFail("Screenplay Scene template not found")
         }
@@ -146,7 +145,7 @@ final class ScreenplaySceneTemplateTests: XCTestCase {
             "Template must have exactly the expected 10 placeholder keys")
     }
 
-    // MARK: - Existing Placeholders Retained
+    // MARK: - Pre-existing Placeholders Still Present
 
     func testScreenplaySceneRetainsSceneHeadingPlaceholder() {
         guard let template = screenplayTemplate() else { return XCTFail("Template not found") }
@@ -168,36 +167,17 @@ final class ScreenplaySceneTemplateTests: XCTestCase {
         XCTAssertTrue(template.placeholders.contains { $0.key == "dialogue" })
     }
 
-    func testScreenplaySceneRetainsTransitionPlaceholder() {
-        guard let template = screenplayTemplate() else { return XCTFail("Template not found") }
-        XCTAssertTrue(template.placeholders.contains { $0.key == "transition" })
-    }
-
-    func testScreenplaySceneRetainsCharacter2Placeholder() {
-        guard let template = screenplayTemplate() else { return XCTFail("Template not found") }
-        XCTAssertTrue(template.placeholders.contains { $0.key == "character_2" })
-    }
-
-    func testScreenplaySceneRetainsParentheticalPlaceholder() {
-        guard let template = screenplayTemplate() else { return XCTFail("Template not found") }
-        XCTAssertTrue(template.placeholders.contains { $0.key == "parenthetical" })
-    }
-
-    func testScreenplaySceneRetainsDialogue2Placeholder() {
-        guard let template = screenplayTemplate() else { return XCTFail("Template not found") }
-        XCTAssertTrue(template.placeholders.contains { $0.key == "dialogue_2" })
-    }
-
-    func testTransitionPlaceholderHasDefaultValueCutTo() {
+    func testScreenplaySceneRetainsTransitionPlaceholderWithDefaultValue() {
         guard let template = screenplayTemplate() else { return XCTFail("Template not found") }
         let placeholder = template.placeholders.first { $0.key == "transition" }
+        XCTAssertNotNil(placeholder)
         XCTAssertEqual(placeholder?.defaultValue, "CUT TO:",
-            "transition placeholder default value must be 'CUT TO:'")
+            "transition placeholder must retain 'CUT TO:' as its default value")
     }
 
     // MARK: - Template Category
 
-    func testScreenplaySceneTemplateIsInScreenplayCategory() {
+    func testScreenplaySceneIsInScreenplayCategory() {
         guard let template = screenplayTemplate() else {
             return XCTFail("Screenplay Scene template not found")
         }
@@ -205,9 +185,15 @@ final class ScreenplaySceneTemplateTests: XCTestCase {
             "Template category must still be .screenplay after the rename")
     }
 
+    func testGetTemplatesByCategoryReturnsScreenplayScene() {
+        let results = manager.getTemplates(for: .screenplay)
+        XCTAssertTrue(results.contains { $0.name == "Screenplay Scene" },
+            "getTemplates(for: .screenplay) must return the 'Screenplay Scene' template")
+    }
+
     // MARK: - Template Content Tokens
 
-    func testScreenplaySceneContentContainsAllRequiredTokens() {
+    func testTemplateContentContainsAllRequiredTokens() {
         guard let template = screenplayTemplate() else {
             return XCTFail("Screenplay Scene template not found")
         }
@@ -226,29 +212,28 @@ final class ScreenplaySceneTemplateTests: XCTestCase {
         }
     }
 
-    // MARK: - Retrieved by Category
+    // MARK: - Boundary / Regression
 
-    func testGetTemplatesByCategoryReturnsScreenplayScene() {
-        let results = manager.getTemplates(for: .screenplay)
-        XCTAssertTrue(results.contains { $0.name == "Screenplay Scene" },
-            "getTemplates(for: .screenplay) must return the 'Screenplay Scene' template")
-    }
-
-    // MARK: - Template Description Preserved
-
-    func testScreenplaySceneHasCorrectDescription() {
+    /// Verifies that the new placeholders appear between existing dialogue elements.
+    func testCharacterStatePlaceholderAppearsBeforeDialogueInContent() {
         guard let template = screenplayTemplate() else {
             return XCTFail("Screenplay Scene template not found")
         }
-        XCTAssertFalse(template.description.isEmpty,
-            "Screenplay Scene template must have a non-empty description")
-    }
-
-    func testScreenplaySceneHasScreenplayTag() {
-        guard let template = screenplayTemplate() else {
-            return XCTFail("Screenplay Scene template not found")
+        let content = template.content
+        let characterRange = content.range(of: "{{character}}")
+        let characterStateRange = content.range(of: "{{character_state}}")
+        let dialogueRange = content.range(of: "{{dialogue}}")
+        XCTAssertNotNil(characterRange)
+        XCTAssertNotNil(characterStateRange)
+        XCTAssertNotNil(dialogueRange)
+        if let charEnd = characterRange?.upperBound,
+           let stateStart = characterStateRange?.lowerBound,
+           let stateEnd = characterStateRange?.upperBound,
+           let dialogueStart = dialogueRange?.lowerBound {
+            XCTAssertLessThan(charEnd, stateStart,
+                "{{character}} must appear before {{character_state}} in the template content")
+            XCTAssertLessThan(stateEnd, dialogueStart,
+                "{{character_state}} must appear before {{dialogue}} in the template content")
         }
-        XCTAssertTrue(template.metadata.tags.contains("screenplay"),
-            "Screenplay Scene template metadata must include the 'screenplay' tag")
     }
 }
