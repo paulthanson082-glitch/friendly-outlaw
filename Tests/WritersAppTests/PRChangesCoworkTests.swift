@@ -40,10 +40,9 @@ final class UpdateProspectStatusNewBehaviourTests: XCTestCase {
         super.tearDown()
     }
 
-    // MARK: Counter increments every time a "contact" status is set
+    // MARK: Counter increments only on non-contact → contact transition
 
-    /// PR change: counter increments even when the status is set to .contacted a second time
-    /// (old code would have ignored the repeat because previousStatus was already .contacted).
+    /// Transition guard: counter increments on first .contacted but NOT when .contacted again.
     func testContactedToContactedAgainIncrementsTwice() throws {
         app.startCoworkSession()
         let prospect = app.addProspect(name: "Repeat Contact", email: "repeat@example.com")
@@ -53,12 +52,11 @@ final class UpdateProspectStatusNewBehaviourTests: XCTestCase {
             "First .contacted transition must increment counter to 1")
 
         try app.updateProspectStatus(id: prospect.id, status: .contacted)
-        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 2,
-            "Setting .contacted again must now increment counter (new behaviour: no transition guard)")
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1,
+            "Setting .contacted again must NOT increment counter (transition guard)")
     }
 
-    /// PR change: transitioning from .contacted to .replied now increments the counter.
-    /// Old code would NOT increment because both are "contact" states.
+    /// Transition guard: transitioning from .contacted to .replied does NOT increment counter.
     func testContactedToRepliedAlsoIncrementsCounter() throws {
         app.startCoworkSession()
         let prospect = app.addProspect(name: "Transition", email: "trans@example.com")
@@ -67,11 +65,11 @@ final class UpdateProspectStatusNewBehaviourTests: XCTestCase {
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
 
         try app.updateProspectStatus(id: prospect.id, status: .replied)
-        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 2,
-            ".replied after .contacted must now increment (new behaviour)")
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1,
+            ".replied after .contacted must NOT increment (transition guard)")
     }
 
-    /// PR change: transitioning from .replied to .meeting now increments the counter.
+    /// Transition guard: transitioning from .replied to .meeting does NOT increment counter.
     func testRepliedToMeetingAlsoIncrementsCounter() throws {
         app.startCoworkSession()
         let prospect = app.addProspect(name: "Meeting Bound", email: "meeting@example.com")
@@ -80,12 +78,11 @@ final class UpdateProspectStatusNewBehaviourTests: XCTestCase {
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
 
         try app.updateProspectStatus(id: prospect.id, status: .meeting)
-        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 2,
-            ".meeting after .replied must now increment (new behaviour)")
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1,
+            ".meeting after .replied must NOT increment (transition guard)")
     }
 
-    /// PR change: even transitioning back into a contact state from a non-contact state
-    /// (e.g. .declined → .contacted) increments the counter, as before.
+    /// Transitioning back into a contact state from a non-contact state increments the counter.
     func testDeclinedToContactedIncrementsCounter() throws {
         app.startCoworkSession()
         let prospect = app.addProspect(name: "Returned", email: "returned@example.com")
@@ -102,18 +99,19 @@ final class UpdateProspectStatusNewBehaviourTests: XCTestCase {
             "Re-contacting after .declined must increment counter again")
     }
 
-    /// Counter accumulates across many consecutive contact-status updates.
+    /// With transition guard, only the first contact-status transition from a non-contact state counts.
     func testMultipleContactStatusUpdatesCumulativeCount() throws {
         app.startCoworkSession()
         let prospect = app.addProspect(name: "Cumulative", email: "cum@example.com")
 
+        // All these transitions stay within contact state after the first, so only 1 increment
         let contactStatuses: [ProspectStatus] = [.contacted, .replied, .meeting, .contacted, .replied]
         for status in contactStatuses {
             try app.updateProspectStatus(id: prospect.id, status: status)
         }
 
-        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, contactStatuses.count,
-            "Each contact-status update must increment counter; expected \(contactStatuses.count)")
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1,
+            "Only the initial non-contact → contact transition increments; subsequent contact → contact transitions do not")
     }
 
     // MARK: Non-contact statuses do NOT increment
@@ -408,7 +406,7 @@ final class CoworkSessionCounterIntegrationTests: XCTestCase {
         super.tearDown()
     }
 
-    /// End-to-end: session starts at zero, every contact-status update increments, final count is preserved.
+    /// End-to-end: session starts at zero; only non-contact → contact transitions increment.
     func testSessionCounterTracksAllContactStatusUpdates() throws {
         let session = app.startCoworkSession()
         XCTAssertEqual(session.prospectsContacted, 0)
@@ -416,16 +414,16 @@ final class CoworkSessionCounterIntegrationTests: XCTestCase {
         let p1 = app.addProspect(name: "P1", email: "p1@test.com")
         let p2 = app.addProspect(name: "P2", email: "p2@test.com")
 
-        try app.updateProspectStatus(id: p1.id, status: .contacted)  // +1 → 1
-        try app.updateProspectStatus(id: p2.id, status: .contacted)  // +1 → 2
-        try app.updateProspectStatus(id: p1.id, status: .replied)    // +1 → 3 (new behaviour)
-        try app.updateProspectStatus(id: p2.id, status: .meeting)    // +1 → 4
+        try app.updateProspectStatus(id: p1.id, status: .contacted)  // +1 → 1 (new → contact)
+        try app.updateProspectStatus(id: p2.id, status: .contacted)  // +1 → 2 (new → contact)
+        try app.updateProspectStatus(id: p1.id, status: .replied)    // no change (contact → contact)
+        try app.updateProspectStatus(id: p2.id, status: .meeting)    // no change (contact → contact)
 
-        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 4)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 2)
 
         let ended = app.endCoworkSession()
-        XCTAssertEqual(ended?.prospectsContacted, 4,
-            "Final prospectsContacted must reflect all contact-status updates including re-contacts")
+        XCTAssertEqual(ended?.prospectsContacted, 2,
+            "Final prospectsContacted must reflect only non-contact → contact transitions")
     }
 
     /// Verify prospectsContacted is independent of prospectsAdded.
@@ -441,8 +439,8 @@ final class CoworkSessionCounterIntegrationTests: XCTestCase {
 
         XCTAssertEqual(app.activeCoworkSession?.prospectsAdded, 1,
             "prospectsAdded must not change after status updates")
-        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 2,
-            "prospectsContacted must reflect the two contact-status updates")
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1,
+            "prospectsContacted must reflect only the initial non-contact → contact transition")
     }
 
     /// A new session after ending the first should start fresh counters.
@@ -453,7 +451,7 @@ final class CoworkSessionCounterIntegrationTests: XCTestCase {
         try app.updateProspectStatus(id: prospect.id, status: .replied)
 
         let ended = app.endCoworkSession()
-        XCTAssertEqual(ended?.prospectsContacted, 2)
+        XCTAssertEqual(ended?.prospectsContacted, 1)
 
         // Start a new session — counters must reset
         let secondSession = app.startCoworkSession()
@@ -600,7 +598,7 @@ final class UpdateProspectStatusEdgeCaseTests: XCTestCase {
 
     // MARK: Counter accumulates across all three contact status types
 
-    /// Each of the three contact statuses contributes one increment when applied in sequence.
+    /// With transition guard: .contacted increments, .replied and .meeting do NOT (still contact state).
     func testContactedRepliedMeetingEachIncrementOnce() throws {
         app.startCoworkSession()
         let prospect = app.addProspect(name: "All Three", email: "allthree@example.com")
@@ -609,8 +607,8 @@ final class UpdateProspectStatusEdgeCaseTests: XCTestCase {
         try app.updateProspectStatus(id: prospect.id, status: .replied)
         try app.updateProspectStatus(id: prospect.id, status: .meeting)
 
-        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 3,
-            "Each of .contacted, .replied, .meeting must each increment the counter (total = 3)")
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1,
+            "Only .contacted (from .new) increments; .replied and .meeting are contact → contact transitions")
     }
 
     // MARK: Multiple distinct prospects

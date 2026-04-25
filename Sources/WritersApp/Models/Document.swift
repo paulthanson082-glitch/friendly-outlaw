@@ -72,17 +72,6 @@ public struct Document: Codable, Identifiable, Hashable {
         guard let goal = metadata.wordCountGoal, goal > 0 else { return 0.0 }
         return min(1.0, Double(wordCount) / Double(goal))
     }
-
-    // Documents are compared and hashed by their unique `id` only, so that two Document
-    // values representing the same logical document (same UUID) are considered equal
-    // regardless of any mutable fields such as `content` or `metadata`.
-    public static func == (lhs: Document, rhs: Document) -> Bool {
-        lhs.id == rhs.id
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
 }
 
 /// Metadata for documents

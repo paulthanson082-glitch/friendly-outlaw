@@ -158,21 +158,21 @@ final class CoworkModeTests: XCTestCase {
         try app.updateProspectStatus(id: prospect.id, status: .contacted)
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
 
-        // contacted → contacted again: also increments (no transition guard)
+        // contacted → contacted again: does NOT increment (transition guard)
         try app.updateProspectStatus(id: prospect.id, status: .contacted)
-        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 2)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
 
-        // contacted → replied (still a contact state): also increments
+        // contacted → replied (still a contact state): does NOT increment
         try app.updateProspectStatus(id: prospect.id, status: .replied)
-        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 3)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
 
         // replied → declined (not a contact state): counter stays
         try app.updateProspectStatus(id: prospect.id, status: .declined)
-        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 3)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
 
         // declined → meeting (contact state): should increment
         try app.updateProspectStatus(id: prospect.id, status: .meeting)
-        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 4)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 2)
     }
 
     func testCoworkSessionDurationMinutes() {

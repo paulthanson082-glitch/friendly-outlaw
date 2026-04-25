@@ -55,8 +55,8 @@ final class WritersAppTests: XCTestCase {
     func testDocumentHashable() {
         let doc1 = Document(title: "A", content: "Hello", category: .article)
         let doc2 = Document(title: "A", content: "Hello", category: .article)
-        // Same id ⇒ same hash
-        let sameId = Document(id: doc1.id, title: "A", content: "Hello", category: .article)
+        // Same id and identical fields ⇒ same hash (synthesized Hashable)
+        let sameId = Document(id: doc1.id, title: "A", content: "Hello", category: .article, metadata: doc1.metadata)
         XCTAssertEqual(doc1.hashValue, sameId.hashValue)
         // Documents can be stored in Sets
         var set = Set<Document>()
@@ -2328,8 +2328,8 @@ final class WritersAppTests: XCTestCase {
             XCTFail("Screenplay template not found")
             return
         }
-        XCTAssertEqual(screenplay.placeholders.count, 8,
-                       "Screenplay template should have 8 placeholders")
+        XCTAssertEqual(screenplay.placeholders.count, 10,
+                       "Screenplay template should have 10 placeholders")
     }
 
     func testScreenplayTemplateHasExpectedPlaceholderKeys() {
@@ -2341,7 +2341,8 @@ final class WritersAppTests: XCTestCase {
         let keys = Set(screenplay.placeholders.map { $0.key })
         let expected: Set<String> = [
             "scene_heading", "action", "character", "dialogue",
-            "character_2", "parenthetical", "dialogue_2", "transition"
+            "character_2", "parenthetical", "dialogue_2", "transition",
+            "character_state", "shot_description"
         ]
         XCTAssertEqual(keys, expected, "Screenplay template should have exactly the expected placeholder set")
     }
@@ -3708,7 +3709,7 @@ final class HermesAgentTests: XCTestCase {
         let app = WritersApp()
         let all = app.templateManager.getAllTemplates()
         let names = all.map { $0.name }
-        let required = ["Novel Chapter", "Short Story", "Screenplay", "Blog Post",
+        let required = ["Novel Chapter", "Short Story", "Screenplay Scene", "Blog Post",
                         "Article", "Poetry", "Business Letter"]
         for name in required {
             XCTAssertTrue(names.contains(name), "Core template '\(name)' should still be present")

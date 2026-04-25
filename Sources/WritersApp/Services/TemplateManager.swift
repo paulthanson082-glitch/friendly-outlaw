@@ -120,17 +120,20 @@ public class TemplateManager {
             metadata: TemplateMetadata(tags: ["fiction", "short-story"])
         )
 
-        // Screenplay Template
+        // Screenplay Scene Template
         let screenplayTemplate = Template(
-            name: "Screenplay",
+            name: "Screenplay Scene",
             category: .screenplay,
             description: "Standard screenplay scene format",
             content: """
             {{scene_heading}}
 
+            {{shot_description}}
+
             {{action}}
 
             {{character}}
+            {{character_state}}
             {{dialogue}}
 
             {{character_2}}
@@ -141,8 +144,10 @@ public class TemplateManager {
             """,
             placeholders: [
                 Placeholder(key: "scene_heading", label: "Scene Heading", description: "INT/EXT. LOCATION - TIME OF DAY"),
+                Placeholder(key: "shot_description", label: "Shot Description", description: "Camera angle or shot type", defaultValue: "", required: false),
                 Placeholder(key: "action", label: "Action Description", description: "What happens in the scene"),
                 Placeholder(key: "character", label: "Character Name", description: "All caps"),
+                Placeholder(key: "character_state", label: "Character State", description: "Emotional or physical state of the character", defaultValue: "", required: false),
                 Placeholder(key: "dialogue", label: "Dialogue", description: "What the character says"),
                 Placeholder(key: "character_2", label: "Second Character", description: "Another character's name", required: false),
                 Placeholder(key: "parenthetical", label: "Parenthetical", description: "How the dialogue is delivered", defaultValue: "", required: false),

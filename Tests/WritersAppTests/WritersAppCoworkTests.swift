@@ -137,7 +137,7 @@ final class WritersAppCoworkTests: XCTestCase {
     func testUpdateProspectStatusRejectedDoesNotIncrementContactCounter() throws {
         let _ = app.startCoworkSession()
         let prospect = app.addProspect(name: "Rejected", email: "rej@example.com")
-        try app.updateProspectStatus(id: prospect.id, status: .rejected)
+        try app.updateProspectStatus(id: prospect.id, status: .declined)
 
         let ended = app.endCoworkSession()
         XCTAssertEqual(ended?.prospectsContacted, 0,

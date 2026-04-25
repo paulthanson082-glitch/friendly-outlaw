@@ -170,7 +170,7 @@ final class GiftCardErrorTests: XCTestCase {
                 XCTFail("Expected GiftCardError.invalidInput, got \(error)")
                 return
             }
-            XCTAssertEqual(msg, "Expiration days must be greater than or equal to 0")
+            XCTAssertEqual(msg, "Expiration days must be greater than 0")
         }
     }
 
@@ -212,7 +212,7 @@ final class GiftCardErrorTests: XCTestCase {
                 XCTFail("Expected GiftCardError.invalidInput, got \(error)")
                 return
             }
-            XCTAssertEqual(msg, "Expiration days must be greater than or equal to 0")
+            XCTAssertEqual(msg, "Expiration days must be greater than 0")
         }
     }
 
