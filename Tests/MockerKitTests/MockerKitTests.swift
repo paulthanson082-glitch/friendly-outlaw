@@ -130,7 +130,7 @@ final class MockerKitTests: XCTestCase {
         XCTAssertTrue(largeImage.sizeDescription.contains("GB"))
     }
 
-    // MARK: - ImageInfo.shortId: bare sha256 prefix (no colon) — PR change
+    // MARK: - ImageInfo.shortId: bare sha256 prefix (no colon)
 
     /// IDs that start with "sha256" but have no colon must return the first 14 characters of the
     /// full ID (new branch added in this PR).
@@ -199,6 +199,17 @@ final class MockerKitTests: XCTestCase {
         XCTAssertEqual(short, "sha256xyz12345")
         XCTAssertFalse(short.hasPrefix("xyz"),
             "Bare 'sha256' prefix must not be treated as the colon-variant and strip the prefix")
+    }
+
+    /// Boundary: ID with exactly "sha256" (no trailing chars) returns only "sha256" (6 chars).
+    func testImageInfoShortId_sha256BarePrefix_emptyAfterPrefix() {
+        let image = ImageInfo(
+            id: "sha256",
+            repository: "edge",
+            tag: "latest"
+        )
+        XCTAssertEqual(image.shortId, "sha256",
+            "ID equal to 'sha256' with no trailing chars must return the full 6-char string")
     }
 
     // MARK: - ContainerStore Tests

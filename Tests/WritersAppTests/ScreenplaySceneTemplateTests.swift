@@ -7,8 +7,8 @@ import XCTest
 // placeholders: `character_state` and `shot_description`. The template content now also
 // includes the {{character_state}} and {{shot_description}} tokens.
 //
-// These tests verify the actual source-code behavior (10 placeholders, both tokens present
-// in content), matching the WritersAppTests expectations.
+// These tests verify the actual source-code behavior: 10 placeholders, both new tokens
+// present in content, and the template is accessible by the new name.
 
 final class ScreenplaySceneTemplateTests: XCTestCase {
 
@@ -49,7 +49,13 @@ final class ScreenplaySceneTemplateTests: XCTestCase {
             "Searching for 'Screenplay' must return the 'Screenplay Scene' template")
     }
 
-    // MARK: - New Placeholders: character_state
+    func testScreenplaySceneIsFoundBySearchingScene() {
+        let results = manager.searchTemplates(query: "Scene")
+        XCTAssertTrue(results.contains { $0.name == "Screenplay Scene" },
+            "Searching for 'Scene' must return the 'Screenplay Scene' template")
+    }
+
+    // MARK: - New Placeholder: character_state
 
     func testScreenplaySceneTemplateHasCharacterStatePlaceholder() {
         guard let template = screenplayTemplate() else {
@@ -87,7 +93,7 @@ final class ScreenplaySceneTemplateTests: XCTestCase {
             "Template content must contain the {{character_state}} token added in this PR")
     }
 
-    // MARK: - New Placeholders: shot_description
+    // MARK: - New Placeholder: shot_description
 
     func testScreenplaySceneTemplateHasShotDescriptionPlaceholder() {
         guard let template = screenplayTemplate() else {
@@ -140,7 +146,7 @@ final class ScreenplaySceneTemplateTests: XCTestCase {
             "Template must have exactly the expected 10 placeholder keys")
     }
 
-    // MARK: - Existing Placeholders Not Removed
+    // MARK: - Existing Placeholders Retained
 
     func testScreenplaySceneRetainsSceneHeadingPlaceholder() {
         guard let template = screenplayTemplate() else { return XCTFail("Template not found") }
@@ -152,6 +158,11 @@ final class ScreenplaySceneTemplateTests: XCTestCase {
         XCTAssertTrue(template.placeholders.contains { $0.key == "action" })
     }
 
+    func testScreenplaySceneRetainsCharacterPlaceholder() {
+        guard let template = screenplayTemplate() else { return XCTFail("Template not found") }
+        XCTAssertTrue(template.placeholders.contains { $0.key == "character" })
+    }
+
     func testScreenplaySceneRetainsDialoguePlaceholder() {
         guard let template = screenplayTemplate() else { return XCTFail("Template not found") }
         XCTAssertTrue(template.placeholders.contains { $0.key == "dialogue" })
@@ -160,6 +171,28 @@ final class ScreenplaySceneTemplateTests: XCTestCase {
     func testScreenplaySceneRetainsTransitionPlaceholder() {
         guard let template = screenplayTemplate() else { return XCTFail("Template not found") }
         XCTAssertTrue(template.placeholders.contains { $0.key == "transition" })
+    }
+
+    func testScreenplaySceneRetainsCharacter2Placeholder() {
+        guard let template = screenplayTemplate() else { return XCTFail("Template not found") }
+        XCTAssertTrue(template.placeholders.contains { $0.key == "character_2" })
+    }
+
+    func testScreenplaySceneRetainsParentheticalPlaceholder() {
+        guard let template = screenplayTemplate() else { return XCTFail("Template not found") }
+        XCTAssertTrue(template.placeholders.contains { $0.key == "parenthetical" })
+    }
+
+    func testScreenplaySceneRetainsDialogue2Placeholder() {
+        guard let template = screenplayTemplate() else { return XCTFail("Template not found") }
+        XCTAssertTrue(template.placeholders.contains { $0.key == "dialogue_2" })
+    }
+
+    func testTransitionPlaceholderHasDefaultValueCutTo() {
+        guard let template = screenplayTemplate() else { return XCTFail("Template not found") }
+        let placeholder = template.placeholders.first { $0.key == "transition" }
+        XCTAssertEqual(placeholder?.defaultValue, "CUT TO:",
+            "transition placeholder default value must be 'CUT TO:'")
     }
 
     // MARK: - Template Category
@@ -199,5 +232,23 @@ final class ScreenplaySceneTemplateTests: XCTestCase {
         let results = manager.getTemplates(for: .screenplay)
         XCTAssertTrue(results.contains { $0.name == "Screenplay Scene" },
             "getTemplates(for: .screenplay) must return the 'Screenplay Scene' template")
+    }
+
+    // MARK: - Template Description Preserved
+
+    func testScreenplaySceneHasCorrectDescription() {
+        guard let template = screenplayTemplate() else {
+            return XCTFail("Screenplay Scene template not found")
+        }
+        XCTAssertFalse(template.description.isEmpty,
+            "Screenplay Scene template must have a non-empty description")
+    }
+
+    func testScreenplaySceneHasScreenplayTag() {
+        guard let template = screenplayTemplate() else {
+            return XCTFail("Screenplay Scene template not found")
+        }
+        XCTAssertTrue(template.metadata.tags.contains("screenplay"),
+            "Screenplay Scene template metadata must include the 'screenplay' tag")
     }
 }

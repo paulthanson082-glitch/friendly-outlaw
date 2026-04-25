@@ -62,7 +62,7 @@ final class DocumentEquatableTests: XCTestCase {
         let doc2 = Document(
             id: fixedId,
             title: "Same Title",
-            content: "Revised content.",  // different content
+            content: "Revised content.",
             category: .novel,
             metadata: metadata
         )
@@ -111,6 +111,23 @@ final class DocumentEquatableTests: XCTestCase {
             "Documents with different ids must never be equal")
     }
 
+    func testDocumentEqualityIsReflexive() {
+        let fixedDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let metadata = DocumentMetadata(created: fixedDate, modified: fixedDate)
+        let doc = Document(id: UUID(), title: "T", content: "C", category: .novel, metadata: metadata)
+        XCTAssertEqual(doc, doc, "A document must equal itself")
+    }
+
+    func testDocumentEqualityIsSymmetric() {
+        let fixedDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let fixedId = UUID()
+        let metadata = DocumentMetadata(created: fixedDate, modified: fixedDate)
+        let doc1 = Document(id: fixedId, title: "T", content: "C", category: .novel, metadata: metadata)
+        let doc2 = Document(id: fixedId, title: "T", content: "C", category: .novel, metadata: metadata)
+        XCTAssertEqual(doc1, doc2)
+        XCTAssertEqual(doc2, doc1, "Equality must be symmetric")
+    }
+
     // MARK: - Hashability: use in Set
 
     func testDocumentCanBeStoredInSet() {
@@ -140,7 +157,6 @@ final class DocumentEquatableTests: XCTestCase {
         doc1.hash(into: &hasher1)
         var hasher2 = Hasher()
         doc2.hash(into: &hasher2)
-        // Hash collision is theoretically possible but practically impossible with this input difference.
         XCTAssertNotEqual(hasher1.finalize(), hasher2.finalize(),
             "Documents with different content should produce different hash values")
     }
@@ -177,7 +193,7 @@ final class DocumentEquatableTests: XCTestCase {
         let fixedDate = Date(timeIntervalSince1970: 1_700_000_000)
         let fixedId = UUID()
         let metadata = DocumentMetadata(created: fixedDate, modified: fixedDate)
-        // These have the same id but different content → NOT equal after the PR.
+        // Same id but different content → NOT equal after the PR.
         let doc1 = Document(id: fixedId, title: "T", content: "Content A", category: .novel, metadata: metadata)
         let doc2 = Document(id: fixedId, title: "T", content: "Content B", category: .novel, metadata: metadata)
         let docSet: Set<Document> = [doc1, doc2]
@@ -196,7 +212,33 @@ final class DocumentEquatableTests: XCTestCase {
             "Inserting the same document twice must not increase the set size")
     }
 
-    // MARK: - DocumentMetadata synthesized Equatable/Hashable
+    func testDocumentsCanBeUsedAsDictionaryKeys() {
+        let fixedDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let fixedId = UUID()
+        let metadata = DocumentMetadata(created: fixedDate, modified: fixedDate)
+        let doc = Document(id: fixedId, title: "Key Doc", content: "Content", category: .novel, metadata: metadata)
+        var dict: [Document: String] = [:]
+        dict[doc] = "associated-value"
+        XCTAssertEqual(dict[doc], "associated-value",
+            "Document must be usable as a dictionary key (Hashable)")
+    }
+
+    // MARK: - Regression: documents with same ID + content remain equal
+
+    func testDocumentsWithIdenticalContentAndSameIdAreEqualAfterPR() {
+        let fixedDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let fixedId = UUID()
+        let metadata = DocumentMetadata(created: fixedDate, modified: fixedDate)
+        let doc1 = Document(id: fixedId, title: "Final Chapter", content: "The end.", category: .novel, metadata: metadata)
+        let doc2 = Document(id: fixedId, title: "Final Chapter", content: "The end.", category: .novel, metadata: metadata)
+        XCTAssertEqual(doc1, doc2,
+            "Regression: two Documents with the same id and identical content must still be equal after the PR")
+    }
+}
+
+// MARK: - DocumentMetadata synthesized Equatable/Hashable
+
+final class DocumentMetadataEquatableTests: XCTestCase {
 
     func testDocumentMetadataEqualityIsSynthesized() {
         let date = Date(timeIntervalSince1970: 1_700_000_000)
@@ -219,11 +261,26 @@ final class DocumentEquatableTests: XCTestCase {
         XCTAssertNotEqual(meta1, meta2, "DocumentMetadata with different wordCountGoal must not be equal")
     }
 
+    func testDocumentMetadataWithDifferentNotesIsNotEqual() {
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        let meta1 = DocumentMetadata(created: date, modified: date, notes: "First draft")
+        let meta2 = DocumentMetadata(created: date, modified: date, notes: "Second draft")
+        XCTAssertNotEqual(meta1, meta2, "DocumentMetadata with different notes must not be equal")
+    }
+
     func testDocumentMetadataCanBeUsedInDictionary() {
         let date = Date(timeIntervalSince1970: 1_700_000_000)
         let meta = DocumentMetadata(created: date, modified: date)
         var dict: [DocumentMetadata: String] = [:]
         dict[meta] = "value"
         XCTAssertEqual(dict[meta], "value", "DocumentMetadata must be usable as a dictionary key")
+    }
+
+    func testDocumentMetadataCanBeStoredInSet() {
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        let meta = DocumentMetadata(created: date, modified: date, wordCountGoal: 80000)
+        var metaSet: Set<DocumentMetadata> = []
+        metaSet.insert(meta)
+        XCTAssertEqual(metaSet.count, 1)
     }
 }

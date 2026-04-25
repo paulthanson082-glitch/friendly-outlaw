@@ -208,6 +208,28 @@ final class WritersAppCoworkTests: XCTestCase {
             "new → declined (both non-contact states) must not increment the counter")
     }
 
+    /// Same status set twice (e.g. contacted → contacted) must NOT double-increment.
+    func testSameContactStatusSetTwiceDoesNotDoubleIncrement() throws {
+        app.startCoworkSession()
+        let prospect = app.addProspect(name: "Repeat", email: "rep@example.com")
+        try app.updateProspectStatus(id: prospect.id, status: .contacted)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
+        try app.updateProspectStatus(id: prospect.id, status: .contacted)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1,
+            "Setting the same contact status a second time must not increment the counter again")
+    }
+
+    /// declined → meeting (non-contact → contact) must increment.
+    func testDeclinedToMeetingIncrementsCounter() throws {
+        app.startCoworkSession()
+        let prospect = app.addProspect(name: "Second Chance", email: "sc@example.com")
+        try app.updateProspectStatus(id: prospect.id, status: .declined)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 0)
+        try app.updateProspectStatus(id: prospect.id, status: .meeting)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1,
+            "declined → meeting (non-contact → contact) must increment the counter")
+    }
+
     // MARK: - ProspectDatabase Directly (unit tests for ProspectDatabase class)
 
     func testProspectDatabaseAddAndRetrieve() {
