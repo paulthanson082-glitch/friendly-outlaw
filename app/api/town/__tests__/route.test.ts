@@ -135,9 +135,9 @@ describe('/api/town GET', () => {
   });
 
   it('should limit messages to 30', async () => {
-    const mockBots = [];
-    const mockWorldState = [];
-    const mockMemories = [];
+    const mockBots: any[] = [];
+    const mockWorldState: any[] = [];
+    const mockMemories: any[] = [];
 
     // Mock sql to verify LIMIT 30 is used
     mockSql.mockResolvedValueOnce(mockBots).mockResolvedValueOnce([]).mockResolvedValueOnce(mockWorldState).mockResolvedValueOnce(mockMemories);

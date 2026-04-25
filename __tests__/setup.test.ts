@@ -28,17 +28,17 @@ describe('jest.setup.ts polyfills', () => {
     });
 
     it('should default status to 200 when no init is provided', () => {
-      const res = new Response({ message: 'ok' });
+      const res = new Response({ message: 'ok' } as any);
       expect(res.status).toBe(200);
     });
 
     it('should use the provided status code', () => {
-      const res = new Response({ error: 'not found' }, { status: 404 });
+      const res = new Response({ error: 'not found' } as any, { status: 404 });
       expect(res.status).toBe(404);
     });
 
     it('should correctly reflect status 400', () => {
-      const res = new Response({ error: 'bad request' }, { status: 400 });
+      const res = new Response({ error: 'bad request' } as any, { status: 400 });
       expect(res.status).toBe(400);
     });
 
@@ -48,13 +48,13 @@ describe('jest.setup.ts polyfills', () => {
     });
 
     it('should correctly reflect status 201', () => {
-      const res = new Response({ id: 1 }, { status: 201 });
+      const res = new Response({ id: 1 } as any, { status: 201 });
       expect(res.status).toBe(201);
     });
 
     it('should return JSON body via async json()', async () => {
       const body = { key: 'value', count: 42 };
-      const res = new Response(body, { status: 200 });
+      const res = new Response(body as any, { status: 200 });
       const data = await res.json();
       expect(data).toEqual(body);
     });
@@ -73,7 +73,7 @@ describe('jest.setup.ts polyfills', () => {
 
     it('should stringify an object body in text()', async () => {
       const body = { hello: 'world' };
-      const res = new Response(body, { status: 200 });
+      const res = new Response(body as any, { status: 200 });
       const text = await res.text();
       expect(text).toContain('hello');
     });
@@ -211,8 +211,8 @@ describe('jest.setup.ts polyfills', () => {
 
     it('should handle the same body used in multiple Response instances', async () => {
       const body = { shared: true };
-      const res1 = new Response(body, { status: 200 });
-      const res2 = new Response(body, { status: 404 });
+      const res1 = new Response(body as any, { status: 200 });
+      const res2 = new Response(body as any, { status: 404 });
 
       expect(res1.status).toBe(200);
       expect(res2.status).toBe(404);
@@ -237,25 +237,25 @@ describe('jest.setup.ts polyfills', () => {
     });
 
     it('should return a number body from json()', async () => {
-      const res = new Response(42, { status: 200 });
+      const res = new Response(42 as any, { status: 200 });
       const data = await res.json();
       expect(data).toBe(42);
     });
 
     it('should return a boolean body from json()', async () => {
-      const res = new Response(true, { status: 200 });
+      const res = new Response(true as any, { status: 200 });
       const data = await res.json();
       expect(data).toBe(true);
     });
 
     it('should stringify a number body in text()', async () => {
-      const res = new Response(123, { status: 200 });
+      const res = new Response(123 as any, { status: 200 });
       const text = await res.text();
       expect(text).toBe('123');
     });
 
     it('should stringify a boolean body in text()', async () => {
-      const res = new Response(false, { status: 200 });
+      const res = new Response(false as any, { status: 200 });
       const text = await res.text();
       expect(text).toBe('false');
     });
