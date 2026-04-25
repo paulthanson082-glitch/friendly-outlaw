@@ -23,17 +23,17 @@ final class TemplateManagerTests: XCTestCase {
     // MARK: - Screenplay Template: Removed Placeholders (PR Change)
 
     private func screenplayTemplate() -> Template? {
-        return manager.getAllTemplates().first { $0.name == "Screenplay Scene" }
+        return manager.getAllTemplates().first { $0.name == "Screenplay" }
     }
 
     func testScreenplayTemplateExists() {
-        XCTAssertNotNil(screenplayTemplate(), "Screenplay Scene template must exist in defaults")
+        XCTAssertNotNil(screenplayTemplate(), "Screenplay template must exist in defaults")
     }
 
     /// PR change: character_state placeholder was removed from the screenplay template.
     func testScreenplayTemplateDoesNotHaveCharacterStatePlaceholder() {
         guard let template = screenplayTemplate() else {
-            return XCTFail("Screenplay Scene template not found")
+            return XCTFail("Screenplay template not found")
         }
         let hasCharacterState = template.placeholders.contains { $0.key == "character_state" }
         XCTAssertFalse(hasCharacterState,
@@ -43,7 +43,7 @@ final class TemplateManagerTests: XCTestCase {
     /// PR change: shot_description placeholder was removed from the screenplay template.
     func testScreenplayTemplateDoesNotHaveShotDescriptionPlaceholder() {
         guard let template = screenplayTemplate() else {
-            return XCTFail("Screenplay Scene template not found")
+            return XCTFail("Screenplay template not found")
         }
         let hasShotDescription = template.placeholders.contains { $0.key == "shot_description" }
         XCTAssertFalse(hasShotDescription,
@@ -53,7 +53,7 @@ final class TemplateManagerTests: XCTestCase {
     /// PR change: {{character_state}} token was removed from the screenplay template content.
     func testScreenplayTemplateContentDoesNotContainCharacterStateToken() {
         guard let template = screenplayTemplate() else {
-            return XCTFail("Screenplay Scene template not found")
+            return XCTFail("Screenplay template not found")
         }
         XCTAssertFalse(template.content.contains("{{character_state}}"),
             "Template content must not contain {{character_state}} token after PR removal")
@@ -62,7 +62,7 @@ final class TemplateManagerTests: XCTestCase {
     /// PR change: {{shot_description}} token was removed from the screenplay template content.
     func testScreenplayTemplateContentDoesNotContainShotDescriptionToken() {
         guard let template = screenplayTemplate() else {
-            return XCTFail("Screenplay Scene template not found")
+            return XCTFail("Screenplay template not found")
         }
         XCTAssertFalse(template.content.contains("{{shot_description}}"),
             "Template content must not contain {{shot_description}} token after PR removal")
@@ -72,56 +72,56 @@ final class TemplateManagerTests: XCTestCase {
 
     func testScreenplayTemplateHasSceneHeadingPlaceholder() {
         guard let template = screenplayTemplate() else {
-            return XCTFail("Screenplay Scene template not found")
+            return XCTFail("Screenplay template not found")
         }
         XCTAssertTrue(template.placeholders.contains { $0.key == "scene_heading" })
     }
 
     func testScreenplayTemplateHasActionPlaceholder() {
         guard let template = screenplayTemplate() else {
-            return XCTFail("Screenplay Scene template not found")
+            return XCTFail("Screenplay template not found")
         }
         XCTAssertTrue(template.placeholders.contains { $0.key == "action" })
     }
 
     func testScreenplayTemplateHasCharacterPlaceholder() {
         guard let template = screenplayTemplate() else {
-            return XCTFail("Screenplay Scene template not found")
+            return XCTFail("Screenplay template not found")
         }
         XCTAssertTrue(template.placeholders.contains { $0.key == "character" })
     }
 
     func testScreenplayTemplateHasDialoguePlaceholder() {
         guard let template = screenplayTemplate() else {
-            return XCTFail("Screenplay Scene template not found")
+            return XCTFail("Screenplay template not found")
         }
         XCTAssertTrue(template.placeholders.contains { $0.key == "dialogue" })
     }
 
     func testScreenplayTemplateHasTransitionPlaceholder() {
         guard let template = screenplayTemplate() else {
-            return XCTFail("Screenplay Scene template not found")
+            return XCTFail("Screenplay template not found")
         }
         XCTAssertTrue(template.placeholders.contains { $0.key == "transition" })
     }
 
     func testScreenplayTemplateHasCharacter2Placeholder() {
         guard let template = screenplayTemplate() else {
-            return XCTFail("Screenplay Scene template not found")
+            return XCTFail("Screenplay template not found")
         }
         XCTAssertTrue(template.placeholders.contains { $0.key == "character_2" })
     }
 
     func testScreenplayTemplateHasParentheticalPlaceholder() {
         guard let template = screenplayTemplate() else {
-            return XCTFail("Screenplay Scene template not found")
+            return XCTFail("Screenplay template not found")
         }
         XCTAssertTrue(template.placeholders.contains { $0.key == "parenthetical" })
     }
 
     func testScreenplayTemplateHasDialogue2Placeholder() {
         guard let template = screenplayTemplate() else {
-            return XCTFail("Screenplay Scene template not found")
+            return XCTFail("Screenplay template not found")
         }
         XCTAssertTrue(template.placeholders.contains { $0.key == "dialogue_2" })
     }
@@ -129,7 +129,7 @@ final class TemplateManagerTests: XCTestCase {
     /// After the PR, the screenplay template has exactly 8 placeholders (removed 2 of 10).
     func testScreenplayTemplateHasExactPlaceholderCount() {
         guard let template = screenplayTemplate() else {
-            return XCTFail("Screenplay Scene template not found")
+            return XCTFail("Screenplay template not found")
         }
         XCTAssertEqual(template.placeholders.count, 8,
             "After removing character_state and shot_description, screenplay template should have 8 placeholders")
@@ -137,7 +137,7 @@ final class TemplateManagerTests: XCTestCase {
 
     func testScreenplayTemplateContentContainsRequiredTokens() {
         guard let template = screenplayTemplate() else {
-            return XCTFail("Screenplay Scene template not found")
+            return XCTFail("Screenplay template not found")
         }
         XCTAssertTrue(template.content.contains("{{scene_heading}}"))
         XCTAssertTrue(template.content.contains("{{action}}"))
@@ -148,7 +148,7 @@ final class TemplateManagerTests: XCTestCase {
 
     func testScreenplayTemplateIsInScreenplayCategory() {
         guard let template = screenplayTemplate() else {
-            return XCTFail("Screenplay Scene template not found")
+            return XCTFail("Screenplay template not found")
         }
         XCTAssertEqual(template.category, .screenplay)
     }
@@ -189,11 +189,11 @@ final class TemplateManagerTests: XCTestCase {
 
     func testSearchTemplateByName() {
         let results = manager.searchTemplates(query: "Screenplay")
-        XCTAssertTrue(results.contains { $0.name == "Screenplay Scene" })
+        XCTAssertTrue(results.contains { $0.name == "Screenplay" })
     }
 
     func testGetTemplatesByCategory() {
         let results = manager.getTemplates(for: .screenplay)
-        XCTAssertTrue(results.contains { $0.name == "Screenplay Scene" })
+        XCTAssertTrue(results.contains { $0.name == "Screenplay" })
     }
 }

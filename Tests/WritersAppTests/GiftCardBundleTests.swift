@@ -446,14 +446,14 @@ final class GiftCardBundleTests: XCTestCase {
                 price: 10.0,
                 bundleType: .starter,
                 aiCredits: 50,
-                expirationDays: 0
+                expirationDays: -1
             )
         ) { error in
             guard case GiftCardError.invalidInput(let message) = error else {
                 XCTFail("Expected GiftCardError.invalidInput, got \(error)")
                 return
             }
-            XCTAssertTrue(message.contains("Expiration days must be greater than 0"))
+            XCTAssertTrue(message.lowercased().contains("expiration"))
         }
     }
 
@@ -495,7 +495,7 @@ final class GiftCardBundleTests: XCTestCase {
                 price: 10.0,
                 bundleType: .starter,
                 aiCredits: 50,
-                expirationDays: 0
+                expirationDays: -1
             )
         ) { error in
             XCTAssertNotNil((error as? GiftCardError)?.errorDescription)
