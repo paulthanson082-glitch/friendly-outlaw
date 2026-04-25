@@ -107,7 +107,7 @@ final class GiftCardErrorTests: XCTestCase {
                 price: 10.0,
                 bundleType: .starter,
                 aiCredits: 50,
-                expirationDays: 0
+                expirationDays: -1
             )
         ) { error in
             guard case GiftCardError.invalidInput(let msg) = error else {
@@ -152,7 +152,7 @@ final class GiftCardErrorTests: XCTestCase {
         XCTAssertEqual(extracted, specificMessage)
     }
 
-    // MARK: - Regression: expirationDays=0 invalid input error message
+    // MARK: - Regression: expirationDays=0 is now valid (PR change: >= 0 instead of > 0)
 
     func testZeroExpirationDaysErrorMessageContent() throws {
         let manager = GiftCardManager()
@@ -163,14 +163,14 @@ final class GiftCardErrorTests: XCTestCase {
                 price: 10.0,
                 bundleType: .starter,
                 aiCredits: 50,
-                expirationDays: 0
+                expirationDays: -1
             )
         ) { error in
             guard case GiftCardError.invalidInput(let msg) = error else {
                 XCTFail("Expected GiftCardError.invalidInput, got \(error)")
                 return
             }
-            XCTAssertEqual(msg, "Expiration days must be greater than 0")
+            XCTAssertEqual(msg, "Expiration days must be greater than or equal to 0")
         }
     }
 
@@ -212,8 +212,7 @@ final class GiftCardErrorTests: XCTestCase {
                 XCTFail("Expected GiftCardError.invalidInput, got \(error)")
                 return
             }
-            // Message must reflect the new wording ("greater than 0", not "greater than or equal to 0").
-            XCTAssertEqual(msg, "Expiration days must be greater than 0")
+            XCTAssertEqual(msg, "Expiration days must be greater than or equal to 0")
         }
     }
 
