@@ -446,14 +446,14 @@ final class GiftCardBundleTests: XCTestCase {
                 price: 10.0,
                 bundleType: .starter,
                 aiCredits: 50,
-                expirationDays: -1
+                expirationDays: 0
             )
         ) { error in
             guard case GiftCardError.invalidInput(let message) = error else {
                 XCTFail("Expected GiftCardError.invalidInput, got \(error)")
                 return
             }
-            XCTAssertTrue(message.lowercased().contains("expiration"))
+            XCTAssertTrue(message.contains("Expiration days must be greater than 0"))
         }
     }
 
@@ -495,7 +495,7 @@ final class GiftCardBundleTests: XCTestCase {
                 price: 10.0,
                 bundleType: .starter,
                 aiCredits: 50,
-                expirationDays: -1
+                expirationDays: 0
             )
         ) { error in
             XCTAssertNotNil((error as? GiftCardError)?.errorDescription)
@@ -540,5 +540,75 @@ final class GiftCardBundleTests: XCTestCase {
         let retrieved = try databaseManager.getGiftCardBundle(id: bundle.id)
         XCTAssertNotNil(retrieved)
         XCTAssertEqual(retrieved?.includedTemplateIds.count, 0)
+    }
+
+    // MARK: - PR Change: expirationDays validation changed from >= 0 to > 0
+
+    /// After this PR, expirationDays=1 (minimum valid value) must succeed.
+    func testCreateBundleWithExpirationDaysOneSucceeds() throws {
+        let bundle = try giftCardManager.createBundle(
+            name: "Short Expiry Bundle",
+            description: "Expires in 1 day",
+            price: 5.0,
+            bundleType: .starter,
+            aiCredits: 10,
+            expirationDays: 1
+        )
+        XCTAssertNotNil(bundle.id,
+            "expirationDays=1 is the minimum valid value after the PR change and must not throw")
+    }
+
+    /// expirationDays=0 must be rejected (changed from >= 0 to > 0).
+    func testCreateBundleWithExpirationDaysZeroThrowsInvalidInput() {
+        XCTAssertThrowsError(
+            try giftCardManager.createBundle(
+                name: "Zero Expiry",
+                description: "Zero days",
+                price: 5.0,
+                bundleType: .starter,
+                aiCredits: 10,
+                expirationDays: 0
+            )
+        ) { error in
+            guard case GiftCardError.invalidInput(let message) = error else {
+                XCTFail("Expected GiftCardError.invalidInput, got \(error)")
+                return
+            }
+            XCTAssertEqual(message, "Expiration days must be greater than 0",
+                "Error message must use 'greater than 0' wording (not 'greater than or equal to 0')")
+        }
+    }
+
+    /// Negative expirationDays must also be rejected.
+    func testCreateBundleWithNegativeExpirationDaysThrowsInvalidInput() {
+        XCTAssertThrowsError(
+            try giftCardManager.createBundle(
+                name: "Negative Expiry",
+                description: "Negative days",
+                price: 5.0,
+                bundleType: .starter,
+                aiCredits: 10,
+                expirationDays: -5
+            )
+        ) { error in
+            guard case GiftCardError.invalidInput = error else {
+                XCTFail("Expected GiftCardError.invalidInput, got \(error)")
+                return
+            }
+        }
+    }
+
+    /// Boundary: large expirationDays value is accepted.
+    func testCreateBundleWithLargeExpirationDaysSucceeds() throws {
+        let bundle = try giftCardManager.createBundle(
+            name: "Long Expiry Bundle",
+            description: "Expires in 10 years",
+            price: 99.0,
+            bundleType: .enterprise,
+            aiCredits: 1000,
+            expirationDays: 3650
+        )
+        XCTAssertNotNil(bundle.id,
+            "Large expirationDays value (e.g., 3650) must be accepted without error")
     }
 }
