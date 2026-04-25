@@ -392,8 +392,7 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertNotNil(retrieved)
         XCTAssertEqual(retrieved?.model, .claude3Sonnet, "model must persist in database")
         XCTAssertEqual(retrieved?.maxTokens, 2048, "maxTokens must persist in database")
-        let retrievedConfig = try XCTUnwrap(retrieved)
-        XCTAssertEqual(retrievedConfig.temperature, 0.42, accuracy: 0.001, "temperature must persist in database")
+        XCTAssertEqual(retrieved?.temperature, 0.42, accuracy: 0.001, "temperature must persist in database")
     }
 
     func testEmptyAPIKeyInputAlsoReturnedAsEmpty() throws {
@@ -1354,8 +1353,7 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertNotNil(retrieved)
         XCTAssertEqual(retrieved?.model, .claude3Opus, "Model must persist")
         XCTAssertEqual(retrieved?.maxTokens, 8192, "Max tokens must persist")
-        let config2 = try XCTUnwrap(retrieved)
-        XCTAssertEqual(config2.temperature, 0.9, accuracy: 0.001, "Temperature must persist")
+        XCTAssertEqual(retrieved?.temperature, 0.9, accuracy: 0.001, "Temperature must persist")
         XCTAssertEqual(retrieved?.apiKey, "", "API key must be empty (security measure)")
     }
 
@@ -1391,5 +1389,98 @@ final class DatabaseManagerTests: XCTestCase {
 
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
         XCTAssertEqual(retrieved?.apiKey, "")
+    }
+
+    // MARK: - PR Change: apiKey is now persisted in plaintext (DatabaseManager.swift line ~1011)
+    // sqlite3_bind_text(statement, 2, configuration.apiKey, ...) instead of ""
+
+    /// After this PR, a non-empty API key must be stored and retrieved as-is.
+    func testNonEmptyAPIKeyIsNowPersistedAndRetrieved() throws {
+        let expectedKey = "sk-ant-api03-TestKey123"
+        let config = AIConfiguration(
+            apiKey: expectedKey,
+            model: .claude3Sonnet,
+            maxTokens: 4096,
+            temperature: 0.7
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertNotNil(retrieved)
+        XCTAssertEqual(retrieved?.apiKey, expectedKey,
+            "PR change: apiKey is now stored with sqlite3_bind_text and must round-trip correctly")
+    }
+
+    /// API key with special characters must be stored and retrieved verbatim.
+    func testAPIKeyWithSpecialCharactersIsPersistedCorrectly() throws {
+        let specialKey = "sk-ant-api03-AbCdEf!@#_XYZ-09"
+        let config = AIConfiguration(
+            apiKey: specialKey,
+            model: .claude3Opus,
+            maxTokens: 2048,
+            temperature: 0.5
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertEqual(retrieved?.apiKey, specialKey,
+            "API keys with special characters must be stored and retrieved without modification")
+    }
+
+    /// Updating the configuration must replace the stored apiKey.
+    func testUpdatingAPIKeyReplacesStoredValue() throws {
+        let config1 = AIConfiguration(
+            apiKey: "initial-key",
+            model: .claude3Sonnet,
+            maxTokens: 4096,
+            temperature: 0.7
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config1)
+
+        let config2 = AIConfiguration(
+            apiKey: "updated-key",
+            model: .claude3Sonnet,
+            maxTokens: 4096,
+            temperature: 0.7
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config2)
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertEqual(retrieved?.apiKey, "updated-key",
+            "After saving a second configuration, the updated apiKey must be persisted")
+    }
+
+    /// Empty string apiKey continues to round-trip as empty (no regression).
+    func testEmptyAPIKeyRoundTripWithNewStorageBehavior() throws {
+        let config = AIConfiguration(
+            apiKey: "",
+            model: .claude35Sonnet,
+            maxTokens: 8192,
+            temperature: 0.3
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertEqual(retrieved?.apiKey, "",
+            "An explicitly empty apiKey must still be stored and retrieved as an empty string")
+    }
+
+    /// All other fields remain intact when a non-empty apiKey is stored.
+    func testNonAPIKeyFieldsRemainCorrectWhenAPIKeyIsNonEmpty() throws {
+        let config = AIConfiguration(
+            apiKey: "my-real-key",
+            model: .claude3Opus,
+            maxTokens: 8192,
+            temperature: 0.9
+        )
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertEqual(retrieved?.model, .claude3Opus,
+            "model must persist alongside a non-empty apiKey")
+        XCTAssertEqual(retrieved?.maxTokens, 8192,
+            "maxTokens must persist alongside a non-empty apiKey")
+        XCTAssertEqual(retrieved?.temperature, 0.9, accuracy: 0.001,
+            "temperature must persist alongside a non-empty apiKey")
     }
 }
