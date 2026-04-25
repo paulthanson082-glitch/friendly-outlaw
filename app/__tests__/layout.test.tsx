@@ -108,12 +108,12 @@ describe('metadata', () => {
 
   it('should have non-empty title', () => {
     expect(metadata.title).toBeTruthy();
-    expect(metadata.title.length).toBeGreaterThan(0);
+    expect((metadata.title as string).length).toBeGreaterThan(0);
   });
 
   it('should have non-empty description', () => {
     expect(metadata.description).toBeTruthy();
-    expect(metadata.description.length).toBeGreaterThan(0);
+    expect((metadata.description as string).length).toBeGreaterThan(0);
   });
 
   it('should have descriptive content', () => {
@@ -122,12 +122,12 @@ describe('metadata', () => {
   });
 
   it('should have SEO-friendly title length', () => {
-    expect(metadata.title.length).toBeLessThan(60);
+    expect((metadata.title as string).length).toBeLessThan(60);
   });
 
   it('should have SEO-friendly description length', () => {
-    expect(metadata.description.length).toBeGreaterThan(50);
-    expect(metadata.description.length).toBeLessThan(160);
+    expect((metadata.description as string).length).toBeGreaterThan(50);
+    expect((metadata.description as string).length).toBeLessThan(160);
   });
 
   it('should not contain special HTML entities in metadata', () => {
@@ -137,7 +137,7 @@ describe('metadata', () => {
   });
 
   it('should have metadata that matches page purpose', () => {
-    expect(metadata.title.toLowerCase()).toContain('ai');
-    expect(metadata.description.toLowerCase()).toContain('residents');
+    expect((metadata.title as string).toLowerCase()).toContain('ai');
+    expect((metadata.description as string).toLowerCase()).toContain('residents');
   });
 });

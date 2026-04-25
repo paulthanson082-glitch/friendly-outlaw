@@ -297,7 +297,7 @@ describe('/api/simulate', () => {
         json: async () => {
           throw new Error('Invalid JSON');
         },
-      } as NextRequest;
+      } as unknown as NextRequest;
 
       mockSql
         .mockResolvedValueOnce([{ value: 'running' }])
