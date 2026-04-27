@@ -388,11 +388,11 @@ final class DatabaseManagerTests: XCTestCase {
         )
         try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
 
-        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
-        let retrievedConfig = try XCTUnwrap(retrieved)
+        let retrievedConfig = try XCTUnwrap(databaseManager.getAIConfiguration(userId: testUserId))
         XCTAssertEqual(retrievedConfig.model, .claude3Sonnet, "model must persist in database")
         XCTAssertEqual(retrievedConfig.maxTokens, 2048, "maxTokens must persist in database")
         XCTAssertEqual(retrievedConfig.temperature, 0.42, accuracy: 0.001, "temperature must persist in database")
+        XCTAssertEqual(retrievedConfig.apiKey, "", "API key must not be persisted (security)")
     }
 
     func testEmptyAPIKeyInputAlsoReturnedAsEmpty() throws {
@@ -1349,12 +1349,11 @@ final class DatabaseManagerTests: XCTestCase {
         )
         try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
 
-        let retrieved2 = try databaseManager.getAIConfiguration(userId: testUserId)
-        let config2 = try XCTUnwrap(retrieved2)
-        XCTAssertEqual(config2.model, .claude3Opus, "Model must persist")
-        XCTAssertEqual(config2.maxTokens, 8192, "Max tokens must persist")
-        XCTAssertEqual(config2.temperature, 0.9, accuracy: 0.001, "Temperature must persist")
-        XCTAssertEqual(config2.apiKey, "", "API key must be empty (security measure)")
+        let retrievedConfig = try XCTUnwrap(databaseManager.getAIConfiguration(userId: testUserId))
+        XCTAssertEqual(retrievedConfig.model, .claude3Opus, "Model must persist")
+        XCTAssertEqual(retrievedConfig.maxTokens, 8192, "Max tokens must persist")
+        XCTAssertEqual(retrievedConfig.temperature, 0.9, accuracy: 0.001, "Temperature must persist")
+        XCTAssertEqual(retrievedConfig.apiKey, "", "API key must be empty (security measure)")
     }
 
     func testAPIKeyEmptyAfterCloseAndReopen() throws {
