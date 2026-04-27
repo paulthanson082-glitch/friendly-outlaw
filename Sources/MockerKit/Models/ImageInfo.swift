@@ -44,9 +44,6 @@ public struct ImageInfo: Codable, Sendable, Identifiable {
         if id.hasPrefix(digestPrefix) {
             return String(id.dropFirst(digestPrefix.count).prefix(12))
         }
-        if id.hasPrefix("sha256") {
-            return String(id.prefix(14))
-        }
         return String(id.prefix(12))
     }
 
