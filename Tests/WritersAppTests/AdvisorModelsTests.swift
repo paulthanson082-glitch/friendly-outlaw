@@ -75,6 +75,15 @@ final class AdvisorCategoryTests: XCTestCase {
             XCTAssertEqual(decoded, category, "\(category) must survive JSON encode/decode")
         }
     }
+
+    func testDisplayNameMatchesCapitalizedRawValue() {
+        // Each displayName must be the capitalized form of the raw value
+        for category in AdvisorCategory.allCases {
+            let expected = category.rawValue.prefix(1).uppercased() + category.rawValue.dropFirst()
+            XCTAssertEqual(category.displayName, expected,
+                "displayName for .\(category) must be capitalized rawValue")
+        }
+    }
 }
 
 // MARK: - AdvisorPriority Tests
@@ -141,7 +150,7 @@ final class AdvisorRecommendationTests: XCTestCase {
         XCTAssertEqual(rec.id, fixedId)
     }
 
-    func testInitWithDefaultId() {
+    func testInitWithDefaultIdGeneratesUUID() {
         let rec = AdvisorRecommendation(
             category: .craft,
             priority: .medium,
@@ -151,6 +160,12 @@ final class AdvisorRecommendationTests: XCTestCase {
             generatedAt: Date()
         )
         XCTAssertNotNil(rec.id)
+    }
+
+    func testTwoDefaultInitCallsProduceDifferentIds() {
+        let rec1 = AdvisorRecommendation(category: .craft, priority: .low, title: "T1", recommendation: "R", actionableSteps: [])
+        let rec2 = AdvisorRecommendation(category: .craft, priority: .low, title: "T2", recommendation: "R", actionableSteps: [])
+        XCTAssertNotEqual(rec1.id, rec2.id)
     }
 
     func testInitStoresCategory() {
@@ -239,6 +254,14 @@ final class AdvisorRecommendationTests: XCTestCase {
         XCTAssertEqual(rec.generatedAt, fixedDate)
     }
 
+    func testDefaultGeneratedAtIsNearNow() {
+        let before = Date()
+        let rec = AdvisorRecommendation(category: .craft, priority: .low, title: "T", recommendation: "R", actionableSteps: [])
+        let after = Date()
+        XCTAssertGreaterThanOrEqual(rec.generatedAt, before)
+        XCTAssertLessThanOrEqual(rec.generatedAt, after)
+    }
+
     func testCodableRoundTrip() throws {
         let fixedDate = Date(timeIntervalSince1970: 1_700_000_000)
         let original = AdvisorRecommendation(
@@ -263,7 +286,7 @@ final class AdvisorRecommendationTests: XCTestCase {
                        accuracy: 0.001)
     }
 
-    func testIdentifiableUsesId() {
+    func testIdentifiableIdMatchesStoredId() {
         let fixedId = UUID()
         let rec = AdvisorRecommendation(
             id: fixedId,
@@ -276,20 +299,34 @@ final class AdvisorRecommendationTests: XCTestCase {
         )
         XCTAssertEqual(rec.id, fixedId, "Identifiable.id must equal the stored id")
     }
+
+    func testCodablePreservesActionableStepsOrder() throws {
+        let steps = ["First step", "Second step", "Third step"]
+        let original = AdvisorRecommendation(
+            category: .goals, priority: .medium, title: "T", recommendation: "R",
+            actionableSteps: steps, generatedAt: Date(timeIntervalSince1970: 0)
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(AdvisorRecommendation.self, from: data)
+        XCTAssertEqual(decoded.actionableSteps, steps, "Actionable steps order must be preserved after round-trip")
+    }
 }
 
 // MARK: - WritingAdvisorReport Tests
 
 final class WritingAdvisorReportTests: XCTestCase {
 
-    private func makeRecommendation(category: AdvisorCategory = .productivity, priority: AdvisorPriority = .medium) -> AdvisorRecommendation {
+    private func makeRecommendation(
+        category: AdvisorCategory = .productivity,
+        priority: AdvisorPriority = .medium
+    ) -> AdvisorRecommendation {
         AdvisorRecommendation(
             category: category,
             priority: priority,
             title: "Test Recommendation",
             recommendation: "Do this.",
             actionableSteps: ["Step A"],
-            generatedAt: Date()
+            generatedAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
     }
 
@@ -377,7 +414,7 @@ final class WritingAdvisorReportTests: XCTestCase {
                        accuracy: 0.001)
     }
 
-    func testCodableRoundTripMultipleRecommendations() throws {
+    func testCodableRoundTripWithMultipleRecommendations() throws {
         let recs = [
             makeRecommendation(category: .productivity, priority: .high),
             makeRecommendation(category: .creativity, priority: .medium),
@@ -395,6 +432,18 @@ final class WritingAdvisorReportTests: XCTestCase {
         XCTAssertEqual(decoded.recommendations[0].priority, .high)
         XCTAssertEqual(decoded.recommendations[1].category, .creativity)
         XCTAssertEqual(decoded.recommendations[2].priority, .low)
+    }
+
+    func testRecommendationsOrderIsPreserved() throws {
+        // Insert three recommendations in a known order and verify retrieval order
+        let categories: [AdvisorCategory] = [.productivity, .craft, .goals]
+        let recs = categories.map { makeRecommendation(category: $0) }
+        let original = WritingAdvisorReport(recommendations: recs, overallAssessment: "OK", focusArea: .productivity)
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(WritingAdvisorReport.self, from: data)
+        for (idx, category) in categories.enumerated() {
+            XCTAssertEqual(decoded.recommendations[idx].category, category)
+        }
     }
 }
 
@@ -459,6 +508,25 @@ final class AdvisorContextTests: XCTestCase {
         XCTAssertNil(ctx.sessionStats)
     }
 
+    func testInitWithSessionStats() {
+        let stats = SessionStats(
+            totalSessions: 10,
+            totalDurationSeconds: 36000,
+            averageDurationSeconds: 3600,
+            earliestSession: nil,
+            latestSession: nil
+        )
+        let ctx = AdvisorContext(
+            totalDocuments: 5,
+            recentDocumentTitles: [],
+            totalWordsAcrossDocuments: 1000,
+            documentCategories: [],
+            sessionStats: stats
+        )
+        XCTAssertNotNil(ctx.sessionStats)
+        XCTAssertEqual(ctx.sessionStats?.totalSessions, 10)
+    }
+
     func testInitWithNilAdditionalNotes() {
         let ctx = AdvisorContext(
             totalDocuments: 1,
@@ -504,5 +572,20 @@ final class AdvisorContextTests: XCTestCase {
         )
         XCTAssertEqual(ctx.totalDocuments, 0)
         XCTAssertEqual(ctx.totalWordsAcrossDocuments, 0)
+    }
+
+    func testRecentDocumentTitlesOrderIsPreserved() {
+        let titles = ["Z Title", "A Title", "M Title"]
+        let ctx = AdvisorContext(
+            totalDocuments: 3,
+            recentDocumentTitles: titles,
+            totalWordsAcrossDocuments: 0,
+            documentCategories: [],
+            sessionStats: nil
+        )
+        // Order must be preserved as provided
+        XCTAssertEqual(ctx.recentDocumentTitles[0], "Z Title")
+        XCTAssertEqual(ctx.recentDocumentTitles[1], "A Title")
+        XCTAssertEqual(ctx.recentDocumentTitles[2], "M Title")
     }
 }

@@ -78,6 +78,21 @@ final class DocumentEquatableTests: XCTestCase {
             "Documents with different ids must never be equal")
     }
 
+    func testDocumentIsEqualToItself() {
+        let meta = makeMetadata()
+        let doc = Document(id: UUID(), title: "T", content: "C", category: .novel, metadata: meta)
+        XCTAssertEqual(doc, doc, "A document must equal itself (reflexive)")
+    }
+
+    func testDocumentEqualityIsSymmetric() {
+        let id = UUID()
+        let meta = makeMetadata()
+        let doc1 = Document(id: id, title: "T", content: "C", category: .novel, metadata: meta)
+        let doc2 = Document(id: id, title: "T", content: "C", category: .novel, metadata: meta)
+        XCTAssertEqual(doc1, doc2)
+        XCTAssertEqual(doc2, doc1, "Equality must be symmetric")
+    }
+
     // MARK: - Hashability: use in Set
 
     func testDocumentCanBeStoredInSet() {
@@ -205,5 +220,11 @@ final class DocumentMetadataEquatableHashableTests: XCTestCase {
         let meta1 = DocumentMetadata(created: date, modified: date, notes: "First draft")
         let meta2 = DocumentMetadata(created: date, modified: date, notes: "Second draft")
         XCTAssertNotEqual(meta1, meta2, "DocumentMetadata with different notes must not be equal")
+    }
+
+    func testDocumentMetadataIsEqualToItself() {
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        let meta = DocumentMetadata(created: date, modified: date, notes: "Reflexive test")
+        XCTAssertEqual(meta, meta, "DocumentMetadata must equal itself")
     }
 }

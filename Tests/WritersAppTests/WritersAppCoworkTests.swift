@@ -415,23 +415,37 @@ final class WritersAppCoworkTests: XCTestCase {
         let prospect = app.addProspect(name: "P9", email: "p9@ex.com")
         try app.updateProspectStatus(id: prospect.id, status: .contacted)
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
-        try app.updateProspectStatus(id: prospect.id, status: .declined) // non-contact
+        try app.updateProspectStatus(id: prospect.id, status: .declined)  // non-contact
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
-        try app.updateProspectStatus(id: prospect.id, status: .meeting) // contact again
+        try app.updateProspectStatus(id: prospect.id, status: .meeting)  // contact again
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 2,
-            "declined → meeting (non-contact to contact) must increment counter for the second transition")
+            "non-contact → contact after a previous contact transition must add to the counter")
     }
 
-    /// Multiple prospects, each going through a first contact transition, count once each.
-    func testMultipleProspectsEachCountedOnceOnFirstContactTransition() throws {
+    /// Multiple prospects: each first-contact transition increments independently.
+    func testMultipleProspectsEachIncrementOnFirstContact() throws {
         app.startCoworkSession()
-        let p1 = app.addProspect(name: "P10", email: "p10@ex.com")
-        let p2 = app.addProspect(name: "P11", email: "p11@ex.com")
-        let p3 = app.addProspect(name: "P12", email: "p12@ex.com")
+        let p1 = app.addProspect(name: "PA", email: "pa@ex.com")
+        let p2 = app.addProspect(name: "PB", email: "pb@ex.com")
+        let p3 = app.addProspect(name: "PC", email: "pc@ex.com")
+
         try app.updateProspectStatus(id: p1.id, status: .contacted)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
+
         try app.updateProspectStatus(id: p2.id, status: .replied)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 2)
+
         try app.updateProspectStatus(id: p3.id, status: .meeting)
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 3,
-            "Three distinct non-contact → contact first-transitions must produce count of 3")
+            "Each new prospect's first contact-state transition must increment the counter once")
+    }
+
+    /// Counter is not incremented when there is no active cowork session.
+    func testNoActiveSessionContactedCounterNotTracked() throws {
+        // No startCoworkSession() call
+        let prospect = app.addProspect(name: "Orphan", email: "orphan@ex.com")
+        try app.updateProspectStatus(id: prospect.id, status: .contacted)
+        XCTAssertNil(app.activeCoworkSession,
+            "With no active session, activeCoworkSession must remain nil")
     }
 }
