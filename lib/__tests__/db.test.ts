@@ -68,7 +68,7 @@ describe('db module', () => {
       const mockSql = getDb();
       await initDb();
 
-      const calls = (mockSql as unknown as jest.Mock).mock.calls;
+      const calls = (mockSql as jest.Mock).mock.calls;
       const createBotsCall = calls.find(call =>
         call[0].some((str: string) => str.includes('CREATE TABLE IF NOT EXISTS bots'))
       );
@@ -79,7 +79,7 @@ describe('db module', () => {
       const mockSql = getDb();
       await initDb();
 
-      const calls = (mockSql as unknown as jest.Mock).mock.calls;
+      const calls = (mockSql as jest.Mock).mock.calls;
       const createMessagesCall = calls.find(call =>
         call[0].some((str: string) => str.includes('CREATE TABLE IF NOT EXISTS messages'))
       );
@@ -90,7 +90,7 @@ describe('db module', () => {
       const mockSql = getDb();
       await initDb();
 
-      const calls = (mockSql as unknown as jest.Mock).mock.calls;
+      const calls = (mockSql as jest.Mock).mock.calls;
       const createMemoriesCall = calls.find(call =>
         call[0].some((str: string) => str.includes('CREATE TABLE IF NOT EXISTS bot_memories'))
       );
@@ -101,7 +101,7 @@ describe('db module', () => {
       const mockSql = getDb();
       await initDb();
 
-      const calls = (mockSql as unknown as jest.Mock).mock.calls;
+      const calls = (mockSql as jest.Mock).mock.calls;
       const createWorldStateCall = calls.find(call =>
         call[0].some((str: string) => str.includes('CREATE TABLE IF NOT EXISTS world_state'))
       );
@@ -112,7 +112,7 @@ describe('db module', () => {
       const mockSql = getDb();
       await initDb();
 
-      const calls = (mockSql as unknown as jest.Mock).mock.calls;
+      const calls = (mockSql as jest.Mock).mock.calls;
       const indexCalls = calls.filter(call =>
         call[0].some((str: string) => str.includes('CREATE INDEX IF NOT EXISTS'))
       );
@@ -123,7 +123,7 @@ describe('db module', () => {
       const mockSql = getDb();
       await initDb();
 
-      const calls = (mockSql as unknown as jest.Mock).mock.calls;
+      const calls = (mockSql as jest.Mock).mock.calls;
       const insertWorldStateCall = calls.find(call =>
         call[0].some((str: string) => str.includes('INSERT INTO world_state'))
       );
@@ -134,7 +134,7 @@ describe('db module', () => {
       const mockSql = getDb();
       await initDb();
 
-      const calls = (mockSql as unknown as jest.Mock).mock.calls;
+      const calls = (mockSql as jest.Mock).mock.calls;
       const insertWorldStateCall = calls.find(call =>
         call[0].some((str: string) => str.includes('ON CONFLICT (key) DO NOTHING'))
       );
@@ -160,7 +160,7 @@ describe('db module', () => {
       const mockSql = getDb();
       await initDb();
 
-      const calls = (mockSql as unknown as jest.Mock).mock.calls;
+      const calls = (mockSql as jest.Mock).mock.calls;
       const createBotsCall = calls.find(call =>
         call[0].some((str: string) => str.includes('CREATE TABLE IF NOT EXISTS bots'))
       );
@@ -176,7 +176,7 @@ describe('db module', () => {
       const mockSql = getDb();
       await initDb();
 
-      const calls = (mockSql as unknown as jest.Mock).mock.calls;
+      const calls = (mockSql as jest.Mock).mock.calls;
       const createMessagesCall = calls.find(call =>
         call[0].some((str: string) => str.includes('CREATE TABLE IF NOT EXISTS messages'))
       );
@@ -209,7 +209,7 @@ describe('db module', () => {
       const mockSql = getDb();
       await initDb();
 
-      const calls = (mockSql as unknown as jest.Mock).mock.calls;
+      const calls = (mockSql as jest.Mock).mock.calls;
       const indexCalls = calls.filter(call =>
         call[0].some((str: string) => str.includes('CREATE INDEX'))
       );
@@ -222,7 +222,7 @@ describe('db module', () => {
       const mockSql = getDb();
       await initDb();
 
-      const calls = (mockSql as unknown as jest.Mock).mock.calls;
+      const calls = (mockSql as jest.Mock).mock.calls;
       const foreignKeyCall = calls.find(call =>
         call[0].some((str: string) => str.includes('ON DELETE CASCADE'))
       );
@@ -234,7 +234,7 @@ describe('db module', () => {
       const mockSql = getDb();
       await initDb();
 
-      const calls = (mockSql as unknown as jest.Mock).mock.calls;
+      const calls = (mockSql as jest.Mock).mock.calls;
       const worldStateCall = calls.find(call =>
         call[0].some((str: string) => str.includes('status') && str.includes('running'))
       );
@@ -246,7 +246,7 @@ describe('db module', () => {
       const mockSql = getDb();
       await initDb();
 
-      const calls = (mockSql as unknown as jest.Mock).mock.calls;
+      const calls = (mockSql as jest.Mock).mock.calls;
       const worldStateCall = calls.find(call =>
         call[0].some((str: string) => str.includes('tick') && str.includes('0'))
       );

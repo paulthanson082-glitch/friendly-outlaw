@@ -501,7 +501,7 @@ describe('S24ToolsPage', () => {
     });
 
     it('handles localStorage returning null (first visit) without errors', () => {
-      localStorageMock.getItem.mockReturnValue(null as any);
+      localStorageMock.getItem.mockReturnValue(null);
       expect(() => render(<S24ToolsPage />)).not.toThrow();
       expect(screen.getByText('0/27')).toBeInTheDocument();
     });
