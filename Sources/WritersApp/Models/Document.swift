@@ -73,9 +73,6 @@ public struct Document: Codable, Identifiable, Hashable {
         return min(1.0, Double(wordCount) / Double(goal))
     }
 
-    // Documents are compared and hashed by their unique `id` only, so that two Document
-    // values representing the same logical document (same UUID) are considered equal
-    // regardless of any mutable fields such as `content` or `metadata`.
     public static func == (lhs: Document, rhs: Document) -> Bool {
         lhs.id == rhs.id
     }

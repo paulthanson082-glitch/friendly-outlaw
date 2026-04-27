@@ -150,11 +150,11 @@ final class CoworkModeTests: XCTestCase {
         XCTAssertEqual(app.activeCoworkSession?.prospectsAdded, 2)
     }
 
-    func testProspectsContactedCounterOnlyIncrementsOnTrueTransition() throws {
+    func testProspectsContactedCounterIncrementsOnEveryContactStatus() throws {
         app.startCoworkSession()
         let prospect = app.addProspect(name: "P", email: "p@x.com")
 
-        // Transition new → contacted: should increment
+        // new → contacted: increments
         try app.updateProspectStatus(id: prospect.id, status: .contacted)
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
 
@@ -162,7 +162,7 @@ final class CoworkModeTests: XCTestCase {
         try app.updateProspectStatus(id: prospect.id, status: .contacted)
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 2)
 
-        // contacted → replied (still a contact state): also increments
+        // contacted → replied (still a contact state): increments
         try app.updateProspectStatus(id: prospect.id, status: .replied)
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 3)
 
@@ -170,7 +170,7 @@ final class CoworkModeTests: XCTestCase {
         try app.updateProspectStatus(id: prospect.id, status: .declined)
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 3)
 
-        // declined → meeting (contact state): should increment
+        // declined → meeting (contact state): increments
         try app.updateProspectStatus(id: prospect.id, status: .meeting)
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 4)
     }

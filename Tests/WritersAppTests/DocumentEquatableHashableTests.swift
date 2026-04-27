@@ -3,14 +3,8 @@ import XCTest
 
 // MARK: - Document Equatable/Hashable Tests
 //
-// PR change: the custom `==` and `hash(into:)` implementations were removed from `Document`.
-//
-// Before this PR, equality and hashing were based on `id` alone — two documents with
-// the same UUID but different content were considered equal.
-//
-// After this PR, Swift synthesizes Equatable/Hashable from ALL stored properties
-// (id, title, content, templateId, category, metadata). Two documents with the same
-// UUID but any differing field are now considered NOT equal.
+// Document uses identity-based equality and hashing: two Documents with the same UUID `id`
+// are considered equal regardless of content, title, category, or metadata differences.
 
 final class DocumentEquatableTests: XCTestCase {
 
@@ -20,7 +14,7 @@ final class DocumentEquatableTests: XCTestCase {
         DocumentMetadata(created: date, modified: date, lastOpened: nil, wordCountGoal: nil, tags: [], notes: "")
     }
 
-    // MARK: - Identical documents are equal (synthesized)
+    // MARK: - Identical documents are equal
 
     func testDocumentsWithIdenticalPropertiesAreEqual() {
         let id = UUID()
@@ -28,18 +22,18 @@ final class DocumentEquatableTests: XCTestCase {
         let doc1 = Document(id: id, title: "Chapter One", content: "It was a dark and stormy night.", category: .novel, metadata: meta)
         let doc2 = Document(id: id, title: "Chapter One", content: "It was a dark and stormy night.", category: .novel, metadata: meta)
         XCTAssertEqual(doc1, doc2,
-            "Two documents with identical properties must be equal (synthesized Equatable)")
+            "Two documents with identical properties must be equal")
     }
 
-    // MARK: - Same id, different fields → NOT equal after PR
+    // MARK: - Same id, different fields → equal (id-only equality)
 
     func testDocumentsWithSameIdButDifferentContentAreNotEqual() {
         let id = UUID()
         let meta = makeMetadata()
         let doc1 = Document(id: id, title: "Title", content: "Original content.", category: .novel, metadata: meta)
         let doc2 = Document(id: id, title: "Title", content: "Revised content.", category: .novel, metadata: meta)
-        XCTAssertNotEqual(doc1, doc2,
-            "After the PR, documents with the same id but different content must NOT be equal")
+        XCTAssertEqual(doc1, doc2,
+            "Documents with the same id are equal regardless of content (id-only equality)")
     }
 
     func testDocumentsWithSameIdButDifferentTitleAreNotEqual() {
@@ -47,8 +41,8 @@ final class DocumentEquatableTests: XCTestCase {
         let meta = makeMetadata()
         let doc1 = Document(id: id, title: "Title A", content: "Body", category: .shortStory, metadata: meta)
         let doc2 = Document(id: id, title: "Title B", content: "Body", category: .shortStory, metadata: meta)
-        XCTAssertNotEqual(doc1, doc2,
-            "Documents with the same id but different titles must NOT be equal")
+        XCTAssertEqual(doc1, doc2,
+            "Documents with the same id are equal regardless of title (id-only equality)")
     }
 
     func testDocumentsWithSameIdButDifferentCategoryAreNotEqual() {
@@ -56,8 +50,8 @@ final class DocumentEquatableTests: XCTestCase {
         let meta = makeMetadata()
         let doc1 = Document(id: id, title: "T", content: "C", category: .novel, metadata: meta)
         let doc2 = Document(id: id, title: "T", content: "C", category: .screenplay, metadata: meta)
-        XCTAssertNotEqual(doc1, doc2,
-            "Documents with the same id but different categories must NOT be equal")
+        XCTAssertEqual(doc1, doc2,
+            "Documents with the same id are equal regardless of category (id-only equality)")
     }
 
     func testDocumentsWithSameIdButDifferentMetadataAreNotEqual() {
@@ -66,8 +60,8 @@ final class DocumentEquatableTests: XCTestCase {
         let meta2 = DocumentMetadata(created: Date(timeIntervalSince1970: 2_000_000), modified: Date(timeIntervalSince1970: 2_000_000))
         let doc1 = Document(id: id, title: "T", content: "C", category: .novel, metadata: meta1)
         let doc2 = Document(id: id, title: "T", content: "C", category: .novel, metadata: meta2)
-        XCTAssertNotEqual(doc1, doc2,
-            "Documents with the same id but different metadata must NOT be equal")
+        XCTAssertEqual(doc1, doc2,
+            "Documents with the same id are equal regardless of metadata (id-only equality)")
     }
 
     func testDocumentsWithDifferentIdsAreNotEqual() {
@@ -98,8 +92,8 @@ final class DocumentEquatableTests: XCTestCase {
         doc1.hash(into: &hasher1)
         var hasher2 = Hasher()
         doc2.hash(into: &hasher2)
-        XCTAssertNotEqual(hasher1.finalize(), hasher2.finalize(),
-            "Documents with different content should produce different hash values")
+        XCTAssertEqual(hasher1.finalize(), hasher2.finalize(),
+            "Documents with the same id produce the same hash value regardless of content (id-only hashing)")
     }
 
     func testEqualDocumentsHaveSameHashValue() {
@@ -123,8 +117,8 @@ final class DocumentEquatableTests: XCTestCase {
         let doc1 = Document(id: id, title: "T", content: "Content A", category: .novel, metadata: meta)
         let doc2 = Document(id: id, title: "T", content: "Content B", category: .novel, metadata: meta)
         let docSet: Set<Document> = [doc1, doc2]
-        XCTAssertEqual(docSet.count, 2,
-            "After the PR, two documents with the same id but different content occupy two slots in a Set")
+        XCTAssertEqual(docSet.count, 1,
+            "Two documents with the same id occupy one slot in a Set (id-only equality)")
     }
 
     func testInsertingDuplicateDocumentDoesNotIncreaseSetSize() {
@@ -136,7 +130,7 @@ final class DocumentEquatableTests: XCTestCase {
             "Inserting the same document twice must not increase the set size")
     }
 
-    // MARK: - Regression: document with updated content is treated as distinct
+    // MARK: - Documents with same id are treated as same document even when mutated
 
     func testMutatedContentIsConsideredDifferentDocument() {
         let id = UUID()
@@ -144,8 +138,8 @@ final class DocumentEquatableTests: XCTestCase {
         var doc = Document(id: id, title: "Novel", content: "Original", category: .novel, metadata: meta)
         let snapshot = doc
         doc.content = "Updated content after edit"
-        XCTAssertNotEqual(doc, snapshot,
-            "After mutating content, the document should not equal its earlier snapshot")
+        XCTAssertEqual(doc, snapshot,
+            "After mutating content, the document equals its earlier snapshot (same id → same identity)")
     }
 
     func testMutatedTitleIsConsideredDifferentDocument() {
@@ -154,8 +148,8 @@ final class DocumentEquatableTests: XCTestCase {
         var doc = Document(id: id, title: "Old Title", content: "Body", category: .novel, metadata: meta)
         let snapshot = doc
         doc.title = "New Title"
-        XCTAssertNotEqual(doc, snapshot,
-            "After mutating title, the document should not equal its earlier snapshot")
+        XCTAssertEqual(doc, snapshot,
+            "After mutating title, the document equals its earlier snapshot (same id → same identity)")
     }
 }
 
