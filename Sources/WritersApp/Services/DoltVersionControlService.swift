@@ -137,7 +137,8 @@ public class DoltVersionControlService {
                 title: doc.title,
                 content: doc.content,
                 category: doc.category.rawValue,
-                wordCount: doc.wordCount
+                wordCount: doc.wordCount,
+                capturedAt: newCommit.timestamp
             )
             try db.insertVCSnapshot(snapshot)
         }

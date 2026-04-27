@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents a writing document created from a template or from scratch
-public struct Document: Codable, Identifiable, Hashable {
+public struct Document: Codable, Identifiable {
     public let id: UUID
     public var title: String
     public var content: String
@@ -71,6 +71,16 @@ public struct Document: Codable, Identifiable, Hashable {
     public func wordCountProgress() -> Double {
         guard let goal = metadata.wordCountGoal, goal > 0 else { return 0.0 }
         return min(1.0, Double(wordCount) / Double(goal))
+    }
+}
+
+extension Document: Hashable {
+    public static func == (lhs: Document, rhs: Document) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
 
