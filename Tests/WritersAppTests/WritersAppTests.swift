@@ -3699,12 +3699,14 @@ final class HermesAgentTests: XCTestCase {
     // MARK: - TemplateManager Default Templates Additional Tests
 
     func testTemplateManagerDefaultTemplateCount() {
+        let app = WritersApp(databasePath: ":memory:")
         let all = app.templateManager.getAllTemplates()
         XCTAssertEqual(all.count, 7,
                        "Default templates should be exactly 7")
     }
 
     func testTemplateManagerRetainsCoreLiteraryTemplates() {
+        let app = WritersApp(databasePath: ":memory:")
         let all = app.templateManager.getAllTemplates()
         let names = all.map { $0.name }
         let required = ["Novel Chapter", "Short Story", "Screenplay", "Blog Post",
@@ -3715,6 +3717,7 @@ final class HermesAgentTests: XCTestCase {
     }
 
     func testTemplateManagerGetTemplatesForRemovedCategoryReturnsEmpty() {
+        let app = WritersApp(databasePath: ":memory:")
         let otherTemplates = app.templateManager.getTemplates(for: .other)
         let legacyNames = [
             "Morning Inbox Summary", "Weekly Status Report", "Daily Sales Dashboard"
@@ -3726,6 +3729,7 @@ final class HermesAgentTests: XCTestCase {
     }
 
     func testTemplateManagerSearchDoesNotFindRemovedTemplates() {
+        let app = WritersApp(databasePath: ":memory:")
         XCTAssertTrue(app.templateManager.searchTemplates(query: "Inbox Summary").isEmpty)
         XCTAssertTrue(app.templateManager.searchTemplates(query: "Competitor News").isEmpty)
         XCTAssertTrue(app.templateManager.searchTemplates(query: "Sales Dashboard").isEmpty)
