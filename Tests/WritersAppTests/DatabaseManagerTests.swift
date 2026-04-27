@@ -1391,7 +1391,7 @@ final class DatabaseManagerTests: XCTestCase {
         XCTAssertEqual(retrieved?.apiKey, "")
     }
 
-    // MARK: - PR Change: apiKey is now persisted (sqlite3_bind_text uses configuration.apiKey, not "")
+    // MARK: - PR Change: apiKey is now persisted (sqlite3_bind_text uses configuration.apiKey)
 
     /// After the PR, a non-empty API key must be stored and retrieved as-is.
     func testNonEmptyAPIKeyIsPersistedAndRetrievedCorrectly() throws {
@@ -1439,16 +1439,6 @@ final class DatabaseManagerTests: XCTestCase {
             "After saving a second configuration, the updated apiKey must replace the original")
     }
 
-    /// Empty string apiKey continues to round-trip as empty (no regression from PR change).
-    func testEmptyAPIKeyRoundTripAfterPRChange() throws {
-        let config = AIConfiguration(apiKey: "", model: .claude35Sonnet, maxTokens: 8192, temperature: 0.3)
-        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
-
-        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
-        XCTAssertEqual(retrieved?.apiKey, "",
-            "An explicitly empty apiKey must still be stored and retrieved as an empty string after the PR change")
-    }
-
     /// All non-apiKey fields remain correct when a non-empty apiKey is stored.
     func testNonAPIKeyFieldsArePreservedWhenAPIKeyIsNonEmpty() throws {
         let config = AIConfiguration(
@@ -1477,5 +1467,20 @@ final class DatabaseManagerTests: XCTestCase {
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
         XCTAssertEqual(retrieved?.apiKey, longKey,
             "A very long API key must be stored and retrieved in full")
+    }
+
+    /// Non-empty key persists after close and reopen of the database.
+    func testAPIKeyPersistsAfterDatabaseCloseAndReopen() throws {
+        let key = "sk-ant-persistent-key"
+        let config = AIConfiguration(apiKey: key, model: .claude35Sonnet, maxTokens: 4096, temperature: 0.7)
+        try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
+
+        databaseManager.close()
+        try databaseManager.initialize()
+
+        let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
+        XCTAssertNotNil(retrieved)
+        XCTAssertEqual(retrieved?.apiKey, key,
+            "Non-empty apiKey must persist after database close and reopen")
     }
 }
