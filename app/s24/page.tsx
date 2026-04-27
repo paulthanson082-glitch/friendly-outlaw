@@ -405,11 +405,7 @@ export default function S24ToolsPage() {
                       : {}),
                   }}
                   onClick={() => toggle(task.id)}
-                  aria-label={
-                    done
-                      ? `Mark "${task.label}" as incomplete`
-                      : `Mark "${task.label}" as complete`
-                  }
+                  aria-label={done ? 'Mark incomplete' : 'Mark complete'}
                   aria-pressed={done}
                 >
                   {done && <span style={s.checkmark}>✓</span>}

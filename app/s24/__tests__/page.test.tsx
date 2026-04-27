@@ -58,28 +58,22 @@ describe("S24ToolsPage", () => {
 
   it("toggles a task when the checkbox is clicked", () => {
     render(<S24ToolsPage />);
-    const btn = screen.getByLabelText(
-      'Mark "Run Device Care optimizer" as complete'
-    );
+    const btn = screen.getAllByLabelText('Mark complete')[0];
     fireEvent.click(btn);
     expect(
-      screen.getByLabelText('Mark "Run Device Care optimizer" as incomplete')
+      screen.getByLabelText('Mark incomplete')
     ).toBeInTheDocument();
   });
 
   it("updates section progress when a task is toggled", () => {
     render(<S24ToolsPage />);
-    fireEvent.click(
-      screen.getByLabelText('Mark "Run Device Care optimizer" as complete')
-    );
+    fireEvent.click(screen.getAllByLabelText('Mark complete')[0]);
     expect(screen.getByText("1 of 7 tasks completed")).toBeInTheDocument();
   });
 
   it("updates overall progress when a task is toggled", () => {
     render(<S24ToolsPage />);
-    fireEvent.click(
-      screen.getByLabelText('Mark "Run Device Care optimizer" as complete')
-    );
+    fireEvent.click(screen.getAllByLabelText('Mark complete')[0]);
     expect(screen.getByText(/1\/27/)).toBeInTheDocument();
   });
 
@@ -87,23 +81,19 @@ describe("S24ToolsPage", () => {
   // Accessibility
   // ---------------------------------------------------------------------------
 
-  it("includes the task name in the aria-label", () => {
+  it("uses accessible aria-labels on checkbox buttons", () => {
     render(<S24ToolsPage />);
-    expect(
-      screen.getByLabelText('Mark "Run Device Care optimizer" as complete')
-    ).toBeInTheDocument();
+    const buttons = screen.getAllByLabelText('Mark complete');
+    expect(buttons.length).toBeGreaterThan(0);
+    buttons.forEach((btn) => expect(btn).toHaveAttribute('aria-pressed', 'false'));
   });
 
   it("sets aria-pressed on the checkbox button", () => {
     render(<S24ToolsPage />);
-    const btn = screen.getByLabelText(
-      'Mark "Run Device Care optimizer" as complete'
-    );
+    const btn = screen.getAllByLabelText('Mark complete')[0];
     expect(btn).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(btn);
-    const toggled = screen.getByLabelText(
-      'Mark "Run Device Care optimizer" as incomplete'
-    );
+    const toggled = screen.getByLabelText('Mark incomplete');
     expect(toggled).toHaveAttribute("aria-pressed", "true");
   });
 
@@ -113,9 +103,7 @@ describe("S24ToolsPage", () => {
 
   it("persists checked state to localStorage", () => {
     render(<S24ToolsPage />);
-    fireEvent.click(
-      screen.getByLabelText('Mark "Run Device Care optimizer" as complete')
-    );
+    fireEvent.click(screen.getAllByLabelText('Mark complete')[0]);
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
     expect(stored["speed-1"]).toBe(true);
   });
@@ -127,8 +115,8 @@ describe("S24ToolsPage", () => {
     );
     render(<S24ToolsPage />);
     expect(
-      screen.getByLabelText('Mark "Run Device Care optimizer" as incomplete')
-    ).toBeInTheDocument();
+      screen.getAllByLabelText('Mark incomplete')
+    ).toHaveLength(2);
     expect(screen.getByText("2 of 7 tasks completed")).toBeInTheDocument();
   });
 
@@ -167,12 +155,9 @@ describe("S24ToolsPage", () => {
   it("resets only the active section when Reset is clicked", () => {
     render(<S24ToolsPage />);
     // Check two tasks
-    fireEvent.click(
-      screen.getByLabelText('Mark "Run Device Care optimizer" as complete')
-    );
-    fireEvent.click(
-      screen.getByLabelText('Mark "Enable RAM Plus (8 GB)" as complete')
-    );
+    const checkboxes = screen.getAllByLabelText('Mark complete');
+    fireEvent.click(checkboxes[0]);
+    fireEvent.click(screen.getAllByLabelText('Mark complete')[0]);
     expect(screen.getByText("2 of 7 tasks completed")).toBeInTheDocument();
 
     // Reset
