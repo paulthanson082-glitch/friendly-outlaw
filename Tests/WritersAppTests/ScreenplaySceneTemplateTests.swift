@@ -46,9 +46,9 @@ final class ScreenplaySceneTemplateTests: XCTestCase {
     }
 
     func testScreenplaySceneIsFoundBySearchingScene() {
-        let results = manager.searchTemplates(query: "scene")
+        let results = manager.searchTemplates(query: "Scene")
         XCTAssertTrue(results.contains { $0.name == "Screenplay" },
-            "Searching for 'scene' must return the 'Screenplay' template")
+            "Searching for 'Scene' must return the 'Screenplay' template")
     }
 
     // MARK: - Total Placeholder Count
