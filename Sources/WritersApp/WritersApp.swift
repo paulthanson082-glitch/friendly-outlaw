@@ -1591,9 +1591,8 @@ public class WritersApp {
         let isContactStatus: (ProspectStatus) -> Bool = {
             $0 == .contacted || $0 == .replied || $0 == .meeting
         }
-        let previousStatus = prospectDatabase.getProspect(id: id)?.status
         try prospectDatabase.updateProspectStatus(id: id, status: status)
-        if isContactStatus(status) && !(previousStatus.map(isContactStatus) ?? false) {
+        if isContactStatus(status) {
             activeCoworkSession?.prospectsContacted += 1
         }
     }

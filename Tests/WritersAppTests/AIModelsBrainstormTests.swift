@@ -5,7 +5,7 @@ import XCTest
 // Tests for the updated CategorizedIdea struct which no longer conforms to Identifiable
 // and no longer has a UUID id property (removed in this PR).
 
-final class CategorizedIdeaTests: XCTestCase {
+final class CategorizedIdeaBrainstormTests: XCTestCase {
 
     func testInitStoresTitle() {
         let idea = CategorizedIdea(title: "Magic System", description: "A unique rule-based magic", isSpeculative: false)
@@ -87,7 +87,7 @@ final class CategorizedIdeaTests: XCTestCase {
 // Tests for the updated IdeaCategory struct which no longer conforms to Identifiable
 // and no longer has a UUID id property (removed in this PR).
 
-final class IdeaCategoryTests: XCTestCase {
+final class IdeaCategoryBrainstormTests: XCTestCase {
 
     func testInitStoresName() {
         let category = IdeaCategory(name: "Plot Ideas", description: "Story arc suggestions", ideas: [])
@@ -157,7 +157,7 @@ final class IdeaCategoryTests: XCTestCase {
 // Tests for the updated BrainstormResult struct which no longer conforms to Identifiable
 // and no longer has a UUID id property (removed in this PR).
 
-final class BrainstormResultTests: XCTestCase {
+final class BrainstormResultBrainstormTests: XCTestCase {
 
     func testInitStoresCategories() {
         let cat1 = IdeaCategory(name: "Plot", description: "Plot ideas", ideas: [])
