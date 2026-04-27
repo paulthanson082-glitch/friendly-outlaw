@@ -12,7 +12,7 @@ public class GiftCardManager {
     // MARK: - Bundle CRUD
 
     /// Creates and stores a new gift card bundle.
-    /// - Throws: `GiftCardError.invalidInput` if name is empty, aiCredits ≤ 0, or expirationDays ≤ 0.
+    /// - Throws: `GiftCardError.invalidInput` if name is empty, aiCredits ≤ 0, or expirationDays < 0.
     /// - Returns: The newly created `GiftCardBundle`.
     @discardableResult
     public func createBundle(
@@ -30,8 +30,8 @@ public class GiftCardManager {
         guard aiCredits > 0 else {
             throw GiftCardError.invalidInput("AI credits must be greater than 0")
         }
-        guard expirationDays > 0 else {
-            throw GiftCardError.invalidInput("Expiration days must be greater than 0")
+        guard expirationDays >= 0 else {
+            throw GiftCardError.invalidInput("Expiration days must be greater than or equal to 0")
         }
 
         let bundle = GiftCardBundle(

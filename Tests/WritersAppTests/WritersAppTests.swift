@@ -2328,8 +2328,8 @@ final class WritersAppTests: XCTestCase {
             XCTFail("Screenplay template not found")
             return
         }
-        XCTAssertEqual(screenplay.placeholders.count, 10,
-                       "Screenplay template should have 10 placeholders")
+        XCTAssertEqual(screenplay.placeholders.count, 8,
+                       "Screenplay template should have 8 placeholders")
     }
 
     func testScreenplayTemplateHasExpectedPlaceholderKeys() {
@@ -2341,8 +2341,7 @@ final class WritersAppTests: XCTestCase {
         let keys = Set(screenplay.placeholders.map { $0.key })
         let expected: Set<String> = [
             "scene_heading", "action", "character", "dialogue",
-            "character_2", "parenthetical", "dialogue_2", "transition",
-            "character_state", "shot_description"
+            "character_2", "parenthetical", "dialogue_2", "transition"
         ]
         XCTAssertEqual(keys, expected, "Screenplay template should have exactly the expected placeholder set")
     }

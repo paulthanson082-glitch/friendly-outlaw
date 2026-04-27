@@ -150,29 +150,29 @@ final class CoworkModeTests: XCTestCase {
         XCTAssertEqual(app.activeCoworkSession?.prospectsAdded, 2)
     }
 
-    func testProspectsContactedCounterOnlyIncrementsOnTrueTransition() throws {
+    func testProspectsContactedCounterIncrementsOnEveryContactStatusUpdate() throws {
         app.startCoworkSession()
         let prospect = app.addProspect(name: "P", email: "p@x.com")
 
-        // Transition new → contacted: should increment
+        // new → contacted: should increment
         try app.updateProspectStatus(id: prospect.id, status: .contacted)
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
 
-        // contacted → contacted again: should NOT increment
+        // contacted → contacted again: also increments (new behaviour)
         try app.updateProspectStatus(id: prospect.id, status: .contacted)
-        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 2)
 
-        // contacted → replied (still a contact state): should NOT increment
+        // contacted → replied (still a contact state): increments
         try app.updateProspectStatus(id: prospect.id, status: .replied)
-        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 3)
 
         // replied → declined (not a contact state): counter stays
         try app.updateProspectStatus(id: prospect.id, status: .declined)
-        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 3)
 
-        // declined → meeting (contact state, transitioning from non-contact): should increment
+        // declined → meeting (contact state): should increment
         try app.updateProspectStatus(id: prospect.id, status: .meeting)
-        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 2)
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 4)
     }
 
     func testCoworkSessionDurationMinutes() {
