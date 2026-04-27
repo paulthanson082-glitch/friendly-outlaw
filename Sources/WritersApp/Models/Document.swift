@@ -72,6 +72,14 @@ public struct Document: Codable, Identifiable, Hashable {
         guard let goal = metadata.wordCountGoal, goal > 0 else { return 0.0 }
         return min(1.0, Double(wordCount) / Double(goal))
     }
+
+    public static func == (lhs: Document, rhs: Document) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
 }
 
 /// Metadata for documents
