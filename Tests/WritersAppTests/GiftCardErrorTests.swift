@@ -152,26 +152,19 @@ final class GiftCardErrorTests: XCTestCase {
         XCTAssertEqual(extracted, specificMessage)
     }
 
-    // MARK: - Regression: expirationDays=0 is now valid (PR change: >= 0 instead of > 0)
+    // MARK: - Regression: expirationDays=0 is now valid (>= 0 allows zero)
 
-    func testZeroExpirationDaysErrorMessageContent() throws {
+    func testZeroExpirationDaysIsNowValid() throws {
         let manager = GiftCardManager()
-        XCTAssertThrowsError(
-            try manager.createBundle(
-                name: "Test",
-                description: "Test",
-                price: 10.0,
-                bundleType: .starter,
-                aiCredits: 50,
-                expirationDays: -1
-            )
-        ) { error in
-            guard case GiftCardError.invalidInput(let msg) = error else {
-                XCTFail("Expected GiftCardError.invalidInput, got \(error)")
-                return
-            }
-            XCTAssertEqual(msg, "Expiration days must be greater than or equal to 0")
-        }
+        let bundle = try manager.createBundle(
+            name: "Test",
+            description: "Test",
+            price: 10.0,
+            bundleType: .starter,
+            aiCredits: 50,
+            expirationDays: 0
+        )
+        XCTAssertEqual(bundle.expirationDays, 0)
     }
 
     // MARK: - Pattern matching for remaining cases (bundleExpired, alreadyRedeemed)
