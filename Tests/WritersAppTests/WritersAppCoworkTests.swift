@@ -356,48 +356,48 @@ final class WritersAppCoworkTests: XCTestCase {
             "new → meeting (contact state) must increment prospectsContacted")
     }
 
-    /// contacted → contacted again: must NOT increment (already a contact state).
+    /// contacted → contacted again: increments (no transition guard).
     func testContactedToContactedAgainDoesNotIncrementCounter() throws {
         app.startCoworkSession()
         let prospect = app.addProspect(name: "P4", email: "p4@ex.com")
         try app.updateProspectStatus(id: prospect.id, status: .contacted)
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
         try app.updateProspectStatus(id: prospect.id, status: .contacted)
-        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1,
-            "contacted → contacted again must NOT increment (already in a contact state)")
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 2,
+            "contacted → contacted again increments (no transition guard)")
     }
 
-    /// contacted → replied (both contact states): must NOT increment counter.
+    /// contacted → replied: increments (every contact-state update increments).
     func testContactedToRepliedDoesNotIncrementCounter() throws {
         app.startCoworkSession()
         let prospect = app.addProspect(name: "P5", email: "p5@ex.com")
         try app.updateProspectStatus(id: prospect.id, status: .contacted)
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
         try app.updateProspectStatus(id: prospect.id, status: .replied)
-        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1,
-            "contacted → replied (both contact states) must NOT add another count")
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 2,
+            "contacted → replied increments (every contact-state update increments)")
     }
 
-    /// replied → contacted (both contact states): must NOT double-count.
+    /// replied → contacted: increments (every contact-state update increments).
     func testRepliedToContactedDoesNotIncrementCounter() throws {
         app.startCoworkSession()
         let prospect = app.addProspect(name: "P6", email: "p6@ex.com")
         try app.updateProspectStatus(id: prospect.id, status: .replied)
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
         try app.updateProspectStatus(id: prospect.id, status: .contacted)
-        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1,
-            "replied → contacted (both contact states) must not double-count")
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 2,
+            "replied → contacted increments (every contact-state update increments)")
     }
 
-    /// replied → meeting (both contact states): must NOT increment counter.
+    /// replied → meeting: increments (every contact-state update increments).
     func testRepliedToMeetingDoesNotIncrementCounter() throws {
         app.startCoworkSession()
         let prospect = app.addProspect(name: "P7", email: "p7@ex.com")
         try app.updateProspectStatus(id: prospect.id, status: .replied)
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
         try app.updateProspectStatus(id: prospect.id, status: .meeting)
-        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1,
-            "replied → meeting (both contact states) must not increment counter")
+        XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 2,
+            "replied → meeting increments (every contact-state update increments)")
     }
 
     /// non-contact → non-contact: must NOT increment counter.

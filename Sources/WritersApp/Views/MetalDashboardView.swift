@@ -19,8 +19,13 @@ public struct MetalDashboardView: View {
 
 
     @MainActor
-    public init(viewModel: MetalDashboardViewModel = MetalDashboardViewModel()) {
+    public init(viewModel: MetalDashboardViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
+    }
+
+    @MainActor
+    public init() {
+        _viewModel = StateObject(wrappedValue: MetalDashboardViewModel())
     }
 
     public var body: some View {

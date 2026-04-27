@@ -96,7 +96,7 @@ final class MockerKitTests: XCTestCase {
             repository: "nginx",
             tag: "latest"
         )
-        XCTAssertEqual(image.shortId, "sha256abcdef")
+        XCTAssertEqual(image.shortId, "sha256abcdef12")
     }
 
     func testImageInfoReference() {
