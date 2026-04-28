@@ -1,0 +1,16 @@
+{
+  "name": "friendly-outlaw Swift",
+  "image": "swift:6.0",
+  "postCreateCommand": "swift build",
+  "remoteUser": "root",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "sswg.swift-lang"
+      ],
+      "settings": {
+        "swift.path": "/usr/bin"
+      }
+    }
+  }
+}
