@@ -1,0 +1,70 @@
+#!/data/data/com.termux/files/usr/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/colors.sh" 2>/dev/null
+
+header
+echo -e "  ${WHITE}${BOLD}QUICK COMMAND REFERENCE${NC}"
+echo ""
+
+echo -e "  ${CYAN}── ADB ──────────────────────────────────────────────────${NC}"
+echo -e "  ${GREEN}adb devices -l${NC}                          List connected devices"
+echo -e "  ${GREEN}adb shell${NC}                               Open device shell"
+echo -e "  ${GREEN}adb logcat -v time *:E${NC}                  Show errors only"
+echo -e "  ${GREEN}adb shell dumpsys battery${NC}               Battery info"
+echo -e "  ${GREEN}adb shell pm list packages -3${NC}           User-installed apps"
+echo -e "  ${GREEN}adb shell am start -n pkg/.Activity${NC}     Launch activity"
+echo -e "  ${GREEN}adb shell input tap X Y${NC}                 Tap screen at coords"
+echo -e "  ${GREEN}adb shell input text 'hello'${NC}            Type text"
+echo -e "  ${GREEN}adb shell screencap -p /sdcard/sc.png${NC}   Screenshot"
+echo ""
+
+echo -e "  ${CYAN}── Network ──────────────────────────────────────────────${NC}"
+echo -e "  ${GREEN}nmap -T4 192.168.1.0/24${NC}                Scan local network"
+echo -e "  ${GREEN}nmap -sV -p 1-1000 target${NC}              Service scan"
+echo -e "  ${GREEN}curl -sI https://example.com${NC}            HTTP headers"
+echo -e "  ${GREEN}dig example.com ANY${NC}                     All DNS records"
+echo -e "  ${GREEN}mtr google.com${NC}                          Traceroute + ping"
+echo -e "  ${GREEN}iperf3 -s${NC}                               Start bandwidth server"
+echo -e "  ${GREEN}nc -zv host 80-443${NC}                      Port scan with nc"
+echo -e "  ${GREEN}ss -tnp${NC}                                 Active TCP connections"
+echo ""
+
+echo -e "  ${CYAN}── Frida ────────────────────────────────────────────────${NC}"
+echo -e "  ${GREEN}frida-ps -U${NC}                             List USB device processes"
+echo -e "  ${GREEN}frida -U com.app -l script.js${NC}           Inject script"
+echo -e "  ${GREEN}frida -U -f com.app --no-pause${NC}          Spawn and attach"
+echo -e "  ${GREEN}objection -g com.app explore${NC}            Interactive exploration"
+echo -e "  ${GREEN}objection patchapk -s app.apk${NC}           Patch APK with gadget"
+echo ""
+
+echo -e "  ${CYAN}── System ───────────────────────────────────────────────${NC}"
+echo -e "  ${GREEN}getprop ro.build.version.release${NC}        Android version"
+echo -e "  ${GREEN}cat /proc/cpuinfo${NC}                       CPU info"
+echo -e "  ${GREEN}cat /proc/meminfo${NC}                       Memory info"
+echo -e "  ${GREEN}df -h${NC}                                   Disk usage"
+echo -e "  ${GREEN}top -n 1${NC}                                CPU/process snapshot"
+echo -e "  ${GREEN}cat /proc/loadavg${NC}                       System load"
+echo ""
+
+echo -e "  ${CYAN}── Crypto & Hashing ─────────────────────────────────────${NC}"
+echo -e "  ${GREEN}sha256sum file${NC}                          SHA256 hash"
+echo -e "  ${GREEN}openssl rand -hex 32${NC}                    Generate 32-byte hex key"
+echo -e "  ${GREEN}echo 'text' | base64${NC}                    Base64 encode"
+echo -e "  ${GREEN}openssl s_client -connect h:443${NC}         TLS cert inspect"
+echo ""
+
+echo -e "  ${CYAN}── File Tools ───────────────────────────────────────────${NC}"
+echo -e "  ${GREEN}strings -n 8 binary${NC}                     Extract strings"
+echo -e "  ${GREEN}xxd file | head -20${NC}                     Hex dump"
+echo -e "  ${GREEN}file apk_or_binary${NC}                      File type"
+echo -e "  ${GREEN}objdump -d binary | head -50${NC}            Disassemble"
+echo -e "  ${GREEN}readelf -h binary${NC}                       ELF header"
+echo ""
+
+echo -e "  ${CYAN}── APK ──────────────────────────────────────────────────${NC}"
+echo -e "  ${GREEN}apktool d app.apk${NC}                       Decompile APK"
+echo -e "  ${GREEN}apktool b app_dir${NC}                       Recompile"
+echo -e "  ${GREEN}jadx app.apk -d output/${NC}                 Decompile to Java"
+echo ""
+
+echo -ne "  ${DIM}Press Enter to return...${NC}"; read -r
