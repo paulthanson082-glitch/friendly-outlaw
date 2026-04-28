@@ -107,6 +107,17 @@ public class WritingGoalManager {
         return goals.values.filter { $0.type == .daily && $0.isActive }
     }
 
+    /// Searches goals by name or notes
+    public func searchGoals(query: String) -> [WritingGoal] {
+        if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return getAllGoals()
+        }
+        return goals.values.filter { goal in
+            goal.name.localizedCaseInsensitiveContains(query) ||
+            goal.notes.localizedCaseInsensitiveContains(query)
+        }.sorted { $0.startDate > $1.startDate }
+    }
+
     // MARK: - Progress Tracking
 
     /// Records progress toward a goal

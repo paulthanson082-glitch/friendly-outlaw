@@ -729,6 +729,73 @@ final class WritingGoalManagerTests: XCTestCase {
         }
     }
 
+    // MARK: - Search Tests
+
+    func testSearchGoalsByName() {
+        _ = manager.createGoal(name: "Morning Writing", type: .daily, target: 500)
+        _ = manager.createGoal(name: "Novel Project", type: .project, target: 50000)
+
+        let results = manager.searchGoals(query: "morning")
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.name, "Morning Writing")
+    }
+
+    func testSearchGoalsByNotes() {
+        var goal = manager.createGoal(name: "Daily Goal", type: .daily, target: 500)
+        goal.notes = "Focus on chapter three"
+        manager.updateGoal(goal)
+        _ = manager.createGoal(name: "Weekly Goal", type: .weekly, target: 3000)
+
+        let results = manager.searchGoals(query: "chapter")
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.id, goal.id)
+    }
+
+    func testSearchGoalsCaseInsensitive() {
+        _ = manager.createGoal(name: "NOVEL PROJECT", type: .project, target: 50000)
+
+        let results = manager.searchGoals(query: "novel")
+
+        XCTAssertEqual(results.count, 1)
+    }
+
+    func testSearchGoalsEmptyQueryReturnsAll() {
+        _ = manager.createGoal(name: "Goal 1", type: .daily, target: 500)
+        _ = manager.createGoal(name: "Goal 2", type: .weekly, target: 3000)
+
+        let results = manager.searchGoals(query: "")
+
+        XCTAssertEqual(results.count, 2)
+    }
+
+    func testSearchGoalsWhitespaceQueryReturnsAll() {
+        _ = manager.createGoal(name: "Goal 1", type: .daily, target: 500)
+
+        let results = manager.searchGoals(query: "   ")
+
+        XCTAssertEqual(results.count, 1)
+    }
+
+    func testSearchGoalsNoMatch() {
+        _ = manager.createGoal(name: "Morning Writing", type: .daily, target: 500)
+
+        let results = manager.searchGoals(query: "xyz_no_match")
+
+        XCTAssertEqual(results.count, 0)
+    }
+
+    func testSearchGoalsMatchesMultiple() {
+        _ = manager.createGoal(name: "Daily Writing Goal", type: .daily, target: 500)
+        _ = manager.createGoal(name: "Weekly Writing Goal", type: .weekly, target: 3000)
+        _ = manager.createGoal(name: "Unrelated", type: .project, target: 1000)
+
+        let results = manager.searchGoals(query: "writing")
+
+        XCTAssertEqual(results.count, 2)
+    }
+
     // MARK: - Edge Cases and Negative Tests
 
     func testCreateGoalWithZeroTarget() {
