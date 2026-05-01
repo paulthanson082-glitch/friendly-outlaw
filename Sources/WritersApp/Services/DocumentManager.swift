@@ -36,7 +36,11 @@ public class DocumentManager {
             .sorted { $0.metadata.modified > $1.metadata.modified }
     }
 
-    /// Searches documents by title or content
+    /// Searches documents for a given query across titles and content.
+    /// 
+    /// The query is trimmed of leading and trailing whitespace and newlines; if the trimmed query is empty, no documents are returned. Matching is performed using case-insensitive containment against each document's `title` and `content`. Results are ordered by `metadata.modified` descending.
+    /// - Parameter query: The search term; leading and trailing whitespace/newlines are ignored.
+    /// - Returns: An array of matching `Document` values sorted by most recently modified first; an empty array if the trimmed query is empty or no matches are found.
     public func searchDocuments(query: String) -> [Document] {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedQuery.isEmpty else { return [] }
