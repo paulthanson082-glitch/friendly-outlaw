@@ -210,11 +210,7 @@ public class WritersApp {
     /// The document's content is sent to Ragie as raw text. The returned
     /// `RagieDocument` includes the Ragie document id and initial processing status.
     /// Poll `getRagieDocumentStatus(ragieId:)` until `isReady` is true before querying.
-    ///
-    /// - Parameter documentId: The id of the local `Document` to ingest.
-    /// Ingests the specified document's text into Ragie and returns the resulting RagieDocument.
-    /// - Parameters:
-    ///   - documentId: The UUID of the document to ingest.
+    /// - Parameter documentId: The UUID of the document to ingest.
     /// - Returns: The `RagieDocument` created by Ragie for the ingested document.
     /// - Throws: `RagieError.ragieNotEnabled` if Ragie has not been enabled; `RagieError.documentNotFound` if no document exists with the given `documentId`.
     public func ingestDocumentToRagie(documentId: UUID) async throws -> RagieDocument {
@@ -230,13 +226,9 @@ public class WritersApp {
     }
 
     /// Fetch the processing status of a Ragie document.
-    ///
-    /// - Parameter ragieId: The Ragie document id (from `ingestDocumentToRagie`).
-    /// Retrieves the Ragie document and its current status for the given Ragie document identifier.
     /// - Parameter ragieId: The Ragie-assigned identifier of the document to fetch.
     /// - Returns: The `RagieDocument` matching `ragieId`.
-    /// - Throws: `RagieError.ragieNotEnabled` if Ragie integration is not enabled.
-    /// - Throws: Any error propagated from `RagieService` if the document cannot be retrieved.
+    /// - Throws: `RagieError.ragieNotEnabled` if Ragie integration is not enabled; any error propagated from `RagieService` if the document cannot be retrieved.
     public func getRagieDocumentStatus(ragieId: String) async throws -> RagieDocument {
         guard let ragie = ragieService else { throw RagieError.ragieNotEnabled }
         return try await ragie.getDocument(id: ragieId)
