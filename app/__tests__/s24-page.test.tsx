@@ -111,7 +111,7 @@ describe('S24ToolsPage', () => {
 
       await waitFor(() => {
         // "Run Device Care optimizer" should now be checked
-        const btn = screen.getByLabelText('Mark incomplete');
+        const btn = screen.getByLabelText(/as incomplete/i);
         expect(btn).toBeInTheDocument();
       });
     });
@@ -119,7 +119,7 @@ describe('S24ToolsPage', () => {
     it('persists checked state to localStorage when a task is toggled', async () => {
       render(<S24ToolsPage />);
 
-      const checkboxes = screen.getAllByLabelText('Mark complete');
+      const checkboxes = screen.getAllByLabelText(/as complete/i);
       fireEvent.click(checkboxes[0]);
 
       await waitFor(() => {
@@ -145,14 +145,14 @@ describe('S24ToolsPage', () => {
 
       render(<S24ToolsPage />);
 
-      const checkboxes = screen.getAllByLabelText('Mark complete');
+      const checkboxes = screen.getAllByLabelText(/as complete/i);
       expect(() => fireEvent.click(checkboxes[0])).not.toThrow();
     });
 
     it('stores the correct task id as the key in localStorage', async () => {
       render(<S24ToolsPage />);
 
-      const checkboxes = screen.getAllByLabelText('Mark complete');
+      const checkboxes = screen.getAllByLabelText(/as complete/i);
       fireEvent.click(checkboxes[0]); // speed-1
 
       await waitFor(() => {
@@ -174,35 +174,35 @@ describe('S24ToolsPage', () => {
     it('marks a task complete when its checkbox is clicked', async () => {
       render(<S24ToolsPage />);
 
-      const checkbox = screen.getAllByLabelText('Mark complete')[0];
+      const checkbox = screen.getAllByLabelText(/as complete/i)[0];
       fireEvent.click(checkbox);
 
       await waitFor(() => {
-        expect(screen.getByLabelText('Mark incomplete')).toBeInTheDocument();
+        expect(screen.getByLabelText(/as incomplete/i)).toBeInTheDocument();
       });
     });
 
     it('un-marks a completed task when clicked again (toggle)', async () => {
       render(<S24ToolsPage />);
 
-      const checkbox = screen.getAllByLabelText('Mark complete')[0];
+      const checkbox = screen.getAllByLabelText(/as complete/i)[0];
       fireEvent.click(checkbox);
 
       await waitFor(() =>
-        expect(screen.getByLabelText('Mark incomplete')).toBeInTheDocument()
+        expect(screen.getByLabelText(/as incomplete/i)).toBeInTheDocument()
       );
 
-      fireEvent.click(screen.getByLabelText('Mark incomplete'));
+      fireEvent.click(screen.getByLabelText(/as incomplete/i));
 
       await waitFor(() => {
-        expect(screen.queryByLabelText('Mark incomplete')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/as incomplete/i)).not.toBeInTheDocument();
       });
     });
 
     it('shows a checkmark inside a completed task checkbox', async () => {
       render(<S24ToolsPage />);
 
-      const checkbox = screen.getAllByLabelText('Mark complete')[0];
+      const checkbox = screen.getAllByLabelText(/as complete/i)[0];
       fireEvent.click(checkbox);
 
       await waitFor(() => {
@@ -214,7 +214,7 @@ describe('S24ToolsPage', () => {
       render(<S24ToolsPage />);
 
       // Click the first task checkbox
-      fireEvent.click(screen.getAllByLabelText('Mark complete')[0]);
+      fireEvent.click(screen.getAllByLabelText(/as complete/i)[0]);
 
       await waitFor(() => {
         const label = screen.getByText('Run Device Care optimizer');
@@ -227,7 +227,7 @@ describe('S24ToolsPage', () => {
 
       expect(screen.getByText('0/27')).toBeInTheDocument();
 
-      fireEvent.click(screen.getAllByLabelText('Mark complete')[0]);
+      fireEvent.click(screen.getAllByLabelText(/as complete/i)[0]);
 
       await waitFor(() => {
         expect(screen.getByText('1/27')).toBeInTheDocument();
@@ -240,7 +240,7 @@ describe('S24ToolsPage', () => {
       // Speed & Performance has 7 tasks; tab badge initially shows 0/7
       expect(screen.getAllByText('0/7')[0]).toBeInTheDocument();
 
-      fireEvent.click(screen.getAllByLabelText('Mark complete')[0]);
+      fireEvent.click(screen.getAllByLabelText(/as complete/i)[0]);
 
       await waitFor(() => {
         expect(screen.getAllByText('1/7')[0]).toBeInTheDocument();
@@ -326,7 +326,7 @@ describe('S24ToolsPage', () => {
     it('updates section progress text when tasks are completed', async () => {
       render(<S24ToolsPage />);
 
-      fireEvent.click(screen.getAllByLabelText('Mark complete')[0]);
+      fireEvent.click(screen.getAllByLabelText(/as complete/i)[0]);
 
       await waitFor(() => {
         expect(screen.getByText('1 of 7 tasks completed')).toBeInTheDocument();
@@ -350,7 +350,7 @@ describe('S24ToolsPage', () => {
 
       expect(screen.queryByText('Reset')).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getAllByLabelText('Mark complete')[0]);
+      fireEvent.click(screen.getAllByLabelText(/as complete/i)[0]);
 
       await waitFor(() => {
         expect(screen.getByText('Reset')).toBeInTheDocument();
@@ -361,25 +361,25 @@ describe('S24ToolsPage', () => {
       render(<S24ToolsPage />);
 
       // Check first two tasks in Speed section
-      const checkboxes = screen.getAllByLabelText('Mark complete');
+      const checkboxes = screen.getAllByLabelText(/as complete/i);
       fireEvent.click(checkboxes[0]);
       fireEvent.click(checkboxes[1]);
 
       await waitFor(() =>
-        expect(screen.getAllByLabelText('Mark incomplete')).toHaveLength(2)
+        expect(screen.getAllByLabelText(/as incomplete/i)).toHaveLength(2)
       );
 
       fireEvent.click(screen.getByText('Reset'));
 
       await waitFor(() => {
-        expect(screen.queryByLabelText('Mark incomplete')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/as incomplete/i)).not.toBeInTheDocument();
       });
     });
 
     it('hides Reset button after reset clears all tasks', async () => {
       render(<S24ToolsPage />);
 
-      fireEvent.click(screen.getAllByLabelText('Mark complete')[0]);
+      fireEvent.click(screen.getAllByLabelText(/as complete/i)[0]);
 
       await waitFor(() =>
         expect(screen.getByText('Reset')).toBeInTheDocument()
@@ -400,7 +400,7 @@ describe('S24ToolsPage', () => {
       await waitFor(() =>
         expect(screen.getByText('Install Microsoft 365')).toBeInTheDocument()
       );
-      fireEvent.click(screen.getAllByLabelText('Mark complete')[0]);
+      fireEvent.click(screen.getAllByLabelText(/as complete/i)[0]);
       await waitFor(() =>
         expect(screen.getByText('1 of 7 tasks completed')).toBeInTheDocument()
       );
@@ -410,7 +410,7 @@ describe('S24ToolsPage', () => {
       await waitFor(() =>
         expect(screen.getByText('Run Device Care optimizer')).toBeInTheDocument()
       );
-      fireEvent.click(screen.getAllByLabelText('Mark complete')[0]);
+      fireEvent.click(screen.getAllByLabelText(/as complete/i)[0]);
       await waitFor(() =>
         expect(screen.getByText('Reset')).toBeInTheDocument()
       );
@@ -495,7 +495,7 @@ describe('S24ToolsPage', () => {
       render(<S24ToolsPage />);
 
       await waitFor(() => {
-        const incomplete = screen.getAllByLabelText('Mark incomplete');
+        const incomplete = screen.getAllByLabelText(/as incomplete/i);
         expect(incomplete).toHaveLength(3);
       });
     });
@@ -524,7 +524,7 @@ describe('S24ToolsPage', () => {
       render(<S24ToolsPage />);
 
       // Complete a task in speed
-      fireEvent.click(screen.getAllByLabelText('Mark complete')[0]);
+      fireEvent.click(screen.getAllByLabelText(/as complete/i)[0]);
       await waitFor(() =>
         expect(screen.getByText('Reset')).toBeInTheDocument()
       );
@@ -539,7 +539,7 @@ describe('S24ToolsPage', () => {
     it('persists overall progress across tab switches', async () => {
       render(<S24ToolsPage />);
 
-      fireEvent.click(screen.getAllByLabelText('Mark complete')[0]);
+      fireEvent.click(screen.getAllByLabelText(/as complete/i)[0]);
       await waitFor(() =>
         expect(screen.getByText('1/27')).toBeInTheDocument()
       );
@@ -567,7 +567,7 @@ describe('S24ToolsPage', () => {
 
     it('writes localStorage with the exact key "s24-tools-checked" after toggle', async () => {
       render(<S24ToolsPage />);
-      fireEvent.click(screen.getAllByLabelText('Mark complete')[0]);
+      fireEvent.click(screen.getAllByLabelText(/as complete/i)[0]);
       await waitFor(() => {
         expect(localStorageMock.setItem).toHaveBeenCalledWith(
           's24-tools-checked',
@@ -590,7 +590,7 @@ describe('S24ToolsPage', () => {
       await waitFor(() =>
         expect(screen.getByText('Run storage clean in Device Care')).toBeInTheDocument()
       );
-      fireEvent.click(screen.getAllByLabelText('Mark complete')[0]);
+      fireEvent.click(screen.getAllByLabelText(/as complete/i)[0]);
       await waitFor(() => {
         expect(screen.getByText('1 of 7 tasks completed')).toBeInTheDocument();
       });
@@ -620,11 +620,11 @@ describe('S24ToolsPage', () => {
 
     it('overall counter decrements back to 0 after toggling the only completed task off', async () => {
       render(<S24ToolsPage />);
-      const checkbox = screen.getAllByLabelText('Mark complete')[0];
+      const checkbox = screen.getAllByLabelText(/as complete/i)[0];
       fireEvent.click(checkbox);
       await waitFor(() => expect(screen.getByText('1/27')).toBeInTheDocument());
 
-      fireEvent.click(screen.getByLabelText('Mark incomplete'));
+      fireEvent.click(screen.getByLabelText(/as incomplete/i));
       await waitFor(() => {
         expect(screen.getByText('0/27')).toBeInTheDocument();
       });
