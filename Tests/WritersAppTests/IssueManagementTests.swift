@@ -167,20 +167,92 @@ final class IssueManagementTests: XCTestCase {
         _ = app.createIssue(documentId: testDocumentId, title: "Character development", description: "Add backstory")
         _ = app.createIssue(documentId: testDocumentId, title: "Plot revision", description: "Fix pacing issues")
         _ = app.createIssue(documentId: testDocumentId, title: "Grammar check", description: "Review dialogue")
-        
+
         let characterResults = app.searchIssues(query: "character")
         XCTAssertEqual(characterResults.count, 1)
         XCTAssertEqual(characterResults.first?.title, "Character development")
-        
+
         let plotResults = app.searchIssues(query: "plot")
         XCTAssertEqual(plotResults.count, 1)
-        
+
         let dialogueResults = app.searchIssues(query: "dialogue")
         XCTAssertEqual(dialogueResults.count, 1)
-        
+
         // Empty query should return all issues
         let allResults = app.searchIssues(query: "")
         XCTAssertEqual(allResults.count, 3)
+    }
+
+    func testSearchIssuesWhitespaceOnlyQueryReturnsAll() {
+        // PR change: whitespace-only query now returns all issues instead of empty array
+        _ = app.createIssue(documentId: testDocumentId, title: "Issue One", description: "First")
+        _ = app.createIssue(documentId: testDocumentId, title: "Issue Two", description: "Second")
+
+        let spaceResults = app.searchIssues(query: "   ")
+        XCTAssertEqual(spaceResults.count, 2)
+
+        let newlineResults = app.searchIssues(query: "\n")
+        XCTAssertEqual(newlineResults.count, 2)
+
+        let mixedResults = app.searchIssues(query: " \t ")
+        XCTAssertEqual(mixedResults.count, 2)
+    }
+
+    func testSearchIssuesWhitespaceQueryOnEmptyStore() {
+        // Regression: whitespace-only query on empty issue store should return empty, not crash
+        let results = app.searchIssues(query: "   ")
+        XCTAssertEqual(results.count, 0)
+    }
+
+    func testSearchIssuesDirectlyOnIssueManager() {
+        // Test IssueManager.searchIssues directly (not via app) for completeness
+        let manager = IssueManager()
+        let docId = UUID()
+
+        let issue1 = Issue(documentId: docId, title: "Plot hole", description: "Missing character motive")
+        let issue2 = Issue(documentId: docId, title: "Grammar error", description: "Fix dialogue punctuation")
+        manager.createIssue(issue1)
+        manager.createIssue(issue2)
+
+        // Non-empty query filters by title or description
+        let plotResults = manager.searchIssues(query: "plot")
+        XCTAssertEqual(plotResults.count, 1)
+        XCTAssertEqual(plotResults.first?.id, issue1.id)
+
+        let dialogueResults = manager.searchIssues(query: "dialogue")
+        XCTAssertEqual(dialogueResults.count, 1)
+        XCTAssertEqual(dialogueResults.first?.id, issue2.id)
+
+        // Empty query returns all
+        let allResults = manager.searchIssues(query: "")
+        XCTAssertEqual(allResults.count, 2)
+
+        // Whitespace-only query returns all (PR change)
+        let whitespaceResults = manager.searchIssues(query: "   ")
+        XCTAssertEqual(whitespaceResults.count, 2)
+    }
+
+    func testSearchIssuesDirectlySortedByCreatedDesc() {
+        // Verify search results are sorted by created date descending
+        let manager = IssueManager()
+        let docId = UUID()
+
+        let issue1 = Issue(documentId: docId, title: "Older issue", description: "")
+        manager.createIssue(issue1)
+        Thread.sleep(forTimeInterval: 0.01)
+        let issue2 = Issue(documentId: docId, title: "Newer issue", description: "")
+        manager.createIssue(issue2)
+
+        // Empty query returns all, newest first
+        let results = manager.searchIssues(query: "")
+        XCTAssertEqual(results.count, 2)
+        XCTAssertEqual(results[0].id, issue2.id)
+        XCTAssertEqual(results[1].id, issue1.id)
+
+        // Whitespace query also returns newest first
+        let wsResults = manager.searchIssues(query: "  ")
+        XCTAssertEqual(wsResults.count, 2)
+        XCTAssertEqual(wsResults[0].id, issue2.id)
     }
     
     // MARK: - Issue Status Update Tests

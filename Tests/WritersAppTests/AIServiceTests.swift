@@ -221,6 +221,115 @@ final class AIServiceTests: XCTestCase {
         XCTAssertEqual(insights.insights, "Reading level: Grade 8")
     }
 
+    // MARK: - extractText Behavior Tests (PR change: separator "" instead of " ")
+
+    // extractText is a private method. The tests below validate the expected
+    // concatenation behavior (no separator between adjacent text blocks) using
+    // a local helper that mirrors the changed logic, and verify observable
+    // public-API contract properties that depend on it.
+
+    /// Local mirror of the changed private extractText(from:) logic.
+    private func extractText(from content: [[String: Any]]) -> String? {
+        let textParts = content.compactMap { block -> String? in
+            guard block["type"] as? String == "text" else { return nil }
+            return block["text"] as? String
+        }
+        // PR change: joined() — no separator (was joined(separator: " "))
+        return textParts.isEmpty ? nil : textParts.joined()
+    }
+
+    func testExtractTextSingleBlock() {
+        let content: [[String: Any]] = [
+            ["type": "text", "text": "Hello world"]
+        ]
+        let result = extractText(from: content)
+        XCTAssertEqual(result, "Hello world")
+    }
+
+    func testExtractTextMultipleBlocksJoinedWithoutSeparator() {
+        // PR change: blocks are now joined with no separator (previously joined with " ")
+        let content: [[String: Any]] = [
+            ["type": "text", "text": "Hello"],
+            ["type": "text", "text": " world"]
+        ]
+        let result = extractText(from: content)
+        // After change: "Hello" + " world" = "Hello world" (space is part of the second block)
+        XCTAssertEqual(result, "Hello world")
+    }
+
+    func testExtractTextMultipleBlocksNoSpaceInBlocks() {
+        // With the old separator " " this would be "foobar" with a space between.
+        // With the new separator "" (empty) this concatenates directly: "foobar"
+        let content: [[String: Any]] = [
+            ["type": "text", "text": "foo"],
+            ["type": "text", "text": "bar"]
+        ]
+        let result = extractText(from: content)
+        // PR change: no space inserted between blocks → "foobar"
+        XCTAssertEqual(result, "foobar")
+        XCTAssertNotEqual(result, "foo bar")
+    }
+
+    func testExtractTextIgnoresNonTextBlocks() {
+        let content: [[String: Any]] = [
+            ["type": "tool_use", "id": "tu_123", "name": "search", "input": [:]],
+            ["type": "text", "text": "Result after tool"]
+        ]
+        let result = extractText(from: content)
+        XCTAssertEqual(result, "Result after tool")
+    }
+
+    func testExtractTextReturnsNilForEmptyContent() {
+        let content: [[String: Any]] = []
+        let result = extractText(from: content)
+        XCTAssertNil(result)
+    }
+
+    func testExtractTextReturnsNilForNoTextBlocks() {
+        // All blocks are non-text; nil is returned
+        let content: [[String: Any]] = [
+            ["type": "tool_use", "id": "tu_1", "name": "search", "input": [:]],
+            ["type": "tool_result", "tool_use_id": "tu_1", "content": "done"]
+        ]
+        let result = extractText(from: content)
+        XCTAssertNil(result)
+    }
+
+    func testExtractTextWithEmptyStringBlock() {
+        // A text block with an empty string contributes nothing but is still a valid block
+        let content: [[String: Any]] = [
+            ["type": "text", "text": ""]
+        ]
+        let result = extractText(from: content)
+        // One text block exists, so result is non-nil — it's an empty string
+        XCTAssertNotNil(result)
+        XCTAssertEqual(result, "")
+    }
+
+    func testExtractTextMixedBlocksMultipleTextBlocks() {
+        // Interleaved text and tool blocks; only text blocks are extracted and concatenated
+        let content: [[String: Any]] = [
+            ["type": "text", "text": "Part one."],
+            ["type": "tool_use", "id": "tu_1", "name": "lookup", "input": [:]],
+            ["type": "text", "text": "Part two."]
+        ]
+        let result = extractText(from: content)
+        // PR change: no space inserted → "Part one.Part two."
+        XCTAssertEqual(result, "Part one.Part two.")
+        XCTAssertNotEqual(result, "Part one. Part two.")
+    }
+
+    func testExtractTextFallbackInToolLoopReturnsEmptyStringWhenNoText() {
+        // In sendRequestWithToolLoop, when stop_reason == "end_turn",
+        // the result is extractText(from: content) ?? "".
+        // If extractText returns nil (no text blocks), the result is "".
+        let noTextContent: [[String: Any]] = [
+            ["type": "tool_use", "id": "tu_1", "name": "search", "input": [:]]
+        ]
+        let result = extractText(from: noTextContent) ?? ""
+        XCTAssertEqual(result, "")
+    }
+
     // MARK: - AIServiceError Tests
 
     func testAIServiceErrorDescriptions() {

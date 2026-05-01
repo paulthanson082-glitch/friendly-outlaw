@@ -76,6 +76,61 @@ final class DocumentManagerTests: XCTestCase {
         XCTAssertEqual(results.count, 2)
     }
 
+    func testSearchDocumentsWhitespaceOnlyQueryReturnsAll() {
+        // PR change: whitespace-only query now returns all documents instead of empty array
+        let doc1 = Document(title: "Alpha", content: "First content", category: .article)
+        let doc2 = Document(title: "Beta", content: "Second content", category: .novel)
+
+        documentManager.createDocument(doc1)
+        documentManager.createDocument(doc2)
+
+        let spaceResults = documentManager.searchDocuments(query: "   ")
+        XCTAssertEqual(spaceResults.count, 2)
+
+        let newlineResults = documentManager.searchDocuments(query: "\n\n")
+        XCTAssertEqual(newlineResults.count, 2)
+
+        let tabResults = documentManager.searchDocuments(query: "\t  \t")
+        XCTAssertEqual(tabResults.count, 2)
+    }
+
+    func testSearchDocumentsWhitespaceQueryOnEmptyStore() {
+        // Regression: whitespace query on empty store should return empty array, not crash
+        let results = documentManager.searchDocuments(query: "   ")
+        XCTAssertEqual(results.count, 0)
+    }
+
+    func testSearchDocumentsQueryWithSurroundingWhitespace() {
+        // PR change: query is passed directly to localizedCaseInsensitiveContains without trimming,
+        // so leading/trailing whitespace in a non-blank query is included in matching.
+        // A query like " Swift " (with spaces) should NOT match "Swift Programming" because
+        // the title does not contain the literal string " Swift " with surrounding spaces.
+        let doc = Document(title: "Swift Programming", content: "Learn Swift", category: .article)
+        documentManager.createDocument(doc)
+
+        // Exact match works
+        let exactResults = documentManager.searchDocuments(query: "Swift")
+        XCTAssertEqual(exactResults.count, 1)
+
+        // Query with surrounding spaces does not match (spaces are part of the search string)
+        let paddedResults = documentManager.searchDocuments(query: " Swift ")
+        XCTAssertEqual(paddedResults.count, 0)
+    }
+
+    func testSearchDocumentsEmptyQuerySortedByModifiedDesc() {
+        // Verify that all-documents result is sorted newest-modified first
+        let doc1 = Document(title: "Older", content: "Content", category: .article)
+        documentManager.createDocument(doc1)
+        Thread.sleep(forTimeInterval: 0.01)
+        let doc2 = Document(title: "Newer", content: "Content", category: .article)
+        documentManager.createDocument(doc2)
+
+        let results = documentManager.searchDocuments(query: "")
+        XCTAssertEqual(results.count, 2)
+        XCTAssertEqual(results[0].id, doc2.id)
+        XCTAssertEqual(results[1].id, doc1.id)
+    }
+
     // MARK: - Update Tests
 
     func testUpdateDocument() {
