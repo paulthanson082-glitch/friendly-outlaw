@@ -167,20 +167,56 @@ final class IssueManagementTests: XCTestCase {
         _ = app.createIssue(documentId: testDocumentId, title: "Character development", description: "Add backstory")
         _ = app.createIssue(documentId: testDocumentId, title: "Plot revision", description: "Fix pacing issues")
         _ = app.createIssue(documentId: testDocumentId, title: "Grammar check", description: "Review dialogue")
-        
+
         let characterResults = app.searchIssues(query: "character")
         XCTAssertEqual(characterResults.count, 1)
         XCTAssertEqual(characterResults.first?.title, "Character development")
-        
+
         let plotResults = app.searchIssues(query: "plot")
         XCTAssertEqual(plotResults.count, 1)
-        
+
         let dialogueResults = app.searchIssues(query: "dialogue")
         XCTAssertEqual(dialogueResults.count, 1)
-        
+
         // Empty query should return all issues
         let allResults = app.searchIssues(query: "")
         XCTAssertEqual(allResults.count, 3)
+    }
+
+    func testSearchIssuesWhitespaceOnlyQueryReturnsAll() {
+        _ = app.createIssue(documentId: testDocumentId, title: "Issue Alpha")
+        _ = app.createIssue(documentId: testDocumentId, title: "Issue Beta")
+        _ = app.createIssue(documentId: testDocumentId, title: "Issue Gamma")
+
+        let results = app.searchIssues(query: "   ")
+        XCTAssertEqual(results.count, 3)
+    }
+
+    func testSearchIssuesTabNewlineQueryReturnsAll() {
+        _ = app.createIssue(documentId: testDocumentId, title: "Issue One")
+        _ = app.createIssue(documentId: testDocumentId, title: "Issue Two")
+
+        let results = app.searchIssues(query: "\t\n")
+        XCTAssertEqual(results.count, 2)
+    }
+
+    func testSearchIssuesByDescription() {
+        _ = app.createIssue(documentId: testDocumentId, title: "Vague Title", description: "unique-term-in-description")
+        _ = app.createIssue(documentId: testDocumentId, title: "Another Issue", description: "something else entirely")
+
+        let results = app.searchIssues(query: "unique-term-in-description")
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.title, "Vague Title")
+    }
+
+    func testSearchIssuesEmptyQueryOnEmptyStoreReturnsEmpty() {
+        let results = app.searchIssues(query: "")
+        XCTAssertEqual(results.count, 0)
+    }
+
+    func testSearchIssuesWhitespaceQueryOnEmptyStoreReturnsEmpty() {
+        let results = app.searchIssues(query: "   ")
+        XCTAssertEqual(results.count, 0)
     }
     
     // MARK: - Issue Status Update Tests

@@ -239,6 +239,42 @@ final class AIServiceTests: XCTestCase {
         XCTAssertTrue(networkError.errorDescription?.contains("Network error") ?? false)
     }
 
+    func testAIServiceErrorToolLoopExhaustedDescription() {
+        let error = AIServiceError.toolLoopExhausted(iterations: 10)
+        let description = error.errorDescription ?? ""
+        XCTAssertTrue(description.contains("10"), "Description should contain the iteration count")
+    }
+
+    func testAIServiceErrorToolLoopExhaustedDifferentIterationCount() {
+        let error = AIServiceError.toolLoopExhausted(iterations: 5)
+        let description = error.errorDescription ?? ""
+        XCTAssertTrue(description.contains("5"))
+    }
+
+    func testAIServiceErrorToolExecutionFailedDescription() {
+        let error = AIServiceError.toolExecutionFailed(toolName: "search_tool", reason: "timeout")
+        let description = error.errorDescription ?? ""
+        XCTAssertTrue(description.contains("search_tool"), "Description should contain the tool name")
+        XCTAssertTrue(description.contains("timeout"), "Description should contain the failure reason")
+    }
+
+    func testAIServiceErrorToolExecutionFailedDifferentValues() {
+        let error = AIServiceError.toolExecutionFailed(toolName: "calculator", reason: "division by zero")
+        let description = error.errorDescription ?? ""
+        XCTAssertTrue(description.contains("calculator"))
+        XCTAssertTrue(description.contains("division by zero"))
+    }
+
+    func testAIServiceErrorApiErrorWithDifferentStatusCodes() {
+        let notFoundError = AIServiceError.apiError(statusCode: 404, message: "Not Found")
+        XCTAssertTrue(notFoundError.errorDescription?.contains("404") ?? false)
+        XCTAssertTrue(notFoundError.errorDescription?.contains("Not Found") ?? false)
+
+        let serverError = AIServiceError.apiError(statusCode: 500, message: "Internal Server Error")
+        XCTAssertTrue(serverError.errorDescription?.contains("500") ?? false)
+        XCTAssertTrue(serverError.errorDescription?.contains("Internal Server Error") ?? false)
+    }
+
     // MARK: - AIError Tests
 
     func testAIErrorDescriptions() {

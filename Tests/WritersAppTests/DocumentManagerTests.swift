@@ -76,6 +76,40 @@ final class DocumentManagerTests: XCTestCase {
         XCTAssertEqual(results.count, 2)
     }
 
+    func testSearchDocumentsWhitespaceOnlyQueryReturnsAllDocuments() {
+        let doc1 = Document(title: "First", content: "Content", category: .article)
+        let doc2 = Document(title: "Second", content: "Content", category: .novel)
+        let doc3 = Document(title: "Third", content: "Content", category: .blogPost)
+
+        documentManager.createDocument(doc1)
+        documentManager.createDocument(doc2)
+        documentManager.createDocument(doc3)
+
+        let results = documentManager.searchDocuments(query: "   ")
+        XCTAssertEqual(results.count, 3)
+    }
+
+    func testSearchDocumentsTabAndNewlineQueryReturnsAllDocuments() {
+        let doc1 = Document(title: "Alpha", content: "Content", category: .article)
+        let doc2 = Document(title: "Beta", content: "Content", category: .article)
+
+        documentManager.createDocument(doc1)
+        documentManager.createDocument(doc2)
+
+        let results = documentManager.searchDocuments(query: "\t\n")
+        XCTAssertEqual(results.count, 2)
+    }
+
+    func testSearchDocumentsEmptyQueryOnEmptyStoreReturnsEmpty() {
+        let results = documentManager.searchDocuments(query: "")
+        XCTAssertEqual(results.count, 0)
+    }
+
+    func testSearchDocumentsWhitespaceQueryOnEmptyStoreReturnsEmpty() {
+        let results = documentManager.searchDocuments(query: "   ")
+        XCTAssertEqual(results.count, 0)
+    }
+
     // MARK: - Update Tests
 
     func testUpdateDocument() {
