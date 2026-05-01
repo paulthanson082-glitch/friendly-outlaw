@@ -76,6 +76,53 @@ final class DocumentManagerTests: XCTestCase {
         XCTAssertEqual(results.count, 2)
     }
 
+    func testSearchDocumentsWhitespaceOnlyQueryReturnsAllDocuments() {
+        let doc1 = Document(title: "Novel Draft", content: "Chapter one", category: .novel)
+        let doc2 = Document(title: "Short Story", content: "Once upon a time", category: .shortStory)
+        let doc3 = Document(title: "Tech Article", content: "Swift 5.9 features", category: .article)
+
+        documentManager.createDocument(doc1)
+        documentManager.createDocument(doc2)
+        documentManager.createDocument(doc3)
+
+        let results = documentManager.searchDocuments(query: "   ")
+        XCTAssertEqual(results.count, 3)
+    }
+
+    func testSearchDocumentsNewlineTabQueryReturnsAllDocuments() {
+        let doc1 = Document(title: "Essay One", content: "Content A", category: .essay)
+        let doc2 = Document(title: "Essay Two", content: "Content B", category: .essay)
+
+        documentManager.createDocument(doc1)
+        documentManager.createDocument(doc2)
+
+        let results = documentManager.searchDocuments(query: "\n\t")
+        XCTAssertEqual(results.count, 2)
+    }
+
+    func testSearchDocumentsEmptyQueryOnEmptyManagerReturnsEmpty() {
+        let results = documentManager.searchDocuments(query: "")
+        XCTAssertEqual(results.count, 0)
+    }
+
+    func testSearchDocumentsResultsSortedByModifiedDescending() {
+        var metadata1 = DocumentMetadata()
+        metadata1.modified = Date(timeIntervalSinceNow: -200)
+        let doc1 = Document(title: "Old Article", content: "swift basics", category: .article, metadata: metadata1)
+
+        var metadata2 = DocumentMetadata()
+        metadata2.modified = Date(timeIntervalSinceNow: -50)
+        let doc2 = Document(title: "New Article", content: "swift advanced", category: .article, metadata: metadata2)
+
+        documentManager.createDocument(doc1)
+        documentManager.createDocument(doc2)
+
+        let results = documentManager.searchDocuments(query: "swift")
+        XCTAssertEqual(results.count, 2)
+        XCTAssertEqual(results[0].id, doc2.id) // more recently modified first
+        XCTAssertEqual(results[1].id, doc1.id)
+    }
+
     // MARK: - Update Tests
 
     func testUpdateDocument() {
