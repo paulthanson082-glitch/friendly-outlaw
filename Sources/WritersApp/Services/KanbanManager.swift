@@ -98,15 +98,15 @@ public class KanbanManager {
 
     /// Searches tasks by title or description using a case-insensitive match.
     /// - Parameters:
-    ///   - query: The search string; leading/trailing whitespace is ignored. If empty after trimming, all tasks are returned.
+    ///   - query: The search string; leading/trailing whitespace is ignored. Returns empty array if query is empty.
     /// - Returns: An array of matching `KanbanTask` objects sorted by `metadata.created` in descending order.
     public func searchTasks(query: String) -> [KanbanTask] {
-        if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return Array(tasks.values).sorted { $0.metadata.created > $1.metadata.created }
-        }
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedQuery.isEmpty else { return [] }
+
         return tasks.values.filter { task in
-            task.title.localizedCaseInsensitiveContains(query) ||
-            task.description.localizedCaseInsensitiveContains(query)
+            task.title.localizedCaseInsensitiveContains(trimmedQuery) ||
+            task.description.localizedCaseInsensitiveContains(trimmedQuery)
         }.sorted { $0.metadata.created > $1.metadata.created }
     }
 

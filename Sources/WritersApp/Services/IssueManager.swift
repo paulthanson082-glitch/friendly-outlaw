@@ -46,14 +46,12 @@ public class IssueManager {
     
     /// Searches issues by title or description
     public func searchIssues(query: String) -> [Issue] {
-        // Return all issues if query is empty
-        if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return getAllIssues()
-        }
-        
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedQuery.isEmpty else { return [] }
+
         return issues.values.filter { issue in
-            issue.title.localizedCaseInsensitiveContains(query) ||
-            issue.description.localizedCaseInsensitiveContains(query)
+            issue.title.localizedCaseInsensitiveContains(trimmedQuery) ||
+            issue.description.localizedCaseInsensitiveContains(trimmedQuery)
         }.sorted { $0.metadata.created > $1.metadata.created }
     }
     

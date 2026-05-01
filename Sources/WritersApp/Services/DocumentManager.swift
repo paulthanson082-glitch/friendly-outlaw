@@ -38,15 +38,12 @@ public class DocumentManager {
 
     /// Searches documents by title or content
     public func searchDocuments(query: String) -> [Document] {
-        // Return all documents if query is empty
-        if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return getAllDocuments()
-        }
-        
-        // Use localizedCaseInsensitiveContains which handles case conversion internally
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedQuery.isEmpty else { return [] }
+
         return documents.values.filter { doc in
-            doc.title.localizedCaseInsensitiveContains(query) ||
-            doc.content.localizedCaseInsensitiveContains(query)
+            doc.title.localizedCaseInsensitiveContains(trimmedQuery) ||
+            doc.content.localizedCaseInsensitiveContains(trimmedQuery)
         }.sorted { $0.metadata.modified > $1.metadata.modified }
     }
 

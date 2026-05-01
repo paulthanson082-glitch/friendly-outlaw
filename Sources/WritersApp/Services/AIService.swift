@@ -445,8 +445,7 @@ public class AIService {
     /// Send a request with an explicit system prompt and user prompt.
     ///
     /// Used by `MultiAgentHarness` to give each agent (planner, generator, evaluator)
-    /// its own specialised system prompt without affecting the general-purpose assistance
-    /// Sends a user prompt together with a system prompt to the Anthropic Messages API and returns the assistant's extracted text response.
+    /// its own specialised system prompt without affecting general-purpose assistance.
     /// - Parameters:
     ///   - systemPrompt: System-level instructions to include in the request's `system` field.
     ///   - userPrompt: The user-facing prompt sent as the single user message.
@@ -491,8 +490,8 @@ public class AIService {
 
     /// Send an agent task with a dedicated system prompt AND tool loop support.
     ///
-    /// Combines the persona injection of `performAgentTask` with the iterative
-    /// Performs an agent task that may use external tools and returns the assistant's final response.
+    /// Combines the persona injection of `performAgentTask` with the iterative tool loop,
+    /// allowing the agent to invoke tools and use their results in reasoning.
     /// - Parameters:
     ///   - systemPrompt: Instructions injected as the system-level prompt for the agent.
     ///   - userPrompt: The user-facing prompt that starts the conversation.
@@ -517,14 +516,13 @@ public class AIService {
     }
 
     /// Extracts joined text from a list of content blocks.
-    /// Extracts and concatenated text blocks from a content array.
     /// - Returns: The joined text of all blocks where `"type" == "text"`, or `nil` if no text blocks are present.
     private func extractText(from content: [[String: Any]]) -> String? {
         let textParts = content.compactMap { block -> String? in
             guard block["type"] as? String == "text" else { return nil }
             return block["text"] as? String
         }
-        return textParts.isEmpty ? nil : textParts.joined()
+        return textParts.isEmpty ? nil : textParts.joined(separator: " ")
     }
 
     /// Executes all tool_use blocks found in an assistant response and returns their results.
