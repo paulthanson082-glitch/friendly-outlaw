@@ -182,6 +182,21 @@ final class IssueManagementTests: XCTestCase {
         let allResults = app.searchIssues(query: "")
         XCTAssertEqual(allResults.count, 3)
     }
+
+    func testSearchIssuesWhitespaceOnlyQueryReturnsAllIssues() {
+        // PR change: whitespace-only queries now return all issues instead of []
+        _ = app.createIssue(documentId: testDocumentId, title: "Issue Alpha", description: "First issue")
+        _ = app.createIssue(documentId: testDocumentId, title: "Issue Beta", description: "Second issue")
+
+        let spacesResult = app.searchIssues(query: "   ")
+        XCTAssertEqual(spacesResult.count, 2)
+
+        let tabResult = app.searchIssues(query: "\t")
+        XCTAssertEqual(tabResult.count, 2)
+
+        let newlineResult = app.searchIssues(query: "\n")
+        XCTAssertEqual(newlineResult.count, 2)
+    }
     
     // MARK: - Issue Status Update Tests
     
