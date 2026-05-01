@@ -76,6 +76,32 @@ final class DocumentManagerTests: XCTestCase {
         XCTAssertEqual(results.count, 2)
     }
 
+    func testSearchDocumentsWhitespaceOnlyQueryReturnsAllDocuments() {
+        // PR change: whitespace-only queries now return all documents instead of []
+        let doc1 = Document(title: "Novel Draft", content: "Chapter one content", category: .novel)
+        let doc2 = Document(title: "Blog Post", content: "Some thoughts", category: .blogPost)
+        let doc3 = Document(title: "Short Story", content: "Once upon a time", category: .shortStory)
+
+        documentManager.createDocument(doc1)
+        documentManager.createDocument(doc2)
+        documentManager.createDocument(doc3)
+
+        let spacesResult = documentManager.searchDocuments(query: "   ")
+        XCTAssertEqual(spacesResult.count, 3)
+
+        let tabResult = documentManager.searchDocuments(query: "\t")
+        XCTAssertEqual(tabResult.count, 3)
+
+        let newlineResult = documentManager.searchDocuments(query: "\n")
+        XCTAssertEqual(newlineResult.count, 3)
+    }
+
+    func testSearchDocumentsWhitespaceOnlyQueryOnEmptyManagerReturnsEmpty() {
+        // Edge case: whitespace-only query with no documents returns empty array
+        let results = documentManager.searchDocuments(query: "   ")
+        XCTAssertEqual(results.count, 0)
+    }
+
     // MARK: - Update Tests
 
     func testUpdateDocument() {
