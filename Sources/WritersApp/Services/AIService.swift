@@ -380,7 +380,11 @@ public class AIService {
 
             // If the model finished with a text response, extract and return it
             if stopReason == "end_turn" {
-                return extractText(from: content) ?? ""
+                if let text = extractText(from: content) {
+                    return text
+                }
+                // If there's no text in the response, that's still valid (e.g., tool-only response)
+                return ""
             }
 
             // If the model wants to use tools, execute them and continue the loop
