@@ -102,12 +102,15 @@ public class WritingGoalManager {
             .sorted { $0.startDate > $1.startDate }
     }
 
-    /// Gets daily goals
+    /// Retrieves active daily writing goals.
+    /// - Returns: An array of `WritingGoal` objects whose `type` is `.daily` and whose `isActive` property is true.
     public func getDailyGoals() -> [WritingGoal] {
         return goals.values.filter { $0.type == .daily && $0.isActive }
     }
 
-    /// Searches goals by name or notes
+    /// Searches stored goals by matching the query against each goal's name and notes (case-insensitive).
+    /// - Parameter query: The text to search for; if empty or only whitespace, all goals are returned.
+    /// - Returns: An array of goals whose `name` or `notes` contain `query`, sorted by descending `startDate`.
     public func searchGoals(query: String) -> [WritingGoal] {
         if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return getAllGoals()
