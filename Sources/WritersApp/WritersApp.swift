@@ -212,7 +212,10 @@ public class WritersApp {
     /// Poll `getRagieDocumentStatus(ragieId:)` until `isReady` is true before querying.
     /// - Parameter documentId: The UUID of the document to ingest.
     /// - Returns: The `RagieDocument` created by Ragie for the ingested document.
-    /// - Throws: `RagieError.ragieNotEnabled` if Ragie has not been enabled; `RagieError.documentNotFound` if no document exists with the given `documentId`.
+    /// Ingests a stored document's content into Ragie and returns the created RagieDocument.
+    /// - Parameter documentId: The UUID of the document to ingest.
+    /// - Returns: The created `RagieDocument`.
+    /// - Throws: `RagieError.ragieNotEnabled` if Ragie is not configured, `RagieError.documentNotFound` if the document does not exist, or an error propagated from `RagieService` if ingestion fails.
     public func ingestDocumentToRagie(documentId: UUID) async throws -> RagieDocument {
         guard let ragie = ragieService else { throw RagieError.ragieNotEnabled }
         guard let document = documentManager.getDocument(id: documentId) else {
@@ -228,7 +231,10 @@ public class WritersApp {
     /// Fetch the processing status of a Ragie document.
     /// - Parameter ragieId: The Ragie-assigned identifier of the document to fetch.
     /// - Returns: The `RagieDocument` matching `ragieId`.
-    /// - Throws: `RagieError.ragieNotEnabled` if Ragie integration is not enabled; any error propagated from `RagieService` if the document cannot be retrieved.
+    /// Retrieves a document from Ragie by its Ragie-assigned identifier.
+    /// - Parameter ragieId: The Ragie-assigned document identifier.
+    /// - Returns: The `RagieDocument` corresponding to `ragieId`.
+    /// - Throws: `RagieError.ragieNotEnabled` if Ragie is not enabled; or any error propagated from `RagieService` when fetching the document.
     public func getRagieDocumentStatus(ragieId: String) async throws -> RagieDocument {
         guard let ragie = ragieService else { throw RagieError.ragieNotEnabled }
         return try await ragie.getDocument(id: ragieId)

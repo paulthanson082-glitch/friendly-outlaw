@@ -341,7 +341,20 @@ public class AIService {
     ///   - `AIServiceError.invalidResponse` if the network response is not an HTTP response.
     ///   - `AIServiceError.apiError` if the API returns a non-200 status code (includes status code and message).
     ///   - `AIServiceError.invalidResponseFormat` if the response JSON is missing expected fields or text cannot be extracted.
-    ///   - `AIServiceError.toolLoopExhausted` if no final response is produced within `maxIterations`.
+    /// Sends a prompt to the Anthropic Messages API and iteratively processes any tool-use cycles until a final text response is produced or the iteration limit is reached.
+    /// - Parameters:
+    ///   - prompt: The user prompt sent to the model.
+    ///   - tools: Tool definitions made available to the model for possible tool-use actions.
+    ///   - toolExecutor: Executor used to run tool calls requested by the model.
+    ///   - maxIterations: Maximum number of request/response iterations to allow for tool-use loops.
+    ///   - systemPrompt: Optional system-level prompt to include in the request.
+    /// - Returns: The final assistant text response. Returns an empty string if the final completion contains no text (e.g., a tool-only completion).
+    /// - Throws:
+    ///   - `AIServiceError.invalidURL` if the API URL is malformed.
+    ///   - `AIServiceError.invalidResponse` if the network response is not an `HTTPURLResponse`.
+    ///   - `AIServiceError.apiError(statusCode:message:)` for non-200 HTTP responses, with the response body as the message when available.
+    ///   - `AIServiceError.invalidResponseFormat` if expected fields (`stop_reason` or `content`) or extractable text are missing when required.
+    ///   - `AIServiceError.toolLoopExhausted(iterations:)` if the loop completes without producing a final `end_turn` response within `maxIterations`.
     private func sendRequestWithToolLoop(
         prompt: String,
         tools: [ToolDefinition],
@@ -502,7 +515,16 @@ public class AIService {
     ///   - tools: Definitions of tools the agent may invoke during the interaction.
     ///   - toolExecutor: Executor responsible for running tool calls and returning their results.
     ///   - maxIterations: Maximum number of tool-invocation/response cycles to allow before aborting.
-    /// - Returns: The assistant's generated response text.
+    /// Performs an agent-style interaction that allows the model to invoke tools in a loop and returns the final assistant response.
+    /// 
+    /// The provided `systemPrompt` is sent as the system-level instruction, and `userPrompt` is used as the initial user message. The model may request tool usage; each tool call is executed via `toolExecutor` and results are fed back into the conversation until the model produces a non-tool response or `maxIterations` is reached.
+    /// - Parameters:
+    ///   - systemPrompt: System-level instructions to guide the agent's behavior.
+    ///   - userPrompt: The initial user message driving the agent task.
+    ///   - tools: Definitions of tools the agent may call during the interaction.
+    ///   - toolExecutor: Executor responsible for running tool calls and returning results.
+    ///   - maxIterations: Maximum number of tool-use/response iterations to perform before aborting (default is 10).
+    /// - Returns: The final assistant response text produced after the tool loop completes; may be an empty string if the assistant produced no extractable text.
     public func performAgentTaskWithTools(
         systemPrompt: String,
         userPrompt: String,
@@ -520,7 +542,9 @@ public class AIService {
     }
 
     /// Extracts joined text from a list of content blocks.
-    /// - Returns: The joined text of all blocks where `"type" == "text"`, or `nil` if no text blocks are present.
+    /// Extracts and joins all text blocks from a content array into a single string.
+    /// - Parameter content: An array of dictionaries representing content blocks; blocks with `"type": "text"` may contain a `"text"` string.
+    /// - Returns: The concatenated text of all `"text"` blocks separated by a single space, or `nil` if no text blocks are present.
     private func extractText(from content: [[String: Any]]) -> String? {
         let textParts = content.compactMap { block -> String? in
             guard block["type"] as? String == "text" else { return nil }

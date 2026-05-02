@@ -42,7 +42,9 @@ public class DoltVersionControlService {
 
     /// Retrieve the currently active version-control branch, if one exists.
     /// - Returns: The active `VCBranch` if one is marked active, `nil` otherwise.
-    /// - Throws: Any error encountered while fetching branches from the database.
+    /// Retrieve the currently active version-control branch.
+    /// - Returns: The active `VCBranch` if one exists, `nil` otherwise.
+    /// - Throws: Any error propagated from the database manager.
     public func currentBranch() throws -> VCBranch? {
         let branches = try db.getAllVCBranches()
         return branches.first(where: { $0.isActive })
@@ -53,7 +55,16 @@ public class DoltVersionControlService {
     ///   - name: The name of the branch to check out or create.
     ///   - createNew: If `true`, create a new branch with the given name and activate it; if `false`, activate an existing branch.
     /// - Returns: The authoritative `VCBranch` instance after activation.
-    /// - Throws: `VersionControlError.branchAlreadyExists(name)` if `createNew` is `true` and a branch with `name` already exists; `VersionControlError.branchNotFound(name)` if `createNew` is `false` and the branch does not exist.
+    /// Selects an existing branch or creates a new one and makes it the active branch.
+    /// 
+    /// If `createNew` is `true`, a branch with `name` is created and activated; if a branch with that name already exists, an error is thrown. If `createNew` is `false`, the named branch is activated and the authoritative branch record from the database is returned.
+    /// - Parameters:
+    ///   - name: The branch name to checkout or create.
+    ///   - createNew: When `true`, create a new branch with `name` and activate it; when `false`, activate an existing branch.
+    /// - Returns: The authoritative `VCBranch` record as stored in the database after activation.
+    /// - Throws: `VersionControlError.branchAlreadyExists(name)` if attempting to create a branch that already exists.
+    /// - Throws: `VersionControlError.branchNotFound(name)` if the named branch does not exist (or cannot be re-fetched after activation).
+    /// - Throws: Propagates errors from underlying `DatabaseManager` operations.
     @discardableResult
     public func checkoutBranch(name: String, createNew: Bool = false) throws -> VCBranch {
         if createNew {

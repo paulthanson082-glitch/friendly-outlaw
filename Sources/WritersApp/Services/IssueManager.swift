@@ -44,7 +44,9 @@ public class IssueManager {
             .sorted { $0.metadata.created > $1.metadata.created }
     }
     
-    /// Searches issues by title or description
+    /// Searches issues whose title or description contains the given query using case-insensitive localized matching.
+    /// - Parameter query: The search string; leading and trailing whitespace and newlines are ignored. If the trimmed query is empty, the method returns an empty array.
+    /// - Returns: An array of issues whose title or description contains the trimmed query (case-insensitive, localized), sorted by `metadata.created` in descending order.
     public func searchIssues(query: String) -> [Issue] {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedQuery.isEmpty else { return [] }
