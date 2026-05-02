@@ -44,7 +44,7 @@ final class KanbanManagerTests: XCTestCase {
         XCTAssertEqual(results.count, 2)
     }
 
-    func testSearchTasksNewlineOnlyQueryReturnsAllTasks() {
+    func testSearchTasksNewlineTabQueryReturnsAllTasks() {
         let task1 = KanbanTask(title: "Task One", boardId: testBoardId)
         let task2 = KanbanTask(title: "Task Two", boardId: testBoardId)
         kanbanManager.createTask(task1)
@@ -161,6 +161,24 @@ final class KanbanManagerTests: XCTestCase {
         XCTAssertEqual(results[1].id, task1.id)
     }
 
+    func testSearchTasksWhitespaceQueryResultsSortedByCreatedDescending() {
+        var metadata1 = KanbanTaskMetadata()
+        metadata1.created = Date(timeIntervalSinceNow: -300)
+        let task1 = KanbanTask(title: "Oldest task", boardId: testBoardId, metadata: metadata1)
+
+        var metadata2 = KanbanTaskMetadata()
+        metadata2.created = Date(timeIntervalSinceNow: -100)
+        let task2 = KanbanTask(title: "Middle task", boardId: testBoardId, metadata: metadata2)
+
+        kanbanManager.createTask(task1)
+        kanbanManager.createTask(task2)
+
+        let results = kanbanManager.searchTasks(query: "   ")
+        XCTAssertEqual(results.count, 2)
+        XCTAssertEqual(results[0].id, task2.id)
+        XCTAssertEqual(results[1].id, task1.id)
+    }
+
     // MARK: - Board CRUD
 
     func testCreateAndGetBoard() {
@@ -229,6 +247,21 @@ final class KanbanManagerTests: XCTestCase {
 
         XCTAssertNil(kanbanManager.getTask(id: task1.id))
         XCTAssertNil(kanbanManager.getTask(id: task2.id))
+    }
+
+    func testDeleteBoardDoesNotRemoveTasksOnOtherBoards() {
+        let boardToDelete = KanbanBoard(name: "Deleted Board")
+        kanbanManager.createBoard(boardToDelete)
+
+        let taskOnDeletedBoard = KanbanTask(title: "Doomed task", boardId: boardToDelete.id)
+        let taskOnTestBoard = KanbanTask(title: "Safe task", boardId: testBoardId)
+        kanbanManager.createTask(taskOnDeletedBoard)
+        kanbanManager.createTask(taskOnTestBoard)
+
+        kanbanManager.deleteBoard(id: boardToDelete.id)
+
+        XCTAssertNil(kanbanManager.getTask(id: taskOnDeletedBoard.id))
+        XCTAssertNotNil(kanbanManager.getTask(id: taskOnTestBoard.id))
     }
 
     // MARK: - Task CRUD

@@ -123,6 +123,42 @@ final class DocumentManagerTests: XCTestCase {
         XCTAssertEqual(results[1].id, doc1.id)
     }
 
+    func testSearchDocumentsEmptyQueryReturnsSortedByModifiedDescending() {
+        var metadata1 = DocumentMetadata()
+        metadata1.modified = Date(timeIntervalSinceNow: -300)
+        let doc1 = Document(title: "Old Doc", content: "Old content", category: .article, metadata: metadata1)
+
+        var metadata2 = DocumentMetadata()
+        metadata2.modified = Date(timeIntervalSinceNow: -100)
+        let doc2 = Document(title: "Recent Doc", content: "Recent content", category: .article, metadata: metadata2)
+
+        documentManager.createDocument(doc1)
+        documentManager.createDocument(doc2)
+
+        let results = documentManager.searchDocuments(query: "")
+        XCTAssertEqual(results.count, 2)
+        XCTAssertEqual(results[0].id, doc2.id)
+        XCTAssertEqual(results[1].id, doc1.id)
+    }
+
+    func testSearchDocumentsWhitespaceQueryReturnsSortedByModifiedDescending() {
+        var metadata1 = DocumentMetadata()
+        metadata1.modified = Date(timeIntervalSinceNow: -300)
+        let doc1 = Document(title: "Old Doc", content: "content", category: .article, metadata: metadata1)
+
+        var metadata2 = DocumentMetadata()
+        metadata2.modified = Date(timeIntervalSinceNow: -100)
+        let doc2 = Document(title: "Recent Doc", content: "content", category: .article, metadata: metadata2)
+
+        documentManager.createDocument(doc1)
+        documentManager.createDocument(doc2)
+
+        let results = documentManager.searchDocuments(query: "   ")
+        XCTAssertEqual(results.count, 2)
+        XCTAssertEqual(results[0].id, doc2.id)
+        XCTAssertEqual(results[1].id, doc1.id)
+    }
+
     // MARK: - Update Tests
 
     func testUpdateDocument() {

@@ -211,7 +211,19 @@ final class IssueManagementTests: XCTestCase {
         let results = app.searchIssues(query: "nonexistent_xyz_term")
         XCTAssertEqual(results.count, 0)
     }
-    
+
+    func testSearchIssuesEmptyQueryReturnsSortedByCreatedDescending() {
+        _ = app.createIssue(documentId: testDocumentId, title: "First Issue", description: "Created first")
+        // Small sleep to guarantee ordering
+        Thread.sleep(forTimeInterval: 0.01)
+        _ = app.createIssue(documentId: testDocumentId, title: "Second Issue", description: "Created second")
+
+        let results = app.searchIssues(query: "")
+        XCTAssertEqual(results.count, 2)
+        XCTAssertEqual(results[0].title, "Second Issue")
+        XCTAssertEqual(results[1].title, "First Issue")
+    }
+
     // MARK: - Issue Status Update Tests
     
     func testUpdateIssueStatus() {
