@@ -123,6 +123,30 @@ final class DocumentManagerTests: XCTestCase {
         XCTAssertEqual(results[1].id, doc1.id)
     }
 
+    func testSearchDocumentsEmptyQueryResultsSortedByModifiedDescending() {
+        var metadata1 = DocumentMetadata()
+        metadata1.modified = Date(timeIntervalSinceNow: -300)
+        let doc1 = Document(title: "Oldest Doc", content: "content", category: .article, metadata: metadata1)
+
+        var metadata2 = DocumentMetadata()
+        metadata2.modified = Date(timeIntervalSinceNow: -100)
+        let doc2 = Document(title: "Middle Doc", content: "content", category: .article, metadata: metadata2)
+
+        var metadata3 = DocumentMetadata()
+        metadata3.modified = Date(timeIntervalSinceNow: -10)
+        let doc3 = Document(title: "Newest Doc", content: "content", category: .article, metadata: metadata3)
+
+        documentManager.createDocument(doc1)
+        documentManager.createDocument(doc2)
+        documentManager.createDocument(doc3)
+
+        let results = documentManager.searchDocuments(query: "")
+        XCTAssertEqual(results.count, 3)
+        XCTAssertEqual(results[0].id, doc3.id) // newest modified first
+        XCTAssertEqual(results[1].id, doc2.id)
+        XCTAssertEqual(results[2].id, doc1.id)
+    }
+
     // MARK: - Update Tests
 
     func testUpdateDocument() {

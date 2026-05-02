@@ -211,7 +211,43 @@ final class IssueManagementTests: XCTestCase {
         let results = app.searchIssues(query: "nonexistent_xyz_term")
         XCTAssertEqual(results.count, 0)
     }
-    
+
+    func testSearchIssuesCaseInsensitive() {
+        _ = app.createIssue(documentId: testDocumentId, title: "UPPERCASE ISSUE", description: "lowercase content")
+
+        XCTAssertEqual(app.searchIssues(query: "UPPERCASE").count, 1)
+        XCTAssertEqual(app.searchIssues(query: "uppercase").count, 1)
+        XCTAssertEqual(app.searchIssues(query: "UpperCase").count, 1)
+        XCTAssertEqual(app.searchIssues(query: "LOWERCASE").count, 1)
+    }
+
+    func testSearchIssuesMatchesTitleOrDescription() {
+        _ = app.createIssue(documentId: testDocumentId, title: "pacing issue", description: "Fix act one")
+        _ = app.createIssue(documentId: testDocumentId, title: "Dialogue fix", description: "Improve pacing in act two")
+        _ = app.createIssue(documentId: testDocumentId, title: "Research task", description: "Find references")
+
+        let results = app.searchIssues(query: "pacing")
+        XCTAssertEqual(results.count, 2)
+    }
+
+    func testSearchIssuesResultsSortedByCreatedDescending() {
+        var metadata1 = IssueMetadata()
+        metadata1.created = Date(timeIntervalSinceNow: -300)
+        let issue1 = Issue(documentId: testDocumentId, title: "Old Issue", metadata: metadata1)
+
+        var metadata2 = IssueMetadata()
+        metadata2.created = Date(timeIntervalSinceNow: -50)
+        let issue2 = Issue(documentId: testDocumentId, title: "New Issue", metadata: metadata2)
+
+        app.issueManager.createIssue(issue1)
+        app.issueManager.createIssue(issue2)
+
+        let results = app.searchIssues(query: "Issue")
+        XCTAssertEqual(results.count, 2)
+        XCTAssertEqual(results[0].id, issue2.id) // newer first
+        XCTAssertEqual(results[1].id, issue1.id)
+    }
+
     // MARK: - Issue Status Update Tests
     
     func testUpdateIssueStatus() {

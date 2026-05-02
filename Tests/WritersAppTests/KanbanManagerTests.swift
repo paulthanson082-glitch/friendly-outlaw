@@ -44,7 +44,7 @@ final class KanbanManagerTests: XCTestCase {
         XCTAssertEqual(results.count, 2)
     }
 
-    func testSearchTasksNewlineOnlyQueryReturnsAllTasks() {
+    func testSearchTasksNewlineTabQueryReturnsAllTasks() {
         let task1 = KanbanTask(title: "Task One", boardId: testBoardId)
         let task2 = KanbanTask(title: "Task Two", boardId: testBoardId)
         kanbanManager.createTask(task1)
@@ -56,6 +56,7 @@ final class KanbanManagerTests: XCTestCase {
 
     func testSearchTasksEmptyQueryOnEmptyManagerReturnsEmptyArray() {
         let results = kanbanManager.searchTasks(query: "")
+        // setUp creates one board but no tasks
         XCTAssertEqual(results.count, 0)
     }
 
@@ -231,6 +232,21 @@ final class KanbanManagerTests: XCTestCase {
         XCTAssertNil(kanbanManager.getTask(id: task2.id))
     }
 
+    func testDeleteBoardDoesNotRemoveTasksOnOtherBoards() {
+        let boardToDelete = KanbanBoard(name: "Board To Delete")
+        kanbanManager.createBoard(boardToDelete)
+
+        let taskOnTestBoard = KanbanTask(title: "Safe task", boardId: testBoardId)
+        let taskOnDeletedBoard = KanbanTask(title: "Doomed task", boardId: boardToDelete.id)
+        kanbanManager.createTask(taskOnTestBoard)
+        kanbanManager.createTask(taskOnDeletedBoard)
+
+        kanbanManager.deleteBoard(id: boardToDelete.id)
+
+        XCTAssertNotNil(kanbanManager.getTask(id: taskOnTestBoard.id))
+        XCTAssertNil(kanbanManager.getTask(id: taskOnDeletedBoard.id))
+    }
+
     // MARK: - Task CRUD
 
     func testCreateAndGetTask() {
@@ -273,6 +289,42 @@ final class KanbanManagerTests: XCTestCase {
         XCTAssertEqual(otherBoardTasks.count, 1)
     }
 
+    func testGetTasksForBoardInColumn() {
+        let task1 = KanbanTask(title: "Backlog task", column: .backlog, boardId: testBoardId)
+        let task2 = KanbanTask(title: "Running task", column: .running, boardId: testBoardId)
+        let task3 = KanbanTask(title: "Another backlog task", column: .backlog, boardId: testBoardId)
+        kanbanManager.createTask(task1)
+        kanbanManager.createTask(task2)
+        kanbanManager.createTask(task3)
+
+        let backlogTasks = kanbanManager.getTasks(forBoard: testBoardId, inColumn: .backlog)
+        XCTAssertEqual(backlogTasks.count, 2)
+
+        let runningTasks = kanbanManager.getTasks(forBoard: testBoardId, inColumn: .running)
+        XCTAssertEqual(runningTasks.count, 1)
+
+        let doneTasks = kanbanManager.getTasks(forBoard: testBoardId, inColumn: .done)
+        XCTAssertEqual(doneTasks.count, 0)
+    }
+
+    func testGetTasksInColumnAcrossAllBoards() {
+        let otherBoard = KanbanBoard(name: "Other Board")
+        kanbanManager.createBoard(otherBoard)
+
+        let task1 = KanbanTask(title: "Running task 1", column: .running, boardId: testBoardId)
+        let task2 = KanbanTask(title: "Running task 2", column: .running, boardId: otherBoard.id)
+        let task3 = KanbanTask(title: "Backlog task", column: .backlog, boardId: testBoardId)
+        kanbanManager.createTask(task1)
+        kanbanManager.createTask(task2)
+        kanbanManager.createTask(task3)
+
+        let runningTasks = kanbanManager.getTasks(inColumn: .running)
+        XCTAssertEqual(runningTasks.count, 2)
+
+        let backlogTasks = kanbanManager.getTasks(inColumn: .backlog)
+        XCTAssertEqual(backlogTasks.count, 1)
+    }
+
     // MARK: - Column Transitions
 
     func testMoveTaskToColumn() {
@@ -305,6 +357,20 @@ final class KanbanManagerTests: XCTestCase {
         XCTAssertNil(retrieved?.metadata.completedAt)
     }
 
+    func testMoveTaskUpdatesModifiedTimestamp() {
+        let task = KanbanTask(title: "Timestamp task", column: .backlog, boardId: testBoardId)
+        kanbanManager.createTask(task)
+        let originalModified = kanbanManager.getTask(id: task.id)?.metadata.modified
+
+        Thread.sleep(forTimeInterval: 0.01)
+        kanbanManager.moveTask(id: task.id, toColumn: .planning)
+
+        let newModified = kanbanManager.getTask(id: task.id)?.metadata.modified
+        XCTAssertNotNil(originalModified)
+        XCTAssertNotNil(newModified)
+        XCTAssertGreaterThan(newModified!, originalModified!)
+    }
+
     func testAdvanceTask() {
         let task = KanbanTask(title: "Advance me", column: .backlog, boardId: testBoardId)
         kanbanManager.createTask(task)
@@ -319,6 +385,11 @@ final class KanbanManagerTests: XCTestCase {
         kanbanManager.createTask(task)
 
         let result = kanbanManager.advanceTask(id: task.id)
+        XCTAssertNil(result)
+    }
+
+    func testAdvanceTaskForUnknownIdReturnsNil() {
+        let result = kanbanManager.advanceTask(id: UUID())
         XCTAssertNil(result)
     }
 
@@ -337,6 +408,68 @@ final class KanbanManagerTests: XCTestCase {
 
         let result = kanbanManager.regressTask(id: task.id)
         XCTAssertNil(result)
+    }
+
+    func testRegressTaskForUnknownIdReturnsNil() {
+        let result = kanbanManager.regressTask(id: UUID())
+        XCTAssertNil(result)
+    }
+
+    func testFullColumnProgressionBacklogToDone() {
+        let task = KanbanTask(title: "Progress task", column: .backlog, boardId: testBoardId)
+        kanbanManager.createTask(task)
+
+        XCTAssertEqual(kanbanManager.advanceTask(id: task.id), .planning)
+        XCTAssertEqual(kanbanManager.advanceTask(id: task.id), .running)
+        XCTAssertEqual(kanbanManager.advanceTask(id: task.id), .review)
+        XCTAssertEqual(kanbanManager.advanceTask(id: task.id), .done)
+        XCTAssertNil(kanbanManager.advanceTask(id: task.id))
+
+        XCTAssertNotNil(kanbanManager.getTask(id: task.id)?.metadata.completedAt)
+    }
+
+    // MARK: - updateTask
+
+    func testUpdateTaskSetsModifiedTimestamp() {
+        let task = KanbanTask(title: "Update me", boardId: testBoardId)
+        kanbanManager.createTask(task)
+        let originalModified = kanbanManager.getTask(id: task.id)?.metadata.modified
+
+        Thread.sleep(forTimeInterval: 0.01)
+        var updated = task
+        updated.title = "Updated Title"
+        kanbanManager.updateTask(updated)
+
+        let retrieved = kanbanManager.getTask(id: task.id)
+        XCTAssertEqual(retrieved?.title, "Updated Title")
+        XCTAssertNotNil(originalModified)
+        XCTAssertGreaterThan(retrieved!.metadata.modified, originalModified!)
+    }
+
+    func testUpdateTaskMovingToDoneSetsCompletedAt() {
+        let task = KanbanTask(title: "Update to done", column: .review, boardId: testBoardId)
+        kanbanManager.createTask(task)
+
+        var updated = task
+        updated.column = .done
+        kanbanManager.updateTask(updated)
+
+        let retrieved = kanbanManager.getTask(id: task.id)
+        XCTAssertNotNil(retrieved?.metadata.completedAt)
+    }
+
+    func testUpdateTaskMovingOutOfDoneClearsCompletedAt() {
+        var meta = KanbanTaskMetadata()
+        meta.completedAt = Date()
+        let task = KanbanTask(title: "Move out of done", column: .done, boardId: testBoardId, metadata: meta)
+        kanbanManager.createTask(task)
+
+        var updated = task
+        updated.column = .review
+        kanbanManager.updateTask(updated)
+
+        let retrieved = kanbanManager.getTask(id: task.id)
+        XCTAssertNil(retrieved?.metadata.completedAt)
     }
 
     // MARK: - Statistics
@@ -366,5 +499,14 @@ final class KanbanManagerTests: XCTestCase {
 
         let counts = kanbanManager.getTaskCountByColumn()
         XCTAssertEqual(counts[.done], 2)
+    }
+
+    func testGetTaskCountByColumnAllColumnsPresent() {
+        let counts = kanbanManager.getTaskCountByColumn(forBoard: testBoardId)
+
+        // Every KanbanColumn case should be present in the dictionary
+        for column in KanbanColumn.allCases {
+            XCTAssertNotNil(counts[column], "Missing count for column: \(column)")
+        }
     }
 }
