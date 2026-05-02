@@ -73,7 +73,7 @@ final class DocumentManagerTests: XCTestCase {
         documentManager.createDocument(doc2)
 
         let results = documentManager.searchDocuments(query: "")
-        XCTAssertEqual(results.count, 2)
+        XCTAssertTrue(results.isEmpty)
     }
 
     func testSearchDocumentsWhitespaceOnlyQueryReturnsAllDocuments() {

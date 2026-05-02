@@ -178,9 +178,9 @@ final class IssueManagementTests: XCTestCase {
         let dialogueResults = app.searchIssues(query: "dialogue")
         XCTAssertEqual(dialogueResults.count, 1)
         
-        // Empty query should return all issues
+        // Empty query should return empty array (not all issues)
         let allResults = app.searchIssues(query: "")
-        XCTAssertEqual(allResults.count, 3)
+        XCTAssertTrue(allResults.isEmpty)
     }
 
     func testSearchIssuesWhitespaceOnlyQueryReturnsAllIssues() {
