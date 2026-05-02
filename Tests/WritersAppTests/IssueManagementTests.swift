@@ -211,7 +211,16 @@ final class IssueManagementTests: XCTestCase {
         let results = app.searchIssues(query: "nonexistent_xyz_term")
         XCTAssertEqual(results.count, 0)
     }
-    
+
+    func testSearchIssuesWhitespaceQueryIncludesAllIssuesAcrossDocuments() {
+        let doc2 = app.createBlankDocument(title: "Another Doc", category: .shortStory)
+        _ = app.createIssue(documentId: testDocumentId, title: "Issue in doc 1", description: "")
+        _ = app.createIssue(documentId: doc2.id, title: "Issue in doc 2", description: "")
+
+        let results = app.searchIssues(query: "  ")
+        XCTAssertEqual(results.count, 2)
+    }
+
     // MARK: - Issue Status Update Tests
     
     func testUpdateIssueStatus() {
