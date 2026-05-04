@@ -1,13 +1,43 @@
 import Foundation
 
+// MARK: - Authentication
+
+/// Represents different authentication methods for Claude Platform
+public enum AuthenticationMethod {
+    case apiKey(String)
+    case browserAuth(token: String)
+    case workloadIdentity(token: String, issuer: String)
+}
+
+/// Configuration for workload identity federation (OIDC)
+public struct WorkloadIdentityConfig: Codable {
+    public let issuer: String
+    public let audience: String?
+    public let subjectTokenType: String
+    public let tokenEndpoint: String
+
+    public init(
+        issuer: String,
+        audience: String? = nil,
+        subjectTokenType: String = "urn:ietf:params:oauth:token-type:id_token",
+        tokenEndpoint: String
+    ) {
+        self.issuer = issuer
+        self.audience = audience
+        self.subjectTokenType = subjectTokenType
+        self.tokenEndpoint = tokenEndpoint
+    }
+}
+
 // MARK: - AI Configuration
 
-/// Configuration for AI service
+/// Configuration for AI service supporting keyless and traditional authentication
 public struct AIConfiguration {
-    public let apiKey: String
+    public let authMethod: AuthenticationMethod
     public let model: AIModel
     public let maxTokens: Int
     public let temperature: Double
+    public let workloadIdentityConfig: WorkloadIdentityConfig?
 
     public init(
         apiKey: String,
@@ -15,10 +45,49 @@ public struct AIConfiguration {
         maxTokens: Int = 4096,
         temperature: Double = 0.7
     ) {
-        self.apiKey = apiKey
+        self.authMethod = .apiKey(apiKey)
         self.model = model
         self.maxTokens = maxTokens
         self.temperature = temperature
+        self.workloadIdentityConfig = nil
+    }
+
+    public init(
+        browserAuthToken: String,
+        model: AIModel = .claude35Sonnet,
+        maxTokens: Int = 4096,
+        temperature: Double = 0.7
+    ) {
+        self.authMethod = .browserAuth(token: browserAuthToken)
+        self.model = model
+        self.maxTokens = maxTokens
+        self.temperature = temperature
+        self.workloadIdentityConfig = nil
+    }
+
+    public init(
+        workloadIdentityToken: String,
+        issuer: String,
+        workloadIdentityConfig: WorkloadIdentityConfig,
+        model: AIModel = .claude35Sonnet,
+        maxTokens: Int = 4096,
+        temperature: Double = 0.7
+    ) {
+        self.authMethod = .workloadIdentity(token: workloadIdentityToken, issuer: issuer)
+        self.model = model
+        self.maxTokens = maxTokens
+        self.temperature = temperature
+        self.workloadIdentityConfig = workloadIdentityConfig
+    }
+
+    @available(*, deprecated, message: "Use init(apiKey:) constructor instead")
+    public var apiKey: String {
+        switch authMethod {
+        case .apiKey(let key):
+            return key
+        default:
+            return ""
+        }
     }
 }
 

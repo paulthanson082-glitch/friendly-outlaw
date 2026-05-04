@@ -13,6 +13,7 @@ public class WritersApp {
     public let versionControl: DoltVersionControlService
     public let giftCardManager: GiftCardManager
     public let crmManager: CRMManager
+    public let keylessAuthService: KeylessAuthService
     public private(set) var guiService: GuiNewService?
     public private(set) var aiService: AIService?
     public private(set) var chatbotService: ChatbotService?
@@ -58,6 +59,7 @@ public class WritersApp {
         self.spoilerProtection = SpoilerProtectionService()
         self.giftCardManager = GiftCardManager(databaseManager: databaseManager)
         self.crmManager = CRMManager()
+        self.keylessAuthService = KeylessAuthService()
         self.guiService = nil
         self.appSettings = AppSettings()
         self.prospectDatabase = ProspectDatabase()
@@ -128,6 +130,65 @@ public class WritersApp {
     /// Check if AI is available
     public var isAIEnabled: Bool {
         return aiService != nil
+    }
+
+    // MARK: - Keyless Authentication
+
+    /// Initiates browser-based authentication for CLI
+    public func initiateBrowserAuth(clientId: String = "friendly-outlaw-cli") async throws -> BrowserAuthSession {
+        return try await keylessAuthService.initiateBrowserAuth(clientId: clientId)
+    }
+
+    /// Exchanges authorization code for access token (browser auth)
+    public func exchangeAuthorizationCode(
+        code: String,
+        clientId: String,
+        clientSecret: String
+    ) async throws -> BrowserAuthToken {
+        let token = try await keylessAuthService.exchangeCodeForToken(
+            code: code,
+            clientId: clientId,
+            clientSecret: clientSecret
+        )
+        let config = AIConfiguration(
+            browserAuthToken: token.accessToken
+        )
+        enableAI(configuration: config)
+        return token
+    }
+
+    /// Enables AI using workload identity federation (OIDC)
+    public func enableAIWithWorkloadIdentity(
+        subjectToken: String,
+        issuer: String,
+        config: WorkloadIdentityConfig,
+        audience: String? = nil
+    ) async throws {
+        let token = try await keylessAuthService.exchangeWorkloadIdentity(
+            subjectToken: subjectToken,
+            issuer: issuer,
+            audience: audience,
+            config: config
+        )
+        let aiConfig = AIConfiguration(
+            workloadIdentityToken: token.accessToken,
+            issuer: issuer,
+            workloadIdentityConfig: config
+        )
+        enableAI(configuration: aiConfig)
+    }
+
+    /// Refreshes an expired browser auth token
+    public func refreshBrowserAuthToken(
+        refreshToken: String,
+        clientId: String,
+        clientSecret: String
+    ) async throws -> BrowserAuthToken {
+        return try await keylessAuthService.refreshToken(
+            refreshToken: refreshToken,
+            clientId: clientId,
+            clientSecret: clientSecret
+        )
     }
 
     // MARK: - Spoiler Protection

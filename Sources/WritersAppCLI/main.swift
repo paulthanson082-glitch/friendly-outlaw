@@ -268,19 +268,58 @@ struct WritersAppCLI {
         displayProviderInfo()
         print()
 
-        // Check for API key in environment
-        if let apiKey = ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"], !apiKey.isEmpty {
+        // Check for authentication methods (in order of preference)
+        let env = ProcessInfo.processInfo.environment
+
+        // 1. Workload identity federation (OIDC) - highest priority for automated workloads
+        if let workloadToken = env["ANTHROPIC_WORKLOAD_TOKEN"],
+           let issuer = env["ANTHROPIC_WORKLOAD_ISSUER"],
+           let tokenEndpoint = env["ANTHROPIC_TOKEN_ENDPOINT"] {
+            print("✓ AI features enabled (Workload Identity Federation)")
+            let config = WorkloadIdentityConfig(
+                issuer: issuer,
+                audience: env["ANTHROPIC_WORKLOAD_AUDIENCE"],
+                tokenEndpoint: tokenEndpoint
+            )
+            do {
+                try await app.enableAIWithWorkloadIdentity(
+                    subjectToken: workloadToken,
+                    issuer: issuer,
+                    config: config
+                )
+                print("  Issuer: \(issuer)")
+            } catch {
+                print("✗ Failed to enable workload identity: \(error.localizedDescription)")
+                print("ⓘ Falling back to API key authentication")
+                if let apiKey = env["ANTHROPIC_API_KEY"], !apiKey.isEmpty {
+                    let config = AIConfiguration(apiKey: apiKey, model: .claude35Sonnet)
+                    app.enableAI(configuration: config)
+                    print("✓ AI features enabled (Claude API)")
+                }
+            }
+        }
+        // 2. Browser authentication token
+        else if let browserToken = env["ANTHROPIC_BROWSER_TOKEN"], !browserToken.isEmpty {
+            print("✓ AI features enabled (Browser Authentication)")
+            let config = AIConfiguration(browserAuthToken: browserToken, model: .claude35Sonnet)
+            app.enableAI(configuration: config)
+        }
+        // 3. Traditional API key
+        else if let apiKey = env["ANTHROPIC_API_KEY"], !apiKey.isEmpty {
             print("✓ AI features enabled (Claude API)")
             let config = AIConfiguration(apiKey: apiKey, model: .claude35Sonnet)
             app.enableAI(configuration: config)
-        } else if ProcessInfo.processInfo.environment["ANTHROPIC_AUTH_TOKEN"] != nil {
-            // Clother provider configured
+        }
+        // 4. Clother provider
+        else if env["ANTHROPIC_AUTH_TOKEN"] != nil {
             print("✓ AI features enabled (via Clother)")
-            // Create config with default values; Clother handles auth via env vars
             let config = AIConfiguration(apiKey: "clother-managed", model: .claude35Sonnet)
             app.enableAI(configuration: config)
         } else {
-            print("ⓘ AI features disabled (set ANTHROPIC_API_KEY to enable)")
+            print("ⓘ AI features disabled - set one of:")
+            print("   • ANTHROPIC_API_KEY (traditional API key)")
+            print("   • ANTHROPIC_BROWSER_TOKEN (browser auth)")
+            print("   • ANTHROPIC_WORKLOAD_TOKEN (workload identity federation)")
         }
 
         // Initialize gui.new client if API key is present (optional)
@@ -2585,8 +2624,15 @@ func showHelp() {
         WritersAppCLI --gui-doc "My Novel"         # Publish document to gui.new
         WritersAppCLI --gui-kanban "Sprint Board"  # Publish Kanban board to gui.new
 
-    ENVIRONMENT VARIABLES:
-        ANTHROPIC_API_KEY      Set this to enable AI features (Anthropic Claude)
+    ENVIRONMENT VARIABLES (Authentication):
+        ANTHROPIC_API_KEY           Traditional API key (if set, BROWSER_TOKEN and WORKLOAD_* are ignored)
+        ANTHROPIC_BROWSER_TOKEN     Browser-authenticated token (OAuth via Claude Platform)
+        ANTHROPIC_WORKLOAD_TOKEN    Token from cloud workload identity (AWS, GCP, Azure, or OIDC)
+        ANTHROPIC_WORKLOAD_ISSUER   Workload identity issuer URL
+        ANTHROPIC_TOKEN_ENDPOINT    OIDC token exchange endpoint
+        ANTHROPIC_WORKLOAD_AUDIENCE Optional: OIDC audience claim
+
+    ENVIRONMENT VARIABLES (Other):
         GUI_NEW_API_KEY        Optional: gui.new Pro API key for extended canvas expiry
 
     USING ALTERNATIVE LLM PROVIDERS WITH CLOTHER:

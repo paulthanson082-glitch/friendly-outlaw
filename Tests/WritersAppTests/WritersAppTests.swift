@@ -3807,6 +3807,139 @@ final class HermesAgentTests: XCTestCase {
     }
 }
 
+    // MARK: - Keyless Authentication Tests
+
+    func testAIConfigurationWithAPIKey() {
+        let config = AIConfiguration(apiKey: "sk-test-key")
+        XCTAssertEqual(config.model, .claude35Sonnet)
+        XCTAssertEqual(config.maxTokens, 4096)
+        XCTAssertEqual(config.temperature, 0.7)
+    }
+
+    func testAIConfigurationWithBrowserAuth() {
+        let config = AIConfiguration(browserAuthToken: "browser-token-123")
+        XCTAssertEqual(config.model, .claude35Sonnet)
+        if case .browserAuth(let token) = config.authMethod {
+            XCTAssertEqual(token, "browser-token-123")
+        } else {
+            XCTFail("Should be browserAuth")
+        }
+    }
+
+    func testAIConfigurationWithWorkloadIdentity() {
+        let workloadConfig = WorkloadIdentityConfig(
+            issuer: "https://kubernetes.example.com",
+            audience: "anthropic",
+            tokenEndpoint: "https://kubernetes.example.com/token"
+        )
+        let config = AIConfiguration(
+            workloadIdentityToken: "workload-token-456",
+            issuer: "https://kubernetes.example.com",
+            workloadIdentityConfig: workloadConfig
+        )
+
+        XCTAssertEqual(config.model, .claude35Sonnet)
+        if case .workloadIdentity(let token, let issuer) = config.authMethod {
+            XCTAssertEqual(token, "workload-token-456")
+            XCTAssertEqual(issuer, "https://kubernetes.example.com")
+        } else {
+            XCTFail("Should be workloadIdentity")
+        }
+    }
+
+    func testWorkloadIdentityConfigInit() {
+        let config = WorkloadIdentityConfig(
+            issuer: "https://sts.amazonaws.com",
+            audience: "anthropic-api",
+            tokenEndpoint: "https://sts.amazonaws.com/token"
+        )
+        XCTAssertEqual(config.issuer, "https://sts.amazonaws.com")
+        XCTAssertEqual(config.audience, "anthropic-api")
+        XCTAssertEqual(config.tokenEndpoint, "https://sts.amazonaws.com/token")
+        XCTAssertEqual(config.subjectTokenType, "urn:ietf:params:oauth:token-type:id_token")
+    }
+
+    func testBrowserAuthSessionStructure() {
+        let session = BrowserAuthSession(
+            authorizationUrl: "https://console.anthropic.com/oauth/authorize?...",
+            state: "state-123",
+            nonce: "nonce-456",
+            clientId: "friendly-outlaw-cli"
+        )
+
+        XCTAssertTrue(session.authorizationUrl.contains("oauth/authorize"))
+        XCTAssertEqual(session.state, "state-123")
+        XCTAssertEqual(session.nonce, "nonce-456")
+        XCTAssertEqual(session.clientId, "friendly-outlaw-cli")
+    }
+
+    func testBrowserAuthTokenDecoding() {
+        let json = """
+        {
+            "access_token": "access-123",
+            "refresh_token": "refresh-456",
+            "expires_in": 3600,
+            "token_type": "Bearer",
+            "scope": "openid profile email"
+        }
+        """.data(using: .utf8)!
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let token = try? decoder.decode(BrowserAuthToken.self, from: json)
+
+        XCTAssertNotNil(token)
+        XCTAssertEqual(token?.accessToken, "access-123")
+        XCTAssertEqual(token?.refreshToken, "refresh-456")
+        XCTAssertEqual(token?.tokenType, "Bearer")
+    }
+
+    func testWorkloadIdentityTokenDecoding() {
+        let json = """
+        {
+            "access_token": "workload-access-789",
+            "expires_in": 3600,
+            "token_type": "Bearer",
+            "issued_token_type": "urn:ietf:params:oauth:token-type:access_token"
+        }
+        """.data(using: .utf8)!
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let token = try? decoder.decode(WorkloadIdentityToken.self, from: json)
+
+        XCTAssertNotNil(token)
+        XCTAssertEqual(token?.accessToken, "workload-access-789")
+        XCTAssertEqual(token?.tokenType, "Bearer")
+    }
+
+    func testKeylessAuthServiceInitialization() {
+        let authService = KeylessAuthService()
+        XCTAssertNil(authService.getCurrentToken())
+        XCTAssertNil(authService.getCurrentIssuer())
+    }
+
+    func testKeylessAuthErrorDescriptions() {
+        let errors: [KeylessAuthError] = [
+            .tokenExchangeFailed,
+            .tokenRefreshFailed,
+            .workloadIdentityExchangeFailed,
+            .invalidAuthorizationCode,
+            .authenticationCancelled,
+            .networkError("Connection timeout")
+        ]
+
+        for error in errors {
+            XCTAssertNotNil(error.errorDescription)
+            XCTAssertFalse(error.errorDescription?.isEmpty ?? true)
+        }
+    }
+
+    func testWritersAppKeylessAuthMethods() {
+        let app = WritersApp()
+        XCTAssertNotNil(app.keylessAuthService)
+    }
+
 // MARK: - Test Helpers
 
 private class MockComputerUseExecutor: ComputerUseExecutor {

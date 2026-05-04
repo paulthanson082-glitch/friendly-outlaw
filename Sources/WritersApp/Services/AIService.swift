@@ -421,7 +421,14 @@ public class AIService {
     ) throws -> URLRequest {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue(configuration.apiKey, forHTTPHeaderField: "x-api-key")
+
+        switch configuration.authMethod {
+        case .apiKey(let key):
+            request.setValue(key, forHTTPHeaderField: "x-api-key")
+        case .browserAuth(let token), .workloadIdentity(let token, _):
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "authorization")
+        }
+
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.setValue("application/json", forHTTPHeaderField: "content-type")
 
