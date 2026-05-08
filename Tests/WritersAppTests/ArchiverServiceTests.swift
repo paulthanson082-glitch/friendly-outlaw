@@ -235,13 +235,14 @@ final class ArchiverServiceTests: XCTestCase {
         let collection = archiver.createCollection(name: "Archive")
         archiver.addDocumentToCollection(relatedDoc.id, collectionId: collection.id)
 
-        let suggestions = Task {
-            await archiver.suggestRelated(to: currentDoc.id, limit: 5)
+        let expectation = XCTestExpectation(description: "Suggestions loaded")
+        Task {
+            let result = await archiver.suggestRelated(to: currentDoc.id, limit: 5)
+            XCTAssertEqual(result.count, 1)
+            XCTAssertEqual(result[0].id, relatedDoc.id)
+            expectation.fulfill()
         }
-
-        let result = try! suggestions.value
-        XCTAssertEqual(result.count, 1)
-        XCTAssertEqual(result[0].id, relatedDoc.id)
+        wait(for: [expectation], timeout: 1.0)
     }
 
     func testSuggestRelatedNoResults() {
@@ -254,12 +255,13 @@ final class ArchiverServiceTests: XCTestCase {
         let collection = archiver.createCollection(name: "Archive")
         archiver.addDocumentToCollection(archiveDoc.id, collectionId: collection.id)
 
-        let suggestions = Task {
-            await archiver.suggestRelated(to: currentDoc.id, limit: 5)
+        let expectation = XCTestExpectation(description: "Suggestions loaded")
+        Task {
+            let result = await archiver.suggestRelated(to: currentDoc.id, limit: 5)
+            XCTAssertTrue(result.isEmpty)
+            expectation.fulfill()
         }
-
-        let result = try! suggestions.value
-        XCTAssertTrue(result.isEmpty)
+        wait(for: [expectation], timeout: 1.0)
     }
 
     func testSuggestRelatedExcludesCurrentDocument() {
@@ -269,12 +271,13 @@ final class ArchiverServiceTests: XCTestCase {
         let collection = archiver.createCollection(name: "Archive")
         archiver.addDocumentToCollection(doc.id, collectionId: collection.id)
 
-        let suggestions = Task {
-            await archiver.suggestRelated(to: doc.id, limit: 5)
+        let expectation = XCTestExpectation(description: "Suggestions loaded")
+        Task {
+            let result = await archiver.suggestRelated(to: doc.id, limit: 5)
+            XCTAssertTrue(result.isEmpty)
+            expectation.fulfill()
         }
-
-        let result = try! suggestions.value
-        XCTAssertTrue(result.isEmpty)
+        wait(for: [expectation], timeout: 1.0)
     }
 
     // MARK: - Statistics Tests
@@ -300,19 +303,28 @@ final class ArchiverServiceTests: XCTestCase {
 
     // MARK: - Organization Tests
 
-    func testOrganizeByTagsWithoutAI() async {
+    func testOrganizeByTagsWithoutAI() {
         let doc = documentManager.createBlankDocument(title: "Story")
         doc.tags = ["fantasy", "dragon"]
 
-        let tags = try! await archiver.organizeByTags([doc.id])
-
-        XCTAssertEqual(tags[doc.id], ["dragon", "fantasy"])
+        let expectation = XCTestExpectation(description: "Tags organized")
+        Task {
+            let tags = try await archiver.organizeByTags([doc.id])
+            XCTAssertEqual(tags[doc.id], ["dragon", "fantasy"])
+            expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: 1.0)
     }
 
-    func testOrganizeByTagsNonexistentDocument() async {
-        let tags = try! await archiver.organizeByTags([UUID()])
-
-        XCTAssertEqual(tags[UUID()], [])
+    func testOrganizeByTagsNonexistentDocument() {
+        let docId = UUID()
+        let expectation = XCTestExpectation(description: "Tags organized")
+        Task {
+            let tags = try await archiver.organizeByTags([docId])
+            XCTAssertEqual(tags[docId], [])
+            expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: 1.0)
     }
 
     // MARK: - Profile Tests
