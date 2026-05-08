@@ -549,7 +549,7 @@ ExportFormat: markdown, plainText, html
 
 ### AI
 ```swift
-AIModel: claude35Sonnet, claude3Opus, claude3Sonnet, claude3Haiku
+AIModel: claude35Sonnet, claude3Opus, claude3Sonnet, claude3Haiku, maxhermes
 AIAssistanceType: continueWriting, improveText, grammarCheck, styleSuggestions,
                   generateOutline, brainstormIdeas, characterDevelopment, plotSuggestions,
                   dialogueImprovement, descriptionEnhancement, titleGeneration,
@@ -645,7 +645,7 @@ See [MYTHOS.md](MYTHOS.md) for information on extended model capabilities used i
 ```swift
 let config = AIConfiguration(
     apiKey: "sk-ant-...",
-    model: .claude35Sonnet,  // or .claude3Opus, .claude3Sonnet, .claude3Haiku
+    model: .claude35Sonnet,  // or .claude3Opus, .claude3Sonnet, .claude3Haiku, .maxhermes
     maxTokens: 4096,
     temperature: 0.7
 )

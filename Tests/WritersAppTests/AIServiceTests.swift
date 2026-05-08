@@ -36,6 +36,7 @@ final class AIServiceTests: XCTestCase {
         XCTAssertEqual(AIModel.claude3Opus.rawValue, "claude-3-opus-20240229")
         XCTAssertEqual(AIModel.claude3Sonnet.rawValue, "claude-3-sonnet-20240229")
         XCTAssertEqual(AIModel.claude3Haiku.rawValue, "claude-3-haiku-20240307")
+        XCTAssertEqual(AIModel.maxhermes.rawValue, "maxhermes-01")
     }
 
     func testAIModelDisplayNames() {
@@ -43,6 +44,7 @@ final class AIServiceTests: XCTestCase {
         XCTAssertEqual(AIModel.claude3Opus.displayName, "Claude 3 Opus")
         XCTAssertEqual(AIModel.claude3Sonnet.displayName, "Claude 3 Sonnet")
         XCTAssertEqual(AIModel.claude3Haiku.displayName, "Claude 3 Haiku")
+        XCTAssertEqual(AIModel.maxhermes.displayName, "MaxHermes")
     }
 
     // MARK: - AIService Initialization Tests
