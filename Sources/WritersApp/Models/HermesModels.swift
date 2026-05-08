@@ -331,3 +331,137 @@ public enum HermesError: LocalizedError {
         }
     }
 }
+
+// MARK: - Archiver Models
+
+/// A snapshot of archive state at a point in time (word count, streak, documents completed, etc.)
+public struct ArchiveSnapshot: Identifiable, Codable {
+    public let id: UUID
+    public let documentId: UUID
+    public let timestamp: Date
+    public let wordCount: Int
+    public let characterCount: Int
+    public let sessionCount: Int
+    public let daysStreak: Int
+    public let title: String
+    public let summary: String
+    public let tags: [String]
+
+    public init(
+        id: UUID = UUID(),
+        documentId: UUID,
+        timestamp: Date = Date(),
+        wordCount: Int = 0,
+        characterCount: Int = 0,
+        sessionCount: Int = 0,
+        daysStreak: Int = 0,
+        title: String,
+        summary: String,
+        tags: [String] = []
+    ) {
+        self.id = id
+        self.documentId = documentId
+        self.timestamp = timestamp
+        self.wordCount = wordCount
+        self.characterCount = characterCount
+        self.sessionCount = sessionCount
+        self.daysStreak = daysStreak
+        self.title = title
+        self.summary = summary
+        self.tags = tags
+    }
+}
+
+/// A named collection of archived documents, ideas, and snapshots
+public struct ArchiveCollection: Identifiable, Codable {
+    public let id: UUID
+    public let name: String
+    public let description: String
+    public var documentIds: [UUID]
+    public var ideaIds: [UUID]
+    public var snapshotIds: [UUID]
+    public let createdAt: Date
+    public var updatedAt: Date
+    public var tags: [String]
+    public var theme: String
+
+    public init(
+        id: UUID = UUID(),
+        name: String,
+        description: String = "",
+        documentIds: [UUID] = [],
+        ideaIds: [UUID] = [],
+        snapshotIds: [UUID] = [],
+        createdAt: Date = Date(),
+        updatedAt: Date = Date(),
+        tags: [String] = [],
+        theme: String = "default"
+    ) {
+        self.id = id
+        self.name = name
+        self.description = description
+        self.documentIds = documentIds
+        self.ideaIds = ideaIds
+        self.snapshotIds = snapshotIds
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.tags = tags
+        self.theme = theme
+    }
+}
+
+/// Context provided to Archiver for organizing and summarizing work
+public struct ArchiverContext: Codable {
+    public let userId: UUID?
+    public let timeRange: DateRange?
+    public let excludedTags: [String]
+    public let priorityTags: [String]
+
+    public struct DateRange: Codable {
+        public let start: Date
+        public let end: Date
+
+        public init(start: Date, end: Date) {
+            self.start = start
+            self.end = end
+        }
+    }
+
+    public init(
+        userId: UUID? = nil,
+        timeRange: DateRange? = nil,
+        excludedTags: [String] = [],
+        priorityTags: [String] = []
+    ) {
+        self.userId = userId
+        self.timeRange = timeRange
+        self.excludedTags = excludedTags
+        self.priorityTags = priorityTags
+    }
+}
+
+/// Archiver agent profile configuration for organizing and preserving creative work
+public struct ArchiverProfile: Codable {
+    public let id: UUID
+    public let name: String
+    public var collections: [ArchiveCollection]
+    public var snapshots: [ArchiveSnapshot]
+    public let createdAt: Date
+    public var lastArchiveAt: Date?
+
+    public init(
+        id: UUID = UUID(),
+        name: String = "My Archive",
+        collections: [ArchiveCollection] = [],
+        snapshots: [ArchiveSnapshot] = [],
+        createdAt: Date = Date(),
+        lastArchiveAt: Date? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.collections = collections
+        self.snapshots = snapshots
+        self.createdAt = createdAt
+        self.lastArchiveAt = lastArchiveAt
+    }
+}
