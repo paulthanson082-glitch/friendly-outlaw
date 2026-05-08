@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>BOT ORACLE — Ask Anything</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #050510;
+  --teal:    #00ffaa;
+  --purple:  #7700ff;
+  --pink:    #ff0066;
+  --blue:    #00aaff;
+  --text:    #8aaec8;
+  --panel:   rgba(6, 4, 22, 0.88);
+  --border:  rgba(0, 255, 170, 0.28);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  overflow: hidden;
+  height: 100dvh;
+  width: 100vw;
+  user-select: none;
+}
+
+/* ── canvas ──────────────────────────────────────── */
+#bgCanvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 1;
+}
+
+/* ── scanlines overlay ───────────────────────────── */
+.scanlines {
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0,0,0,0.06) 3px,
+    rgba(0,0,0,0.06) 4px
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ── bot swarm tags (top-left) ───────────────────── */
+#botSwarm {
+  position: fixed;
+  top: 14px; left: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-width: 210px;
+  z-index: 50;
+}
+.bot-tag {
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  padding: 3px 7px;
+  border-radius: 2px;
+  opacity: 0.55;
+  transition: opacity 0.3s, box-shadow 0.3s;
+  cursor: default;
+}
+.bot-tag.active {
+  opacity: 1;
+  animation: tagPulse 0.9s ease-in-out infinite;
+}
+@keyframes tagPulse {
+  0%,100% { box-shadow: 0 0 4px currentColor; }
+  50%      { box-shadow: 0 0 14px currentColor; }
+}
+
+/* ── settings (top-right) ────────────────────────── */
+#settingsBtn {
+  position: fixed;
+  top: 14px; right: 14px;
+  background: transparent;
+  border: 1px solid rgba(119,0,255,0.4);
+  color: var(--purple);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.72rem;
+  padding: 7px 12px;
+  cursor: pointer;
+  letter-spacing: 0.1em;
+  z-index: 100;
+  transition: background 0.25s, box-shadow 0.25s;
+}
+#settingsBtn:hover { background: rgba(119,0,255,0.12); box-shadow: 0 0 10px rgba(119,0,255,0.3); }
+
+#settingsPanel {
+  position: fixed;
+  top: 50px; right: 14px;
+  background: rgba(6,4,22,0.96);
+  border: 1px solid rgba(119,0,255,0.35);
+  padding: 16px;
+  width: min(280px, 90vw);
+  z-index: 100;
+  display: none;
+  backdrop-filter: blur(10px);
+}
+#settingsPanel.open { display: block; }
+#settingsPanel label {
+  font-size: 0.7rem;
+  color: var(--purple);
+  letter-spacing: 0.25em;
+  display: block;
+  margin-bottom: 6px;
+}
+#settingsPanel input {
+  width: 100%;
+  background: rgba(0,0,20,0.8);
+  border: 1px solid rgba(119,0,255,0.3);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.8rem;
+  padding: 8px 10px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+#settingsPanel input:focus { border-color: var(--purple); }
+#settingsPanel .note {
+  font-size: 0.62rem;
+  color: rgba(119,0,255,0.5);
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+/* ── main layout ─────────────────────────────────── */
+#app {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100dvh;
+  gap: 18px;
+  padding: 20px;
+  pointer-events: none;
+}
+
+/* ── title ───────────────────────────────────────── */
+.title-area { text-align: center; }
+#mainTitle {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 900;
+  font-size: clamp(1.8rem, 5.5vw, 3.6rem);
+  letter-spacing: 0.32em;
+  color: var(--teal);
+  text-shadow: 0 0 16px var(--teal), 0 0 40px var(--teal), 0 0 80px rgba(0,255,170,0.25);
+}
+#mainTitle.glitch { animation: glitch 0.28s ease; }
+@keyframes glitch {
+  0%   { transform: none; filter: none; }
+  18%  { transform: translate(-4px, 2px) skew(-1deg); filter: hue-rotate(80deg) brightness(1.4); clip-path: inset(15% 0 40% 0); }
+  36%  { transform: translate(4px, -2px); filter: hue-rotate(200deg); clip-path: inset(55% 0 8% 0); }
+  55%  { transform: translate(-2px, 1px) skew(0.5deg); filter: hue-rotate(300deg); }
+  74%  { transform: translate(2px, -1px); }
+  100% { transform: none; filter: none; }
+}
+.subtitle {
+  font-size: clamp(0.55rem, 1.8vw, 0.72rem);
+  color: var(--purple);
+  letter-spacing: 0.45em;
+  margin-top: 6px;
+  opacity: 0.75;
+}
+
+/* ── glass panel ─────────────────────────────────── */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 22px;
+  width: min(620px, 94vw);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 0 35px rgba(0,255,170,0.08), inset 0 0 25px rgba(0,0,40,0.5);
+  position: relative;
+  overflow: hidden;
+  pointer-events: all;
+}
+/* animated scan line inside panel */
+.panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--teal), transparent);
+  opacity: 0.35;
+  animation: panelScan 4s linear infinite;
+}
+@keyframes panelScan {
+  0%   { top: 0; }
+  100% { top: 100%; }
+}
+
+/* ── textarea ────────────────────────────────────── */
+#questionInput {
+  width: 100%;
+  background: rgba(0,0,18,0.75);
+  border: 1px solid var(--border);
+  color: var(--teal);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: clamp(0.82rem, 2.2vw, 0.95rem);
+  padding: 11px 14px;
+  outline: none;
+  resize: vertical;
+  min-height: 56px;
+  max-height: 160px;
+  border-radius: 2px;
+  transition: border-color 0.25s, box-shadow 0.25s;
+  line-height: 1.5;
+}
+#questionInput:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 12px rgba(0,255,170,0.22), inset 0 0 8px rgba(0,255,170,0.04);
+}
+#questionInput::placeholder { color: rgba(0,255,170,0.28); }
+
+/* ── panel bottom row ────────────────────────────── */
+.panel-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+#statusIndicator {
+  font-size: 0.72rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+  flex: 1;
+}
+#statusIndicator .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+#statusIndicator.thinking .dot { animation: dotPulse 0.75s ease-in-out infinite; }
+@keyframes dotPulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.2; transform: scale(0.55); }
+}
+#askBtn {
+  background: transparent;
+  border: 1px solid var(--teal);
+  color: var(--teal);
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+  font-size: clamp(0.6rem, 1.8vw, 0.78rem);
+  padding: 9px 18px;
+  cursor: pointer;
+  letter-spacing: 0.15em;
+  white-space: nowrap;
+  transition: background 0.25s, box-shadow 0.25s;
+}
+#askBtn:hover:not(:disabled) {
+  background: rgba(0,255,170,0.1);
+  box-shadow: 0 0 18px rgba(0,255,170,0.35);
+}
+#askBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── answer area ─────────────────────────────────── */
+#answerArea {
+  margin-top: 18px;
+  border-top: 1px solid rgba(0,255,170,0.12);
+  padding-top: 14px;
+}
+#answerHeader {
+  font-size: 0.68rem;
+  letter-spacing: 0.3em;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#answerText {
+  color: #c0d8e6;
+  font-size: clamp(0.8rem, 2vw, 0.9rem);
+  line-height: 1.75;
+  white-space: pre-wrap;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+#answerText::-webkit-scrollbar { width: 3px; }
+#answerText::-webkit-scrollbar-track { background: transparent; }
+#answerText::-webkit-scrollbar-thumb { background: rgba(0,255,170,0.25); }
+.cursor {
+  display: inline-block;
+  width: 7px;
+  height: 0.9em;
+  background: var(--teal);
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  animation: cursorBlink 1s step-end infinite;
+}
+@keyframes cursorBlink {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+
+/* ── footer hint ─────────────────────────────────── */
+.hint {
+  font-size: 0.6rem;
+  color: rgba(138,174,200,0.35);
+  letter-spacing: 0.2em;
+  text-align: center;
+}
+</style>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+<div class="scanlines"></div>
+
+<!-- Bot swarm status tags -->
+<div id="botSwarm"></div>
+
+<!-- Settings -->
+<button id="settingsBtn" onclick="toggleSettings()">⚙ CONFIG</button>
+<div id="settingsPanel">
+  <label>ANTHROPIC API KEY</label>
+  <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off">
+  <p class="note">Never stored. Session memory only.<br>Get a key at console.anthropic.com</p>
+</div>
+
+<!-- Main UI -->
+<div id="app">
+  <div class="title-area">
+    <div id="mainTitle">BOT ORACLE</div>
+    <div class="subtitle">COLLECTIVE INTELLIGENCE &nbsp;·&nbsp; ASK ANYTHING</div>
+  </div>
+
+  <div class="panel">
+    <textarea
+      id="questionInput"
+      placeholder="Ask the oracle anything…"
+      rows="2"
+      onkeydown="handleKey(event)"
+    ></textarea>
+
+    <div class="panel-bottom">
+      <div id="statusIndicator"></div>
+      <button id="askBtn" onclick="askQuestion()">ASK THE ORACLE</button>
+    </div>
+
+    <div id="answerArea" style="display:none">
+      <div id="answerHeader"></div>
+      <div id="answerText"></div>
+    </div>
+  </div>
+
+  <div class="hint">ENTER or ⌘↵ to ask &nbsp;·&nbsp; TAP CONFIG for API key</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  BOT ORACLE — Visual Engine + AI Interface
+// ═══════════════════════════════════════════════════
+
+// ── Bot definitions ──────────────────────────────
+const BOT_CONFIGS = [
+  { name: 'AXIOM',   color: '#00ffaa', size: 34 },
+  { name: 'NEXUS',   color: '#7700ff', size: 40 },
+  { name: 'PHANTOM', color: '#ff0066', size: 30 },
+  { name: 'CIPHER',  color: '#00aaff', size: 37 },
+  { name: 'SPECTRE', color: '#ffaa00', size: 32 },
+  { name: 'WRAITH',  color: '#cc00ff', size: 36 },
+  { name: 'VECTOR',  color: '#00ffdd', size: 28 },
+  { name: 'ECHO',    color: '#ff6600', size: 33 },
+  { name: 'VOID',    color: '#5500ff', size: 42 },
+  { name: 'BINARY',  color: '#00ff66', size: 29 },
+  { name: 'GLITCH',  color: '#ff0099', size: 37 },
+  { name: 'ORACLE',  color: '#ffdd00', size: 45 },
+];
+
+// Perimeter slots as fractions of screen (W, H)
+const BOT_SLOTS = [
+  [0.10, 0.11],
+  [0.50, 0.07],
+  [0.90, 0.11],
+  [0.93, 0.38],
+  [0.93, 0.68],
+  [0.87, 0.90],
+  [0.50, 0.93],
+  [0.13, 0.90],
+  [0.07, 0.68],
+  [0.07, 0.38],
+  [0.22, 0.28],
+  [0.78, 0.74],
+];
+
+// ── Canvas setup ─────────────────────────────────
+const canvas = document.getElementById('bgCanvas');
+const ctx    = canvas.getContext('2d');
+let W = canvas.width  = window.innerWidth;
+let H = canvas.height = window.innerHeight;
+
+window.addEventListener('resize', () => {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  initBots();
+  initParticles();
+});
+
+// ── Helpers ──────────────────────────────────────
+function hex2rgba(hex, a) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  r = Math.min(r, w/2, h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y);
+  ctx.arcTo(x+w, y, x+w, y+r, r);
+  ctx.lineTo(x+w, y+h-r);
+  ctx.arcTo(x+w, y+h, x+w-r, y+h, r);
+  ctx.lineTo(x+r, y+h);
+  ctx.arcTo(x, y+h, x, y+h-r, r);
+  ctx.lineTo(x, y+r);
+  ctx.arcTo(x, y, x+r, y, r);
+  ctx.closePath();
+}
+
+// ── Particle class ────────────────────────────────
+class Particle {
+  constructor(init = false) { this.reset(init); }
+
+  reset(init) {
+    this.x    = Math.random() * W;
+    this.y    = init ? Math.random() * H : (Math.random() > 0.5 ? -4 : H+4);
+    this.size = Math.random() * 1.7 + 0.3;
+    this.vx   = (Math.random() - 0.5) * 0.22;
+    this.vy   = (Math.random() - 0.5) * 0.22;
+    this.base = Math.random() * 0.45 + 0.1;
+    this.tp   = Math.random() * Math.PI * 2;
+    this.ts   = 0.018 + Math.random() * 0.038;
+    const r   = Math.random();
+    this.col  = r < 0.5 ? '#00ffaa' : r < 0.8 ? '#7700ff' : '#00aaff';
+  }
+
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.tp += this.ts;
+    if (this.x < -8 || this.x > W+8 || this.y < -8 || this.y > H+8) this.reset(false);
+  }
+
+  draw() {
+    const a = this.base * (0.55 + Math.sin(this.tp) * 0.45);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.fillStyle   = this.col;
+    ctx.shadowBlur  = 4;
+    ctx.shadowColor = this.col;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ── Stream particle (flows toward active bot) ─────
+class StreamParticle {
+  constructor(target) {
+    const edge = Math.floor(Math.random() * 4);
+    if      (edge === 0) { this.x = Math.random() * W; this.y = 0; }
+    else if (edge === 1) { this.x = W;                  this.y = Math.random() * H; }
+    else if (edge === 2) { this.x = Math.random() * W;  this.y = H; }
+    else                 { this.x = 0;                  this.y = Math.random() * H; }
+    this.target = target;
+    this.speed  = 2.5 + Math.random() * 3;
+    this.size   = 1.2 + Math.random() * 2;
+    this.col    = target.color;
+    this.dead   = false;
+  }
+
+  update() {
+    const dx   = this.target.x - this.x;
+    const dy   = this.target.y - this.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 12) { this.dead = true; return; }
+    this.x += (dx / dist) * this.speed;
+    this.y += (dy / dist) * this.speed;
+    this.alpha = Math.min(0.85, dist / 120);
+  }
+
+  draw() {
+    ctx.save();
+    ctx.globalAlpha = this.alpha || 0.5;
+    ctx.fillStyle   = this.col;
+    ctx.shadowBlur  = 7;
+    ctx.shadowColor = this.col;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ── Bot class ─────────────────────────────────────
+class Bot {
+  constructor(config, bx, by) {
+    this.name     = config.name;
+    this.color    = config.color;
+    this.baseSize = config.size;
+    this.size     = config.size;
+    this.baseX    = bx;
+    this.baseY    = by;
+    this.x        = bx;
+    this.y        = by;
+
+    this.orbitRX  = 22 + Math.random() * 48;
+    this.orbitRY  = 12 + Math.random() * 28;
+    this.orbitSpd = (0.0005 + Math.random() * 0.0014) * (Math.random() > 0.5 ? 1 : -1);
+    this.orbitA   = Math.random() * Math.PI * 2;
+
+    this.bobAmp = 7 + Math.random() * 16;
+    this.bobSpd = 0.011 + Math.random() * 0.017;
+    this.bobOff = Math.random() * Math.PI * 2;
+
+    this.active      = false;
+    this.pulsePhase  = Math.random() * Math.PI * 2;
+    this.eyePhase    = Math.random() * Math.PI * 2;
+    this.blinkTimer  = Math.floor(Math.random() * 240);
+    this.blinkLen    = Math.floor(Math.random() * 280) + 160;
+    this.isBlinking  = false;
+  }
+
+  update(time) {
+    this.orbitA  += this.orbitSpd;
+    this.x        = this.baseX + Math.cos(this.orbitA) * this.orbitRX;
+    this.y        = this.baseY
+                  + Math.sin(this.orbitA * 0.55) * this.orbitRY
+                  + Math.sin(time * this.bobSpd + this.bobOff) * this.bobAmp;
+
+    this.pulsePhase += this.active ? 0.09 : 0.024;
+    this.eyePhase   += 0.017;
+
+    this.blinkTimer++;
+    if (this.blinkTimer >= this.blinkLen) {
+      this.isBlinking = !this.isBlinking;
+      this.blinkLen   = this.isBlinking ? 9 : Math.floor(Math.random() * 280) + 150;
+      this.blinkTimer = 0;
+    }
+
+    const pf  = this.active ? 1 + Math.sin(this.pulsePhase) * 0.13 : 1;
+    this.size = this.baseSize * pf;
+  }
+
+  draw(time) {
+    const { x, y, color } = this;
+    const s  = this.size;
+    const gm = this.active ? 2.4 : 1;
+
+    ctx.save();
+
+    // outer aura
+    const aura = ctx.createRadialGradient(x, y, 0, x, y, s * 4);
+    aura.addColorStop(0, hex2rgba(color, this.active ? 0.2 : 0.06));
+    aura.addColorStop(1, 'transparent');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(x, y, s * 4, 0, Math.PI*2);
+    ctx.fill();
+
+    // body
+    ctx.shadowBlur  = 18 * gm;
+    ctx.shadowColor = color;
+    const bodyG = ctx.createRadialGradient(x - s*0.3, y - s*0.35, s*0.05, x, y, s);
+    bodyG.addColorStop(0, '#1e1230');
+    bodyG.addColorStop(0.55, '#0d0720');
+    bodyG.addColorStop(1, '#060410');
+    ctx.fillStyle = bodyG;
+    ctx.beginPath();
+    ctx.arc(x, y, s, 0, Math.PI*2);
+    ctx.fill();
+
+    // body ring
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = this.active ? 2.2 : 1.5;
+    ctx.stroke();
+
+    // inner ring
+    ctx.strokeStyle = hex2rgba(color, 0.18);
+    ctx.lineWidth   = 0.8;
+    ctx.beginPath();
+    ctx.arc(x, y, s * 0.73, 0, Math.PI*2);
+    ctx.stroke();
+
+    // circuit lines (clipped)
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, s * 0.97, 0, Math.PI*2);
+    ctx.clip();
+    ctx.strokeStyle = hex2rgba(color, 0.2);
+    ctx.lineWidth   = 0.7;
+    ctx.shadowBlur  = 0;
+    ctx.beginPath();
+    ctx.moveTo(x - s, y + s*0.44);
+    ctx.lineTo(x - s*0.34, y + s*0.44);
+    ctx.lineTo(x - s*0.34, y + s*0.64);
+    ctx.lineTo(x + s*0.34, y + s*0.64);
+    ctx.lineTo(x + s*0.34, y + s*0.44);
+    ctx.lineTo(x + s, y + s*0.44);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x - s*0.55, y - s*0.6);
+    ctx.lineTo(x - s*0.17, y - s*0.6);
+    ctx.lineTo(x - s*0.17, y - s*0.48);
+    ctx.stroke();
+    ctx.restore();
+
+    // eyes
+    const eyeY = y - s * 0.1;
+    const eyeW = s * 0.32;
+    const eyeH = s * 0.13;
+    const scan = Math.sin(this.eyePhase) * s * 0.1;
+
+    ctx.shadowBlur  = 10 * gm;
+    ctx.shadowColor = color;
+
+    if (!this.isBlinking) {
+      ctx.fillStyle = color;
+      roundRect(ctx, x - s*0.53 + scan, eyeY - eyeH/2, eyeW, eyeH, 3);
+      ctx.fill();
+      roundRect(ctx, x + s*0.21 + scan, eyeY - eyeH/2, eyeW, eyeH, 3);
+      ctx.fill();
+      // shine
+      ctx.shadowBlur  = 0;
+      ctx.fillStyle   = 'rgba(255,255,255,0.42)';
+      ctx.beginPath();
+      ctx.arc(x - s*0.46 + scan, eyeY - eyeH*0.1, eyeH*0.27, 0, Math.PI*2);
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = color;
+      ctx.lineWidth   = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x - s*0.53, eyeY); ctx.lineTo(x - s*0.21, eyeY); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x + s*0.21, eyeY); ctx.lineTo(x + s*0.53, eyeY); ctx.stroke();
+    }
+
+    // mouth / data display when active
+    if (this.active) {
+      const mY = y + s * 0.38;
+      ctx.fillStyle  = hex2rgba(color, 0.28);
+      ctx.shadowBlur = 0;
+      roundRect(ctx, x - s*0.38, mY - s*0.08, s*0.76, s*0.16, 2);
+      ctx.fill();
+      for (let d = 0; d < 5; d++) {
+        const on = Math.sin(time * 0.12 + d * 1.3 + this.pulsePhase) > 0;
+        ctx.fillStyle = on ? color : hex2rgba(color, 0.22);
+        ctx.beginPath();
+        ctx.arc(x - s*0.28 + d * s*0.14, mY, 1.7, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+
+    // main antenna
+    ctx.shadowBlur  = 8;
+    ctx.shadowColor = color;
+    ctx.strokeStyle = hex2rgba(color, 0.78);
+    ctx.lineWidth   = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x - s*0.1, y - s);
+    ctx.lineTo(x + s*0.06, y - s*1.42);
+    ctx.lineTo(x + s*0.23, y - s*1.78);
+    ctx.stroke();
+    // tip
+    const tipA = this.active ? (Math.sin(this.pulsePhase * 4) > 0 ? 1 : 0.12) : 0.62;
+    ctx.globalAlpha = tipA;
+    ctx.fillStyle   = color;
+    ctx.shadowBlur  = this.active ? 20 : 5;
+    ctx.beginPath();
+    ctx.arc(x + s*0.23, y - s*1.78, 3.5, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // secondary antenna
+    ctx.shadowBlur  = 4;
+    ctx.strokeStyle = hex2rgba(color, 0.48);
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + s*0.28, y - s*0.88);
+    ctx.lineTo(x + s*0.52, y - s*1.26);
+    ctx.stroke();
+    ctx.fillStyle = hex2rgba(color, 0.65);
+    ctx.beginPath();
+    ctx.arc(x + s*0.52, y - s*1.26, 2.2, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+// ── State ─────────────────────────────────────────
+let particles    = [];
+let streamParticles = [];
+let bots         = [];
+let activeBot    = null;
+let time         = 0;
+let isAsking     = false;
+let glitchTimer  = 0;
+let arcTimer     = 0;
+let isThinking   = false;
+
+// ── Init ──────────────────────────────────────────
+function initParticles() {
+  particles = Array.from({ length: 160 }, () => new Particle(true));
+}
+
+function initBots() {
+  bots = BOT_CONFIGS.map((cfg, i) => {
+    const [fx, fy] = BOT_SLOTS[i];
+    const bx = fx * W + (Math.random() - 0.5) * 28;
+    const by = fy * H + (Math.random() - 0.5) * 18;
+    return new Bot(cfg, bx, by);
+  });
+  renderBotTags();
+}
+
+function renderBotTags() {
+  const sw = document.getElementById('botSwarm');
+  sw.innerHTML = '';
+  bots.forEach(b => {
+    const el = document.createElement('div');
+    el.className  = 'bot-tag';
+    el.id         = 'tag-' + b.name;
+    el.style.color  = b.color;
+    el.style.border = `1px solid ${b.color}44`;
+    el.textContent  = b.name;
+    sw.appendChild(el);
+  });
+}
+
+// ── Draw helpers ──────────────────────────────────
+function drawBackground() {
+  ctx.fillStyle = '#050510';
+  ctx.fillRect(0, 0, W, H);
+
+  // fog blobs
+  const fogs = [
+    { x: W*0.15, y: H*0.25, r: W*0.3,  c: 'rgba(18,0,55,0.14)' },
+    { x: W*0.82, y: H*0.65, r: W*0.28, c: 'rgba(0,35,28,0.11)' },
+    { x: W*0.5,  y: H*0.85, r: W*0.35, c: 'rgba(28,0,45,0.1)'  },
+    { x: W*0.08, y: H*0.88, r: W*0.22, c: 'rgba(0,18,50,0.09)' },
+    { x: W*0.92, y: H*0.12, r: W*0.2,  c: 'rgba(40,0,30,0.1)'  },
+  ];
+  fogs.forEach(f => {
+    const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r);
+    g.addColorStop(0, f.c);
+    g.addColorStop(1, 'transparent');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  });
+
+  // grid
+  ctx.strokeStyle = 'rgba(0,255,170,0.025)';
+  ctx.lineWidth   = 1;
+  const gs = 65;
+  for (let x = 0; x < W; x += gs) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += gs) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+}
+
+function drawConnections() {
+  for (let i = 0; i < bots.length; i++) {
+    for (let j = i+1; j < bots.length; j++) {
+      const dx   = bots[i].x - bots[j].x;
+      const dy   = bots[i].y - bots[j].y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 260) continue;
+      const a = (1 - dist / 260) * 0.13;
+      ctx.save();
+      ctx.strokeStyle = `rgba(0,255,170,${a})`;
+      ctx.lineWidth   = 0.6;
+      ctx.beginPath();
+      ctx.moveTo(bots[i].x, bots[i].y);
+      ctx.lineTo(bots[j].x, bots[j].y);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+}
+
+function drawArc(b1, b2) {
+  const segs = 7;
+  ctx.save();
+  ctx.strokeStyle = hex2rgba(b1.color, 0.35);
+  ctx.lineWidth   = 0.8;
+  ctx.shadowBlur  = 6;
+  ctx.shadowColor = b1.color;
+  ctx.beginPath();
+  ctx.moveTo(b1.x, b1.y);
+  for (let i = 1; i <= segs; i++) {
+    const t = i / segs;
+    ctx.lineTo(
+      b1.x + (b2.x - b1.x) * t + (Math.random()-0.5) * 18,
+      b1.y + (b2.y - b1.y) * t + (Math.random()-0.5) * 18
+    );
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ── Animation loop ────────────────────────────────
+function animate() {
+  requestAnimationFrame(animate);
+  time++;
+
+  drawBackground();
+
+  particles.forEach(p => { p.update(); p.draw(); });
+
+  drawConnections();
+
+  // occasional electric arc between two bots
+  arcTimer++;
+  if (arcTimer > 100 && Math.random() > 0.975) {
+    arcTimer = 0;
+    const b1 = bots[Math.floor(Math.random() * bots.length)];
+    const b2 = bots[Math.floor(Math.random() * bots.length)];
+    if (b1 !== b2) drawArc(b1, b2);
+  }
+
+  // stream particles toward active bot
+  if (isThinking && activeBot && Math.random() > 0.65) {
+    streamParticles.push(new StreamParticle(activeBot));
+  }
+  streamParticles = streamParticles.filter(sp => {
+    sp.update();
+    if (!sp.dead) sp.draw();
+    return !sp.dead;
+  });
+
+  bots.forEach(b => { b.update(time); b.draw(time); });
+
+  // random glitch on title
+  glitchTimer++;
+  if (glitchTimer > 320 && Math.random() > 0.994) {
+    glitchTimer = 0;
+    const el = document.getElementById('mainTitle');
+    el.classList.add('glitch');
+    setTimeout(() => el.classList.remove('glitch'), 290);
+  }
+}
+
+// ── API interaction ───────────────────────────────
+async function askQuestion() {
+  if (isAsking) return;
+
+  const qi  = document.getElementById('questionInput');
+  const q   = qi.value.trim();
+  if (!q) { qi.focus(); return; }
+
+  const key = document.getElementById('apiKeyInput').value.trim();
+  if (!key) {
+    setStatus('API key required — click CONFIG', '#ff0066', false);
+    document.getElementById('settingsPanel').classList.add('open');
+    return;
+  }
+
+  isAsking   = true;
+  isThinking = true;
+
+  // pick a random bot to respond
+  const bot = bots[Math.floor(Math.random() * bots.length)];
+  if (activeBot) activeBot.active = false;
+  activeBot       = bot;
+  bot.active      = true;
+
+  // highlight tag
+  document.querySelectorAll('.bot-tag').forEach(t => {
+    t.classList.remove('active');
+    t.style.opacity = '0.38';
+  });
+  const tag = document.getElementById('tag-' + bot.name);
+  if (tag) { tag.classList.add('active'); tag.style.opacity = '1'; }
+
+  setStatus(`${bot.name} IS PROCESSING…`, bot.color, true);
+  document.getElementById('askBtn').disabled = true;
+  document.getElementById('answerArea').style.display = 'none';
+
+  try {
+    const res  = await fetch('/api/ask', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ question: q, apiKey: key, bot: bot.name }),
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      setStatus('ERROR: ' + data.error, '#ff0066', false);
+    } else {
+      typeAnswer(data.answer, bot);
+      qi.value = '';
+    }
+  } catch (err) {
+    setStatus('CONNECTION FAILED: ' + err.message, '#ff0066', false);
+  } finally {
+    isAsking   = false;
+    isThinking = false;
+    bot.active = false;
+    setStatus('', bot.color, false);
+    document.getElementById('askBtn').disabled = false;
+    document.querySelectorAll('.bot-tag').forEach(t => {
+      t.classList.remove('active');
+      t.style.opacity = '0.55';
+    });
+  }
+}
+
+function typeAnswer(text, bot) {
+  const area   = document.getElementById('answerArea');
+  const header = document.getElementById('answerHeader');
+  const el     = document.getElementById('answerText');
+
+  area.style.display = 'block';
+  header.innerHTML   =
+    `<span style="color:${bot.color}">◈ ${bot.name}</span>`
+    + `<span style="opacity:0.45;font-size:0.6rem;letter-spacing:0.3em"> RESPONDS</span>`;
+  el.innerHTML = '';
+
+  const cursor = document.createElement('span');
+  cursor.className = 'cursor';
+  el.appendChild(cursor);
+
+  let i = 0;
+  const iv = setInterval(() => {
+    if (i < text.length) {
+      cursor.insertAdjacentText('beforebegin', text[i++]);
+      el.scrollTop = el.scrollHeight;
+    } else {
+      cursor.remove();
+      clearInterval(iv);
+    }
+  }, 16);
+}
+
+function setStatus(msg, color, thinking) {
+  const el = document.getElementById('statusIndicator');
+  el.className = thinking ? 'thinking' : '';
+  el.innerHTML = msg
+    ? `<div class="dot" style="background:${color}"></div><span style="color:${color}">${msg}</span>`
+    : '';
+}
+
+// ── UI helpers ────────────────────────────────────
+function toggleSettings() {
+  document.getElementById('settingsPanel').classList.toggle('open');
+}
+
+document.addEventListener('click', e => {
+  const panel = document.getElementById('settingsPanel');
+  const btn   = document.getElementById('settingsBtn');
+  if (!panel.contains(e.target) && e.target !== btn) {
+    panel.classList.remove('open');
+  }
+});
+
+function handleKey(e) {
+  // Enter (without shift) OR Cmd/Ctrl + Enter
+  if (e.key === 'Enter' && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
+    e.preventDefault();
+    askQuestion();
+  }
+}
+
+// ── Start ─────────────────────────────────────────
+initParticles();
+initBots();
+animate();
+</script>
+</body>
+</html>
