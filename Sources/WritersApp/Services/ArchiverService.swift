@@ -283,32 +283,32 @@ public class ArchiverService {
     ) -> (documents: [Document], snapshots: [ArchiveSnapshot], collections: [ArchiveCollection]) {
         let lowerQuery = query.lowercased()
 
-        let matchingDocs = profile.collections
+        let matchingDocs = Array(profile.collections
             .flatMap { col in col.documentIds.compactMap { documentManager.getDocument(id: $0) } }
             .filter { doc in
                 doc.title.lowercased().contains(lowerQuery) ||
                 doc.content.lowercased().contains(lowerQuery) ||
                 (doc.tags ?? []).contains { $0.lowercased().contains(lowerQuery) }
             }
-            .prefix(limit)
+            .prefix(limit))
 
-        let matchingSnapshots = profile.snapshots
+        let matchingSnapshots = Array(profile.snapshots
             .filter { snap in
                 snap.title.lowercased().contains(lowerQuery) ||
                 snap.summary.lowercased().contains(lowerQuery) ||
                 snap.tags.contains { $0.lowercased().contains(lowerQuery) }
             }
-            .prefix(limit)
+            .prefix(limit))
 
-        let matchingCollections = profile.collections
+        let matchingCollections = Array(profile.collections
             .filter { col in
                 col.name.lowercased().contains(lowerQuery) ||
                 col.description.lowercased().contains(lowerQuery) ||
                 col.tags.contains { $0.lowercased().contains(lowerQuery) }
             }
-            .prefix(limit)
+            .prefix(limit))
 
-        return (Array(matchingDocs), Array(matchingSnapshots), Array(matchingCollections))
+        return (matchingDocs, matchingSnapshots, matchingCollections)
     }
 
     /// Suggests archived documents relevant to the current work.
@@ -336,7 +336,8 @@ public class ArchiverService {
             var score = 0
             let docTags = Set(doc.tags ?? [])
             score += docTags.intersection(currentTags).count * 10
-            if doc.title.lowercased().contains(current.title.lowercased().prefix(3)) {
+            let currentTitlePrefix = String(current.title.lowercased().prefix(3))
+            if doc.title.lowercased().contains(currentTitlePrefix) {
                 score += 5
             }
             if score > 0 {
@@ -344,10 +345,10 @@ public class ArchiverService {
             }
         }
 
-        return scored
+        return Array(scored
             .sorted { $0.score > $1.score }
             .prefix(limit)
-            .map { $0.doc }
+            .map { $0.doc })
     }
 
     // MARK: - Statistics
