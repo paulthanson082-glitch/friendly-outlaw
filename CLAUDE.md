@@ -4,12 +4,15 @@ This document provides essential context for AI assistants working with this cod
 
 ## Project Overview
 
-**friendly-outlaw** is a Swift application for writers featuring template management, document creation with word count tracking, AI-powered writing assistance (via Claude/Anthropic API), issue tracking, Kanban boards, version control, plugin architecture, and multi-format export capabilities.
+**friendly-outlaw** is a multi-platform Swift writing assistant featuring template management, document creation with word count tracking, AI-powered writing assistance (via Claude/Anthropic API), issue tracking, Kanban boards, version control, plugin architecture, multi-format export, CRM, chatbot, computer-use, multi-agent harness, and Docker container orchestration tools.
 
-- **Type**: Swift library + CLI application
-- **Platforms**: macOS 13+, iOS 16+
+- **Type**: Swift library + multiple CLI executables
+- **Platforms**: macOS 14+, iOS 16+
 - **Swift Version**: 5.9+
-- **Dependencies**: `CSQLite` (system library wrapping `sqlite3`) for persistent storage
+- **Dependencies**:
+  - `CSQLite` (system library wrapping `sqlite3`) — persistent storage
+  - `swift-argument-parser` 1.3.0+ — CLI argument parsing
+  - `Yams` 5.0.0+ — YAML parsing (used by MockerKit)
 
 ## Quick Commands
 
@@ -23,7 +26,9 @@ swift test                            # Run all tests
 swift test --verbose                  # Verbose output
 
 # Run
-swift run WritersAppCLI               # Run CLI app
+swift run WritersAppCLI               # Run writers CLI app
+swift run mocker                      # Run container orchestration CLI
+swift run manop                       # Run manpage operator CLI
 ANTHROPIC_API_KEY="sk-..." swift run WritersAppCLI  # With AI features
 
 # Clean
@@ -41,37 +46,59 @@ swift package clean                   # Remove build artifacts
 │   │   │   ├── Document.swift        # Document, DocumentMetadata
 │   │   │   ├── AIModels.swift        # AI config, AIAssistanceType, tool loop types
 │   │   │   ├── AISuggestion.swift    # AISuggestion, UserSession, AIToolUsageStats
+│   │   │   ├── AppSettings.swift     # App-wide settings and preferences
+│   │   │   ├── ChatbotModels.swift   # Chatbot conversation models
+│   │   │   ├── ComputerUseModels.swift  # Computer-use action/result models
+│   │   │   ├── CoworkModels.swift    # Collaborative work session models
+│   │   │   ├── CRMModels.swift       # CRM contact, deal, pipeline models
 │   │   │   ├── FocusSession.swift    # FocusSession, FocusSessionType, FocusSessionState
+│   │   │   ├── GuiNewModels.swift    # GUI automation models
+│   │   │   ├── HardwareModels.swift  # Hardware/device info models
+│   │   │   ├── HarnessModels.swift   # Multi-agent harness models
+│   │   │   ├── HermesModels.swift    # Hermes messaging models
 │   │   │   ├── Issue.swift           # Issue, IssueStatus, IssuePriority, IssueMetadata
 │   │   │   ├── KanbanModels.swift    # KanbanBoard, KanbanTask, KanbanColumn
+│   │   │   ├── RagieModels.swift     # RAG/retrieval models
 │   │   │   ├── TraceModels.swift     # Trace, TraceEvent, TraceSpan (analytics)
 │   │   │   ├── VersionControl.swift  # VCBranch, VCCommit, VCDiff, VCMergeResult
+│   │   │   ├── WritingAdvisorModels.swift  # Writing advisor session/feedback models
 │   │   │   ├── WritingGoal.swift     # WritingGoal, GoalType, GoalUnit, WritingStreak
 │   │   │   └── iPadProModels.swift   # iPad Pro-specific UI models
 │   │   ├── Services/                 # Business logic
-│   │   │   ├── TemplateManager.swift # Template CRUD + 7 default templates
-│   │   │   ├── DocumentManager.swift # Document CRUD + statistics
 │   │   │   ├── AIService.swift       # Claude API integration + tool loop
+│   │   │   ├── ApplePencilManager.swift    # Apple Pencil input handling
+│   │   │   ├── ChatbotService.swift  # Conversational chatbot via Claude
+│   │   │   ├── ComputerUseService.swift    # Computer-use action execution
+│   │   │   ├── CoworkService.swift   # Collaborative writing sessions
+│   │   │   ├── CRMManager.swift      # CRM contact/deal management
 │   │   │   ├── DatabaseManager.swift # SQLite persistence (sessions, suggestions, VC)
+│   │   │   ├── DocumentManager.swift # Document CRUD + statistics
 │   │   │   ├── DoltVersionControlService.swift  # Branch/commit/diff/merge/time-travel
+│   │   │   ├── EncouragementService.swift # Motivational messages + milestones
+│   │   │   ├── FocusSessionManager.swift # Focus session lifecycle
+│   │   │   ├── GuiNewService.swift   # GUI automation service
+│   │   │   ├── HardwareManager.swift # Hardware/device management
+│   │   │   ├── HermesService.swift   # Hermes messaging/notification service
 │   │   │   ├── IssueManager.swift    # Issue CRUD + status/priority management
 │   │   │   ├── KanbanManager.swift   # Kanban board and task management
-│   │   │   ├── WritingGoalManager.swift  # Goal tracking + streaks
-│   │   │   ├── FocusSessionManager.swift # Focus session lifecycle
-│   │   │   ├── EncouragementService.swift # Motivational messages + milestones
-│   │   │   ├── ProductivityAnalytics.swift # Writing analytics and statistics
-│   │   │   ├── TraceAnalysisService.swift  # Distributed trace analysis
-│   │   │   ├── WritingToolExecutor.swift   # AI tool loop executor (5 built-in tools)
-│   │   │   ├── ApplePencilManager.swift    # Apple Pencil input handling
 │   │   │   ├── KeyboardShortcutManager.swift # Keyboard shortcut registration
+│   │   │   ├── MultiAgentHarness.swift     # Multi-agent orchestration
 │   │   │   ├── MultitaskingManager.swift   # iPadOS multitasking/split view
-│   │   │   └── StageManagerSupport.swift   # Stage Manager window management
+│   │   │   ├── ProductivityAnalytics.swift # Writing analytics and statistics
+│   │   │   ├── RagieService.swift    # RAG/retrieval-augmented generation
+│   │   │   ├── StageManagerSupport.swift   # Stage Manager window management
+│   │   │   ├── TemplateManager.swift # Template CRUD + 7 default templates
+│   │   │   ├── TraceAnalysisService.swift  # Distributed trace analysis
+│   │   │   ├── WritingAdvisorService.swift # AI-powered writing advisor
+│   │   │   ├── WritingGoalManager.swift    # Goal tracking + streaks
+│   │   │   └── WritingToolExecutor.swift   # AI tool loop executor (5 built-in tools)
 │   │   ├── Plugins/                  # Plugin architecture
 │   │   │   ├── Plugin.swift          # Plugin protocol, PluginCapability, PluginAction
 │   │   │   ├── PluginManager.swift   # Plugin registry and lifecycle (singleton)
 │   │   │   ├── ClaudeMemoryPlugin.swift  # Memory storage via plugin protocol
 │   │   │   └── MCPClient.swift       # MCP (Model Context Protocol) client
 │   │   ├── Views/                    # UI layer
+│   │   │   ├── CRMDashboardView.swift     # CRM dashboard SwiftUI view
 │   │   │   ├── MetalDashboardView.swift   # Metal GPU-accelerated dashboard
 │   │   │   ├── MetalDashboardViewModel.swift
 │   │   │   ├── MetalTheme.swift       # Metal rendering theme/colors
@@ -82,16 +109,94 @@ swift package clean                   # Remove build artifacts
 │   │   │   ├── String+Extensions.swift   # Placeholder substitution utilities
 │   │   │   └── CoreGraphics+Codable.swift # CGFloat/CGSize/CGPoint Codable support
 │   │   └── WritersApp.swift          # Main entry point / facade class
-│   └── WritersAppCLI/
-│       └── main.swift                # Interactive CLI
+│   ├── WritersAppCLI/
+│   │   └── main.swift                # Interactive writers CLI
+│   ├── MockerKit/                    # Docker container orchestration library
+│   │   ├── Compose/
+│   │   │   ├── ComposeFile.swift     # Docker Compose file parsing
+│   │   │   └── ComposeOrchestrator.swift # Compose lifecycle management
+│   │   ├── Container/
+│   │   │   ├── ContainerEngine.swift # Container create/start/stop/remove
+│   │   │   └── ContainerStore.swift  # In-memory container state
+│   │   ├── Image/
+│   │   │   ├── ImageManager.swift    # Image pull/list/remove
+│   │   │   └── ImageStore.swift      # In-memory image state
+│   │   ├── Network/
+│   │   │   └── NetworkManager.swift  # Docker network management
+│   │   ├── Volume/
+│   │   │   └── VolumeManager.swift   # Docker volume management
+│   │   ├── Models/
+│   │   │   ├── ContainerInfo.swift
+│   │   │   ├── ImageInfo.swift
+│   │   │   ├── NetworkInfo.swift
+│   │   │   └── VolumeInfo.swift
+│   │   ├── Formatters/
+│   │   │   └── TableFormatter.swift  # CLI table output formatting
+│   │   └── Config/
+│   │       └── MockerConfig.swift    # Mocker daemon configuration
+│   ├── Mocker/                       # `mocker` CLI executable
+│   │   └── Commands/
+│   │       ├── MockerCommand.swift   # Root command
+│   │       ├── ComposeCommands.swift
+│   │       ├── ContainerCommands.swift
+│   │       ├── ImageCommands.swift
+│   │       ├── NetworkCommands.swift
+│   │       ├── SystemCommands.swift
+│   │       └── VolumeCommands.swift
+│   └── ManpageOperator/
+│       └── main.swift                # `manop` CLI — manual page operations
 ├── Tests/
-│   └── WritersAppTests/
-│       └── WritersAppTests.swift     # 88+ unit tests
+│   ├── WritersAppTests/              # 17 test files
+│   │   ├── WritersAppTests.swift     # Core: templates, documents, word count, tool loop
+│   │   ├── AIServiceTests.swift      # AI operations and tool loop
+│   │   ├── DatabaseManagerTests.swift # SQLite CRUD operations
+│   │   ├── DocumentManagerTests.swift # Document lifecycle
+│   │   ├── DoltVersionControlServiceTests.swift # VC branches, commits, diff, merge
+│   │   ├── EncouragementServiceTests.swift # Motivational messages
+│   │   ├── ErrorPathTests.swift      # Error handling edge cases
+│   │   ├── ExportTests.swift         # Export format correctness
+│   │   ├── FocusSessionManagerTests.swift # Focus session lifecycle
+│   │   ├── IssueManagementTests.swift # Issues + reopen
+│   │   ├── MetalDashboardTests.swift # Metal dashboard view model
+│   │   ├── PerformanceTests.swift    # Performance benchmarks
+│   │   ├── PluginTests.swift         # Plugin system
+│   │   ├── ProductivityAnalyticsTests.swift # Analytics aggregation
+│   │   ├── WritingAdvisorTests.swift # Writing advisor service
+│   │   ├── WritingGoalManagerTests.swift # Goals and streaks
+│   │   └── iPadProFeaturesTests.swift # iPad-specific features
+│   └── MockerKitTests/
+│       └── MockerKitTests.swift      # Container toolkit tests
 ├── examples/
+│   ├── README.md
 │   ├── python_ai_service.py          # Python Anthropic SDK example
-│   └── requirements.txt
+│   ├── requirements.txt              # Python dependencies
+│   ├── go_ai_service/
+│   │   └── main.go                   # Go implementation (stdlib only)
+│   ├── custom_board_examples.swift   # Custom Kanban board examples
+│   ├── firecrawl_skill_generator.py  # Web scraping/crawling examples
+│   ├── sherlock_integration.md       # Username research use cases
+│   └── sherlock_mcp_server.py        # MCP server for Sherlock
+├── app/                              # Next.js web application
+├── frontend/                         # React frontend components
+├── backend/                          # Node.js/Express backend
+├── mobile/                           # React Native iOS/Android app
 ├── .vscode/                          # VS Code configuration
 ├── .claude/
+│   ├── settings.json                 # Hooks registration + tool permissions
+│   ├── hooks/
+│   │   └── session-start.sh          # SessionStart hook — installs deps, builds
+│   ├── agents/                       # Subagents (isolated workers)
+│   │   ├── knowledge-advisor.md
+│   │   ├── swift-code-reviewer.md
+│   │   ├── swift-debugger.md
+│   │   ├── template-designer.md
+│   │   └── test-runner.md
+│   ├── skills/                       # Skills (reusable workflows)
+│   │   ├── add-template.md
+│   │   ├── add-ai-feature.md
+│   │   ├── add-version-control-op.md
+│   │   ├── build-and-test.md
+│   │   └── firecrawl.md
 │   └── knowledge/                    # Structured standards as JSON
 │       ├── index.json
 │       ├── swift.json
@@ -100,7 +205,10 @@ swift package clean                   # Remove build artifacts
 │       ├── templates.json
 │       └── testing.json
 ├── Package.swift                     # SPM manifest
-└── README.md
+├── README.md
+├── DATABASE.md                       # SQLite schema and persistence details
+├── QUICK_START.md                    # Quick setup guide
+└── [additional docs: AGENTS.md, HARDWARE.md, DEPLOYMENT.md, ...]
 ```
 
 ## Architecture Patterns
@@ -112,12 +220,22 @@ swift package clean                   # Remove build artifacts
 - `KanbanManager`: Kanban boards, tasks, column-based workflow
 - `WritingGoalManager`: Goal creation, progress tracking, streaks
 - `FocusSessionManager`: Focus session lifecycle
+- `CRMManager`: CRM contacts, deals, pipeline stages
+- `HardwareManager`: Hardware/device info and management
 
 ### Service Pattern
 - `AIService`: Anthropic API calls, tool loop, analysis
+- `ChatbotService`: Conversational chatbot powered by Claude
+- `ComputerUseService`: Claude computer-use action execution
+- `CoworkService`: Collaborative writing sessions
 - `EncouragementService`: Milestone-aware motivational messages
+- `GuiNewService`: GUI automation
+- `HermesService`: Messaging and notifications
+- `MultiAgentHarness`: Orchestrates multiple Claude agents in parallel
 - `ProductivityAnalytics`: Writing analytics aggregation
+- `RagieService`: Retrieval-augmented generation integration
 - `TraceAnalysisService`: Distributed trace analysis
+- `WritingAdvisorService`: AI-powered writing advisor
 - `DoltVersionControlService`: Branch/commit/diff/merge for documents
 
 ### Database Layer
@@ -127,6 +245,7 @@ swift package clean                   # Remove build artifacts
   - AI configuration per user
   - Issues (mirror of in-memory `IssueManager`)
   - Version control branches, commits, and document snapshots
+- See `DATABASE.md` for full schema reference
 
 ### Plugin System
 - `Plugin` protocol: All plugins implement `initialize()`, `shutdown()`, `execute(action:)`
@@ -147,6 +266,13 @@ swift package clean                   # Remove build artifacts
 - Supports: `initializeDefaultBranch()`, `checkoutBranch()`, `commit()`, `log()`, `diff()`, `merge()`, `query(asOf:)` (time-travel), `history(of:)`
 - Merge strategies: `.fastForward` and `.threeWay`
 - Backed by `DatabaseManager` for durability
+
+### MockerKit — Container Orchestration
+- `ContainerEngine`: Interfaces with Docker daemon to create/start/stop/remove containers
+- `ComposeOrchestrator`: Parses Docker Compose YAML (via Yams) and manages multi-container apps
+- `ImageManager` / `NetworkManager` / `VolumeManager`: Lifecycle management for Docker primitives
+- `TableFormatter`: Renders CLI output as aligned tables
+- `mocker` CLI: Wraps MockerKit via `swift-argument-parser` with subcommands for each resource type
 
 ### Model Structure
 - **Structs** for data: `Document`, `Template`, `AIConfiguration`, `Issue`, `KanbanTask`, `VCBranch`, `WritingGoal`
@@ -453,18 +579,32 @@ protocol AIToolExecutor {
 
 ## Testing
 
-88+ test functions organized in groups:
+Tests are split across 18 files (17 for `WritersApp`, 1 for `MockerKit`):
 
-| Group | Tests |
-|-------|-------|
-| Core: templates, documents, word count, stats, placeholders | 8 |
-| Tool loop types (`ToolDefinition`, `ToolUseBlock`, `ToolResult`) | 7 |
-| `WritingToolExecutor` built-in tools | 9 |
-| Issue management + reopen | 3 |
-| Kanban boards + task workflow | 18 |
-| Dolt version control (branches, commits, diff, merge, time-travel) | 17 |
+| File | Coverage |
+|------|----------|
+| `WritersAppTests.swift` | Core: templates, documents, word count, stats, placeholders, tool loop types |
+| `AIServiceTests.swift` | AI operations, tool loop |
+| `DatabaseManagerTests.swift` | SQLite CRUD |
+| `DocumentManagerTests.swift` | Document lifecycle |
+| `DoltVersionControlServiceTests.swift` | Branches, commits, diff, merge, time-travel |
+| `EncouragementServiceTests.swift` | Motivational messages, milestones |
+| `ErrorPathTests.swift` | Error handling edge cases |
+| `ExportTests.swift` | Export format correctness |
+| `FocusSessionManagerTests.swift` | Focus session lifecycle |
+| `IssueManagementTests.swift` | Issues + reopen |
+| `MetalDashboardTests.swift` | Metal dashboard view model |
+| `PerformanceTests.swift` | Performance benchmarks |
+| `PluginTests.swift` | Plugin system |
+| `ProductivityAnalyticsTests.swift` | Analytics aggregation |
+| `WritingAdvisorTests.swift` | Writing advisor service |
+| `WritingGoalManagerTests.swift` | Goals and streaks |
+| `iPadProFeaturesTests.swift` | iPad-specific features |
+| `MockerKitTests.swift` | Container orchestration toolkit |
 
 Run with: `swift test`
+
+Use `DatabaseManager(databasePath: ":memory:")` in tests for isolated SQLite instances.
 
 ## Environment Variables
 
@@ -478,9 +618,9 @@ The `.claude/` directory organises all Claude Code extensions for this project.
 
 ```
 .claude/
-├── settings.json          # Hooks registration + tool permissions
+├── settings.json          # Hooks registration + tool permissions (45+ allowed commands)
 ├── hooks/
-│   └── session-start.sh   # SessionStart hook — installs deps, builds, installs plugins
+│   └── session-start.sh   # SessionStart hook — installs deps, builds project
 ├── agents/                # Subagents (isolated workers with their own context)
 │   ├── knowledge-advisor.md
 │   ├── swift-code-reviewer.md
@@ -490,8 +630,9 @@ The `.claude/` directory organises all Claude Code extensions for this project.
 ├── skills/                # Skills (reusable workflows that run in the current context)
 │   ├── add-template.md
 │   ├── add-ai-feature.md
+│   ├── add-version-control-op.md
 │   ├── build-and-test.md
-│   └── add-version-control-op.md
+│   └── firecrawl.md
 └── knowledge/             # Structured standards as JSON (used by knowledge-advisor)
     ├── index.json
     ├── swift.json
@@ -526,8 +667,8 @@ The `.claude/` directory organises all Claude Code extensions for this project.
 |-------|-------------|
 | `add-template` | Adding a new writing template to `TemplateManager` |
 | `add-ai-feature` | Implementing a new AI-assisted writing capability |
-| `build-and-test` | Building the project and running the full test suite |
 | `add-version-control-op` | Extending `DoltVersionControlService` with new operations |
+| `build-and-test` | Building the project and running the full test suite |
 | `firecrawl` | Scraping URLs, searching the web, crawling sites, or browsing interactive pages |
 
 ## Knowledge System
@@ -571,16 +712,16 @@ The **knowledge-advisor** subagent reads the relevant files and returns a focuse
 2. Create system prompt and user prompt
 3. Add assistance type to `AIAssistanceType` enum in `AIModels.swift`
 4. Expose via `WritersApp.swift` if needed
-5. Add CLI option in `main.swift` if applicable
-6. Add test coverage
+5. Add CLI option in `Sources/WritersAppCLI/main.swift` if applicable
+6. Add test coverage in `Tests/WritersAppTests/AIServiceTests.swift`
 
 ### Adding a New Export Format
 1. Add case to `ExportFormat` enum in `WritersApp.swift`
 2. Implement conversion in `exportDocument()` method
-3. Update tests
+3. Update `Tests/WritersAppTests/ExportTests.swift`
 
 ### Modifying Document/Template Models
-1. Update struct in `Models/` directory
+1. Update struct in `Sources/WritersApp/Models/` directory
 2. Ensure `Codable` conformance is maintained
 3. Update related manager methods
 4. Update tests
@@ -604,14 +745,21 @@ The **knowledge-advisor** subagent reads the relevant files and returns a focuse
 3. Add new model types to `Sources/WritersApp/Models/VersionControl.swift`
 4. Add tests with in-memory `DatabaseManager(databasePath: ":memory:")`
 
+### Adding a MockerKit Feature
+1. Add method to the relevant `Sources/MockerKit/` manager or engine
+2. Add model types to `Sources/MockerKit/Models/` if needed
+3. Wire CLI subcommand in `Sources/Mocker/Commands/`
+4. Add tests in `Tests/MockerKitTests/MockerKitTests.swift`
+
 ## Files to Avoid Modifying Without Care
 
-- `Package.swift` — Changes affect build configuration; `CSQLite` system library must remain
+- `Package.swift` — Changes affect build configuration; `CSQLite` system library must remain; `Yams` and `swift-argument-parser` are required by MockerKit and Mocker
 - `.vscode/` — VS Code settings for cross-device development
 - `Tests/` — Ensure tests pass after changes
 - `Sources/WritersApp/Views/` — Metal/SwiftUI views with platform-specific rendering code
 - `Sources/WritersApp/Plugins/` — Plugin infrastructure; changes may break MCP integration
 - `Sources/WritersApp/Services/DatabaseManager.swift` — Schema changes require migration strategy
+- `Sources/MockerKit/Container/ContainerEngine.swift` — Direct Docker daemon interface
 
 ## Development Notes
 
@@ -624,6 +772,8 @@ The **knowledge-advisor** subagent reads the relevant files and returns a focuse
 - Version control and issue manager are dual-layered: in-memory + SQLite; keep them in sync via `WritersApp` facade methods
 - `advanceKanbanTask` / `regressKanbanTask` automatically set/clear `completedAt` when transitioning to/from `.done`
 - `reopenIssue` sets status to `.open` and clears `metadata.resolvedAt`
+- `MockerKit` uses `Yams` for Docker Compose YAML parsing; requires Docker daemon running at runtime
+- `ManpageOperator` (`manop`) is a standalone CLI with no dependency on `WritersApp` or `MockerKit`
 
 ## VS Code Integration
 
