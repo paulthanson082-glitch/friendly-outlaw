@@ -11,17 +11,21 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
+import { useLocalization } from '../localization/LocalizationContext';
 
 export default function SettingsScreen({ navigation }: any) {
   const { user, logout } = useAuth();
+  const { language, setLanguage, t } = useLocalization();
   const [notifications, setNotifications] = React.useState(true);
+  const [pushNotifications, setPushNotifications] = React.useState(true);
   const [autoSave, setAutoSave] = React.useState(true);
+  const [theme, setTheme] = React.useState<'light' | 'dark' | 'auto'>('auto');
 
   const handleLogout = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('common.profile'), t('auth.confirmSignOut'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Sign Out',
+        text: t('auth.signOut'),
         style: 'destructive',
         onPress: async () => {
           await logout();
@@ -31,17 +35,17 @@ export default function SettingsScreen({ navigation }: any) {
   };
 
   const handleClearCache = async () => {
-    Alert.alert('Clear Cache', 'This will clear all cached data. Continue?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('settings.clearCache'), t('settings.clearCacheConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Clear',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
             // Clear cache logic here
-            Alert.alert('Success', 'Cache cleared');
+            Alert.alert(t('common.success'), t('settings.cacheClear'));
           } catch (error) {
-            Alert.alert('Error', 'Failed to clear cache');
+            Alert.alert(t('common.error'), 'Failed to clear cache');
           }
         },
       },
@@ -53,7 +57,7 @@ export default function SettingsScreen({ navigation }: any) {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Profile Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Profile</Text>
+          <Text style={styles.sectionTitle}>{t('common.profile')}</Text>
           <View style={styles.profileCard}>
             <View style={styles.avatarPlaceholder}>
               <Text style={styles.avatarText}>
@@ -69,14 +73,20 @@ export default function SettingsScreen({ navigation }: any) {
 
         {/* Preferences Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Preferences</Text>
+          <Text style={styles.sectionTitle}>{t('settings.preferences')}</Text>
+          <LanguageSelector
+            currentLanguage={language}
+            onLanguageChange={setLanguage}
+            t={t}
+          />
+          <ThemeSelector currentTheme={theme} onThemeChange={setTheme} t={t} />
           <SettingRow
-            label="Push Notifications"
-            value={notifications}
-            onValueChange={setNotifications}
+            label={t('settings.pushNotifications')}
+            value={pushNotifications}
+            onValueChange={setPushNotifications}
           />
           <SettingRow
-            label="Auto-Save Documents"
+            label={t('settings.autoSave')}
             value={autoSave}
             onValueChange={setAutoSave}
           />
@@ -84,33 +94,168 @@ export default function SettingsScreen({ navigation }: any) {
 
         {/* About Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
-          <SettingItem label="Version" value="1.0.0" />
-          <SettingItem label="Build" value="1" />
+          <Text style={styles.sectionTitle}>{t('settings.about')}</Text>
+          <SettingItem label={t('settings.version')} value="1.0.0" />
+          <SettingItem label={t('settings.build')} value="1" />
         </View>
 
         {/* Actions Section */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.actionBtn} onPress={handleClearCache}>
-            <Text style={styles.actionBtnText}>Clear Cache</Text>
+            <Text style={styles.actionBtnText}>{t('settings.clearCache')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionBtn, styles.actionBtnDanger]}
             onPress={handleLogout}
           >
             <Text style={[styles.actionBtnText, styles.actionBtnTextDanger]}>
-              Sign Out
+              {t('auth.signOut')}
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>© 2024 Jules Writers App</Text>
-          <Text style={styles.footerText}>Made with ❤️ by Anthropic</Text>
+          <Text style={styles.footerText}>{t('settings.copyright')}</Text>
+          <Text style={styles.footerText}>{t('settings.made')}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function LanguageSelector({
+  currentLanguage,
+  onLanguageChange,
+  t,
+}: {
+  currentLanguage: string;
+  onLanguageChange: (lang: 'en' | 'pt' | 'pl') => void;
+  t: (key: string) => string;
+}) {
+  return (
+    <View>
+      <Text style={styles.settingLabel}>{t('settings.language')}</Text>
+      <View style={styles.languageGrid}>
+        <TouchableOpacity
+          style={[
+            styles.languageBtn,
+            currentLanguage === 'en' && styles.languageBtnActive,
+          ]}
+          onPress={() => onLanguageChange('en')}
+        >
+          <Text
+            style={[
+              styles.languageBtnText,
+              currentLanguage === 'en' && styles.languageBtnTextActive,
+            ]}
+          >
+            🇬🇧 English
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.languageBtn,
+            currentLanguage === 'pt' && styles.languageBtnActive,
+          ]}
+          onPress={() => onLanguageChange('pt')}
+        >
+          <Text
+            style={[
+              styles.languageBtnText,
+              currentLanguage === 'pt' && styles.languageBtnTextActive,
+            ]}
+          >
+            🇧🇷 Português
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.languageBtn,
+            currentLanguage === 'pl' && styles.languageBtnActive,
+          ]}
+          onPress={() => onLanguageChange('pl')}
+        >
+          <Text
+            style={[
+              styles.languageBtnText,
+              currentLanguage === 'pl' && styles.languageBtnTextActive,
+            ]}
+          >
+            🇵🇱 Polski
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+function ThemeSelector({
+  currentTheme,
+  onThemeChange,
+  t,
+}: {
+  currentTheme: string;
+  onThemeChange: (theme: 'light' | 'dark' | 'auto') => void;
+  t: (key: string) => string;
+}) {
+  return (
+    <View style={styles.themeSection}>
+      <Text style={styles.settingLabel}>{t('settings.theme')}</Text>
+      <View style={styles.themeGrid}>
+        <TouchableOpacity
+          style={[
+            styles.themeBtn,
+            currentTheme === 'light' && styles.themeBtnActive,
+          ]}
+          onPress={() => onThemeChange('light')}
+        >
+          <Text style={styles.themeBtnIcon}>☀️</Text>
+          <Text
+            style={[
+              styles.themeBtnText,
+              currentTheme === 'light' && styles.themeBtnTextActive,
+            ]}
+          >
+            {t('settings.light')}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.themeBtn,
+            currentTheme === 'dark' && styles.themeBtnActive,
+          ]}
+          onPress={() => onThemeChange('dark')}
+        >
+          <Text style={styles.themeBtnIcon}>🌙</Text>
+          <Text
+            style={[
+              styles.themeBtnText,
+              currentTheme === 'dark' && styles.themeBtnTextActive,
+            ]}
+          >
+            {t('settings.dark')}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.themeBtn,
+            currentTheme === 'auto' && styles.themeBtnActive,
+          ]}
+          onPress={() => onThemeChange('auto')}
+        >
+          <Text style={styles.themeBtnIcon}>⚙️</Text>
+          <Text
+            style={[
+              styles.themeBtnText,
+              currentTheme === 'auto' && styles.themeBtnTextActive,
+            ]}
+          >
+            {t('settings.auto')}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
@@ -214,6 +359,69 @@ const styles = StyleSheet.create({
   settingValue: {
     fontSize: 14,
     color: '#999',
+  },
+  languageGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  languageBtn: {
+    width: '48%',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    alignItems: 'center',
+    backgroundColor: '#f9f9f9',
+  },
+  languageBtnActive: {
+    borderColor: '#007bff',
+    backgroundColor: '#e7f3ff',
+  },
+  languageBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+  },
+  languageBtnTextActive: {
+    color: '#007bff',
+  },
+  themeSection: {
+    marginBottom: 16,
+  },
+  themeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  themeBtn: {
+    width: '31%',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    alignItems: 'center',
+    backgroundColor: '#f9f9f9',
+  },
+  themeBtnActive: {
+    borderColor: '#007bff',
+    backgroundColor: '#e7f3ff',
+  },
+  themeBtnIcon: {
+    fontSize: 20,
+    marginBottom: 4,
+  },
+  themeBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+  },
+  themeBtnTextActive: {
+    color: '#007bff',
   },
   actionBtn: {
     paddingVertical: 12,
