@@ -96,7 +96,7 @@ final class MockerKitTests: XCTestCase {
             repository: "nginx",
             tag: "latest"
         )
-        XCTAssertEqual(image.shortId, "sha256abcdef12")
+        XCTAssertEqual(image.shortId, "sha256abcdef")
     }
 
     func testImageInfoReference() {
@@ -128,78 +128,6 @@ final class MockerKitTests: XCTestCase {
 
         let largeImage = ImageInfo(repository: "ubuntu", size: 1_073_741_824) // 1 GB
         XCTAssertTrue(largeImage.sizeDescription.contains("GB"))
-    }
-
-    // MARK: - ImageInfo.shortId: bare sha256 prefix (no colon)
-    //
-    // PR change: IDs that start with "sha256" but have no colon now return the first 14
-    // characters of the full ID instead of falling through to the 12-character default.
-
-    /// Normal case: ID starts with "sha256" (no colon) and is long enough → first 14 chars returned.
-    func testImageInfoShortId_sha256BarePrefix_returns14Chars() {
-        let image = ImageInfo(
-            id: "sha256abcdef12345678901234",
-            repository: "myapp",
-            tag: "v1"
-        )
-        XCTAssertEqual(image.shortId, "sha256abcdef12",
-            "Bare 'sha256' prefix without colon must return first 14 characters")
-    }
-
-    /// Boundary: ID is exactly 14 characters starting with "sha256" → full ID returned.
-    func testImageInfoShortId_sha256BarePrefix_exactlyFourteenChars() {
-        let image = ImageInfo(
-            id: "sha256abcdefgh",   // exactly 14 chars
-            repository: "alpine",
-            tag: "edge"
-        )
-        XCTAssertEqual(image.shortId, "sha256abcdefgh",
-            "When ID has exactly 14 characters and bare 'sha256' prefix, all 14 must be returned")
-    }
-
-    /// Boundary: ID is shorter than 14 characters starting with "sha256" → returns all available chars.
-    func testImageInfoShortId_sha256BarePrefix_shorterThanFourteen() {
-        let image = ImageInfo(
-            id: "sha256abc",   // 9 chars < 14
-            repository: "minimal",
-            tag: "latest"
-        )
-        XCTAssertEqual(image.shortId, "sha256abc",
-            "When bare-prefix ID is shorter than 14 chars, shortId must return all available characters")
-    }
-
-    /// The first branch (sha256: with colon) must NOT be affected by the new bare-prefix branch.
-    func testImageInfoShortId_sha256ColonPrefix_stillReturns12HexChars() {
-        let hexDigest = "sha256:abcdef123456789012345678"
-        let image = ImageInfo(id: hexDigest, repository: "postgres", tag: "15")
-        XCTAssertEqual(image.shortId, "abcdef123456",
-            "Digest-form 'sha256:' prefix must still return first 12 hex characters after the colon")
-    }
-
-    /// Non-sha256 IDs must still fall through to the default 12-character short-ID convention.
-    func testImageInfoShortId_nonSha256Id_stillReturns12Chars() {
-        let image = ImageInfo(
-            id: "abcdef1234567890abcdef12",
-            repository: "redis",
-            tag: "7"
-        )
-        XCTAssertEqual(image.shortId, "abcdef123456",
-            "Non-sha256 IDs must still use the standard Docker 12-character short-ID convention")
-    }
-
-    /// Regression: an ID starting with "sha256" (no colon) must NOT be treated as the colon variant.
-    func testImageInfoShortId_sha256BarePrefix_doesNotConfuseWithColonVariant() {
-        // "sha256:" is 7 chars; this ID has "sha256" (6 chars) followed by non-colon content.
-        let image = ImageInfo(
-            id: "sha256xyz1234567890abcdef",
-            repository: "node",
-            tag: "20"
-        )
-        let short = image.shortId
-        XCTAssertEqual(short, "sha256xyz12345",
-            "Bare 'sha256' prefix must return first 14 chars, not strip the prefix like the colon variant")
-        XCTAssertFalse(short.hasPrefix("xyz"),
-            "Bare 'sha256' prefix must not be treated as the colon-variant and strip the prefix")
     }
 
     // MARK: - ContainerStore Tests
@@ -488,120 +416,169 @@ final class MockerKitTests: XCTestCase {
         XCTAssertTrue(TableFormatter.relativeTime(now.addingTimeInterval(-7200)).contains("hours"))
         XCTAssertTrue(TableFormatter.relativeTime(now.addingTimeInterval(-172800)).contains("days"))
     }
-}
 
-// MARK: - ImageInfo.shortId: bare sha256 prefix (no colon)
-//
-// PR change: IDs that start with "sha256" but have no colon (i.e. no "sha256:" digest form)
-// now return the first 14 characters of the full ID, instead of falling through to
-// the default 12-character short-ID convention.
+    // MARK: - ImageInfo Architecture & OS Tests (new fields)
 
-final class ImageInfoShortIdBarePrefixTests: XCTestCase {
-
-    // MARK: - New branch: bare "sha256" prefix without colon returns first 14 characters
-
-    /// Standard case: ID longer than 14 chars starting with "sha256" (no colon).
-    func testShortId_sha256BarePrefix_returns14Chars() {
-        let image = ImageInfo(
-            id: "sha256abcdef12345678901234",
-            repository: "myapp",
-            tag: "v1"
-        )
-        XCTAssertEqual(image.shortId, "sha256abcdef12",
-            "Bare 'sha256' prefix without colon must return exactly the first 14 characters")
+    func testImageInfoDefaultArchitecture() {
+        let image = ImageInfo(repository: "nginx", tag: "latest")
+        XCTAssertEqual(image.architecture, "arm64",
+                       "Default architecture should be arm64")
     }
 
-    /// Boundary: ID is exactly 14 characters starting with "sha256" → full ID returned unchanged.
-    func testShortId_sha256BarePrefix_exactlyFourteenCharsReturnsFullId() {
-        let image = ImageInfo(
-            id: "sha256abcdefgh",  // exactly 14 chars
-            repository: "alpine",
-            tag: "edge"
-        )
-        XCTAssertEqual(image.shortId, "sha256abcdefgh",
-            "When the bare-prefix ID is exactly 14 characters, shortId must equal the full ID")
+    func testImageInfoDefaultOS() {
+        let image = ImageInfo(repository: "nginx", tag: "latest")
+        XCTAssertEqual(image.os, "linux",
+                       "Default OS should be linux")
     }
 
-    /// Boundary: ID shorter than 14 characters starting with "sha256" → all available chars returned.
-    func testShortId_sha256BarePrefix_shorterThanFourteen_returnsAll() {
-        let image = ImageInfo(
-            id: "sha256abc",  // 9 chars < 14
-            repository: "minimal",
-            tag: "latest"
-        )
-        XCTAssertEqual(image.shortId, "sha256abc",
-            "When bare-prefix ID is shorter than 14 chars, shortId must return all available characters")
+    func testImageInfoCustomArchitecture() {
+        let image = ImageInfo(repository: "nginx", tag: "latest", architecture: "amd64")
+        XCTAssertEqual(image.architecture, "amd64")
     }
 
-    /// Boundary: ID is exactly 15 characters → first 14 returned.
-    func testShortId_sha256BarePrefix_fifteenChars_returns14() {
-        let image = ImageInfo(
-            id: "sha256abcdef123",  // 15 chars
-            repository: "redis",
-            tag: "7"
-        )
-        XCTAssertEqual(image.shortId, "sha256abcdef12",
-            "A 15-char bare-prefix ID must return the first 14 characters")
+    func testImageInfoCustomOS() {
+        let image = ImageInfo(repository: "windowsservercore", tag: "ltsc2022", os: "windows")
+        XCTAssertEqual(image.os, "windows")
     }
 
-    /// Regression: the "sha256:" digest form (with colon) must NOT be affected by the new branch.
-    func testShortId_sha256ColonPrefix_stillReturns12HexCharsAfterColon() {
+    func testImageInfoAllFieldsCustom() {
+        let date = Date(timeIntervalSinceReferenceDate: 1_000_000)
         let image = ImageInfo(
-            id: "sha256:abcdef123456789012345678",
+            id: "deadbeef123456789012",
+            repository: "myrepo/myimage",
+            tag: "v2.0",
+            digest: "sha256:abc123",
+            createdAt: date,
+            size: 209_715_200,
+            labels: ["maintainer": "dev@example.com"],
+            architecture: "arm64",
+            os: "linux"
+        )
+        XCTAssertEqual(image.id, "deadbeef123456789012")
+        XCTAssertEqual(image.repository, "myrepo/myimage")
+        XCTAssertEqual(image.tag, "v2.0")
+        XCTAssertEqual(image.digest, "sha256:abc123")
+        XCTAssertEqual(image.createdAt, date)
+        XCTAssertEqual(image.size, 209_715_200)
+        XCTAssertEqual(image.labels["maintainer"], "dev@example.com")
+        XCTAssertEqual(image.architecture, "arm64")
+        XCTAssertEqual(image.os, "linux")
+    }
+
+    func testImageInfoSizeDescription_bytes() {
+        let image = ImageInfo(repository: "scratch", size: 512)
+        XCTAssertTrue(image.sizeDescription.hasSuffix("B"),
+                      "512 bytes should format as 'B': got '\(image.sizeDescription)'")
+        XCTAssertFalse(image.sizeDescription.contains("k"),
+                       "512 bytes should not be formatted as kB")
+    }
+
+    func testImageInfoSizeDescription_kB() {
+        let image = ImageInfo(repository: "tiny", size: 10_240) // 10 kB
+        XCTAssertTrue(image.sizeDescription.contains("kB"),
+                      "10240 bytes should format as kB: got '\(image.sizeDescription)'")
+    }
+
+    func testImageInfoParseReference_withDigest() {
+        // Digest references (name@sha256:...) should use "latest" as the tag
+        let (repo, tag) = ImageInfo.parseReference("nginx@sha256:abc123def456")
+        XCTAssertEqual(repo, "nginx")
+        XCTAssertEqual(tag, "latest",
+                       "Digest reference should yield tag 'latest'")
+    }
+
+    func testImageInfoParseReference_registryPort() {
+        // registry:5000/repo — the colon belongs to the port, not a tag separator
+        let (repo, tag) = ImageInfo.parseReference("registry.local:5000/myapp")
+        XCTAssertEqual(repo, "registry.local:5000/myapp",
+                       "Registry with port should be treated as repository without explicit tag")
+        XCTAssertEqual(tag, "latest")
+    }
+
+    func testImageInfoCodableRoundtrip() throws {
+        let original = ImageInfo(
+            id: "cafebabe123456789012",
             repository: "postgres",
-            tag: "15"
+            tag: "16-alpine",
+            architecture: "amd64",
+            os: "linux"
         )
-        XCTAssertEqual(image.shortId, "abcdef123456",
-            "Digest-form 'sha256:' prefix must still return first 12 hex characters after the colon")
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let data = try encoder.encode(original)
+        let decoded = try decoder.decode(ImageInfo.self, from: data)
+        XCTAssertEqual(decoded.id, original.id)
+        XCTAssertEqual(decoded.repository, original.repository)
+        XCTAssertEqual(decoded.tag, original.tag)
+        XCTAssertEqual(decoded.architecture, original.architecture)
+        XCTAssertEqual(decoded.os, original.os)
     }
 
-    /// Regression: non-sha256 IDs must continue using the 12-char short-ID convention.
-    func testShortId_nonSha256Id_stillReturns12Chars() {
-        let image = ImageInfo(
-            id: "abcdef1234567890abcdef12",
-            repository: "redis",
-            tag: "7"
-        )
-        XCTAssertEqual(image.shortId, "abcdef123456",
-            "Non-sha256 IDs must still use the standard Docker 12-character short-ID convention")
+    // MARK: - BuildOptions Tests (new struct)
+
+    func testBuildOptionsDefaults() {
+        let opts = BuildOptions()
+        XCTAssertNil(opts.tag)
+        XCTAssertNil(opts.file)
+        XCTAssertTrue(opts.buildArgs.isEmpty)
+        XCTAssertFalse(opts.noCache)
+        XCTAssertFalse(opts.pull)
+        XCTAssertNil(opts.target)
+        XCTAssertNil(opts.platform)
+        XCTAssertTrue(opts.cacheFrom.isEmpty)
+        XCTAssertFalse(opts.load)
+        XCTAssertFalse(opts.push)
+        XCTAssertTrue(opts.labels.isEmpty)
+        XCTAssertFalse(opts.quiet)
     }
 
-    /// Bare "sha256" prefix must NOT strip the prefix as the colon-variant does.
-    func testShortId_sha256BarePrefix_doesNotStripPrefix() {
-        let image = ImageInfo(
-            id: "sha256xyz1234567890abcdef",
-            repository: "node",
-            tag: "20"
+    func testBuildOptionsCustomValues() {
+        let opts = BuildOptions(
+            tag: "myapp:v1.0",
+            file: "Dockerfile.prod",
+            buildArgs: ["ENV": "production", "VERSION": "1.0"],
+            noCache: true,
+            pull: true,
+            target: "release-stage",
+            platform: "linux/amd64",
+            cacheFrom: ["type=registry,ref=myapp:cache"],
+            load: true,
+            push: false,
+            labels: ["build.date": "2026-01-01"],
+            quiet: false
         )
-        let short = image.shortId
-        XCTAssertEqual(short, "sha256xyz12345",
-            "Bare 'sha256' prefix must return first 14 chars including the 'sha256' text")
-        XCTAssertTrue(short.hasPrefix("sha256"),
-            "Short ID must retain the 'sha256' prefix – it must not be stripped like in the colon-variant")
+        XCTAssertEqual(opts.tag, "myapp:v1.0")
+        XCTAssertEqual(opts.file, "Dockerfile.prod")
+        XCTAssertEqual(opts.buildArgs["ENV"], "production")
+        XCTAssertEqual(opts.buildArgs["VERSION"], "1.0")
+        XCTAssertTrue(opts.noCache)
+        XCTAssertTrue(opts.pull)
+        XCTAssertEqual(opts.target, "release-stage")
+        XCTAssertEqual(opts.platform, "linux/amd64")
+        XCTAssertEqual(opts.cacheFrom.count, 1)
+        XCTAssertTrue(opts.load)
+        XCTAssertFalse(opts.push)
+        XCTAssertEqual(opts.labels["build.date"], "2026-01-01")
     }
 
-    /// The returned shortId for bare-prefix IDs must always start with "sha256".
-    func testShortId_sha256BarePrefix_resultStartsWithSha256() {
-        let ids = [
-            "sha256ffffffff000000aabbcc",
-            "sha256aabbccddeeff112233",
-            "sha256000000000000111111"
-        ]
-        for id in ids {
-            let image = ImageInfo(id: id, repository: "test", tag: "latest")
-            XCTAssertTrue(image.shortId.hasPrefix("sha256"),
-                "shortId for bare-prefix ID '\(id)' must start with 'sha256'")
-        }
+    func testBuildOptionsNoCacheAndPushMutuallyIndependent() {
+        // noCache and push/load are independent flags
+        var opts = BuildOptions(noCache: true, push: true)
+        XCTAssertTrue(opts.noCache)
+        XCTAssertTrue(opts.push)
+        opts.load = true
+        XCTAssertTrue(opts.load)
     }
 
-    /// shortId length for a long bare-prefix ID must be exactly 14.
-    func testShortId_sha256BarePrefix_lengthIsAlways14ForLongId() {
-        let image = ImageInfo(
-            id: "sha256" + String(repeating: "a", count: 40),
-            repository: "img",
-            tag: "latest"
-        )
-        XCTAssertEqual(image.shortId.count, 14,
-            "shortId for a long bare-prefix ID must have exactly 14 characters")
+    func testBuildOptionsMutability() {
+        var opts = BuildOptions()
+        opts.tag = "updated:latest"
+        opts.noCache = true
+        opts.platform = "linux/arm64"
+        XCTAssertEqual(opts.tag, "updated:latest")
+        XCTAssertTrue(opts.noCache)
+        XCTAssertEqual(opts.platform, "linux/arm64")
     }
 }
