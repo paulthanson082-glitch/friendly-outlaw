@@ -17,6 +17,7 @@ public class WritersApp {
     public private(set) var aiService: AIService?
     public private(set) var chatbotService: ChatbotService?
     public private(set) var hermesService: HermesService?
+    public private(set) var archiverService: ArchiverService?
     public private(set) var ragieService: RagieService?
     public private(set) var writingAdvisorService: WritingAdvisorService?
     public private(set) var spoilerProtection: SpoilerProtectionService
@@ -78,10 +79,15 @@ public class WritersApp {
                 documentManager: self.documentManager,
                 templateManager: self.templateManager
             )
+            self.archiverService = ArchiverService(
+                aiService: svc,
+                documentManager: self.documentManager
+            )
         } else {
             self.chatbotService = nil
             self.writingAdvisorService = nil
             self.hermesService = nil
+            self.archiverService = nil
         }
         try? databaseManager.initialize()
     }
@@ -107,6 +113,10 @@ public class WritersApp {
             documentManager: self.documentManager,
             templateManager: self.templateManager
         )
+        self.archiverService = ArchiverService(
+            aiService: aiSvc,
+            documentManager: self.documentManager
+        )
         if let uid = userId {
             self.currentUserId = uid
             try? self.databaseManager.saveAIConfiguration(userId: uid, configuration: configuration)
@@ -116,13 +126,14 @@ public class WritersApp {
     /// Disables all AI features for the application.
     ///
     /// Disables all AI-related services for the application.
-    /// 
-    /// Clears the AIService, ChatbotService, WritingAdvisorService, and HermesService so AI functionality is unavailable until AI is re-enabled.
+    ///
+    /// Clears the AIService, ChatbotService, WritingAdvisorService, HermesService, and ArchiverService so AI functionality is unavailable until AI is re-enabled.
     public func disableAI() {
         self.aiService = nil
         self.chatbotService = nil
         self.writingAdvisorService = nil
         self.hermesService = nil
+        self.archiverService = nil
     }
 
     /// Check if AI is available
