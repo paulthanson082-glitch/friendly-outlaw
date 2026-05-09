@@ -1145,6 +1145,48 @@ public class WritersApp {
         return try await ai.developCharacter(characterConcept: characterConcept, context: context)
     }
 
+    /// Change the tone of a document to the specified writing tone.
+    /// - Parameters:
+    ///   - documentId: The identifier of the document to modify.
+    ///   - tone: The desired writing tone (e.g., formal, casual, creative).
+    ///   - context: Optional AI context to guide the tone transformation.
+    ///   - replaceContent: If `true`, replaces the stored document content with the tone-shifted version.
+    /// - Returns: The document text rewritten in the specified tone.
+    /// - Throws: `AIError.aiNotEnabled` if AI is not enabled; `AIError.documentNotFound` if the document cannot be found.
+    public func changeDocumentTone(
+        documentId: UUID,
+        tone: WritingTone,
+        context: AIContext? = nil,
+        replaceContent: Bool = false
+    ) async throws -> String {
+        let (ai, document) = try requireAIAndDocument(documentId: documentId)
+
+        let transformed = try await ai.changeTone(
+            text: document.content,
+            tone: tone,
+            context: context
+        )
+
+        if let userId = currentUserId {
+            let suggestion = AISuggestion(
+                userId: userId,
+                documentId: documentId,
+                toolUsed: "Change Tone to \(tone.displayName)",
+                prompt: document.content,
+                response: transformed
+            )
+            try? databaseManager.insertAISuggestion(suggestion)
+        }
+
+        if replaceContent {
+            var updatedDocument = document
+            updatedDocument.content = transformed
+            documentManager.updateDocument(updatedDocument)
+        }
+
+        return transformed
+    }
+
     // MARK: - Writing Advisor
 
     /// Returns personalized writing advice for the current writer.
