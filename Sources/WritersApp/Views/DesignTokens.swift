@@ -1,7 +1,9 @@
+#if canImport(SwiftUI)
 import SwiftUI
 
 /// Centralized design system tokens
 /// Never hardcode values - always reference these tokens
+@available(iOS 16.0, macOS 13.0, *)
 enum DesignTokens {
 
     // MARK: - Colors
@@ -149,6 +151,7 @@ enum DesignTokens {
 
 // MARK: - Convenience Extensions
 
+@available(iOS 16.0, macOS 13.0, *)
 extension View {
     /// Apply small shadow
     func shadowSmall() -> some View {
@@ -168,3 +171,4 @@ extension View {
         return self.shadow(color: s.color, radius: s.radius, x: s.x, y: s.y)
     }
 }
+#endif
