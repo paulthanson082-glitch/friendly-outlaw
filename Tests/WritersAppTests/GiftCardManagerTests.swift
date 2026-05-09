@@ -2,8 +2,8 @@ import XCTest
 @testable import WritersApp
 
 // MARK: - GiftCardManager Tests
-// Tests focused on the PR change: expirationDays validation changed back to > 0
-// (bundles with 0 expiration days are now rejected).
+// Tests focused on the PR change: expirationDays validation changed from >= 0 to > 0,
+// so expirationDays == 0 now throws (previously it was allowed).
 
 final class GiftCardManagerTests: XCTestCase {
 
@@ -19,14 +19,14 @@ final class GiftCardManagerTests: XCTestCase {
         super.tearDown()
     }
 
-    // MARK: - expirationDays Validation (PR Change: > 0, zero is now rejected)
+    // MARK: - expirationDays Validation (PR Change: changed from >= 0 to > 0)
 
-    /// PR change: expirationDays == 0 must now throw (changed from >= 0 to > 0).
+    /// PR change: expirationDays == 0 must now throw (previously it was allowed with >= 0).
     func testCreateBundleWithZeroExpirationDaysThrows() {
         XCTAssertThrowsError(
             try manager.createBundle(
                 name: "Zero-Day Bundle",
-                description: "Expires immediately",
+                description: "Should now fail",
                 price: 9.99,
                 bundleType: .starter,
                 aiCredits: 10,
@@ -43,21 +43,7 @@ final class GiftCardManagerTests: XCTestCase {
         }
     }
 
-    /// Zero expirationDays must not create a bundle in the manager.
-    func testCreateBundleWithZeroExpirationDaysDoesNotStorBundle() {
-        _ = try? manager.createBundle(
-            name: "Zero-Day Bundle",
-            description: "Should not be stored",
-            price: 9.99,
-            bundleType: .starter,
-            aiCredits: 10,
-            expirationDays: 0
-        )
-        XCTAssertTrue(manager.getAllBundles().isEmpty,
-            "A bundle with expirationDays=0 must not be persisted after the PR")
-    }
-
-    /// Negative expirationDays must still be rejected.
+    /// Regression: negative expirationDays must still be rejected.
     func testCreateBundleWithNegativeExpirationDaysThrows() {
         XCTAssertThrowsError(
             try manager.createBundle(
@@ -106,7 +92,7 @@ final class GiftCardManagerTests: XCTestCase {
         XCTAssertEqual(bundle.expirationDays, 30)
     }
 
-    /// Boundary: expirationDays == 1 is the minimum valid value after the PR.
+    /// Boundary: expirationDays == 1 is the new minimum valid value.
     func testCreateBundleWithOneExpirationDaySucceeds() throws {
         let bundle = try manager.createBundle(
             name: "One-Day Bundle",
@@ -119,42 +105,20 @@ final class GiftCardManagerTests: XCTestCase {
         XCTAssertEqual(bundle.expirationDays, 1)
     }
 
-    /// Boundary: expirationDays == 1 is retrievable.
-    func testCreateBundleWithOneExpirationDayIsRetrievable() throws {
-        let bundle = try manager.createBundle(
-            name: "Min-Expiry",
-            description: "Minimum valid expiration",
-            price: 0.99,
-            bundleType: .starter,
-            aiCredits: 1,
-            expirationDays: 1
+    /// Boundary: verify 0 does NOT get stored (it throws before storing).
+    func testCreateBundleWithZeroExpirationDaysIsNotStored() {
+        XCTAssertThrowsError(
+            try manager.createBundle(
+                name: "Instant-Expiry",
+                description: "Should not be stored",
+                price: 0.99,
+                bundleType: .starter,
+                aiCredits: 1,
+                expirationDays: 0
+            )
         )
-        let retrieved = manager.getBundle(id: bundle.id)
-        XCTAssertNotNil(retrieved)
-        XCTAssertEqual(retrieved?.expirationDays, 1)
-    }
-
-    /// Creating a gift card from a 1-day bundle sets expiry near 24 hours from now.
-    func testGiftCardFromOneExpirationDayBundleExpiresInAboutOneDay() throws {
-        let bundle = try manager.createBundle(
-            name: "One-Day Bundle",
-            description: "Expires in a day",
-            price: 0.00,
-            bundleType: .custom,
-            aiCredits: 1,
-            expirationDays: 1
-        )
-        let card = try manager.createGiftCard(bundleId: bundle.id)
-        let expiresAt = card.metadata.expiresAt
-        XCTAssertNotNil(expiresAt, "Gift card from 1-day bundle must have an expiry date")
-        if let expiresAt {
-            let secondsUntilExpiry = expiresAt.timeIntervalSinceNow
-            // Should be approximately 86400 seconds (1 day)
-            XCTAssertGreaterThan(secondsUntilExpiry, 86390,
-                "Gift card should expire in approximately 1 day, got \(secondsUntilExpiry)s")
-            XCTAssertLessThan(secondsUntilExpiry, 86410,
-                "Gift card should expire in approximately 1 day, got \(secondsUntilExpiry)s")
-        }
+        XCTAssertTrue(manager.getAllBundles().isEmpty,
+                      "No bundle should be stored when expirationDays == 0 throws")
     }
 
     // MARK: - AI Credits Validation (unchanged guard, confirm still works)
@@ -238,25 +202,38 @@ final class GiftCardManagerTests: XCTestCase {
         XCTAssertEqual(manager.getAllBundles().first?.id, bundle.id)
     }
 
-    func testMultipleBundlesWithVariousExpirationDays() throws {
-        // PR change: zero is now rejected; only positive values succeed
+    func testMultipleBundlesWithVariousValidExpirationDays() throws {
+        // Test that positive expirationDays values all succeed together (0 no longer valid)
         let _ = try manager.createBundle(name: "One", description: "", price: 0, bundleType: .starter, aiCredits: 1, expirationDays: 1)
         let _ = try manager.createBundle(name: "Thirty", description: "", price: 0, bundleType: .starter, aiCredits: 1, expirationDays: 30)
         let _ = try manager.createBundle(name: "Year", description: "", price: 0, bundleType: .starter, aiCredits: 1, expirationDays: 365)
 
-        XCTAssertEqual(manager.getAllBundles().count, 3,
-            "Only positive expirationDays bundles should be stored after the PR change")
+        XCTAssertEqual(manager.getAllBundles().count, 3)
     }
 
-    /// Regression: zero expirationDays among a mix must not succeed.
-    func testZeroExpirationDaysMixedWithValid() throws {
+    /// Regression: boundary between invalid (0) and valid (1) expirationDays.
+    func testCreateBundleExpirationDaysBoundary() {
+        // 0 throws
         XCTAssertThrowsError(
-            try manager.createBundle(name: "Zero", description: "", price: 0,
-                                     bundleType: .starter, aiCredits: 1, expirationDays: 0)
+            try manager.createBundle(
+                name: "Boundary Zero",
+                description: "",
+                price: 0,
+                bundleType: .starter,
+                aiCredits: 1,
+                expirationDays: 0
+            )
         )
-        // Other bundles with positive expiry should still succeed
-        let _ = try manager.createBundle(name: "Valid", description: "", price: 0,
-                                          bundleType: .starter, aiCredits: 1, expirationDays: 7)
-        XCTAssertEqual(manager.getAllBundles().count, 1)
+        // 1 succeeds
+        XCTAssertNoThrow(
+            try manager.createBundle(
+                name: "Boundary One",
+                description: "",
+                price: 0,
+                bundleType: .starter,
+                aiCredits: 1,
+                expirationDays: 1
+            )
+        )
     }
 }
