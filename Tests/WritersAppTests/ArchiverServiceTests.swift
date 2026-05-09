@@ -193,8 +193,9 @@ final class ArchiverServiceTests: XCTestCase {
     }
 
     func testSearchByTags() {
-        let doc = documentManager.createBlankDocument(title: "Story")
-        doc.tags = ["fantasy", "dragon"]
+        var doc = documentManager.createBlankDocument(title: "Story")
+        doc.metadata.tags = ["fantasy", "dragon"]
+        documentManager.updateDocument(doc)
         let collection = archiver.createCollection(name: "Test")
         archiver.addDocumentToCollection(doc.id, collectionId: collection.id)
 
@@ -226,11 +227,13 @@ final class ArchiverServiceTests: XCTestCase {
     // MARK: - Suggestions Tests
 
     func testSuggestRelated() {
-        let currentDoc = documentManager.createBlankDocument(title: "New Dragon Story")
-        currentDoc.tags = ["fantasy", "dragon"]
+        var currentDoc = documentManager.createBlankDocument(title: "New Dragon Story")
+        currentDoc.metadata.tags = ["fantasy", "dragon"]
+        documentManager.updateDocument(currentDoc)
 
-        let relatedDoc = documentManager.createBlankDocument(title: "Old Dragon Story")
-        relatedDoc.tags = ["fantasy", "dragon"]
+        var relatedDoc = documentManager.createBlankDocument(title: "Old Dragon Story")
+        relatedDoc.metadata.tags = ["fantasy", "dragon"]
+        documentManager.updateDocument(relatedDoc)
 
         let collection = archiver.createCollection(name: "Archive")
         archiver.addDocumentToCollection(relatedDoc.id, collectionId: collection.id)
@@ -246,11 +249,13 @@ final class ArchiverServiceTests: XCTestCase {
     }
 
     func testSuggestRelatedNoResults() {
-        let currentDoc = documentManager.createBlankDocument(title: "Unique Story")
-        currentDoc.tags = ["scifi", "alien"]
+        var currentDoc = documentManager.createBlankDocument(title: "Unique Story")
+        currentDoc.metadata.tags = ["scifi", "alien"]
+        documentManager.updateDocument(currentDoc)
 
-        let archiveDoc = documentManager.createBlankDocument(title: "Fantasy Story")
-        archiveDoc.tags = ["fantasy", "dragon"]
+        var archiveDoc = documentManager.createBlankDocument(title: "Fantasy Story")
+        archiveDoc.metadata.tags = ["fantasy", "dragon"]
+        documentManager.updateDocument(archiveDoc)
 
         let collection = archiver.createCollection(name: "Archive")
         archiver.addDocumentToCollection(archiveDoc.id, collectionId: collection.id)
@@ -265,8 +270,9 @@ final class ArchiverServiceTests: XCTestCase {
     }
 
     func testSuggestRelatedExcludesCurrentDocument() {
-        let doc = documentManager.createBlankDocument(title: "Story")
-        doc.tags = ["fantasy"]
+        var doc = documentManager.createBlankDocument(title: "Story")
+        doc.metadata.tags = ["fantasy"]
+        documentManager.updateDocument(doc)
 
         let collection = archiver.createCollection(name: "Archive")
         archiver.addDocumentToCollection(doc.id, collectionId: collection.id)
@@ -304,8 +310,9 @@ final class ArchiverServiceTests: XCTestCase {
     // MARK: - Organization Tests
 
     func testOrganizeByTagsWithoutAI() {
-        let doc = documentManager.createBlankDocument(title: "Story")
-        doc.tags = ["fantasy", "dragon"]
+        var doc = documentManager.createBlankDocument(title: "Story")
+        doc.metadata.tags = ["fantasy", "dragon"]
+        documentManager.updateDocument(doc)
 
         let expectation = XCTestExpectation(description: "Tags organized")
         Task {

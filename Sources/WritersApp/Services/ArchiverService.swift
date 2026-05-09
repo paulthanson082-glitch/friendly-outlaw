@@ -208,7 +208,7 @@ public class ArchiverService {
                 continue
             }
 
-            var tags = doc.tags ?? []
+            var tags = doc.metadata.tags
             if let aiService = aiService {
                 let prompt = """
                     Generate 3-5 concise, interconnected tags for this writing project:
@@ -288,7 +288,7 @@ public class ArchiverService {
             .filter { doc in
                 doc.title.lowercased().contains(lowerQuery) ||
                 doc.content.lowercased().contains(lowerQuery) ||
-                (doc.tags ?? []).contains { $0.lowercased().contains(lowerQuery) }
+                doc.metadata.tags.contains { $0.lowercased().contains(lowerQuery) }
             }
             .prefix(limit))
 
@@ -330,11 +330,11 @@ public class ArchiverService {
             .filter { $0.id != currentDocumentId }
 
         var scored: [(doc: Document, score: Int)] = []
-        let currentTags = Set(current.tags ?? [])
+        let currentTags = Set(current.metadata.tags)
 
         for doc in archived {
             var score = 0
-            let docTags = Set(doc.tags ?? [])
+            let docTags = Set(doc.metadata.tags)
             score += docTags.intersection(currentTags).count * 10
             let currentTitlePrefix = String(current.title.lowercased().prefix(3))
             if doc.title.lowercased().contains(currentTitlePrefix) {
