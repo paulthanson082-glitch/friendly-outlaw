@@ -1287,12 +1287,12 @@ public class WritersAppViewModel: ObservableObject {
         guard let doc = currentDocument else { return }
         Task {
             do {
-                let response = try await writersApp?.generateDocumentTitles(
+                let response = try await writersApp?.getAIAssistance(
                     documentId: doc.id,
-                    context: currentDocumentContent
-                ) ?? []
+                    type: .expandText
+                ) ?? AIResponse(text: "")
                 await MainActor.run {
-                    aiResponse = response.joined(separator: "\n")
+                    aiResponse = response.text
                 }
             } catch {
                 await MainActor.run {
@@ -1306,10 +1306,9 @@ public class WritersAppViewModel: ObservableObject {
         guard let doc = currentDocument else { return }
         Task {
             do {
-                let response = try await writersApp?.getAssistance(
+                let response = try await writersApp?.getAIAssistance(
                     documentId: doc.id,
-                    type: .custom("Simplify the following text to be easier to understand:\n\(currentDocumentContent)"),
-                    context: currentDocumentContent
+                    type: .simplifyText
                 ) ?? AIResponse(text: "")
                 await MainActor.run {
                     aiResponse = response.text
