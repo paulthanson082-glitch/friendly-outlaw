@@ -38,7 +38,7 @@ fi
 # Build the project to resolve dependencies and cache build artifacts
 if command -v swift &>/dev/null; then
   cd "$CLAUDE_PROJECT_DIR"
-  swift build 2>&1
+  env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.bareRepository GIT_CONFIG_VALUE_0=all swift build 2>&1
 else
   echo "Warning: swift not found — skipping build step." >&2
 fi

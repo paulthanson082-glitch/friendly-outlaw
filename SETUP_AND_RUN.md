@@ -148,6 +148,17 @@ Open the repository folder in VS Code. Pre-configured build tasks are available 
 sudo apt-get install libsqlite3-dev
 ```
 
+### `fatal: cannot use bare repository ... safe.bareRepository is 'explicit'`
+
+Some environments enforce strict Git safety settings that break Swift Package Manager when it reads cached bare repositories.
+
+Use the repository scripts (`./setup.sh`, `./run.sh`) or prefix direct Swift commands with:
+
+```bash
+env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.bareRepository GIT_CONFIG_VALUE_0=all swift build
+env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.bareRepository GIT_CONFIG_VALUE_0=all swift test
+```
+
 ### `swift: command not found`
 
 Download and install Swift from [swift.org/download](https://swift.org/download/), then add it to your `PATH`.

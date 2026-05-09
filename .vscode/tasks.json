@@ -4,7 +4,7 @@
     {
       "label": "Swift: Build",
       "type": "shell",
-      "command": "swift build",
+      "command": "env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.bareRepository GIT_CONFIG_VALUE_0=all swift build",
       "group": {
         "kind": "build",
         "isDefault": true
@@ -20,7 +20,7 @@
     {
       "label": "Swift: Build Release",
       "type": "shell",
-      "command": "swift build -c release",
+      "command": "env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.bareRepository GIT_CONFIG_VALUE_0=all swift build -c release",
       "group": "build",
       "presentation": {
         "echo": true,
@@ -33,7 +33,7 @@
     {
       "label": "Swift: Test",
       "type": "shell",
-      "command": "swift test",
+      "command": "env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.bareRepository GIT_CONFIG_VALUE_0=all swift test",
       "group": {
         "kind": "test",
         "isDefault": true
@@ -61,7 +61,7 @@
     {
       "label": "Swift: Run CLI",
       "type": "shell",
-      "command": "swift run WritersAppCLI",
+      "command": "env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.bareRepository GIT_CONFIG_VALUE_0=all swift run WritersAppCLI",
       "presentation": {
         "echo": true,
         "reveal": "always",
@@ -73,7 +73,7 @@
     {
       "label": "Swift: Update Dependencies",
       "type": "shell",
-      "command": "swift package update",
+      "command": "env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.bareRepository GIT_CONFIG_VALUE_0=all swift package update",
       "presentation": {
         "echo": true,
         "reveal": "always",
@@ -85,7 +85,7 @@
     {
       "label": "Swift: Resolve Dependencies",
       "type": "shell",
-      "command": "swift package resolve",
+      "command": "env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.bareRepository GIT_CONFIG_VALUE_0=all swift package resolve",
       "presentation": {
         "echo": true,
         "reveal": "always",

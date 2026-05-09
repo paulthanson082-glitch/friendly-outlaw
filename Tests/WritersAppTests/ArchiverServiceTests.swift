@@ -6,6 +6,17 @@ final class ArchiverServiceTests: XCTestCase {
     var archiver: ArchiverService!
     var documentManager: DocumentManager!
 
+    @discardableResult
+    private func createBlankDocument(
+        title: String,
+        content: String = "",
+        category: TemplateCategory = .other
+    ) -> Document {
+        let document = Document(title: title, content: content, category: category)
+        documentManager.createDocument(document)
+        return document
+    }
+
     override func setUp() {
         super.setUp()
         documentManager = DocumentManager()
@@ -53,7 +64,7 @@ final class ArchiverServiceTests: XCTestCase {
     }
 
     func testAddDocumentToCollection() {
-        let doc = documentManager.createBlankDocument(title: "Test Doc")
+        let doc = createBlankDocument(title: "Test Doc")
         let collection = archiver.createCollection(name: "Test")
 
         archiver.addDocumentToCollection(doc.id, collectionId: collection.id)
@@ -67,7 +78,7 @@ final class ArchiverServiceTests: XCTestCase {
     }
 
     func testAddDocumentPreventsDuplicates() {
-        let doc = documentManager.createBlankDocument(title: "Test Doc")
+        let doc = createBlankDocument(title: "Test Doc")
         let collection = archiver.createCollection(name: "Test")
 
         archiver.addDocumentToCollection(doc.id, collectionId: collection.id)
@@ -82,7 +93,7 @@ final class ArchiverServiceTests: XCTestCase {
     }
 
     func testRemoveDocumentFromCollection() {
-        let doc = documentManager.createBlankDocument(title: "Test Doc")
+        let doc = createBlankDocument(title: "Test Doc")
         let collection = archiver.createCollection(name: "Test")
 
         archiver.addDocumentToCollection(doc.id, collectionId: collection.id)
@@ -169,7 +180,7 @@ final class ArchiverServiceTests: XCTestCase {
     // MARK: - Search Tests
 
     func testSearchByTitle() {
-        let doc = documentManager.createBlankDocument(title: "Dragon's Tale")
+        let doc = createBlankDocument(title: "Dragon's Tale")
         let collection = archiver.createCollection(name: "Fantasy")
         archiver.addDocumentToCollection(doc.id, collectionId: collection.id)
 
@@ -193,7 +204,7 @@ final class ArchiverServiceTests: XCTestCase {
     }
 
     func testSearchByTags() {
-        var doc = documentManager.createBlankDocument(title: "Story")
+        var doc = createBlankDocument(title: "Story")
         doc.metadata.tags = ["fantasy", "dragon"]
         documentManager.updateDocument(doc)
         let collection = archiver.createCollection(name: "Test")
@@ -214,7 +225,7 @@ final class ArchiverServiceTests: XCTestCase {
 
     func testSearchLimitRespected() {
         for i in 1...15 {
-            let doc = documentManager.createBlankDocument(title: "Doc \(i)")
+            let doc = createBlankDocument(title: "Doc \(i)")
             let collection = archiver.createCollection(name: "Collection \(i)")
             archiver.addDocumentToCollection(doc.id, collectionId: collection.id)
         }
@@ -227,11 +238,11 @@ final class ArchiverServiceTests: XCTestCase {
     // MARK: - Suggestions Tests
 
     func testSuggestRelated() {
-        var currentDoc = documentManager.createBlankDocument(title: "New Dragon Story")
+        var currentDoc = createBlankDocument(title: "New Dragon Story")
         currentDoc.metadata.tags = ["fantasy", "dragon"]
         documentManager.updateDocument(currentDoc)
 
-        var relatedDoc = documentManager.createBlankDocument(title: "Old Dragon Story")
+        var relatedDoc = createBlankDocument(title: "Old Dragon Story")
         relatedDoc.metadata.tags = ["fantasy", "dragon"]
         documentManager.updateDocument(relatedDoc)
 
@@ -249,11 +260,11 @@ final class ArchiverServiceTests: XCTestCase {
     }
 
     func testSuggestRelatedNoResults() {
-        var currentDoc = documentManager.createBlankDocument(title: "Unique Story")
+        var currentDoc = createBlankDocument(title: "Unique Story")
         currentDoc.metadata.tags = ["scifi", "alien"]
         documentManager.updateDocument(currentDoc)
 
-        var archiveDoc = documentManager.createBlankDocument(title: "Fantasy Story")
+        var archiveDoc = createBlankDocument(title: "Fantasy Story")
         archiveDoc.metadata.tags = ["fantasy", "dragon"]
         documentManager.updateDocument(archiveDoc)
 
@@ -270,7 +281,7 @@ final class ArchiverServiceTests: XCTestCase {
     }
 
     func testSuggestRelatedExcludesCurrentDocument() {
-        var doc = documentManager.createBlankDocument(title: "Story")
+        var doc = createBlankDocument(title: "Story")
         doc.metadata.tags = ["fantasy"]
         documentManager.updateDocument(doc)
 
@@ -289,8 +300,8 @@ final class ArchiverServiceTests: XCTestCase {
     // MARK: - Statistics Tests
 
     func testGetArchiveStats() {
-        let doc1 = documentManager.createBlankDocument(title: "Story 1")
-        let doc2 = documentManager.createBlankDocument(title: "Story 2")
+        let doc1 = createBlankDocument(title: "Story 1")
+        let doc2 = createBlankDocument(title: "Story 2")
 
         let collection = archiver.createCollection(name: "Test")
         archiver.addDocumentToCollection(doc1.id, collectionId: collection.id)
@@ -310,7 +321,7 @@ final class ArchiverServiceTests: XCTestCase {
     // MARK: - Organization Tests
 
     func testOrganizeByTagsWithoutAI() {
-        var doc = documentManager.createBlankDocument(title: "Story")
+        var doc = createBlankDocument(title: "Story")
         doc.metadata.tags = ["fantasy", "dragon"]
         documentManager.updateDocument(doc)
 
@@ -370,8 +381,8 @@ final class ArchiverServiceTests: XCTestCase {
     func testArchiveSnapshotCodable() {
         let original = ArchiveSnapshot(
             documentId: UUID(),
-            title: "Milestone",
             wordCount: 5000,
+            title: "Milestone",
             summary: "Test summary",
             tags: ["test"]
         )

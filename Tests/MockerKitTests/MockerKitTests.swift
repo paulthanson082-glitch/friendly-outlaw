@@ -568,8 +568,8 @@ final class MockerKitTests: XCTestCase {
         let output = TableFormatter.formatPS([c1, c2], all: false, quiet: true, noTrunc: false)
         let lines = output.split(separator: "\n")
         XCTAssertEqual(lines.count, 2)
-        XCTAssertEqual(lines[0], c1.shortId)
-        XCTAssertEqual(lines[1], c2.shortId)
+        XCTAssertEqual(String(lines[0]), c1.shortId)
+        XCTAssertEqual(String(lines[1]), c2.shortId)
     }
 
     func testTableFormatter_formatPS_withPorts() {

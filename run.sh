@@ -10,6 +10,14 @@
 
 set -e
 
+swiftpm() {
+    env \
+        GIT_CONFIG_COUNT=1 \
+        GIT_CONFIG_KEY_0=safe.bareRepository \
+        GIT_CONFIG_VALUE_0=all \
+        swift "$@"
+}
+
 show_help() {
     echo "Writers App CLI Runner"
     echo ""
@@ -72,18 +80,18 @@ fi
 echo "Building Writers App CLI..."
 if [ "$BUILD_CONFIG" = "release" ]; then
     echo "Building in release mode (optimized)..."
-    swift build -c release
+    swiftpm build -c release
     echo ""
     echo "Running Writers App CLI (release)..."
     .build/release/WritersAppCLI "${CLI_ARGS[@]}"
 else
     echo "Building in debug mode..."
-    swift build
+    swiftpm build
     echo ""
     echo "Running Writers App CLI (debug)..."
     if [ ${#CLI_ARGS[@]} -eq 0 ]; then
-        swift run WritersAppCLI
+        swiftpm run WritersAppCLI
     else
-        swift run WritersAppCLI "${CLI_ARGS[@]}"
+        swiftpm run WritersAppCLI "${CLI_ARGS[@]}"
     fi
 fi

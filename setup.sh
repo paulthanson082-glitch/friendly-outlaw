@@ -12,6 +12,14 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+swiftpm() {
+    env \
+        GIT_CONFIG_COUNT=1 \
+        GIT_CONFIG_KEY_0=safe.bareRepository \
+        GIT_CONFIG_VALUE_0=all \
+        swift "$@"
+}
+
 ok()   { echo -e "${GREEN}✓${NC} $1"; }
 fail() { echo -e "${RED}✗${NC} $1"; }
 info() { echo -e "${YELLOW}→${NC} $1"; }
@@ -47,7 +55,7 @@ fi
 
 # ── 3. Build ──────────────────────────────
 info "Building Writers App (debug)..."
-if swift build 2>&1; then
+if swiftpm build 2>&1; then
     ok "Build succeeded"
 else
     fail "Build failed — see output above"
