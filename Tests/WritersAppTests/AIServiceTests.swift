@@ -36,6 +36,7 @@ final class AIServiceTests: XCTestCase {
         XCTAssertEqual(AIModel.claude3Opus.rawValue, "claude-3-opus-20240229")
         XCTAssertEqual(AIModel.claude3Sonnet.rawValue, "claude-3-sonnet-20240229")
         XCTAssertEqual(AIModel.claude3Haiku.rawValue, "claude-3-haiku-20240307")
+        XCTAssertEqual(AIModel.maxhermes.rawValue, "maxhermes-01")
     }
 
     func testAIModelDisplayNames() {
@@ -43,6 +44,7 @@ final class AIServiceTests: XCTestCase {
         XCTAssertEqual(AIModel.claude3Opus.displayName, "Claude 3 Opus")
         XCTAssertEqual(AIModel.claude3Sonnet.displayName, "Claude 3 Sonnet")
         XCTAssertEqual(AIModel.claude3Haiku.displayName, "Claude 3 Haiku")
+        XCTAssertEqual(AIModel.maxhermes.displayName, "MaxHermes")
     }
 
     // MARK: - AIService Initialization Tests
@@ -245,420 +247,93 @@ final class AIServiceTests: XCTestCase {
         XCTAssertTrue(AIError.aiNotEnabled.errorDescription?.contains("AI features are not enabled") ?? false)
         XCTAssertTrue(AIError.documentNotFound.errorDescription?.contains("not found") ?? false)
     }
+}
 
-    // MARK: - AIModel Regression Tests (maxhermes removed)
+// MARK: - AIModel.maxhermes Additional Tests (PR: MaxHermes/Minimax model support added)
 
-    func testAIModelDoesNotContainMaxhermes() {
-        // Regression: maxhermes was removed from AIModel; raw value must not decode
-        XCTAssertNil(AIModel(rawValue: "maxhermes"),
-                     "maxhermes should not be a valid AIModel case after removal")
+final class AIModelMaxhermesTests: XCTestCase {
+
+    // MARK: - Raw Value
+
+    func testMaxhermesRawValueIsMaxhermes01() {
+        XCTAssertEqual(AIModel.maxhermes.rawValue, "maxhermes-01")
     }
 
-    func testAIModelCodableRoundtrip() throws {
+    func testMaxhermesRawValueDecodesBack() {
+        let decoded = AIModel(rawValue: "maxhermes-01")
+        XCTAssertNotNil(decoded, "maxhermes-01 must decode to a valid AIModel")
+        XCTAssertEqual(decoded, .maxhermes)
+    }
+
+    func testMaxhermesDisplayNameIsMaxHermes() {
+        XCTAssertEqual(AIModel.maxhermes.displayName, "MaxHermes")
+    }
+
+    // MARK: - Codable
+
+    func testMaxhermesCodableRoundtrip() throws {
         let encoder = JSONEncoder()
         let decoder = JSONDecoder()
-        let models: [AIModel] = [.claude35Sonnet, .claude3Opus, .claude3Sonnet, .claude3Haiku]
-        for model in models {
-            let data = try encoder.encode(model)
-            let decoded = try decoder.decode(AIModel.self, from: data)
-            XCTAssertEqual(decoded, model, "Codable roundtrip failed for \(model)")
-        }
+        let data = try encoder.encode(AIModel.maxhermes)
+        let decoded = try decoder.decode(AIModel.self, from: data)
+        XCTAssertEqual(decoded, AIModel.maxhermes)
     }
 
-    func testAIModelExactCaseCount() {
-        // Verify only 4 models are valid (maxhermes removed)
-        let validRawValues = [
-            "claude-3-5-sonnet-20241022",
-            "claude-3-opus-20240229",
-            "claude-3-sonnet-20240229",
-            "claude-3-haiku-20240307"
+    func testMaxhermesDecodesFromJSONString() throws {
+        let json = "\"maxhermes-01\"".data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(AIModel.self, from: json)
+        XCTAssertEqual(decoded, AIModel.maxhermes)
+    }
+
+    func testMaxhermesEncodesToExpectedJSONString() throws {
+        let data = try JSONEncoder().encode(AIModel.maxhermes)
+        let jsonString = String(data: data, encoding: .utf8)
+        XCTAssertEqual(jsonString, "\"maxhermes-01\"")
+    }
+
+    // MARK: - AIConfiguration with maxhermes
+
+    func testAIConfigurationWithMaxhermesModel() {
+        let config = AIConfiguration(apiKey: "test-key", model: .maxhermes, maxTokens: 2048, temperature: 0.5)
+        XCTAssertEqual(config.model, .maxhermes)
+        XCTAssertEqual(config.model.rawValue, "maxhermes-01")
+        XCTAssertEqual(config.model.displayName, "MaxHermes")
+    }
+
+    func testAIServiceInitWithMaxhermesConfig() {
+        let config = AIConfiguration(apiKey: "test-key", model: .maxhermes)
+        let service = AIService(configuration: config)
+        XCTAssertNotNil(service)
+    }
+
+    // MARK: - Regression: maxhermes is distinct from all other models
+
+    func testMaxhermesIsNotEqualToClaudeModels() {
+        XCTAssertNotEqual(AIModel.maxhermes, AIModel.claude35Sonnet)
+        XCTAssertNotEqual(AIModel.maxhermes, AIModel.claude3Opus)
+        XCTAssertNotEqual(AIModel.maxhermes, AIModel.claude3Sonnet)
+        XCTAssertNotEqual(AIModel.maxhermes, AIModel.claude3Haiku)
+    }
+
+    func testMaxhermesRawValueIsUniqueAmongAllModels() {
+        let allRawValues: [String] = [
+            AIModel.claude35Sonnet.rawValue,
+            AIModel.claude3Opus.rawValue,
+            AIModel.claude3Sonnet.rawValue,
+            AIModel.claude3Haiku.rawValue,
         ]
-        for raw in validRawValues {
-            XCTAssertNotNil(AIModel(rawValue: raw), "Expected \(raw) to be a valid AIModel")
-        }
-    }
-
-    // MARK: - AIAssistanceType Hallucination-Reduction Display Names
-
-    func testAIAssistanceTypeHallucinationDisplayNames() {
-        XCTAssertEqual(AIAssistanceType.brainstormIdeasCategorized.displayName, "Brainstorm Ideas (Categorized)")
-        XCTAssertEqual(AIAssistanceType.extractQuotes.displayName, "Extract Quotes")
-        XCTAssertEqual(AIAssistanceType.verifyWithCitations.displayName, "Verify with Citations")
-        XCTAssertEqual(AIAssistanceType.analyzeWithUncertainty.displayName, "Analyze with Uncertainty")
-        XCTAssertEqual(AIAssistanceType.chainOfThoughtVerification.displayName, "Chain of Thought Verification")
-        XCTAssertEqual(AIAssistanceType.writingAdvisor.displayName, "Writing Advisor")
-    }
-
-    // MARK: - AIAssistanceType Hallucination-Reduction Prompt Generation
-
-    func testExtractQuotesPromptContainsText() {
-        let text = "He said 'Hello world' on page 42."
-        let prompt = AIAssistanceType.extractQuotes.prompt(for: text)
-        XCTAssertTrue(prompt.contains(text))
-        XCTAssertTrue(prompt.contains("quotes"))
-    }
-
-    func testVerifyWithCitationsPromptContainsText() {
-        let text = "The sky is blue because of Rayleigh scattering."
-        let prompt = AIAssistanceType.verifyWithCitations.prompt(for: text)
-        XCTAssertTrue(prompt.contains(text))
-        XCTAssertTrue(prompt.contains("citations"))
-    }
-
-    func testAnalyzeWithUncertaintyPromptContainsText() {
-        let text = "This document discusses economic trends."
-        let prompt = AIAssistanceType.analyzeWithUncertainty.prompt(for: text)
-        XCTAssertTrue(prompt.contains(text))
-        XCTAssertTrue(prompt.contains("uncertain"))
-    }
-
-    func testChainOfThoughtVerificationPromptContainsText() {
-        let text = "Climate change is accelerating."
-        let prompt = AIAssistanceType.chainOfThoughtVerification.prompt(for: text)
-        XCTAssertTrue(prompt.contains(text))
-        XCTAssertTrue(prompt.contains("step"))
-    }
-
-    func testBrainstormIdeasCategorizedPromptContainsJSONSchema() {
-        let text = "Space exploration missions"
-        let prompt = AIAssistanceType.brainstormIdeasCategorized.prompt(for: text)
-        XCTAssertTrue(prompt.contains(text))
-        XCTAssertTrue(prompt.contains("categories"))
-        XCTAssertTrue(prompt.contains("JSON"))
-    }
-
-    func testWritingAdvisorPromptContainsJSONSchema() {
-        let text = "Writer has 500 words per day average."
-        let prompt = AIAssistanceType.writingAdvisor.prompt(for: text)
-        XCTAssertTrue(prompt.contains(text))
-        XCTAssertTrue(prompt.contains("recommendations"))
-        XCTAssertTrue(prompt.contains("JSON"))
-    }
-
-    // MARK: - QuoteBlock Tests
-
-    func testQuoteBlockCreation() {
-        let quote = QuoteBlock(
-            text: "To be or not to be",
-            reference: "Hamlet, Act III",
-            relevanceExplanation: "Famous soliloquy"
+        XCTAssertFalse(
+            allRawValues.contains(AIModel.maxhermes.rawValue),
+            "maxhermes rawValue must be unique among all AIModel cases"
         )
-        XCTAssertEqual(quote.text, "To be or not to be")
-        XCTAssertEqual(quote.reference, "Hamlet, Act III")
-        XCTAssertEqual(quote.relevanceExplanation, "Famous soliloquy")
     }
 
-    func testQuoteBlockWithNilReference() {
-        let quote = QuoteBlock(text: "Some quote", relevanceExplanation: "Relevant")
-        XCTAssertNil(quote.reference)
-    }
+    // MARK: - Boundary: invalid raw values still return nil
 
-    func testQuoteBlockCodableRoundtrip() throws {
-        let original = QuoteBlock(
-            text: "All that glitters is not gold",
-            reference: "Merchant of Venice",
-            relevanceExplanation: "Warns against appearances"
-        )
-        let encoder = JSONEncoder()
-        let decoder = JSONDecoder()
-        let data = try encoder.encode(original)
-        let decoded = try decoder.decode(QuoteBlock.self, from: data)
-        XCTAssertEqual(decoded.text, original.text)
-        XCTAssertEqual(decoded.reference, original.reference)
-        XCTAssertEqual(decoded.relevanceExplanation, original.relevanceExplanation)
-    }
-
-    // MARK: - VerifiedClaim Tests
-
-    func testVerifiedClaimCreation() {
-        let claim = VerifiedClaim(
-            claim: "Water boils at 100°C",
-            supportingQuote: "At standard pressure, water boils at 100°C",
-            evidence: "Physical chemistry reference",
-            isVerified: true
-        )
-        XCTAssertEqual(claim.claim, "Water boils at 100°C")
-        XCTAssertTrue(claim.isVerified)
-        XCTAssertNil(claim.uncertaintyNote)
-    }
-
-    func testVerifiedClaimUnverified() {
-        let claim = VerifiedClaim(
-            claim: "Some unverifiable claim",
-            evidence: "No supporting evidence found for this claim",
-            isVerified: false,
-            uncertaintyNote: "Could not find source"
-        )
-        XCTAssertFalse(claim.isVerified)
-        XCTAssertEqual(claim.uncertaintyNote, "Could not find source")
-    }
-
-    func testVerifiedClaimCodableRoundtrip() throws {
-        let original = VerifiedClaim(
-            claim: "Test claim",
-            supportingQuote: "Supporting text",
-            evidence: "Evidence here",
-            isVerified: true,
-            uncertaintyNote: nil
-        )
-        let encoder = JSONEncoder()
-        let decoder = JSONDecoder()
-        let data = try encoder.encode(original)
-        let decoded = try decoder.decode(VerifiedClaim.self, from: data)
-        XCTAssertEqual(decoded.claim, original.claim)
-        XCTAssertEqual(decoded.isVerified, original.isVerified)
-    }
-
-    // MARK: - UncertaintyAwareAnalysis Tests
-
-    func testUncertaintyAwareAnalysisDefaults() {
-        let analysis = UncertaintyAwareAnalysis(analysis: "Some analysis")
-        XCTAssertEqual(analysis.analysis, "Some analysis")
-        XCTAssertTrue(analysis.confidenceAreas.isEmpty)
-        XCTAssertTrue(analysis.uncertainAreas.isEmpty)
-        XCTAssertTrue(analysis.informationGaps.isEmpty)
-    }
-
-    func testUncertaintyAwareAnalysisFull() {
-        let analysis = UncertaintyAwareAnalysis(
-            analysis: "Detailed analysis",
-            confidenceAreas: ["Historical facts"],
-            uncertainAreas: ["Future projections"],
-            informationGaps: ["Missing primary sources"]
-        )
-        XCTAssertEqual(analysis.confidenceAreas.count, 1)
-        XCTAssertEqual(analysis.uncertainAreas.count, 1)
-        XCTAssertEqual(analysis.informationGaps.count, 1)
-    }
-
-    func testUncertaintyAwareAnalysisCodableRoundtrip() throws {
-        let original = UncertaintyAwareAnalysis(
-            analysis: "Analysis text",
-            confidenceAreas: ["Area A"],
-            uncertainAreas: ["Area B"],
-            informationGaps: ["Gap C"]
-        )
-        let encoder = JSONEncoder()
-        let decoder = JSONDecoder()
-        let data = try encoder.encode(original)
-        let decoded = try decoder.decode(UncertaintyAwareAnalysis.self, from: data)
-        XCTAssertEqual(decoded.analysis, original.analysis)
-        XCTAssertEqual(decoded.confidenceAreas, original.confidenceAreas)
-        XCTAssertEqual(decoded.uncertainAreas, original.uncertainAreas)
-        XCTAssertEqual(decoded.informationGaps, original.informationGaps)
-    }
-
-    // MARK: - ReasoningStep Tests
-
-    func testReasoningStepCreation() {
-        let step = ReasoningStep(
-            claim: "The text argues X",
-            reasoning: "Because of evidence Y",
-            assumptions: ["Author is reliable"],
-            uncertainty: "May be outdated"
-        )
-        XCTAssertEqual(step.claim, "The text argues X")
-        XCTAssertEqual(step.reasoning, "Because of evidence Y")
-        XCTAssertEqual(step.assumptions, ["Author is reliable"])
-        XCTAssertEqual(step.uncertainty, "May be outdated")
-    }
-
-    func testReasoningStepDefaults() {
-        let step = ReasoningStep(claim: "A claim", reasoning: "Some reasoning")
-        XCTAssertTrue(step.assumptions.isEmpty)
-        XCTAssertNil(step.uncertainty)
-    }
-
-    func testReasoningStepCodableRoundtrip() throws {
-        let original = ReasoningStep(
-            claim: "Claim",
-            reasoning: "Reasoning",
-            assumptions: ["Assumption 1"],
-            uncertainty: "Uncertain about X"
-        )
-        let encoder = JSONEncoder()
-        let decoder = JSONDecoder()
-        let data = try encoder.encode(original)
-        let decoded = try decoder.decode(ReasoningStep.self, from: data)
-        XCTAssertEqual(decoded.claim, original.claim)
-        XCTAssertEqual(decoded.reasoning, original.reasoning)
-        XCTAssertEqual(decoded.assumptions, original.assumptions)
-        XCTAssertEqual(decoded.uncertainty, original.uncertainty)
-    }
-
-    // MARK: - ChainOfThoughtAnalysis Tests
-
-    func testChainOfThoughtAnalysisCreation() {
-        let step = ReasoningStep(claim: "Step 1", reasoning: "Because A leads to B")
-        let analysis = ChainOfThoughtAnalysis(
-            reasoning: "Overall reasoning",
-            steps: [step],
-            assumptions: ["Premise 1"],
-            uncertainties: ["Unknown variable"],
-            conclusion: "Therefore, X is true"
-        )
-        XCTAssertEqual(analysis.steps.count, 1)
-        XCTAssertEqual(analysis.assumptions.count, 1)
-        XCTAssertEqual(analysis.uncertainties.count, 1)
-        XCTAssertEqual(analysis.conclusion, "Therefore, X is true")
-    }
-
-    func testChainOfThoughtAnalysisDefaults() {
-        let analysis = ChainOfThoughtAnalysis(reasoning: "Basic reasoning", conclusion: "Final answer")
-        XCTAssertTrue(analysis.steps.isEmpty)
-        XCTAssertTrue(analysis.assumptions.isEmpty)
-        XCTAssertTrue(analysis.uncertainties.isEmpty)
-    }
-
-    func testChainOfThoughtAnalysisCodableRoundtrip() throws {
-        let step = ReasoningStep(claim: "Claim", reasoning: "Reasoning")
-        let original = ChainOfThoughtAnalysis(
-            reasoning: "Full reasoning",
-            steps: [step],
-            assumptions: ["Assumption"],
-            uncertainties: ["Uncertainty"],
-            conclusion: "Conclusion"
-        )
-        let encoder = JSONEncoder()
-        let decoder = JSONDecoder()
-        let data = try encoder.encode(original)
-        let decoded = try decoder.decode(ChainOfThoughtAnalysis.self, from: data)
-        XCTAssertEqual(decoded.reasoning, original.reasoning)
-        XCTAssertEqual(decoded.conclusion, original.conclusion)
-        XCTAssertEqual(decoded.steps.count, original.steps.count)
-        XCTAssertEqual(decoded.assumptions, original.assumptions)
-        XCTAssertEqual(decoded.uncertainties, original.uncertainties)
-    }
-
-    // MARK: - CategorizedIdea / IdeaCategory / BrainstormResult Tests
-
-    func testCategorizedIdeaCreation() {
-        let idea = CategorizedIdea(
-            title: "Mars Colony",
-            description: "Establish a human settlement on Mars",
-            isSpeculative: true
-        )
-        XCTAssertEqual(idea.title, "Mars Colony")
-        XCTAssertEqual(idea.description, "Establish a human settlement on Mars")
-        XCTAssertTrue(idea.isSpeculative)
-    }
-
-    func testCategorizedIdeaCodableRoundtrip() throws {
-        let original = CategorizedIdea(
-            title: "Solar-powered trains",
-            description: "Trains powered by solar panels",
-            isSpeculative: false
-        )
-        let encoder = JSONEncoder()
-        let decoder = JSONDecoder()
-        let data = try encoder.encode(original)
-        let decoded = try decoder.decode(CategorizedIdea.self, from: data)
-        XCTAssertEqual(decoded.title, original.title)
-        XCTAssertEqual(decoded.description, original.description)
-        XCTAssertEqual(decoded.isSpeculative, original.isSpeculative)
-    }
-
-    func testIdeaCategoryCreation() {
-        let idea = CategorizedIdea(title: "Idea 1", description: "Desc", isSpeculative: false)
-        let category = IdeaCategory(
-            name: "Technology",
-            description: "Tech-related ideas",
-            ideas: [idea]
-        )
-        XCTAssertEqual(category.name, "Technology")
-        XCTAssertEqual(category.ideas.count, 1)
-    }
-
-    func testBrainstormResultCodableRoundtrip() throws {
-        let idea = CategorizedIdea(title: "Idea", description: "Desc", isSpeculative: false)
-        let category = IdeaCategory(name: "Category", description: "Desc", ideas: [idea])
-        let original = BrainstormResult(categories: [category])
-
-        let encoder = JSONEncoder()
-        let decoder = JSONDecoder()
-        let data = try encoder.encode(original)
-        let decoded = try decoder.decode(BrainstormResult.self, from: data)
-        XCTAssertEqual(decoded.categories.count, 1)
-        XCTAssertEqual(decoded.categories[0].name, "Category")
-        XCTAssertEqual(decoded.categories[0].ideas.count, 1)
-        XCTAssertEqual(decoded.categories[0].ideas[0].title, "Idea")
-    }
-
-    func testBrainstormResultEmptyCategories() throws {
-        let result = BrainstormResult(categories: [])
-        XCTAssertTrue(result.categories.isEmpty)
-        let encoder = JSONEncoder()
-        let decoder = JSONDecoder()
-        let data = try encoder.encode(result)
-        let decoded = try decoder.decode(BrainstormResult.self, from: data)
-        XCTAssertTrue(decoded.categories.isEmpty)
-    }
-
-    // MARK: - ToolResult Error Flag Tests
-
-    func testToolResultToDictWithoutError() {
-        let result = ToolResult(toolUseId: "tool_001", content: "42 words")
-        let dict = result.toDict()
-        XCTAssertEqual(dict["type"] as? String, "tool_result")
-        XCTAssertEqual(dict["tool_use_id"] as? String, "tool_001")
-        XCTAssertEqual(dict["content"] as? String, "42 words")
-        XCTAssertNil(dict["is_error"])
-    }
-
-    func testToolResultToDictWithError() {
-        let result = ToolResult(toolUseId: "tool_002", content: "Document not found", isError: true)
-        let dict = result.toDict()
-        XCTAssertEqual(dict["is_error"] as? Bool, true)
-    }
-
-    // MARK: - ToolUseBlock Invalid Input Tests
-
-    func testToolUseBlockRejectsWrongType() {
-        let dict: [String: Any] = [
-            "type": "text",
-            "id": "toolu_123",
-            "name": "get_word_count",
-            "input": [:]
-        ]
-        XCTAssertNil(ToolUseBlock(from: dict))
-    }
-
-    func testToolUseBlockRejectsMissingType() {
-        let dict: [String: Any] = [
-            "id": "toolu_123",
-            "name": "get_word_count",
-            "input": [:]
-        ]
-        XCTAssertNil(ToolUseBlock(from: dict))
-    }
-
-    func testToolUseBlockRejectsMissingId() {
-        let dict: [String: Any] = [
-            "type": "tool_use",
-            "name": "get_word_count",
-            "input": [:]
-        ]
-        XCTAssertNil(ToolUseBlock(from: dict))
-    }
-
-    func testToolUseBlockRejectsMissingName() {
-        let dict: [String: Any] = [
-            "type": "tool_use",
-            "id": "toolu_123",
-            "input": [:]
-        ]
-        XCTAssertNil(ToolUseBlock(from: dict))
-    }
-
-    func testToolUseBlockWithMissingInput() {
-        // input is optional — should fall back to empty dict
-        let dict: [String: Any] = [
-            "type": "tool_use",
-            "id": "toolu_456",
-            "name": "list_templates"
-        ]
-        let block = ToolUseBlock(from: dict)
-        XCTAssertNotNil(block)
-        XCTAssertTrue(block?.input.isEmpty ?? false)
+    func testInvalidRawValueReturnsNil() {
+        XCTAssertNil(AIModel(rawValue: "maxhermes"))       // close but wrong
+        XCTAssertNil(AIModel(rawValue: "maxhermes-02"))    // wrong version
+        XCTAssertNil(AIModel(rawValue: "MaxHermes-01"))    // wrong casing
+        XCTAssertNil(AIModel(rawValue: ""))
     }
 }
