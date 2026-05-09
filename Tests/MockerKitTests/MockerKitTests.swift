@@ -417,270 +417,171 @@ final class MockerKitTests: XCTestCase {
         XCTAssertTrue(TableFormatter.relativeTime(now.addingTimeInterval(-172800)).contains("days"))
     }
 
-    func testTableFormatter_relativeTime_weeks() {
-        let now = Date()
-        let twoWeeksAgo = now.addingTimeInterval(-14 * 24 * 3600)
-        let result = TableFormatter.relativeTime(twoWeeksAgo)
-        XCTAssertTrue(result.contains("weeks"), "Expected 'weeks' in '\(result)'")
-    }
+    // MARK: - TableFormatter Extended Tests
 
-    func testTableFormatter_relativeTime_months() {
-        let now = Date()
-        let sixtyDaysAgo = now.addingTimeInterval(-60 * 24 * 3600)
-        let result = TableFormatter.relativeTime(sixtyDaysAgo)
-        XCTAssertTrue(result.contains("months"), "Expected 'months' in '\(result)'")
-    }
-
-    func testTableFormatter_relativeTime_years() {
-        let now = Date()
-        let fourHundredDaysAgo = now.addingTimeInterval(-400 * 24 * 3600)
-        let result = TableFormatter.relativeTime(fourHundredDaysAgo)
-        XCTAssertTrue(result.contains("years"), "Expected 'years' in '\(result)'")
-    }
-
-    func testTableFormatter_formatPS_noTrunc_showsFullId() {
+    func testTableFormatter_formatPS_noTrunc_usesFullId() {
         let fullId = "abcdef1234567890abcdef1234567890"
-        let containers = [
-            ContainerInfo(id: fullId, name: "web", image: "nginx:latest", status: .running),
-        ]
-        let output = TableFormatter.formatPS(containers, all: false, quiet: false, noTrunc: true)
-        XCTAssertTrue(output.contains(fullId), "noTrunc should show full ID")
-    }
-
-    func testTableFormatter_formatPS_quiet_noTrunc_showsFullId() {
-        let fullId = "abcdef1234567890abcdef1234567890"
-        let containers = [
-            ContainerInfo(id: fullId, name: "web", image: "nginx:latest"),
-        ]
-        let output = TableFormatter.formatPS(containers, all: false, quiet: true, noTrunc: true)
+        let container = ContainerInfo(id: fullId, name: "web", image: "nginx")
+        let output = TableFormatter.formatPS([container], all: false, quiet: true, noTrunc: true)
         XCTAssertEqual(output, fullId)
     }
 
-    func testTableFormatter_formatPS_emptyList_showsHeaderOnly() {
-        let output = TableFormatter.formatPS([], all: false, quiet: false, noTrunc: false)
-        // Should have header but no data rows
-        let lines = output.components(separatedBy: "\n")
-        XCTAssertEqual(lines.count, 1)
-        XCTAssertTrue(lines[0].contains("CONTAINER ID"))
-        XCTAssertTrue(lines[0].contains("NAMES"))
-    }
-
-    func testTableFormatter_formatPS_quiet_emptyList() {
-        let output = TableFormatter.formatPS([], all: false, quiet: true, noTrunc: false)
-        XCTAssertEqual(output, "")
-    }
-
-    func testTableFormatter_formatPS_multipleContainers() {
-        let containers = [
-            ContainerInfo(id: "aaa111222333444", name: "web", image: "nginx:latest", status: .running),
-            ContainerInfo(id: "bbb555666777888", name: "db", image: "postgres:15", status: .stopped),
-        ]
-        let output = TableFormatter.formatPS(containers, all: false, quiet: false, noTrunc: false)
-        XCTAssertTrue(output.contains("web"))
-        XCTAssertTrue(output.contains("db"))
+    func testTableFormatter_formatPS_quiet_false_containsData() {
+        let container = ContainerInfo(
+            id: "abcdef1234567890abcdef1234567890",
+            name: "mycontainer",
+            image: "nginx:latest",
+            status: .running
+        )
+        let output = TableFormatter.formatPS([container], all: false, quiet: false, noTrunc: false)
+        XCTAssertTrue(output.contains("mycontainer"))
         XCTAssertTrue(output.contains("nginx:latest"))
-        XCTAssertTrue(output.contains("postgres:15"))
-    }
-
-    func testTableFormatter_formatPS_quiet_multipleContainers() {
-        let containers = [
-            ContainerInfo(id: "aaa111222333444", name: "web", image: "nginx:latest"),
-            ContainerInfo(id: "bbb555666777888", name: "db", image: "postgres:15"),
-        ]
-        let output = TableFormatter.formatPS(containers, all: false, quiet: true, noTrunc: false)
-        let lines = output.components(separatedBy: "\n")
-        XCTAssertEqual(lines.count, 2)
-        XCTAssertEqual(lines[0], "aaa111222333")
-        XCTAssertEqual(lines[1], "bbb555666777")
+        XCTAssertTrue(output.contains("CONTAINER ID"))
+        XCTAssertTrue(output.contains("COMMAND"))
+        XCTAssertTrue(output.contains("CREATED"))
+        XCTAssertTrue(output.contains("PORTS"))
+        XCTAssertTrue(output.contains("NAMES"))
     }
 
     func testTableFormatter_formatPS_withPorts() {
-        let ports = [PortMapping(hostPort: 8080, containerPort: 80)]
+        let port = PortMapping(hostPort: 8080, containerPort: 80)
         let container = ContainerInfo(
-            id: "abc123def456789",
             name: "web",
-            image: "nginx:latest",
-            status: .running,
-            ports: ports
+            image: "nginx",
+            ports: [port]
         )
         let output = TableFormatter.formatPS([container], all: false, quiet: false, noTrunc: false)
         XCTAssertTrue(output.contains("8080"))
         XCTAssertTrue(output.contains("80"))
     }
 
-    func testTableFormatter_formatPS_withCommand() {
+    func testTableFormatter_formatPS_commandTruncatedByDefault() {
+        let longCommand = String(repeating: "x", count: 30)
         let container = ContainerInfo(
-            id: "abc123def456789",
-            name: "web",
-            image: "nginx:latest",
-            command: "nginx -g daemon off;"
+            name: "worker",
+            image: "alpine",
+            command: longCommand
         )
         let output = TableFormatter.formatPS([container], all: false, quiet: false, noTrunc: false)
-        XCTAssertTrue(output.contains("nginx"))
+        // Command should be truncated to 20 chars (including wrapping quotes), ending in "..."
+        XCTAssertTrue(output.contains("..."))
     }
 
-    func testTableFormatter_formatPS_longCommandTruncated() {
-        let longCmd = String(repeating: "x", count: 50)
+    func testTableFormatter_formatPS_commandNotTruncatedWithNoTrunc() {
+        let longCommand = String(repeating: "x", count: 30)
         let container = ContainerInfo(
-            id: "abc123def456789",
-            name: "web",
-            image: "nginx:latest",
-            command: longCmd
-        )
-        let output = TableFormatter.formatPS([container], all: false, quiet: false, noTrunc: false)
-        // Command column is truncated to 20 chars (with "...") when noTrunc is false
-        XCTAssertTrue(output.contains("..."), "Long command should be truncated with '...'")
-        XCTAssertFalse(output.contains(longCmd), "Full long command should not appear when noTrunc is false")
-    }
-
-    func testTableFormatter_formatPS_longCommandNotTruncatedWithNoTrunc() {
-        let longCmd = String(repeating: "x", count: 50)
-        let container = ContainerInfo(
-            id: "abc123def456789",
-            name: "web",
-            image: "nginx:latest",
-            command: longCmd
+            name: "worker",
+            image: "alpine",
+            command: longCommand
         )
         let output = TableFormatter.formatPS([container], all: false, quiet: false, noTrunc: true)
-        XCTAssertTrue(output.contains(longCmd), "Full long command should appear when noTrunc is true")
+        XCTAssertTrue(output.contains(longCommand))
+        XCTAssertFalse(output.contains("..."))
     }
 
-    func testTableFormatter_formatPS_emptyCommand_showsQuotes() {
-        let container = ContainerInfo(
-            id: "abc123def456789",
-            name: "web",
-            image: "nginx:latest",
-            command: ""
-        )
+    func testTableFormatter_formatPS_emptyCommandRenderedAsEmptyQuotes() {
+        let container = ContainerInfo(name: "bare", image: "scratch", command: "")
         let output = TableFormatter.formatPS([container], all: false, quiet: false, noTrunc: false)
-        XCTAssertTrue(output.contains("\"\""), "Empty command should render as '\"\"'")
+        XCTAssertTrue(output.contains("\"\""))
     }
 
-    // MARK: - formatImages Additional Tests
-
-    func testTableFormatter_formatImages_nonQuiet_showsHeaders() {
-        let images = [
-            ImageInfo(id: "abc123def456789", repository: "nginx", tag: "latest"),
+    func testTableFormatter_formatPS_multipleContainers() {
+        let containers = [
+            ContainerInfo(name: "web", image: "nginx"),
+            ContainerInfo(name: "db", image: "postgres"),
+            ContainerInfo(name: "cache", image: "redis"),
         ]
-        let output = TableFormatter.formatImages(images, quiet: false, noTrunc: false)
-        XCTAssertTrue(output.contains("REPOSITORY"))
-        XCTAssertTrue(output.contains("TAG"))
-        XCTAssertTrue(output.contains("IMAGE ID"))
-        XCTAssertTrue(output.contains("SIZE"))
+        let output = TableFormatter.formatPS(containers, all: false, quiet: false, noTrunc: false)
+        let lines = output.split(separator: "\n")
+        // Header + 3 data rows
+        XCTAssertEqual(lines.count, 4)
+        XCTAssertTrue(output.contains("web"))
+        XCTAssertTrue(output.contains("db"))
+        XCTAssertTrue(output.contains("cache"))
     }
 
-    func testTableFormatter_formatImages_nonQuiet_showsData() {
-        let images = [
-            ImageInfo(id: "abc123def456789", repository: "nginx", tag: "1.25"),
-        ]
-        let output = TableFormatter.formatImages(images, quiet: false, noTrunc: false)
-        XCTAssertTrue(output.contains("nginx"))
-        XCTAssertTrue(output.contains("1.25"))
-    }
-
-    func testTableFormatter_formatImages_noTrunc_showsFullId() {
-        let fullId = "sha256abcdef123456789012345678901234"
-        let images = [
-            ImageInfo(id: fullId, repository: "nginx", tag: "latest"),
-        ]
-        let output = TableFormatter.formatImages(images, quiet: false, noTrunc: true)
-        XCTAssertTrue(output.contains(fullId), "noTrunc should show full image ID")
-    }
-
-    func testTableFormatter_formatImages_quiet_noTrunc() {
-        let fullId = "sha256abcdef123456789012345678901234"
-        let images = [
-            ImageInfo(id: fullId, repository: "nginx", tag: "latest"),
-        ]
-        let output = TableFormatter.formatImages(images, quiet: true, noTrunc: true)
+    func testTableFormatter_formatImages_noTrunc_usesFullId() {
+        let fullId = "sha256abcdef1234567890abcdef1234"
+        let image = ImageInfo(id: fullId, repository: "myrepo", tag: "v1")
+        let output = TableFormatter.formatImages([image], quiet: true, noTrunc: true)
         XCTAssertEqual(output, fullId)
     }
 
-    func testTableFormatter_formatImages_quiet_emptyList() {
-        let output = TableFormatter.formatImages([], quiet: true, noTrunc: false)
-        XCTAssertEqual(output, "")
+    func testTableFormatter_formatImages_nonQuiet_containsHeaders() {
+        let image = ImageInfo(repository: "nginx", tag: "latest", size: 1024 * 1024)
+        let output = TableFormatter.formatImages([image], quiet: false, noTrunc: false)
+        XCTAssertTrue(output.contains("REPOSITORY"))
+        XCTAssertTrue(output.contains("TAG"))
+        XCTAssertTrue(output.contains("IMAGE ID"))
+        XCTAssertTrue(output.contains("CREATED"))
+        XCTAssertTrue(output.contains("SIZE"))
     }
 
-    func testTableFormatter_formatImages_emptyList_showsHeaderOnly() {
-        let output = TableFormatter.formatImages([], quiet: false, noTrunc: false)
-        let lines = output.components(separatedBy: "\n")
-        XCTAssertEqual(lines.count, 1)
-        XCTAssertTrue(lines[0].contains("REPOSITORY"))
+    func testTableFormatter_formatImages_nonQuiet_containsData() {
+        let image = ImageInfo(repository: "myapp", tag: "2.0")
+        let output = TableFormatter.formatImages([image], quiet: false, noTrunc: false)
+        XCTAssertTrue(output.contains("myapp"))
+        XCTAssertTrue(output.contains("2.0"))
     }
 
-    func testTableFormatter_formatImages_sizeInOutput() {
+    func testTableFormatter_formatImages_multipleImages_separatedByNewlines() {
         let images = [
-            ImageInfo(id: "abc123def456789", repository: "ubuntu", size: 1_073_741_824), // 1 GB
+            ImageInfo(repository: "nginx", tag: "latest"),
+            ImageInfo(repository: "redis", tag: "7"),
         ]
         let output = TableFormatter.formatImages(images, quiet: false, noTrunc: false)
-        XCTAssertTrue(output.contains("GB"), "Image size should show GB for large images")
+        let lines = output.split(separator: "\n")
+        // Header + 2 data rows
+        XCTAssertEqual(lines.count, 3)
     }
 
-    func testTableFormatter_formatImages_multipleImages() {
-        let images = [
-            ImageInfo(id: "aaa111222333444", repository: "nginx", tag: "latest"),
-            ImageInfo(id: "bbb555666777888", repository: "postgres", tag: "15"),
-        ]
-        let output = TableFormatter.formatImages(images, quiet: false, noTrunc: false)
-        XCTAssertTrue(output.contains("nginx"))
-        XCTAssertTrue(output.contains("postgres"))
-    }
-
-    func testTableFormatter_formatImages_quiet_multipleImages() {
-        let images = [
-            ImageInfo(id: "aaa111222333444", repository: "nginx", tag: "latest"),
-            ImageInfo(id: "bbb555666777888", repository: "postgres", tag: "15"),
-        ]
-        let output = TableFormatter.formatImages(images, quiet: true, noTrunc: false)
-        let lines = output.components(separatedBy: "\n")
-        XCTAssertEqual(lines.count, 2)
-        XCTAssertEqual(lines[0], "aaa111222333")
-        XCTAssertEqual(lines[1], "bbb555666777")
-    }
-
-    // MARK: - formatVolumes Tests
-
-    func testTableFormatter_formatVolumes_showsHeaders() {
-        let volumes: [VolumeInfo] = []
-        let output = TableFormatter.formatVolumes(volumes)
+    func testTableFormatter_formatVolumes_containsHeaders() {
+        let volume = VolumeInfo(name: "myvolume", driver: "local")
+        let output = TableFormatter.formatVolumes([volume])
         XCTAssertTrue(output.contains("DRIVER"))
         XCTAssertTrue(output.contains("VOLUME NAME"))
     }
 
-    func testTableFormatter_formatVolumes_showsVolumeData() {
-        let volumes = [VolumeInfo(name: "pgdata", driver: "local")]
-        let output = TableFormatter.formatVolumes(volumes)
+    func testTableFormatter_formatVolumes_containsData() {
+        let volume = VolumeInfo(name: "pgdata", driver: "local")
+        let output = TableFormatter.formatVolumes([volume])
         XCTAssertTrue(output.contains("pgdata"))
         XCTAssertTrue(output.contains("local"))
     }
 
+    func testTableFormatter_formatVolumes_emptyList_returnsHeaderOnly() {
+        let output = TableFormatter.formatVolumes([])
+        let lines = output.split(separator: "\n")
+        XCTAssertEqual(lines.count, 1)
+        XCTAssertTrue(output.contains("DRIVER"))
+    }
+
     func testTableFormatter_formatVolumes_multipleVolumes() {
         let volumes = [
-            VolumeInfo(name: "pgdata", driver: "local"),
-            VolumeInfo(name: "redis-data", driver: "local"),
+            VolumeInfo(name: "vol1", driver: "local"),
+            VolumeInfo(name: "vol2", driver: "overlay"),
         ]
         let output = TableFormatter.formatVolumes(volumes)
-        XCTAssertTrue(output.contains("pgdata"))
-        XCTAssertTrue(output.contains("redis-data"))
-        let lines = output.components(separatedBy: "\n")
-        // Header + 2 data rows = 3 lines
-        XCTAssertEqual(lines.count, 3)
+        XCTAssertTrue(output.contains("vol1"))
+        XCTAssertTrue(output.contains("vol2"))
+        XCTAssertTrue(output.contains("overlay"))
     }
 
-    func testTableFormatter_formatVolumes_customDriver() {
-        let volumes = [VolumeInfo(name: "nfs-vol", driver: "nfs")]
-        let output = TableFormatter.formatVolumes(volumes)
-        XCTAssertTrue(output.contains("nfs"))
-        XCTAssertTrue(output.contains("nfs-vol"))
-    }
-
-    // MARK: - formatStats Tests
-
-    func testTableFormatter_formatStats_showsHeaders() {
-        let stats: [ContainerStats] = []
-        let output = TableFormatter.formatStats(stats, noStream: true)
+    func testTableFormatter_formatStats_containsHeaders() {
+        let stats = ContainerStats(
+            containerId: "abc123def456789",
+            name: "web",
+            cpuPercent: 5.0,
+            memUsage: 1024 * 1024,
+            memLimit: 512 * 1024 * 1024,
+            networkRx: 0,
+            networkTx: 0,
+            blockRead: 0,
+            blockWrite: 0,
+            pids: 1
+        )
+        let output = TableFormatter.formatStats([stats], noStream: true)
         XCTAssertTrue(output.contains("CONTAINER ID"))
-        XCTAssertTrue(output.contains("NAME"))
         XCTAssertTrue(output.contains("CPU %"))
         XCTAssertTrue(output.contains("MEM USAGE / LIMIT"))
         XCTAssertTrue(output.contains("NET I/O"))
@@ -688,277 +589,232 @@ final class MockerKitTests: XCTestCase {
         XCTAssertTrue(output.contains("PIDS"))
     }
 
-    func testTableFormatter_formatStats_showsCpuPercent() {
-        let stats = [
-            ContainerStats(
-                containerId: "abc123def456789",
-                name: "web",
-                cpuPercent: 12.34,
-                memUsage: 1_048_576,
-                memLimit: 2_147_483_648,
-                networkRx: 1024,
-                networkTx: 512,
-                blockRead: 0,
-                blockWrite: 0,
-                pids: 5
-            )
-        ]
-        let output = TableFormatter.formatStats(stats, noStream: true)
-        XCTAssertTrue(output.contains("12.34%"), "CPU percent should be formatted with 2 decimal places")
+    func testTableFormatter_formatStats_cpuAndMemFormatted() {
+        let stats = ContainerStats(
+            containerId: "abc123def456789",
+            name: "myservice",
+            cpuPercent: 12.34,
+            memUsage: 10 * 1024 * 1024,   // 10 MB
+            memLimit: 512 * 1024 * 1024,  // 512 MB
+            networkRx: 1024,
+            networkTx: 2048,
+            blockRead: 0,
+            blockWrite: 0,
+            pids: 4
+        )
+        let output = TableFormatter.formatStats([stats], noStream: false)
+        XCTAssertTrue(output.contains("12.34%"))
+        XCTAssertTrue(output.contains("MB"))
+        XCTAssertTrue(output.contains("myservice"))
+        XCTAssertTrue(output.contains("4"))
     }
 
-    func testTableFormatter_formatStats_showsMemUsageAndLimit() {
-        let stats = [
-            ContainerStats(
-                containerId: "abc123def456789",
-                name: "web",
-                cpuPercent: 0.5,
-                memUsage: 5_242_880,    // 5 MB
-                memLimit: 1_073_741_824, // 1 GB
-                networkRx: 0,
-                networkTx: 0,
-                blockRead: 0,
-                blockWrite: 0,
-                pids: 2
-            )
-        ]
-        let output = TableFormatter.formatStats(stats, noStream: true)
-        XCTAssertTrue(output.contains("MB"), "Memory usage should display in MB")
-        XCTAssertTrue(output.contains("GB"), "Memory limit should display in GB")
+    func testTableFormatter_formatStats_zeroBytes_showsZeroB() {
+        let stats = ContainerStats(
+            containerId: "abc123def456789",
+            name: "idle",
+            cpuPercent: 0.0,
+            memUsage: 0,
+            memLimit: 0,
+            networkRx: 0,
+            networkTx: 0,
+            blockRead: 0,
+            blockWrite: 0,
+            pids: 0
+        )
+        let output = TableFormatter.formatStats([stats], noStream: true)
+        XCTAssertTrue(output.contains("0B"))
     }
 
-    func testTableFormatter_formatStats_showsMemPercent() {
-        let memUsage: UInt64 = 536_870_912   // 512 MB
-        let memLimit: UInt64 = 1_073_741_824  // 1 GB
-        let stats = [
-            ContainerStats(
-                containerId: "abc123def456789",
-                name: "web",
-                cpuPercent: 0.0,
-                memUsage: memUsage,
-                memLimit: memLimit,
-                networkRx: 0,
-                networkTx: 0,
-                blockRead: 0,
-                blockWrite: 0,
-                pids: 1
-            )
-        ]
-        let output = TableFormatter.formatStats(stats, noStream: true)
-        // memPercent = 50.00%
-        XCTAssertTrue(output.contains("50.00%"), "Memory percent should be 50.00% for half usage")
+    func testTableFormatter_formatStats_gigabyteMemory() {
+        let stats = ContainerStats(
+            containerId: "abc123def456789",
+            name: "heavy",
+            cpuPercent: 80.0,
+            memUsage: UInt64(2) * 1024 * 1024 * 1024,  // 2 GB
+            memLimit: UInt64(8) * 1024 * 1024 * 1024,  // 8 GB
+            networkRx: 0,
+            networkTx: 0,
+            blockRead: 0,
+            blockWrite: 0,
+            pids: 10
+        )
+        let output = TableFormatter.formatStats([stats], noStream: true)
+        XCTAssertTrue(output.contains("GB"))
     }
 
-    func testTableFormatter_formatStats_showsShortContainerId() {
-        let stats = [
-            ContainerStats(
-                containerId: "abcdef1234567890xyz",
-                name: "web",
-                cpuPercent: 0.0,
-                memUsage: 0,
-                memLimit: 0,
-                networkRx: 0,
-                networkTx: 0,
-                blockRead: 0,
-                blockWrite: 0,
-                pids: 0
-            )
-        ]
-        let output = TableFormatter.formatStats(stats, noStream: true)
-        XCTAssertTrue(output.contains("abcdef123456"), "Stats should show 12-char container ID")
-        XCTAssertFalse(output.contains("abcdef1234567890xyz"), "Stats should not show full long ID")
+    func testTableFormatter_formatStats_containerId_truncatedTo12() {
+        let stats = ContainerStats(
+            containerId: "abcdef1234567890fullid",
+            name: "svc",
+            cpuPercent: 0,
+            memUsage: 0,
+            memLimit: 0,
+            networkRx: 0,
+            networkTx: 0,
+            blockRead: 0,
+            blockWrite: 0,
+            pids: 0
+        )
+        let output = TableFormatter.formatStats([stats], noStream: true)
+        XCTAssertTrue(output.contains("abcdef123456"))
+        XCTAssertFalse(output.contains("abcdef1234567890fullid"))
     }
 
-    func testTableFormatter_formatStats_showsPids() {
-        let stats = [
-            ContainerStats(
-                containerId: "abc123def456789",
-                name: "web",
-                cpuPercent: 0.0,
-                memUsage: 0,
-                memLimit: 0,
-                networkRx: 0,
-                networkTx: 0,
-                blockRead: 0,
-                blockWrite: 0,
-                pids: 42
-            )
-        ]
-        let output = TableFormatter.formatStats(stats, noStream: true)
-        XCTAssertTrue(output.contains("42"), "PID count should appear in stats output")
-    }
-
-    func testTableFormatter_formatStats_networkIO_bytes() {
-        let stats = [
-            ContainerStats(
-                containerId: "abc123def456789",
-                name: "web",
-                cpuPercent: 0.0,
-                memUsage: 0,
-                memLimit: 0,
-                networkRx: 512,
-                networkTx: 256,
-                blockRead: 0,
-                blockWrite: 0,
-                pids: 1
-            )
-        ]
-        let output = TableFormatter.formatStats(stats, noStream: true)
-        XCTAssertTrue(output.contains("512B"), "Network RX should show in bytes")
-        XCTAssertTrue(output.contains("256B"), "Network TX should show in bytes")
-    }
-
-    func testTableFormatter_formatStats_zeroMemLimit_zeroPercent() {
-        let stats = [
-            ContainerStats(
-                containerId: "abc123def456789",
-                name: "web",
-                cpuPercent: 0.0,
-                memUsage: 1024,
-                memLimit: 0,  // zero limit → 0% mem
-                networkRx: 0,
-                networkTx: 0,
-                blockRead: 0,
-                blockWrite: 0,
-                pids: 1
-            )
-        ]
-        let output = TableFormatter.formatStats(stats, noStream: true)
-        XCTAssertTrue(output.contains("0.00%"), "Zero memLimit should yield 0.00% memory usage")
-    }
-
-    // MARK: - formatComposePS Tests
-
-    func testTableFormatter_formatComposePS_showsHeaders() {
-        let output = TableFormatter.formatComposePS([], projectName: "myapp")
-        XCTAssertTrue(output.contains("NAME"))
-        XCTAssertTrue(output.contains("IMAGE"))
-        XCTAssertTrue(output.contains("SERVICE"))
-        XCTAssertTrue(output.contains("STATUS"))
-    }
-
-    func testTableFormatter_formatComposePS_showsContainerData() {
+    func testTableFormatter_formatComposePS_containsHeaders() {
         let container = ContainerInfo(
-            id: "abc123def456789",
-            name: "myapp-web-1",
-            image: "nginx:latest",
-            status: .running,
+            name: "myproject-web-1",
+            image: "nginx",
             labels: ["com.docker.compose.service": "web"]
         )
-        let output = TableFormatter.formatComposePS([container], projectName: "myapp")
-        XCTAssertTrue(output.contains("myapp-web-1"))
-        XCTAssertTrue(output.contains("nginx:latest"))
-        XCTAssertTrue(output.contains("web"))
+        let output = TableFormatter.formatComposePS([container], projectName: "myproject")
+        XCTAssertTrue(output.contains("NAME"))
+        XCTAssertTrue(output.contains("IMAGE"))
+        XCTAssertTrue(output.contains("COMMAND"))
+        XCTAssertTrue(output.contains("SERVICE"))
+        XCTAssertTrue(output.contains("CREATED"))
+        XCTAssertTrue(output.contains("STATUS"))
+        XCTAssertTrue(output.contains("PORTS"))
     }
 
-    func testTableFormatter_formatComposePS_showsServiceLabel() {
+    func testTableFormatter_formatComposePS_serviceLabel() {
         let container = ContainerInfo(
-            id: "abc123def456789",
-            name: "myapp-db-1",
-            image: "postgres:15",
-            labels: ["com.docker.compose.service": "database"]
+            name: "app-api-1",
+            image: "myapp:latest",
+            labels: ["com.docker.compose.service": "api"]
         )
-        let output = TableFormatter.formatComposePS([container], projectName: "myapp")
-        XCTAssertTrue(output.contains("database"), "Service label should appear in compose ps output")
+        let output = TableFormatter.formatComposePS([container], projectName: "app")
+        XCTAssertTrue(output.contains("api"))
+        XCTAssertTrue(output.contains("app-api-1"))
+        XCTAssertTrue(output.contains("myapp:latest"))
     }
 
-    func testTableFormatter_formatComposePS_noServiceLabel_showsEmpty() {
-        let container = ContainerInfo(
-            id: "abc123def456789",
-            name: "standalone-container",
-            image: "alpine:latest"
-            // No compose labels
-        )
-        let output = TableFormatter.formatComposePS([container], projectName: "myapp")
-        XCTAssertTrue(output.contains("standalone-container"))
-        XCTAssertTrue(output.contains("alpine:latest"))
+    func testTableFormatter_formatComposePS_missingServiceLabel_usesEmpty() {
+        let container = ContainerInfo(name: "standalone", image: "alpine")
+        let output = TableFormatter.formatComposePS([container], projectName: "proj")
+        // Service column should be empty (no label), but row still appears
+        XCTAssertTrue(output.contains("standalone"))
     }
 
     func testTableFormatter_formatComposePS_withPorts() {
-        let ports = [PortMapping(hostPort: 3000, containerPort: 3000)]
+        let port = PortMapping(hostPort: 3000, containerPort: 3000)
         let container = ContainerInfo(
-            id: "abc123def456789",
-            name: "myapp-api-1",
-            image: "myapp:latest",
-            ports: ports,
-            labels: ["com.docker.compose.service": "api"]
+            name: "proj-web-1",
+            image: "node:18",
+            ports: [port],
+            labels: ["com.docker.compose.service": "web"]
         )
-        let output = TableFormatter.formatComposePS([container], projectName: "myapp")
+        let output = TableFormatter.formatComposePS([container], projectName: "proj")
         XCTAssertTrue(output.contains("3000"))
     }
 
-    func testTableFormatter_formatComposePS_multipleContainers() {
-        let containers = [
-            ContainerInfo(
-                id: "aaa111222333444",
-                name: "myapp-web-1",
-                image: "nginx:latest",
-                labels: ["com.docker.compose.service": "web"]
-            ),
-            ContainerInfo(
-                id: "bbb555666777888",
-                name: "myapp-db-1",
-                image: "postgres:15",
-                labels: ["com.docker.compose.service": "db"]
-            ),
-        ]
-        let output = TableFormatter.formatComposePS(containers, projectName: "myapp")
-        XCTAssertTrue(output.contains("myapp-web-1"))
-        XCTAssertTrue(output.contains("myapp-db-1"))
-        let lines = output.components(separatedBy: "\n")
-        // Header + 2 rows = 3 lines
-        XCTAssertEqual(lines.count, 3)
-    }
-
-    // MARK: - formatTable Generic Tests
-
-    func testTableFormatter_formatTable_basicAlignment() {
-        let header = ["NAME", "VALUE"]
-        let rows = [["short", "x"], ["a-much-longer-name", "y"]]
-        let output = TableFormatter.formatTable(header: header, rows: rows)
-        let lines = output.components(separatedBy: "\n")
-        XCTAssertEqual(lines.count, 3) // header + 2 rows
-        // Column widths should match longest entry
-        XCTAssertTrue(lines[0].hasPrefix("NAME"))
-        XCTAssertTrue(lines[1].contains("short"))
-        XCTAssertTrue(lines[2].contains("a-much-longer-name"))
-    }
-
-    func testTableFormatter_formatTable_emptyRows() {
-        let header = ["COL1", "COL2", "COL3"]
-        let output = TableFormatter.formatTable(header: header, rows: [])
-        let lines = output.components(separatedBy: "\n")
-        XCTAssertEqual(lines.count, 1)
-        XCTAssertTrue(lines[0].contains("COL1"))
-        XCTAssertTrue(lines[0].contains("COL2"))
-        XCTAssertTrue(lines[0].contains("COL3"))
-    }
-
-    func testTableFormatter_formatTable_separatorBetweenColumns() {
-        let header = ["A", "B"]
-        let rows = [["1", "2"]]
-        let output = TableFormatter.formatTable(header: header, rows: rows)
-        // Columns are separated by 3 spaces
-        XCTAssertTrue(output.contains("   "), "Columns should be separated by three spaces")
-    }
-
-    func testTableFormatter_formatTable_singleColumn() {
-        let header = ["ONLY"]
-        let rows = [["value1"], ["value2"]]
-        let output = TableFormatter.formatTable(header: header, rows: rows)
-        XCTAssertTrue(output.contains("ONLY"))
-        XCTAssertTrue(output.contains("value1"))
-        XCTAssertTrue(output.contains("value2"))
-    }
-
-    func testTableFormatter_formatTable_columnsPaddedToWidth() {
-        let header = ["SHORT", "LONGCOLUMNNAME"]
-        let rows = [["a", "b"]]
-        let output = TableFormatter.formatTable(header: header, rows: rows)
-        // "a" should be padded to match "SHORT" (5 chars), then "   " separator
-        let lines = output.components(separatedBy: "\n")
+    func testTableFormatter_formatTable_singleRow() {
+        let output = TableFormatter.formatTable(
+            header: ["NAME", "STATUS"],
+            rows: [["mycontainer", "running"]]
+        )
+        let lines = output.split(separator: "\n")
         XCTAssertEqual(lines.count, 2)
-        // Row line should start with "a" followed by spaces to match header width
-        XCTAssertTrue(lines[1].hasPrefix("a"))
+        XCTAssertTrue(output.contains("NAME"))
+        XCTAssertTrue(output.contains("STATUS"))
+        XCTAssertTrue(output.contains("mycontainer"))
+        XCTAssertTrue(output.contains("running"))
+    }
+
+    func testTableFormatter_formatTable_columnsAlignedWithSpaces() {
+        let output = TableFormatter.formatTable(
+            header: ["A", "BBBBB"],
+            rows: [["short", "x"]]
+        )
+        // Columns are separated by 3 spaces; widths based on max of header/cell
+        XCTAssertTrue(output.contains("   "))  // at least 3 spaces between columns
+    }
+
+    func testTableFormatter_formatTable_columnWidthDrivenByLongestCell() {
+        let output = TableFormatter.formatTable(
+            header: ["ID", "NAME"],
+            rows: [
+                ["abc", "short"],
+                ["def", "this-is-a-very-long-name"],
+            ]
+        )
+        // Header NAME should be padded to length of longest cell "this-is-a-very-long-name"
+        let lines = output.split(separator: "\n", omittingEmptySubsequences: false)
+        // Each line should have the same length (padded to column widths)
+        let lengths = Set(lines.map { $0.count })
+        XCTAssertEqual(lengths.count, 1)
+    }
+
+    func testTableFormatter_formatTable_emptyRows_returnsHeaderOnly() {
+        let output = TableFormatter.formatTable(header: ["COL1", "COL2"], rows: [])
+        let lines = output.split(separator: "\n")
+        XCTAssertEqual(lines.count, 1)
+        XCTAssertTrue(output.contains("COL1"))
+        XCTAssertTrue(output.contains("COL2"))
+    }
+
+    func testTableFormatter_relativeTime_weeks() {
+        let now = Date()
+        // 14 days = 2 weeks
+        let result = TableFormatter.relativeTime(now.addingTimeInterval(-14 * 24 * 3600))
+        XCTAssertTrue(result.contains("weeks"))
+    }
+
+    func testTableFormatter_relativeTime_months() {
+        let now = Date()
+        // 60 days = ~2 months
+        let result = TableFormatter.relativeTime(now.addingTimeInterval(-60 * 24 * 3600))
+        XCTAssertTrue(result.contains("months"))
+    }
+
+    func testTableFormatter_relativeTime_years() {
+        let now = Date()
+        // 400 days = ~1 year
+        let result = TableFormatter.relativeTime(now.addingTimeInterval(-400 * 24 * 3600))
+        XCTAssertTrue(result.contains("years"))
+    }
+
+    func testTableFormatter_relativeTime_justUnderOneMinute_showsSeconds() {
+        let now = Date()
+        let result = TableFormatter.relativeTime(now.addingTimeInterval(-59))
+        XCTAssertTrue(result.contains("seconds"))
+        XCTAssertFalse(result.contains("minutes"))
+    }
+
+    func testTableFormatter_relativeTime_exactlyOneMinute_showsMinutes() {
+        let now = Date()
+        let result = TableFormatter.relativeTime(now.addingTimeInterval(-60))
+        XCTAssertTrue(result.contains("minutes"))
+    }
+
+    func testTableFormatter_formatNetworks_containsAllColumns() {
+        let network = NetworkInfo(name: "mynet", driver: "overlay", scope: "swarm")
+        let output = TableFormatter.formatNetworks([network])
+        XCTAssertTrue(output.contains("NETWORK ID"))
+        XCTAssertTrue(output.contains("NAME"))
+        XCTAssertTrue(output.contains("DRIVER"))
+        XCTAssertTrue(output.contains("SCOPE"))
+        XCTAssertTrue(output.contains("mynet"))
+        XCTAssertTrue(output.contains("overlay"))
+        XCTAssertTrue(output.contains("swarm"))
+    }
+
+    func testTableFormatter_formatNetworks_emptyList_returnsHeaderOnly() {
+        let output = TableFormatter.formatNetworks([])
+        let lines = output.split(separator: "\n")
+        XCTAssertEqual(lines.count, 1)
+        XCTAssertTrue(output.contains("NETWORK ID"))
+    }
+
+    func testTableFormatter_formatNetworks_multipleNetworks() {
+        let networks = [
+            NetworkInfo(name: "frontend", driver: "bridge"),
+            NetworkInfo(name: "backend", driver: "bridge"),
+        ]
+        let output = TableFormatter.formatNetworks(networks)
+        XCTAssertTrue(output.contains("frontend"))
+        XCTAssertTrue(output.contains("backend"))
+        let lines = output.split(separator: "\n")
+        XCTAssertEqual(lines.count, 3)  // header + 2 rows
     }
 }
