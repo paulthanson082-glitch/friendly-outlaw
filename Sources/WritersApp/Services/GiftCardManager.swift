@@ -30,8 +30,8 @@ public class GiftCardManager {
         guard aiCredits > 0 else {
             throw GiftCardError.invalidInput("AI credits must be greater than 0")
         }
-        guard expirationDays >= 0 else {
-            throw GiftCardError.invalidInput("Expiration days must be greater than or equal to 0")
+        guard expirationDays > 0 else {
+            throw GiftCardError.invalidInput("Expiration days must be greater than 0")
         }
 
         let bundle = GiftCardBundle(
