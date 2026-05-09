@@ -231,7 +231,7 @@ public class ArchiverService {
                     // Silently fall back to existing tags
                 }
             }
-            results[docId] = tags
+            results[docId] = Array(Set(tags)).sorted()
         }
 
         return results
