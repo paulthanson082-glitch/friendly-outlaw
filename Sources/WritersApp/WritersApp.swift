@@ -461,11 +461,15 @@ public class WritersApp {
         _ query: String,
         limit: Int = 10
     ) -> (documents: [Document], snapshots: [ArchiveSnapshot], collections: [ArchiveCollection]) {
-        return archiverService?.search(query, limit: limit) ?? ([], [], [])
+        guard let service = archiverService else {
+            return (documents: [], snapshots: [], collections: [])
+        }
+        return service.search(query, limit: limit)
     }
 
     public func suggestRelatedArchived(to documentId: UUID, limit: Int = 5) async -> [Document] {
-        return await archiverService?.suggestRelated(to: documentId, limit: limit) ?? []
+        guard let service = archiverService else { return [] }
+        return await service.suggestRelated(to: documentId, limit: limit)
     }
 
     public func getArchiveStats() -> [String: Any] {
