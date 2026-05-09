@@ -327,8 +327,6 @@ public class AIService {
         var config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = requestTimeoutSeconds
         config.timeoutIntervalForResource = requestTimeoutSeconds * 2
-        config.waitsForConnectivity = true
-
         let session = URLSession(configuration: config)
         let (data, response) = try await session.data(for: urlRequest)
 
