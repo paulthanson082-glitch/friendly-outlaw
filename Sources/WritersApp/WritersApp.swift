@@ -377,6 +377,105 @@ public class WritersApp {
         return hermesService?.getSessionStats(from: session)
     }
 
+    // MARK: - Archiver
+
+    @discardableResult
+    public func createArchiveCollection(
+        name: String,
+        description: String = "",
+        theme: String = "default",
+        tags: [String] = []
+    ) -> ArchiveCollection? {
+        return archiverService?.createCollection(name: name, description: description, theme: theme, tags: tags)
+    }
+
+    public func getArchiveCollection(_ id: UUID) -> ArchiveCollection? {
+        return archiverService?.getCollection(id)
+    }
+
+    public func addDocumentToArchiveCollection(_ documentId: UUID, collectionId: UUID) {
+        archiverService?.addDocumentToCollection(documentId, collectionId: collectionId)
+    }
+
+    public func removeDocumentFromArchiveCollection(_ documentId: UUID, collectionId: UUID) {
+        archiverService?.removeDocumentFromCollection(documentId, collectionId: collectionId)
+    }
+
+    public func listArchiveCollections() -> [ArchiveCollection] {
+        return archiverService?.listCollections() ?? []
+    }
+
+    public func deleteArchiveCollection(_ id: UUID) {
+        archiverService?.deleteCollection(id)
+    }
+
+    @discardableResult
+    public func preserveArchiveMilestone(
+        documentId: UUID,
+        title: String,
+        wordCount: Int = 0,
+        characterCount: Int = 0,
+        sessionCount: Int = 0,
+        daysStreak: Int = 0,
+        summary: String = "",
+        tags: [String] = []
+    ) -> ArchiveSnapshot? {
+        return archiverService?.preserveMilestone(
+            documentId: documentId,
+            title: title,
+            wordCount: wordCount,
+            characterCount: characterCount,
+            sessionCount: sessionCount,
+            daysStreak: daysStreak,
+            summary: summary,
+            tags: tags
+        )
+    }
+
+    public func getArchiveSnapshot(_ id: UUID) -> ArchiveSnapshot? {
+        return archiverService?.getSnapshot(id)
+    }
+
+    public func getArchiveSnapshots(forDocument documentId: UUID) -> [ArchiveSnapshot] {
+        return archiverService?.getSnapshots(forDocument: documentId) ?? []
+    }
+
+    public func listArchiveSnapshots() -> [ArchiveSnapshot] {
+        return archiverService?.listSnapshots() ?? []
+    }
+
+    public func organizeArchiveByTags(
+        _ documentIds: [UUID],
+        context: ArchiverContext = ArchiverContext()
+    ) async throws -> [UUID: [String]] {
+        guard let service = archiverService else { throw AIError.aiNotEnabled }
+        return try await service.organizeByTags(documentIds, context: context)
+    }
+
+    public func summarizeDocumentForArchive(_ documentId: UUID) async throws -> String {
+        guard let service = archiverService else { throw AIError.aiNotEnabled }
+        return try await service.summarizeDocument(documentId)
+    }
+
+    public func searchArchive(
+        _ query: String,
+        limit: Int = 10
+    ) -> (documents: [Document], snapshots: [ArchiveSnapshot], collections: [ArchiveCollection]) {
+        guard let service = archiverService else {
+            return (documents: [], snapshots: [], collections: [])
+        }
+        return service.search(query, limit: limit)
+    }
+
+    public func suggestRelatedArchived(to documentId: UUID, limit: Int = 5) async -> [Document] {
+        guard let service = archiverService else { return [] }
+        return await service.suggestRelated(to: documentId, limit: limit)
+    }
+
+    public func getArchiveStats() -> [String: Any] {
+        return archiverService?.getArchiveStats() ?? [:]
+    }
+
     // MARK: - Settings Management
 
     /// Toggle dark mode on/off
