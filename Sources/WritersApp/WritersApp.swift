@@ -17,7 +17,6 @@ public class WritersApp {
     public private(set) var aiService: AIService?
     public private(set) var chatbotService: ChatbotService?
     public private(set) var hermesService: HermesService?
-    public private(set) var archiverService: ArchiverService?
     public private(set) var ragieService: RagieService?
     public private(set) var writingAdvisorService: WritingAdvisorService?
     public private(set) var spoilerProtection: SpoilerProtectionService
@@ -79,15 +78,10 @@ public class WritersApp {
                 documentManager: self.documentManager,
                 templateManager: self.templateManager
             )
-            self.archiverService = ArchiverService(
-                aiService: svc,
-                documentManager: self.documentManager
-            )
         } else {
             self.chatbotService = nil
             self.writingAdvisorService = nil
             self.hermesService = nil
-            self.archiverService = nil
         }
         try? databaseManager.initialize()
     }
@@ -113,10 +107,6 @@ public class WritersApp {
             documentManager: self.documentManager,
             templateManager: self.templateManager
         )
-        self.archiverService = ArchiverService(
-            aiService: aiSvc,
-            documentManager: self.documentManager
-        )
         if let uid = userId {
             self.currentUserId = uid
             try? self.databaseManager.saveAIConfiguration(userId: uid, configuration: configuration)
@@ -126,14 +116,13 @@ public class WritersApp {
     /// Disables all AI features for the application.
     ///
     /// Disables all AI-related services for the application.
-    ///
-    /// Clears the AIService, ChatbotService, WritingAdvisorService, HermesService, and ArchiverService so AI functionality is unavailable until AI is re-enabled.
+    /// 
+    /// Clears the AIService, ChatbotService, WritingAdvisorService, and HermesService so AI functionality is unavailable until AI is re-enabled.
     public func disableAI() {
         self.aiService = nil
         self.chatbotService = nil
         self.writingAdvisorService = nil
         self.hermesService = nil
-        self.archiverService = nil
     }
 
     /// Check if AI is available
@@ -221,7 +210,11 @@ public class WritersApp {
     /// The document's content is sent to Ragie as raw text. The returned
     /// `RagieDocument` includes the Ragie document id and initial processing status.
     /// Poll `getRagieDocumentStatus(ragieId:)` until `isReady` is true before querying.
-    /// - Parameter documentId: The UUID of the document to ingest.
+    ///
+    /// - Parameter documentId: The id of the local `Document` to ingest.
+    /// Ingests the specified document's text into Ragie and returns the resulting RagieDocument.
+    /// - Parameters:
+    ///   - documentId: The UUID of the document to ingest.
     /// - Returns: The `RagieDocument` created by Ragie for the ingested document.
     /// - Throws: `RagieError.ragieNotEnabled` if Ragie has not been enabled; `RagieError.documentNotFound` if no document exists with the given `documentId`.
     public func ingestDocumentToRagie(documentId: UUID) async throws -> RagieDocument {
@@ -237,9 +230,13 @@ public class WritersApp {
     }
 
     /// Fetch the processing status of a Ragie document.
+    ///
+    /// - Parameter ragieId: The Ragie document id (from `ingestDocumentToRagie`).
+    /// Retrieves the Ragie document and its current status for the given Ragie document identifier.
     /// - Parameter ragieId: The Ragie-assigned identifier of the document to fetch.
     /// - Returns: The `RagieDocument` matching `ragieId`.
-    /// - Throws: `RagieError.ragieNotEnabled` if Ragie integration is not enabled; any error propagated from `RagieService` if the document cannot be retrieved.
+    /// - Throws: `RagieError.ragieNotEnabled` if Ragie integration is not enabled.
+    /// - Throws: Any error propagated from `RagieService` if the document cannot be retrieved.
     public func getRagieDocumentStatus(ragieId: String) async throws -> RagieDocument {
         guard let ragie = ragieService else { throw RagieError.ragieNotEnabled }
         return try await ragie.getDocument(id: ragieId)
@@ -375,105 +372,6 @@ public class WritersApp {
     /// - Returns: A `HermesSessionStats` value, or `nil` if Hermes is not enabled.
     public func getHermesSessionStats(from session: HermesSession) -> HermesSessionStats? {
         return hermesService?.getSessionStats(from: session)
-    }
-
-    // MARK: - Archiver
-
-    @discardableResult
-    public func createArchiveCollection(
-        name: String,
-        description: String = "",
-        theme: String = "default",
-        tags: [String] = []
-    ) -> ArchiveCollection? {
-        return archiverService?.createCollection(name: name, description: description, theme: theme, tags: tags)
-    }
-
-    public func getArchiveCollection(_ id: UUID) -> ArchiveCollection? {
-        return archiverService?.getCollection(id)
-    }
-
-    public func addDocumentToArchiveCollection(_ documentId: UUID, collectionId: UUID) {
-        archiverService?.addDocumentToCollection(documentId, collectionId: collectionId)
-    }
-
-    public func removeDocumentFromArchiveCollection(_ documentId: UUID, collectionId: UUID) {
-        archiverService?.removeDocumentFromCollection(documentId, collectionId: collectionId)
-    }
-
-    public func listArchiveCollections() -> [ArchiveCollection] {
-        return archiverService?.listCollections() ?? []
-    }
-
-    public func deleteArchiveCollection(_ id: UUID) {
-        archiverService?.deleteCollection(id)
-    }
-
-    @discardableResult
-    public func preserveArchiveMilestone(
-        documentId: UUID,
-        title: String,
-        wordCount: Int = 0,
-        characterCount: Int = 0,
-        sessionCount: Int = 0,
-        daysStreak: Int = 0,
-        summary: String = "",
-        tags: [String] = []
-    ) -> ArchiveSnapshot? {
-        return archiverService?.preserveMilestone(
-            documentId: documentId,
-            title: title,
-            wordCount: wordCount,
-            characterCount: characterCount,
-            sessionCount: sessionCount,
-            daysStreak: daysStreak,
-            summary: summary,
-            tags: tags
-        )
-    }
-
-    public func getArchiveSnapshot(_ id: UUID) -> ArchiveSnapshot? {
-        return archiverService?.getSnapshot(id)
-    }
-
-    public func getArchiveSnapshots(forDocument documentId: UUID) -> [ArchiveSnapshot] {
-        return archiverService?.getSnapshots(forDocument: documentId) ?? []
-    }
-
-    public func listArchiveSnapshots() -> [ArchiveSnapshot] {
-        return archiverService?.listSnapshots() ?? []
-    }
-
-    public func organizeArchiveByTags(
-        _ documentIds: [UUID],
-        context: ArchiverContext = ArchiverContext()
-    ) async throws -> [UUID: [String]] {
-        guard let service = archiverService else { throw AIError.aiNotEnabled }
-        return try await service.organizeByTags(documentIds, context: context)
-    }
-
-    public func summarizeDocumentForArchive(_ documentId: UUID) async throws -> String {
-        guard let service = archiverService else { throw AIError.aiNotEnabled }
-        return try await service.summarizeDocument(documentId)
-    }
-
-    public func searchArchive(
-        _ query: String,
-        limit: Int = 10
-    ) -> (documents: [Document], snapshots: [ArchiveSnapshot], collections: [ArchiveCollection]) {
-        guard let service = archiverService else {
-            return (documents: [], snapshots: [], collections: [])
-        }
-        return service.search(query, limit: limit)
-    }
-
-    public func suggestRelatedArchived(to documentId: UUID, limit: Int = 5) async -> [Document] {
-        guard let service = archiverService else { return [] }
-        return await service.suggestRelated(to: documentId, limit: limit)
-    }
-
-    public func getArchiveStats() -> [String: Any] {
-        return archiverService?.getArchiveStats() ?? [:]
     }
 
     // MARK: - Settings Management
@@ -1238,7 +1136,12 @@ public class WritersApp {
         return try await ai.generateOutline(concept: concept, context: context)
     }
 
-    /// Develop a character concept
+    /// Generates a developed character description from a brief concept prompt.
+    /// - Parameters:
+    ///   - characterConcept: A short description or prompt describing the character to develop.
+    ///   - context: Optional AIContext with constraints, tone, or stylistic guidance for generation.
+    /// - Returns: A detailed character description or profile produced by the AI.
+    /// - Throws: `AIError.aiNotEnabled` if the AI service is not available.
     public func developCharacter(
         characterConcept: String,
         context: AIContext? = nil
@@ -1254,7 +1157,14 @@ public class WritersApp {
     ///   - context: Optional AI context to guide the tone transformation.
     ///   - replaceContent: If `true`, replaces the stored document content with the tone-shifted version.
     /// - Returns: The document text rewritten in the specified tone.
-    /// - Throws: `AIError.aiNotEnabled` if AI is not enabled; `AIError.documentNotFound` if the document cannot be found.
+    /// Transforms a document's text to the specified writing tone using the AI service.
+    /// - Parameters:
+    ///   - documentId: The identifier of the document to transform.
+    ///   - tone: The target `WritingTone` to apply.
+    ///   - context: Optional `AIContext` to guide the transformation.
+    ///   - replaceContent: If `true`, replaces and persists the document's stored content with the transformed text.
+    /// - Returns: The transformed document text.
+    /// - Throws: `AIError.aiNotEnabled` if AI features are disabled; `AIError.documentNotFound` if the document cannot be located; or any error propagated from the AI service or persistence operations.
     public func changeDocumentTone(
         documentId: UUID,
         tone: WritingTone,
@@ -1735,8 +1645,9 @@ public class WritersApp {
         let isContactStatus: (ProspectStatus) -> Bool = {
             $0 == .contacted || $0 == .replied || $0 == .meeting
         }
+        let previousStatus = prospectDatabase.getProspect(id: id)?.status
         try prospectDatabase.updateProspectStatus(id: id, status: status)
-        if isContactStatus(status) {
+        if isContactStatus(status) && !(previousStatus.map(isContactStatus) ?? false) {
             activeCoworkSession?.prospectsContacted += 1
         }
     }
