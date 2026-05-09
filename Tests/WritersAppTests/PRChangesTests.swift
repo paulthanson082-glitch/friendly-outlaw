@@ -594,3 +594,505 @@ final class HermesModelsTests: XCTestCase {
         XCTAssertEqual(response.ideas.count, 1)
     }
 }
+
+// MARK: - PR Changes: AIModel.maxhermes Removed
+
+final class AIModelMaxhermesRemovedTests: XCTestCase {
+
+    /// PR change: 'maxhermes-01' is no longer a valid AIModel raw value.
+    func testMaxhermesRawValueDecodesAsNil() {
+        let data = "\"maxhermes-01\"".data(using: .utf8)!
+        let decoded = try? JSONDecoder().decode(AIModel.self, from: data)
+        XCTAssertNil(decoded,
+            "AIModel must not decode 'maxhermes-01' after the maxhermes case was removed in this PR")
+    }
+
+    func testMaxhermesDisplayNameNotPresentInAnyModel() {
+        let displayNames = [
+            AIModel.claude35Sonnet.displayName,
+            AIModel.claude3Opus.displayName,
+            AIModel.claude3Sonnet.displayName,
+            AIModel.claude3Haiku.displayName,
+        ]
+        XCTAssertFalse(displayNames.contains("MaxHermes"),
+            "No remaining AIModel must have display name 'MaxHermes'")
+    }
+
+    /// All four remaining Claude models still encode/decode correctly.
+    func testRemainingModelsCodeableRoundTrip() throws {
+        let models: [AIModel] = [.claude35Sonnet, .claude3Opus, .claude3Sonnet, .claude3Haiku]
+        for model in models {
+            let data = try JSONEncoder().encode(model)
+            let decoded = try JSONDecoder().decode(AIModel.self, from: data)
+            XCTAssertEqual(decoded, model, "Codable round-trip failed for \(model.rawValue)")
+        }
+    }
+
+    func testAllFourModelsHaveUniqueRawValues() {
+        let rawValues = [
+            AIModel.claude35Sonnet.rawValue,
+            AIModel.claude3Opus.rawValue,
+            AIModel.claude3Sonnet.rawValue,
+            AIModel.claude3Haiku.rawValue,
+        ]
+        XCTAssertEqual(rawValues.count, Set(rawValues).count,
+            "All AIModel raw values must be unique")
+    }
+
+    func testAllFourModelsHaveUniqueDisplayNames() {
+        let names = [
+            AIModel.claude35Sonnet.displayName,
+            AIModel.claude3Opus.displayName,
+            AIModel.claude3Sonnet.displayName,
+            AIModel.claude3Haiku.displayName,
+        ]
+        XCTAssertEqual(names.count, Set(names).count,
+            "All AIModel display names must be unique")
+    }
+
+    /// Boundary: AIConfiguration's default model is still claude35Sonnet.
+    func testAIConfigurationDefaultModelIsNotMaxhermes() {
+        let config = AIConfiguration(apiKey: "key")
+        XCTAssertNotEqual(config.model.rawValue, "maxhermes-01")
+        XCTAssertEqual(config.model, .claude35Sonnet)
+    }
+}
+
+// MARK: - PR Changes: Document Synthesized Hashable (custom == and hash removed)
+
+final class DocumentSynthesizedHashablePRTests: XCTestCase {
+
+    /// After removing custom ==, two documents with same id but different content are NOT equal.
+    func testDocumentsWithSameIdDifferentContentAreNotEqual() {
+        let id = UUID()
+        let doc1 = Document(id: id, title: "Title", content: "Content A", category: .article)
+        let doc2 = Document(id: id, title: "Title", content: "Content B", category: .article)
+        XCTAssertNotEqual(doc1, doc2,
+            "PR removed custom ==; synthesized == compares all properties; different content → not equal")
+    }
+
+    /// After removing custom ==, two documents with same id but different title are NOT equal.
+    func testDocumentsWithSameIdDifferentTitleAreNotEqual() {
+        let id = UUID()
+        let doc1 = Document(id: id, title: "Title A", content: "Content", category: .article)
+        let doc2 = Document(id: id, title: "Title B", content: "Content", category: .article)
+        XCTAssertNotEqual(doc1, doc2,
+            "Synthesized == must compare title; different titles → not equal")
+    }
+
+    /// Two documents with all identical properties are equal.
+    func testDocumentsWithIdenticalPropertiesAreEqual() {
+        let id = UUID()
+        let fixedDate = Date(timeIntervalSince1970: 1_700_000_000)
+        var meta = DocumentMetadata()
+        meta.created = fixedDate
+        meta.modified = fixedDate
+        let doc1 = Document(id: id, title: "Same", content: "Same", category: .novel, metadata: meta)
+        let doc2 = Document(id: id, title: "Same", content: "Same", category: .novel, metadata: meta)
+        XCTAssertEqual(doc1, doc2)
+    }
+
+    /// Two documents with same id but different category are not equal (synthesized ==).
+    func testDocumentsWithSameIdDifferentCategoryAreNotEqual() {
+        let id = UUID()
+        let doc1 = Document(id: id, title: "T", content: "C", category: .article)
+        let doc2 = Document(id: id, title: "T", content: "C", category: .novel)
+        XCTAssertNotEqual(doc1, doc2)
+    }
+
+    /// Document can be used as Set member.
+    func testDocumentConformsToHashable() {
+        let id = UUID()
+        let fixedDate = Date(timeIntervalSince1970: 1_700_000_000)
+        var meta = DocumentMetadata()
+        meta.created = fixedDate
+        meta.modified = fixedDate
+        let doc = Document(id: id, title: "T", content: "C", category: .article, metadata: meta)
+        var docSet = Set<Document>()
+        docSet.insert(doc)
+        docSet.insert(doc)
+        XCTAssertEqual(docSet.count, 1, "Inserting same document twice must deduplicate in Set")
+    }
+
+    /// Two docs with same id but different content count as separate Set members.
+    func testDocumentsWithSameIdDifferentContentAreSeparateSetMembers() {
+        let id = UUID()
+        let doc1 = Document(id: id, title: "T", content: "Content A", category: .article)
+        let doc2 = Document(id: id, title: "T", content: "Content B", category: .article)
+        let docSet: Set<Document> = [doc1, doc2]
+        XCTAssertEqual(docSet.count, 2,
+            "Documents with same id but different content must be separate members after removing id-only hash")
+    }
+}
+
+// MARK: - PR Changes: HermesService AgentProfile and switchProfile Removed
+
+final class HermesServiceAgentProfileRemovedTests: XCTestCase {
+
+    var hermesService: HermesService!
+
+    override func setUp() {
+        super.setUp()
+        let config = AIConfiguration(apiKey: "test-key")
+        let aiService = AIService(configuration: config)
+        let documentManager = DocumentManager()
+        let templateManager = TemplateManager()
+        hermesService = HermesService(
+            aiService: aiService,
+            documentManager: documentManager,
+            templateManager: templateManager
+        )
+    }
+
+    override func tearDown() {
+        hermesService = nil
+        super.tearDown()
+    }
+
+    /// Verify session lifecycle still works (PR only removed AgentProfile, not sessions).
+    func testStartSessionCreatesAndStoresSession() {
+        let session = hermesService.startSession()
+        XCTAssertNotNil(hermesService.currentSession)
+        XCTAssertEqual(hermesService.currentSession?.id, session.id)
+    }
+
+    func testEndSessionClearsCurrentSession() {
+        _ = hermesService.startSession()
+        hermesService.endSession()
+        XCTAssertNil(hermesService.currentSession)
+    }
+
+    func testStartNewSessionReplacesOldSession() {
+        let first = hermesService.startSession()
+        let second = hermesService.startSession()
+        XCTAssertNotEqual(first.id, second.id)
+        XCTAssertEqual(hermesService.currentSession?.id, second.id)
+    }
+
+    /// getAllIdeas is still present (not removed in this PR).
+    func testGetAllIdeasStillWorks() {
+        let session = hermesService.startSession()
+        let ideas = hermesService.getAllIdeas(from: session)
+        XCTAssertTrue(ideas.isEmpty)
+    }
+
+    func testGetAllIdeasFilteredByTypeStillWorks() {
+        let session = hermesService.startSession()
+        let ideas = hermesService.getAllIdeas(from: session, filteredBy: .conflict)
+        XCTAssertTrue(ideas.isEmpty)
+    }
+
+    /// getSessionStats is still present (not removed in this PR).
+    func testGetSessionStatsStillWorks() {
+        let session = hermesService.startSession()
+        let stats = hermesService.getSessionStats(from: session)
+        XCTAssertEqual(stats.messageCount, 0)
+        XCTAssertEqual(stats.totalIdeas, 0)
+    }
+
+    /// maxHistoryMessages and maxPromptLength properties still present.
+    func testMaxHistoryMessagesProperty() {
+        XCTAssertEqual(hermesService.maxHistoryMessages, 30)
+    }
+
+    func testMaxPromptLengthProperty() {
+        XCTAssertEqual(hermesService.maxPromptLength, 4000)
+    }
+
+    /// Idea parsing (internal) still works after the removal.
+    func testParseIdeasFromNumberedListStillWorks() {
+        let text = """
+        1. [TWIST] The Hidden Traitor
+           Someone trusted is secretly working against the protagonist.
+        2. [SETTING] Underwater City
+           A city built on the ocean floor.
+        """
+        let ideas = hermesService.parseIdeas(from: text)
+        XCTAssertEqual(ideas.count, 2)
+        XCTAssertEqual(ideas[0].ideaType, .twist)
+        XCTAssertEqual(ideas[1].ideaType, .setting)
+    }
+
+    /// Boundary: Empty prompt causes parseIdeas to return [].
+    func testParseIdeasFromEmptyStringReturnsEmpty() {
+        let ideas = hermesService.parseIdeas(from: "")
+        XCTAssertTrue(ideas.isEmpty)
+    }
+}
+
+// MARK: - PR Changes: DocumentManager.searchDocuments Empty Query Returns All
+
+final class DocumentManagerSearchEmptyQueryPRTests: XCTestCase {
+
+    var manager: DocumentManager!
+
+    override func setUp() {
+        super.setUp()
+        manager = DocumentManager()
+    }
+
+    override func tearDown() {
+        manager = nil
+        super.tearDown()
+    }
+
+    /// PR change: empty query now returns all documents (was []).
+    func testEmptyQueryReturnsAllDocuments() {
+        manager.createDocument(Document(title: "A", content: "Content 1", category: .article))
+        manager.createDocument(Document(title: "B", content: "Content 2", category: .novel))
+        manager.createDocument(Document(title: "C", content: "Content 3", category: .essay))
+
+        let results = manager.searchDocuments(query: "")
+        XCTAssertEqual(results.count, 3,
+            "Empty query must return all documents after the PR change from returning []")
+    }
+
+    /// PR change: whitespace-only query also returns all.
+    func testWhitespaceQueryReturnsAllDocuments() {
+        manager.createDocument(Document(title: "Doc A", content: "C", category: .article))
+        manager.createDocument(Document(title: "Doc B", content: "C", category: .article))
+
+        let results = manager.searchDocuments(query: "   ")
+        XCTAssertEqual(results.count, 2,
+            "Whitespace-only query must return all documents")
+    }
+
+    /// No documents → empty query returns [].
+    func testEmptyQueryWithNoDocumentsReturnsEmpty() {
+        XCTAssertTrue(manager.searchDocuments(query: "").isEmpty)
+    }
+
+    /// Non-empty query still filters (regression check).
+    func testNonEmptyQueryFiltersNormally() {
+        manager.createDocument(Document(title: "Swift Programming", content: "Swift guide", category: .article))
+        manager.createDocument(Document(title: "Python Basics", content: "Python intro", category: .article))
+
+        let results = manager.searchDocuments(query: "Swift")
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.title, "Swift Programming")
+    }
+}
+
+// MARK: - PR Changes: IssueManager.searchIssues Empty Query Returns All
+
+final class IssueManagerSearchEmptyQueryPRTests: XCTestCase {
+
+    var manager: IssueManager!
+    let docId = UUID()
+
+    override func setUp() {
+        super.setUp()
+        manager = IssueManager()
+    }
+
+    override func tearDown() {
+        manager = nil
+        super.tearDown()
+    }
+
+    /// PR change: empty query now returns all issues (was []).
+    func testEmptyQueryReturnsAllIssues() {
+        manager.createIssue(Issue(documentId: docId, title: "Issue A", description: "Desc A"))
+        manager.createIssue(Issue(documentId: docId, title: "Issue B", description: "Desc B"))
+        manager.createIssue(Issue(documentId: docId, title: "Issue C", description: "Desc C"))
+
+        let results = manager.searchIssues(query: "")
+        XCTAssertEqual(results.count, 3,
+            "Empty query must return all issues after the PR change")
+    }
+
+    /// PR change: whitespace-only query also returns all.
+    func testWhitespaceQueryReturnsAllIssues() {
+        manager.createIssue(Issue(documentId: docId, title: "X", description: ""))
+        manager.createIssue(Issue(documentId: docId, title: "Y", description: ""))
+
+        let results = manager.searchIssues(query: "\t")
+        XCTAssertEqual(results.count, 2)
+    }
+
+    /// No issues → empty query returns [].
+    func testEmptyQueryWithNoIssuesReturnsEmpty() {
+        XCTAssertTrue(manager.searchIssues(query: "").isEmpty)
+    }
+
+    /// Non-empty query still filters normally (regression check).
+    func testNonEmptyQueryFiltersNormally() {
+        manager.createIssue(Issue(documentId: docId, title: "Plot hole", description: "Chapter 3 problem"))
+        manager.createIssue(Issue(documentId: docId, title: "Grammar", description: "Run-on sentences"))
+
+        let results = manager.searchIssues(query: "plot")
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.title, "Plot hole")
+    }
+}
+
+// MARK: - PR Changes: KanbanManager.searchTasks Empty Query Returns All
+
+final class KanbanManagerSearchEmptyQueryPRTests: XCTestCase {
+
+    var manager: KanbanManager!
+    var boardId: UUID!
+
+    override func setUp() {
+        super.setUp()
+        manager = KanbanManager()
+        let board = KanbanBoard(name: "Test Board")
+        boardId = board.id
+        manager.createBoard(board)
+    }
+
+    override func tearDown() {
+        manager = nil
+        boardId = nil
+        super.tearDown()
+    }
+
+    /// PR change: empty query now returns all tasks (was []).
+    func testEmptyQueryReturnsAllTasks() {
+        manager.createTask(KanbanTask(title: "Task 1", boardId: boardId))
+        manager.createTask(KanbanTask(title: "Task 2", boardId: boardId))
+        manager.createTask(KanbanTask(title: "Task 3", boardId: boardId))
+
+        let results = manager.searchTasks(query: "")
+        XCTAssertEqual(results.count, 3,
+            "Empty query must return all tasks after the PR change")
+    }
+
+    /// PR change: whitespace query also returns all.
+    func testWhitespaceQueryReturnsAllTasks() {
+        manager.createTask(KanbanTask(title: "Alpha", boardId: boardId))
+        manager.createTask(KanbanTask(title: "Beta", boardId: boardId))
+
+        let results = manager.searchTasks(query: "   ")
+        XCTAssertEqual(results.count, 2)
+    }
+
+    /// No tasks → empty query returns [].
+    func testEmptyQueryWithNoTasksReturnsEmpty() {
+        XCTAssertTrue(manager.searchTasks(query: "").isEmpty)
+    }
+
+    /// Non-empty query filters normally (regression check).
+    func testNonEmptyQueryFiltersNormally() {
+        manager.createTask(KanbanTask(title: "Write chapter", boardId: boardId))
+        manager.createTask(KanbanTask(title: "Review edits", boardId: boardId))
+
+        let results = manager.searchTasks(query: "chapter")
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.title, "Write chapter")
+    }
+
+    /// Empty query results are sorted by created descending.
+    func testEmptyQueryResultsSortedByCreatedDescending() {
+        manager.createTask(KanbanTask(title: "Earlier", boardId: boardId))
+        Thread.sleep(forTimeInterval: 0.01)
+        manager.createTask(KanbanTask(title: "Later", boardId: boardId))
+
+        let results = manager.searchTasks(query: "")
+        XCTAssertEqual(results.count, 2)
+        XCTAssertEqual(results.first?.title, "Later",
+            "Empty query results must be sorted by created descending")
+    }
+}
+
+// MARK: - PR Changes: DatabaseManager apiKey Now Saved Correctly
+
+final class DatabaseManagerAPIKeyPRTests: XCTestCase {
+
+    var dbManager: DatabaseManager!
+    let testUserId = UUID()
+
+    override func setUp() {
+        super.setUp()
+        dbManager = DatabaseManager(databasePath: ":memory:")
+    }
+
+    override func tearDown() {
+        dbManager = nil
+        super.tearDown()
+    }
+
+    /// PR change: apiKey is now saved correctly (was always stored as "").
+    func testSaveAndRetrieveAPIKeyIsPreserved() throws {
+        let apiKey = "sk-ant-test-key-correct-12345"
+        let config = AIConfiguration(
+            apiKey: apiKey,
+            model: .claude35Sonnet,
+            maxTokens: 2048,
+            temperature: 0.8
+        )
+
+        try dbManager.saveAIConfiguration(userId: testUserId, configuration: config)
+        let retrieved = try dbManager.getAIConfiguration(userId: testUserId)
+
+        XCTAssertNotNil(retrieved, "Saved configuration must be retrievable")
+        XCTAssertEqual(retrieved?.apiKey, apiKey,
+            "PR fixed empty-string bug: apiKey must now be stored and retrieved correctly")
+    }
+
+    /// Regression: confirm the old bug (empty string) is gone.
+    func testSavedAPIKeyIsNotEmptyString() throws {
+        let config = AIConfiguration(
+            apiKey: "sk-ant-real-key",
+            model: .claude3Opus,
+            maxTokens: 4096,
+            temperature: 0.7
+        )
+
+        try dbManager.saveAIConfiguration(userId: testUserId, configuration: config)
+        let retrieved = try dbManager.getAIConfiguration(userId: testUserId)
+
+        XCTAssertNotEqual(retrieved?.apiKey, "",
+            "The PR fixed saving empty string as apiKey; it must now save the actual key")
+    }
+
+    /// Model is preserved alongside the fixed apiKey.
+    func testSaveAndRetrieveModelAlongsideAPIKey() throws {
+        let config = AIConfiguration(apiKey: "any-key", model: .claude3Haiku, maxTokens: 1024, temperature: 0.5)
+        try dbManager.saveAIConfiguration(userId: testUserId, configuration: config)
+        let retrieved = try dbManager.getAIConfiguration(userId: testUserId)
+        XCTAssertEqual(retrieved?.model, .claude3Haiku)
+        XCTAssertEqual(retrieved?.apiKey, "any-key")
+    }
+
+    /// maxTokens is preserved correctly.
+    func testSaveAndRetrieveMaxTokensAlongsideAPIKey() throws {
+        let config = AIConfiguration(apiKey: "key", model: .claude35Sonnet, maxTokens: 8192, temperature: 0.3)
+        try dbManager.saveAIConfiguration(userId: testUserId, configuration: config)
+        let retrieved = try dbManager.getAIConfiguration(userId: testUserId)
+        XCTAssertEqual(retrieved?.maxTokens, 8192)
+    }
+
+    /// Temperature is preserved correctly.
+    func testSaveAndRetrieveTemperature() throws {
+        let config = AIConfiguration(apiKey: "key", model: .claude35Sonnet, maxTokens: 1024, temperature: 0.42)
+        try dbManager.saveAIConfiguration(userId: testUserId, configuration: config)
+        let retrieved = try dbManager.getAIConfiguration(userId: testUserId)
+        XCTAssertEqual(retrieved?.temperature ?? 0, 0.42, accuracy: 0.001)
+    }
+
+    /// Saving configuration for a second user does not overwrite the first.
+    func testSaveConfigurationsForMultipleUsersAreIndependent() throws {
+        let userId1 = UUID()
+        let userId2 = UUID()
+        let config1 = AIConfiguration(apiKey: "key-user-1", model: .claude35Sonnet, maxTokens: 1024, temperature: 0.5)
+        let config2 = AIConfiguration(apiKey: "key-user-2", model: .claude3Haiku, maxTokens: 512, temperature: 0.3)
+
+        try dbManager.saveAIConfiguration(userId: userId1, configuration: config1)
+        try dbManager.saveAIConfiguration(userId: userId2, configuration: config2)
+
+        let retrieved1 = try dbManager.getAIConfiguration(userId: userId1)
+        let retrieved2 = try dbManager.getAIConfiguration(userId: userId2)
+
+        XCTAssertEqual(retrieved1?.apiKey, "key-user-1")
+        XCTAssertEqual(retrieved2?.apiKey, "key-user-2")
+    }
+
+    /// Boundary: empty string apiKey is stored and retrieved as empty (not replaced).
+    func testEmptyAPIKeyStoredAsEmpty() throws {
+        let config = AIConfiguration(apiKey: "", model: .claude3Haiku, maxTokens: 1024, temperature: 0.5)
+        try dbManager.saveAIConfiguration(userId: testUserId, configuration: config)
+        let retrieved = try dbManager.getAIConfiguration(userId: testUserId)
+        XCTAssertEqual(retrieved?.apiKey, "")
+    }
+}
