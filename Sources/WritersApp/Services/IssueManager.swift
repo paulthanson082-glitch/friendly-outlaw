@@ -47,7 +47,7 @@ public class IssueManager {
     /// Searches issues by title or description
     public func searchIssues(query: String) -> [Issue] {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedQuery.isEmpty else { return [] }
+        guard !trimmedQuery.isEmpty else { return getAllIssues() }
 
         return issues.values.filter { issue in
             issue.title.localizedCaseInsensitiveContains(trimmedQuery) ||
