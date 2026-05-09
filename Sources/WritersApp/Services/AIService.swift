@@ -8,6 +8,14 @@ public class AIService {
     private let configuration: AIConfiguration
     private let apiURL = "https://api.anthropic.com/v1/messages"
 
+    // MARK: - Resilience & Performance
+    private let requestTimeoutSeconds: TimeInterval = 120
+    private let maxRetries: Int = 3
+    private let initialBackoffSeconds: TimeInterval = 1
+    private let requestDeduplicationQueue = DispatchQueue(label: "com.writersapp.ai.dedup", attributes: .concurrent)
+    private var pendingRequests: [String: Task<String, Error>] = [:]
+    private let lock = NSLock()
+
     internal var currentModel: String { configuration.model.rawValue }
     internal var apiKey: String { configuration.apiKey }
     internal var maxTokens: Int { configuration.maxTokens }
@@ -258,20 +266,88 @@ public class AIService {
     // MARK: - API Communication
 
     private func sendRequest(prompt: String) async throws -> String {
+        guard !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw AIServiceError.emptyPrompt
+        }
+
+        guard prompt.count <= 100000 else {
+            throw AIServiceError.promptTooLarge
+        }
+
+        let promptHash = hashPrompt(prompt)
+
+        let task: Task<String, Error>
+
+        lock.lock()
+        if let existingTask = pendingRequests[promptHash] {
+            lock.unlock()
+            return try await existingTask.value
+        }
+
+        task = Task {
+            try await sendRequestWithRetry(prompt: prompt, promptHash: promptHash)
+        }
+        pendingRequests[promptHash] = task
+        lock.unlock()
+
+        defer {
+            lock.lock()
+            pendingRequests.removeValue(forKey: promptHash)
+            lock.unlock()
+        }
+
+        return try await task.value
+    }
+
+    private func sendRequestWithRetry(prompt: String, promptHash: String) async throws -> String {
+        var lastError: AIServiceError?
+
+        for attempt in 0..<maxRetries {
+            do {
+                return try await sendRequestOnce(prompt: prompt)
+            } catch let error as AIServiceError {
+                lastError = error
+                if attempt < maxRetries - 1 {
+                    let backoffDelay = exponentialBackoff(attempt: attempt)
+                    try await Task.sleep(nanoseconds: UInt64(backoffDelay * 1_000_000_000))
+                }
+            }
+        }
+
+        throw lastError ?? AIServiceError.networkError(NSError(domain: "AIService", code: -1, userInfo: nil))
+    }
+
+    private func sendRequestOnce(prompt: String) async throws -> String {
         guard let url = URL(string: apiURL) else {
             throw AIServiceError.invalidURL
         }
 
-        let messages: [[String: Any]] = [["role": "user", "content": prompt]]
-        let request = try buildAPIURLRequest(url: url, messages: messages, toolDefinitions: [])
-        let (data, response) = try await URLSession.shared.data(for: request)
+        var urlRequest = try buildAPIURLRequest(url: url, messages: [["role": "user", "content": prompt]], toolDefinitions: [])
+
+        var config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = requestTimeoutSeconds
+        config.timeoutIntervalForResource = requestTimeoutSeconds * 2
+        config.waitsForConnectivity = true
+
+        let session = URLSession(configuration: config)
+        let (data, response) = try await session.data(for: urlRequest)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw AIServiceError.invalidResponse
         }
 
         guard httpResponse.statusCode == 200 else {
-            throw AIServiceError.apiError(statusCode: httpResponse.statusCode, message: "Request failed")
+            let errorMessage = parseErrorMessage(from: data) ?? "Request failed"
+            switch httpResponse.statusCode {
+            case 429:
+                throw AIServiceError.rateLimited
+            case 401, 403:
+                throw AIServiceError.unauthorized
+            case 500...599:
+                throw AIServiceError.serverError(statusCode: httpResponse.statusCode)
+            default:
+                throw AIServiceError.apiError(statusCode: httpResponse.statusCode, message: errorMessage)
+            }
         }
 
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -284,6 +360,31 @@ public class AIService {
         }
 
         return text
+    }
+
+    private func exponentialBackoff(attempt: Int) -> TimeInterval {
+        min(initialBackoffSeconds * pow(2, Double(attempt)), 30)
+    }
+
+    private func hashPrompt(_ prompt: String) -> String {
+        let data = prompt.data(using: .utf8) ?? Data()
+        let digest = data.withUnsafeBytes { ptr in
+            var hash: UInt64 = 5381
+            for byte in ptr {
+                hash = ((hash << 5) &+ hash) &+ UInt64(byte)
+            }
+            return hash
+        }
+        return String(digest)
+    }
+
+    private func parseErrorMessage(from data: Data) -> String? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let error = json["error"] as? [String: Any],
+              let message = error["message"] as? String else {
+            return nil
+        }
+        return message
     }
 
     // MARK: - Tool Loop
@@ -1089,6 +1190,11 @@ public enum AIServiceError: LocalizedError {
     case networkError(Error)
     case toolLoopExhausted(iterations: Int)
     case toolExecutionFailed(toolName: String, reason: String)
+    case emptyPrompt
+    case promptTooLarge
+    case rateLimited
+    case unauthorized
+    case serverError(statusCode: Int)
 
     public var errorDescription: String? {
         switch self {
@@ -1106,6 +1212,16 @@ public enum AIServiceError: LocalizedError {
             return "Tool loop exceeded maximum iterations (\(iterations))"
         case .toolExecutionFailed(let toolName, let reason):
             return "Tool '\(toolName)' execution failed: \(reason)"
+        case .emptyPrompt:
+            return "Prompt cannot be empty"
+        case .promptTooLarge:
+            return "Prompt exceeds maximum size (100,000 characters)"
+        case .rateLimited:
+            return "API rate limit exceeded, will retry"
+        case .unauthorized:
+            return "Unauthorized API access (check API key)"
+        case .serverError(let statusCode):
+            return "Server error (status \(statusCode)), will retry"
         }
     }
 }
