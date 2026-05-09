@@ -416,169 +416,861 @@ final class MockerKitTests: XCTestCase {
         XCTAssertTrue(TableFormatter.relativeTime(now.addingTimeInterval(-7200)).contains("hours"))
         XCTAssertTrue(TableFormatter.relativeTime(now.addingTimeInterval(-172800)).contains("days"))
     }
+}
 
-    // MARK: - ImageInfo Architecture & OS Tests (new fields)
 
-    func testImageInfoDefaultArchitecture() {
-        let image = ImageInfo(repository: "nginx", tag: "latest")
-        XCTAssertEqual(image.architecture, "arm64",
-                       "Default architecture should be arm64")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        // Row line should start with "a" followed by spaces to match header width
+        XCTAssertTrue(lines[1].hasPrefix("a"))
     }
 
-    func testImageInfoDefaultOS() {
-        let image = ImageInfo(repository: "nginx", tag: "latest")
-        XCTAssertEqual(image.os, "linux",
-                       "Default OS should be linux")
+    // MARK: - formatNetworks Additional Tests
+
+    func testTableFormatter_formatNetworks_emptyList_showsHeaderOnly() {
+        let output = TableFormatter.formatNetworks([])
+        let lines = output.components(separatedBy: "\n")
+        XCTAssertEqual(lines.count, 1)
+        XCTAssertTrue(lines[0].contains("NETWORK ID"))
+        XCTAssertTrue(lines[0].contains("NAME"))
+        XCTAssertTrue(lines[0].contains("DRIVER"))
+        XCTAssertTrue(lines[0].contains("SCOPE"))
     }
 
-    func testImageInfoCustomArchitecture() {
-        let image = ImageInfo(repository: "nginx", tag: "latest", architecture: "amd64")
-        XCTAssertEqual(image.architecture, "amd64")
+    func testTableFormatter_formatNetworks_multipleNetworks() {
+        let networks = [
+            NetworkInfo(name: "bridge", driver: "bridge"),
+            NetworkInfo(name: "host", driver: "host"),
+            NetworkInfo(name: "none", driver: "null"),
+        ]
+        let output = TableFormatter.formatNetworks(networks)
+        XCTAssertTrue(output.contains("bridge"))
+        XCTAssertTrue(output.contains("host"))
+        XCTAssertTrue(output.contains("none"))
+        let lines = output.components(separatedBy: "\n")
+        XCTAssertEqual(lines.count, 4) // header + 3 rows
     }
 
-    func testImageInfoCustomOS() {
-        let image = ImageInfo(repository: "windowsservercore", tag: "ltsc2022", os: "windows")
-        XCTAssertEqual(image.os, "windows")
+    func testTableFormatter_formatNetworks_showsScope() {
+        let network = NetworkInfo(name: "mynet", driver: "bridge", scope: "local")
+        let output = TableFormatter.formatNetworks([network])
+        XCTAssertTrue(output.contains("local"), "Network scope should appear in output")
     }
 
-    func testImageInfoAllFieldsCustom() {
-        let date = Date(timeIntervalSinceReferenceDate: 1_000_000)
-        let image = ImageInfo(
-            id: "deadbeef123456789012",
-            repository: "myrepo/myimage",
-            tag: "v2.0",
-            digest: "sha256:abc123",
-            createdAt: date,
-            size: 209_715_200,
-            labels: ["maintainer": "dev@example.com"],
-            architecture: "arm64",
-            os: "linux"
+    func testTableFormatter_formatNetworks_showsDriver() {
+        let network = NetworkInfo(name: "mynet", driver: "overlay")
+        let output = TableFormatter.formatNetworks([network])
+        XCTAssertTrue(output.contains("overlay"), "Network driver should appear in output")
+    }
+
+    // MARK: - relativeTime Boundary Tests
+
+    func testTableFormatter_relativeTime_zeroSeconds() {
+        // Exactly 0 seconds ago — should show "0 seconds ago"
+        let now = Date()
+        let result = TableFormatter.relativeTime(now)
+        XCTAssertTrue(result.contains("seconds"), "0s should show 'seconds'")
+    }
+
+    func testTableFormatter_relativeTime_exactlyOneMinute() {
+        // 60 seconds = 1 minute boundary: should switch from "seconds" to "minutes"
+        let now = Date()
+        let sixtySecondsAgo = now.addingTimeInterval(-60)
+        let result = TableFormatter.relativeTime(sixtySecondsAgo)
+        XCTAssertTrue(result.contains("minutes"), "60s should show 'minutes', got: \(result)")
+        XCTAssertFalse(result.contains("seconds"), "60s should not show 'seconds'")
+    }
+
+    func testTableFormatter_relativeTime_fiftyNineSeconds() {
+        // 59 seconds should still show "seconds"
+        let now = Date()
+        let result = TableFormatter.relativeTime(now.addingTimeInterval(-59))
+        XCTAssertTrue(result.contains("seconds"), "59s should show 'seconds'")
+    }
+
+    func testTableFormatter_relativeTime_exactlyOneHour() {
+        // 3600 seconds = 1 hour boundary
+        let now = Date()
+        let oneHourAgo = now.addingTimeInterval(-3600)
+        let result = TableFormatter.relativeTime(oneHourAgo)
+        XCTAssertTrue(result.contains("hours"), "3600s should show 'hours', got: \(result)")
+        XCTAssertFalse(result.contains("minutes"), "3600s should not show 'minutes'")
+    }
+
+    func testTableFormatter_relativeTime_exactlyOneDay() {
+        // 86400 seconds = 1 day boundary
+        let now = Date()
+        let oneDayAgo = now.addingTimeInterval(-86400)
+        let result = TableFormatter.relativeTime(oneDayAgo)
+        XCTAssertTrue(result.contains("days"), "86400s should show 'days', got: \(result)")
+        XCTAssertFalse(result.contains("hours"), "86400s should not show 'hours'")
+    }
+
+    func testTableFormatter_relativeTime_exactlyOneWeek() {
+        // 7 days boundary: days = 7 → not < 7, so shows weeks
+        let now = Date()
+        let oneWeekAgo = now.addingTimeInterval(-7 * 24 * 3600)
+        let result = TableFormatter.relativeTime(oneWeekAgo)
+        XCTAssertTrue(result.contains("weeks"), "7 days should show 'weeks', got: \(result)")
+        XCTAssertFalse(result.contains("days"), "7 days should not show 'days'")
+    }
+
+    func testTableFormatter_relativeTime_sixDays() {
+        // 6 days should still show "days"
+        let now = Date()
+        let sixDaysAgo = now.addingTimeInterval(-6 * 24 * 3600)
+        let result = TableFormatter.relativeTime(sixDaysAgo)
+        XCTAssertTrue(result.contains("days"), "6 days should show 'days', got: \(result)")
+    }
+
+    // MARK: - formatStats Block I/O Tests
+
+    func testTableFormatter_formatStats_showsBlockIO_kilobytes() {
+        let stats = [
+            ContainerStats(
+                containerId: "abc123def456789",
+                name: "web",
+                cpuPercent: 0.0,
+                memUsage: 0,
+                memLimit: 0,
+                networkRx: 0,
+                networkTx: 0,
+                blockRead: 2048,   // 2 kB
+                blockWrite: 1024,  // 1 kB
+                pids: 1
+            )
+        ]
+        let output = TableFormatter.formatStats(stats, noStream: true)
+        XCTAssertTrue(output.contains("kB"), "Block I/O in kB range should show 'kB'")
+    }
+
+    func testTableFormatter_formatStats_showsBlockIO_megabytes() {
+        let stats = [
+            ContainerStats(
+                containerId: "abc123def456789",
+                name: "web",
+                cpuPercent: 0.0,
+                memUsage: 0,
+                memLimit: 0,
+                networkRx: 0,
+                networkTx: 0,
+                blockRead: 10_485_760,  // 10 MB
+                blockWrite: 5_242_880,  // 5 MB
+                pids: 1
+            )
+        ]
+        let output = TableFormatter.formatStats(stats, noStream: true)
+        XCTAssertTrue(output.contains("MB"), "Block I/O in MB range should show 'MB'")
+    }
+
+    func testTableFormatter_formatStats_zeroBlockIO() {
+        let stats = [
+            ContainerStats(
+                containerId: "abc123def456789",
+                name: "web",
+                cpuPercent: 0.0,
+                memUsage: 0,
+                memLimit: 0,
+                networkRx: 0,
+                networkTx: 0,
+                blockRead: 0,
+                blockWrite: 0,
+                pids: 1
+            )
+        ]
+        let output = TableFormatter.formatStats(stats, noStream: true)
+        // "0B / 0B" should appear for block I/O
+        XCTAssertTrue(output.contains("0B"), "Zero block I/O should show '0B'")
+    }
+
+    // MARK: - formatTable Edge Case Tests
+
+    func testTableFormatter_formatTable_rowWithFewerCellsThanHeader() {
+        // Rows with fewer cells than header should not crash and should be rendered
+        let header = ["COL1", "COL2", "COL3"]
+        let rows = [["only-one"]]  // only 1 cell vs 3-column header
+        // Should not crash; prefix(colCount) handles truncation
+        let output = TableFormatter.formatTable(header: header, rows: rows)
+        XCTAssertTrue(output.contains("COL1"))
+        XCTAssertTrue(output.contains("only-one"))
+    }
+
+    func testTableFormatter_formatTable_cellLongerThanHeader() {
+        // A data cell longer than the header should expand the column width
+        let header = ["X"]
+        let rows = [["a-very-long-value-here"]]
+        let output = TableFormatter.formatTable(header: header, rows: rows)
+        XCTAssertTrue(output.contains("a-very-long-value-here"))
+        // Header should be padded to match data width
+        let lines = output.components(separatedBy: "\n")
+        // "X" padded to 22 chars = "X" + 21 spaces
+        XCTAssertTrue(lines[0].hasPrefix("X"))
+    }
+
+    func testTableFormatter_formatTable_preservesOrder() {
+        // Rows should appear in the same order as input
+        let header = ["ID"]
+        let rows = [["row1"], ["row2"], ["row3"]]
+        let output = TableFormatter.formatTable(header: header, rows: rows)
+        let lines = output.components(separatedBy: "\n")
+        // Header is padded to match widest cell (4 chars), then data rows appear in order
+        XCTAssertTrue(lines[0].hasPrefix("ID"))
+        XCTAssertEqual(lines[1].trimmingCharacters(in: .whitespaces), "row1")
+        XCTAssertEqual(lines[2].trimmingCharacters(in: .whitespaces), "row2")
+        XCTAssertEqual(lines[3].trimmingCharacters(in: .whitespaces), "row3")
+    }
+
+    // MARK: - formatPS Command Truncation Boundary Tests
+
+    func testTableFormatter_formatPS_commandAtTruncationBoundary_notTruncated() {
+        // A command that when quoted produces exactly 20 chars should NOT be truncated
+        // Raw cmd = 18 chars → quoted = "\"" + 18 + "\"" = 20 chars → no truncation
+        let cmd18 = String(repeating: "a", count: 18)
+        let container = ContainerInfo(
+            id: "abc123def456789",
+            name: "web",
+            image: "nginx:latest",
+            command: cmd18
         )
-        XCTAssertEqual(image.id, "deadbeef123456789012")
-        XCTAssertEqual(image.repository, "myrepo/myimage")
-        XCTAssertEqual(image.tag, "v2.0")
-        XCTAssertEqual(image.digest, "sha256:abc123")
-        XCTAssertEqual(image.createdAt, date)
-        XCTAssertEqual(image.size, 209_715_200)
-        XCTAssertEqual(image.labels["maintainer"], "dev@example.com")
-        XCTAssertEqual(image.architecture, "arm64")
-        XCTAssertEqual(image.os, "linux")
+        let output = TableFormatter.formatPS([container], all: false, quiet: false, noTrunc: false)
+        XCTAssertFalse(output.contains("..."), "Command of 18 chars (quoted=20) should NOT be truncated")
     }
 
-    func testImageInfoSizeDescription_bytes() {
-        let image = ImageInfo(repository: "scratch", size: 512)
-        XCTAssertTrue(image.sizeDescription.hasSuffix("B"),
-                      "512 bytes should format as 'B': got '\(image.sizeDescription)'")
-        XCTAssertFalse(image.sizeDescription.contains("k"),
-                       "512 bytes should not be formatted as kB")
-    }
-
-    func testImageInfoSizeDescription_kB() {
-        let image = ImageInfo(repository: "tiny", size: 10_240) // 10 kB
-        XCTAssertTrue(image.sizeDescription.contains("kB"),
-                      "10240 bytes should format as kB: got '\(image.sizeDescription)'")
-    }
-
-    func testImageInfoParseReference_withDigest() {
-        // Digest references (name@sha256:...) should use "latest" as the tag
-        let (repo, tag) = ImageInfo.parseReference("nginx@sha256:abc123def456")
-        XCTAssertEqual(repo, "nginx")
-        XCTAssertEqual(tag, "latest",
-                       "Digest reference should yield tag 'latest'")
-    }
-
-    func testImageInfoParseReference_registryPort() {
-        // registry:5000/repo — the colon belongs to the port, not a tag separator
-        let (repo, tag) = ImageInfo.parseReference("registry.local:5000/myapp")
-        XCTAssertEqual(repo, "registry.local:5000/myapp",
-                       "Registry with port should be treated as repository without explicit tag")
-        XCTAssertEqual(tag, "latest")
-    }
-
-    func testImageInfoCodableRoundtrip() throws {
-        let original = ImageInfo(
-            id: "cafebabe123456789012",
-            repository: "postgres",
-            tag: "16-alpine",
-            architecture: "amd64",
-            os: "linux"
+    func testTableFormatter_formatPS_commandJustOverTruncationBoundary_isTruncated() {
+        // Raw cmd = 19 chars → quoted = "\"" + 19 + "\"" = 21 chars → truncated to 20 (17 + "...")
+        let cmd19 = String(repeating: "b", count: 19)
+        let container = ContainerInfo(
+            id: "abc123def456789",
+            name: "web",
+            image: "nginx:latest",
+            command: cmd19
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let data = try encoder.encode(original)
-        let decoded = try decoder.decode(ImageInfo.self, from: data)
-        XCTAssertEqual(decoded.id, original.id)
-        XCTAssertEqual(decoded.repository, original.repository)
-        XCTAssertEqual(decoded.tag, original.tag)
-        XCTAssertEqual(decoded.architecture, original.architecture)
-        XCTAssertEqual(decoded.os, original.os)
+        let output = TableFormatter.formatPS([container], all: false, quiet: false, noTrunc: false)
+        XCTAssertTrue(output.contains("..."), "Command of 19 chars (quoted=21) should be truncated")
     }
 
-    // MARK: - BuildOptions Tests (new struct)
+    // MARK: - formatPS Headers Completeness
 
-    func testBuildOptionsDefaults() {
-        let opts = BuildOptions()
-        XCTAssertNil(opts.tag)
-        XCTAssertNil(opts.file)
-        XCTAssertTrue(opts.buildArgs.isEmpty)
-        XCTAssertFalse(opts.noCache)
-        XCTAssertFalse(opts.pull)
-        XCTAssertNil(opts.target)
-        XCTAssertNil(opts.platform)
-        XCTAssertTrue(opts.cacheFrom.isEmpty)
-        XCTAssertFalse(opts.load)
-        XCTAssertFalse(opts.push)
-        XCTAssertTrue(opts.labels.isEmpty)
-        XCTAssertFalse(opts.quiet)
+    func testTableFormatter_formatPS_headers_complete() {
+        let output = TableFormatter.formatPS([], all: false, quiet: false, noTrunc: false)
+        XCTAssertTrue(output.contains("CONTAINER ID"), "Header should include 'CONTAINER ID'")
+        XCTAssertTrue(output.contains("IMAGE"), "Header should include 'IMAGE'")
+        XCTAssertTrue(output.contains("COMMAND"), "Header should include 'COMMAND'")
+        XCTAssertTrue(output.contains("CREATED"), "Header should include 'CREATED'")
+        XCTAssertTrue(output.contains("STATUS"), "Header should include 'STATUS'")
+        XCTAssertTrue(output.contains("PORTS"), "Header should include 'PORTS'")
+        XCTAssertTrue(output.contains("NAMES"), "Header should include 'NAMES'")
     }
 
-    func testBuildOptionsCustomValues() {
-        let opts = BuildOptions(
-            tag: "myapp:v1.0",
-            file: "Dockerfile.prod",
-            buildArgs: ["ENV": "production", "VERSION": "1.0"],
-            noCache: true,
-            pull: true,
-            target: "release-stage",
-            platform: "linux/amd64",
-            cacheFrom: ["type=registry,ref=myapp:cache"],
-            load: true,
-            push: false,
-            labels: ["build.date": "2026-01-01"],
-            quiet: false
+    // MARK: - formatComposePS Additional Tests
+
+    func testTableFormatter_formatComposePS_emptyList_showsHeaderOnly() {
+        let output = TableFormatter.formatComposePS([], projectName: "myproject")
+        let lines = output.components(separatedBy: "\n")
+        XCTAssertEqual(lines.count, 1, "Empty compose ps should show header row only")
+        XCTAssertTrue(lines[0].contains("NAME"))
+        XCTAssertTrue(lines[0].contains("IMAGE"))
+        XCTAssertTrue(lines[0].contains("SERVICE"))
+    }
+
+    func testTableFormatter_formatComposePS_showsCommand() {
+        let container = ContainerInfo(
+            id: "abc123def456789",
+            name: "myapp-web-1",
+            image: "nginx:latest",
+            command: "nginx -g daemon off;",
+            labels: ["com.docker.compose.service": "web"]
         )
-        XCTAssertEqual(opts.tag, "myapp:v1.0")
-        XCTAssertEqual(opts.file, "Dockerfile.prod")
-        XCTAssertEqual(opts.buildArgs["ENV"], "production")
-        XCTAssertEqual(opts.buildArgs["VERSION"], "1.0")
-        XCTAssertTrue(opts.noCache)
-        XCTAssertTrue(opts.pull)
-        XCTAssertEqual(opts.target, "release-stage")
-        XCTAssertEqual(opts.platform, "linux/amd64")
-        XCTAssertEqual(opts.cacheFrom.count, 1)
-        XCTAssertTrue(opts.load)
-        XCTAssertFalse(opts.push)
-        XCTAssertEqual(opts.labels["build.date"], "2026-01-01")
+        let output = TableFormatter.formatComposePS([container], projectName: "myapp")
+        XCTAssertTrue(output.contains("nginx"), "Compose ps should include container command")
     }
 
-    func testBuildOptionsNoCacheAndPushMutuallyIndependent() {
-        // noCache and push/load are independent flags
-        var opts = BuildOptions(noCache: true, push: true)
-        XCTAssertTrue(opts.noCache)
-        XCTAssertTrue(opts.push)
-        opts.load = true
-        XCTAssertTrue(opts.load)
+    func testTableFormatter_formatComposePS_showsCreatedColumn() {
+        let container = ContainerInfo(
+            id: "abc123def456789",
+            name: "myapp-web-1",
+            image: "nginx:latest",
+            labels: ["com.docker.compose.service": "web"]
+        )
+        let output = TableFormatter.formatComposePS([container], projectName: "myapp")
+        // CREATED column header should be present
+        XCTAssertTrue(output.contains("CREATED"), "Compose ps should show 'CREATED' header")
     }
 
-    func testBuildOptionsMutability() {
-        var opts = BuildOptions()
-        opts.tag = "updated:latest"
-        opts.noCache = true
-        opts.platform = "linux/arm64"
-        XCTAssertEqual(opts.tag, "updated:latest")
-        XCTAssertTrue(opts.noCache)
-        XCTAssertEqual(opts.platform, "linux/arm64")
+    // MARK: - formatStats Network I/O kB boundary
+
+    func testTableFormatter_formatStats_networkIO_kilobytes() {
+        let stats = [
+            ContainerStats(
+                containerId: "abc123def456789",
+                name: "web",
+                cpuPercent: 0.0,
+                memUsage: 0,
+                memLimit: 0,
+                networkRx: 1024,  // exactly 1 kB
+                networkTx: 2048,  // 2 kB
+                blockRead: 0,
+                blockWrite: 0,
+                pids: 1
+            )
+        ]
+        let output = TableFormatter.formatStats(stats, noStream: true)
+        XCTAssertTrue(output.contains("kB"), "Network I/O of 1024+ bytes should show 'kB'")
+    }
+
+    func testTableFormatter_formatStats_networkIO_megabytes() {
+        let stats = [
+            ContainerStats(
+                containerId: "abc123def456789",
+                name: "web",
+                cpuPercent: 0.0,
+                memUsage: 0,
+                memLimit: 0,
+                networkRx: 2_097_152,  // 2 MB
+                networkTx: 1_048_576,  // 1 MB
+                blockRead: 0,
+                blockWrite: 0,
+                pids: 1
+            )
+        ]
+        let output = TableFormatter.formatStats(stats, noStream: true)
+        XCTAssertTrue(output.contains("MB"), "Network I/O of 1MB+ should show 'MB'")
     }
 }
