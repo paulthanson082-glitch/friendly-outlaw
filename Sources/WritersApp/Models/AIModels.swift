@@ -28,7 +28,6 @@ public enum AIModel: String, Codable {
     case claude3Opus = "claude-3-opus-20240229"
     case claude3Sonnet = "claude-3-sonnet-20240229"
     case claude3Haiku = "claude-3-haiku-20240307"
-    case maxhermes = "maxhermes-01"
 
     public var displayName: String {
         switch self {
@@ -36,7 +35,6 @@ public enum AIModel: String, Codable {
         case .claude3Opus: return "Claude 3 Opus"
         case .claude3Sonnet: return "Claude 3 Sonnet"
         case .claude3Haiku: return "Claude 3 Haiku"
-        case .maxhermes: return "MaxHermes"
         }
     }
 }
