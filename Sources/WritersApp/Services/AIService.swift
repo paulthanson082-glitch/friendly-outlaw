@@ -627,7 +627,7 @@ public class AIService {
             guard block["type"] as? String == "text" else { return nil }
             return block["text"] as? String
         }
-        return textParts.isEmpty ? nil : textParts.joined(separator: " ")
+        return textParts.isEmpty ? nil : textParts.joined()
     }
 
     /// Executes all tool_use blocks found in an assistant response and returns their results.
