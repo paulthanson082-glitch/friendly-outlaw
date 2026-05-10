@@ -6,13 +6,15 @@ public final class NvidiaAPILogger {
 
     // MARK: - Public constants
 
-    public static let envFilePath = (
-        "~/.local/share/claude-free/.env" as NSString
-    ).expandingTildeInPath
+    public static let envFilePath: String = {
+        let raw = "~/.local/share/claude-free/.env"
+        return (raw as NSString).expandingTildeInPath
+    }()
 
-    public static let logFilePath = (
-        "~/.local/share/claude-free/proxy.log" as NSString
-    ).expandingTildeInPath
+    public static let logFilePath: String = {
+        let raw = "~/.local/share/claude-free/proxy.log"
+        return (raw as NSString).expandingTildeInPath
+    }()
 
     // MARK: - Properties
 
@@ -43,14 +45,6 @@ public final class NvidiaAPILogger {
     // MARK: - Logging
 
     /// Log a completed NVIDIA API request.
-    ///
-    /// - Parameters:
-    ///   - endpoint: The API path (e.g. `/v1/chat/completions`).
-    ///   - model: The model name used in the request.
-    ///   - promptTokens: Number of tokens in the prompt.
-    ///   - completionTokens: Number of tokens in the completion.
-    ///   - statusCode: HTTP status code returned by the API.
-    ///   - latencyMs: Round-trip time in milliseconds.
     public func log(
         endpoint: String,
         model: String,
@@ -59,28 +53,16 @@ public final class NvidiaAPILogger {
         statusCode: Int,
         latencyMs: Double
     ) {
-        let entry = """
-        [\(timestamp())] status=\(statusCode) model=\(model) \
-        endpoint=\(endpoint) prompt_tokens=\(promptTokens) \
-        completion_tokens=\(completionTokens) latency_ms=\(String(format: "%.1f", latencyMs))
-        """
+        let latencyStr = String(format: "%.1f", latencyMs)
+        let entry = "[\(timestamp())] status=\(statusCode) model=\(model)"
+            + " endpoint=\(endpoint) prompt_tokens=\(promptTokens)"
+            + " completion_tokens=\(completionTokens) latency_ms=\(latencyStr)"
         write(line: entry)
     }
 
     /// Log an NVIDIA API error.
-    ///
-    /// - Parameters:
-    ///   - endpoint: The API path attempted.
-    ///   - model: The model name used in the request.
-    ///   - error: Human-readable error description.
-    public func logError(
-        endpoint: String,
-        model: String,
-        error: String
-    ) {
-        let entry = """
-        [\(timestamp())] ERROR model=\(model) endpoint=\(endpoint) error=\(error)
-        """
+    public func logError(endpoint: String, model: String, error: String) {
+        let entry = "[\(timestamp())] ERROR model=\(model) endpoint=\(endpoint) error=\(error)"
         write(line: entry)
     }
 
@@ -94,13 +76,13 @@ public final class NvidiaAPILogger {
         lock.lock()
         defer { lock.unlock() }
 
-        let data = (line + "\n").data(using: .utf8) ?? Data()
+        guard let data = (line + "\n").data(using: .utf8) else { return }
 
         if FileManager.default.fileExists(atPath: logURL.path) {
             if let handle = try? FileHandle(forWritingTo: logURL) {
-                handle.seekToEndOfFile()
-                handle.write(data)
-                handle.closeFile()
+                _ = try? handle.seekToEnd()
+                try? handle.write(contentsOf: data)
+                try? handle.close()
             }
         } else {
             try? data.write(to: logURL, options: .atomic)
@@ -117,7 +99,7 @@ public final class NvidiaAPILogger {
 
     /// Parse `KEY=value` lines from a .env file, returning the value for
     /// `NVIDIA_API_KEY` (strips surrounding quotes if present).
-    static func readAPIKey(from path: String) -> String? {
+    internal static func readAPIKey(from path: String) -> String? {
         guard let contents = try? String(contentsOfFile: path, encoding: .utf8) else {
             return nil
         }
@@ -125,7 +107,6 @@ public final class NvidiaAPILogger {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             guard !trimmed.hasPrefix("#"), trimmed.hasPrefix("NVIDIA_API_KEY=") else { continue }
             var value = String(trimmed.dropFirst("NVIDIA_API_KEY=".count))
-            // Strip optional surrounding quotes
             if (value.hasPrefix("\"") && value.hasSuffix("\"")) ||
                (value.hasPrefix("'") && value.hasSuffix("'")) {
                 value = String(value.dropFirst().dropLast())
@@ -139,8 +120,7 @@ public final class NvidiaAPILogger {
 // MARK: - NvidiaAIService
 
 /// Thin wrapper around NVIDIA's OpenAI-compatible NIM API.
-///
-/// All requests and errors are automatically forwarded to `NvidiaAPILogger`.
+/// All requests and errors are forwarded to `NvidiaAPILogger`.
 public class NvidiaAIService {
 
     private static let baseURL = "https://integrate.api.nvidia.com/v1"
@@ -150,10 +130,6 @@ public class NvidiaAIService {
     private let model: String
     private let logger: NvidiaAPILogger
 
-    /// - Parameters:
-    ///   - apiKey: NVIDIA API key; defaults to the key found in the .env file.
-    ///   - model: NIM model identifier (default: `meta/llama-3.1-8b-instruct`).
-    ///   - logger: Logger to use; defaults to a new `NvidiaAPILogger`.
     public init(
         apiKey: String? = nil,
         model: String = "meta/llama-3.1-8b-instruct",
@@ -170,11 +146,6 @@ public class NvidiaAIService {
     }
 
     /// Send a chat completion request to NVIDIA NIM and return the response text.
-    ///
-    /// - Parameters:
-    ///   - messages: Array of `{role, content}` dictionaries.
-    ///   - maxTokens: Maximum tokens in the completion.
-    ///   - temperature: Sampling temperature.
     public func chatCompletion(
         messages: [[String: String]],
         maxTokens: Int = 1024,
@@ -207,15 +178,13 @@ public class NvidiaAIService {
         }
 
         guard http.statusCode == 200 else {
-            let msg = (try? JSONSerialization.jsonObject(with: data))
-                .flatMap { $0 as? [String: Any] }
-                .flatMap { $0["error"] as? [String: Any] }
-                .flatMap { $0["message"] as? String } ?? "HTTP \(http.statusCode)"
+            let msg = extractErrorMessage(from: data) ?? "HTTP \(http.statusCode)"
             logger.logError(endpoint: Self.chatEndpoint, model: model, error: msg)
             throw NvidiaAIError.apiError(statusCode: http.statusCode, message: msg)
         }
 
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+        guard let rawJSON = try? JSONSerialization.jsonObject(with: data),
+              let json = rawJSON as? [String: Any],
               let choices = json["choices"] as? [[String: Any]],
               let first = choices.first,
               let message = first["message"] as? [String: Any],
@@ -238,6 +207,16 @@ public class NvidiaAIService {
         )
 
         return content
+    }
+
+    private func extractErrorMessage(from data: Data) -> String? {
+        guard let raw = try? JSONSerialization.jsonObject(with: data),
+              let dict = raw as? [String: Any],
+              let errObj = dict["error"] as? [String: Any],
+              let msg = errObj["message"] as? String else {
+            return nil
+        }
+        return msg
     }
 }
 

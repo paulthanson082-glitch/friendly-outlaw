@@ -198,7 +198,7 @@ final class NvidiaAPILoggerTests: XCTestCase {
     }
 }
 
-extension NvidiaAIError: Equatable {
+extension NvidiaAIError: @retroactive Equatable {
     public static func == (lhs: NvidiaAIError, rhs: NvidiaAIError) -> Bool {
         switch (lhs, rhs) {
         case (.missingAPIKey, .missingAPIKey): return true
