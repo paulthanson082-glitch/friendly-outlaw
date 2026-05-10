@@ -207,7 +207,8 @@ public class NvidiaAIService {
         }
 
         guard http.statusCode == 200 else {
-            let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])
+            let msg = (try? JSONSerialization.jsonObject(with: data))
+                .flatMap { $0 as? [String: Any] }
                 .flatMap { $0["error"] as? [String: Any] }
                 .flatMap { $0["message"] as? String } ?? "HTTP \(http.statusCode)"
             logger.logError(endpoint: Self.chatEndpoint, model: model, error: msg)
