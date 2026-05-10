@@ -1,0 +1,246 @@
+import Foundation
+
+/// Reads the NVIDIA API key from ~/.local/share/claude-free/.env and logs
+/// all NVIDIA NIM API interactions to ~/.local/share/claude-free/proxy.log.
+public final class NvidiaAPILogger {
+
+    // MARK: - Public constants
+
+    public static let envFilePath: String = {
+        let raw = "~/.local/share/claude-free/.env"
+        return (raw as NSString).expandingTildeInPath
+    }()
+
+    public static let logFilePath: String = {
+        let raw = "~/.local/share/claude-free/proxy.log"
+        return (raw as NSString).expandingTildeInPath
+    }()
+
+    // MARK: - Properties
+
+    /// The NVIDIA API key read from the .env file, or nil if not configured.
+    public let apiKey: String?
+
+    private let logURL: URL
+    private let lock = NSLock()
+
+    private static let iso8601: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
+    // MARK: - Initialisation
+
+    public init(
+        envPath: String = NvidiaAPILogger.envFilePath,
+        logPath: String = NvidiaAPILogger.logFilePath
+    ) {
+        apiKey = NvidiaAPILogger.readAPIKey(from: envPath)
+        logURL = URL(fileURLWithPath: logPath)
+        ensureLogDirectoryExists()
+    }
+
+    // MARK: - Logging
+
+    /// Log a completed NVIDIA API request.
+    public func log(
+        endpoint: String,
+        model: String,
+        promptTokens: Int,
+        completionTokens: Int,
+        statusCode: Int,
+        latencyMs: Double
+    ) {
+        let latencyStr = String(format: "%.1f", latencyMs)
+        let entry = "[\(timestamp())] status=\(statusCode) model=\(model)"
+            + " endpoint=\(endpoint) prompt_tokens=\(promptTokens)"
+            + " completion_tokens=\(completionTokens) latency_ms=\(latencyStr)"
+        write(line: entry)
+    }
+
+    /// Log an NVIDIA API error.
+    public func logError(endpoint: String, model: String, error: String) {
+        let entry = "[\(timestamp())] ERROR model=\(model) endpoint=\(endpoint) error=\(error)"
+        write(line: entry)
+    }
+
+    // MARK: - Private helpers
+
+    private func timestamp() -> String {
+        NvidiaAPILogger.iso8601.string(from: Date())
+    }
+
+    private func write(line: String) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard let data = (line + "\n").data(using: .utf8) else { return }
+
+        if FileManager.default.fileExists(atPath: logURL.path) {
+            if let handle = try? FileHandle(forWritingTo: logURL) {
+                _ = try? handle.seekToEnd()
+                try? handle.write(contentsOf: data)
+                try? handle.close()
+            }
+        } else {
+            try? data.write(to: logURL, options: .atomic)
+        }
+    }
+
+    private func ensureLogDirectoryExists() {
+        let dir = logURL.deletingLastPathComponent().path
+        try? FileManager.default.createDirectory(
+            atPath: dir,
+            withIntermediateDirectories: true
+        )
+    }
+
+    /// Parse `KEY=value` lines from a .env file, returning the value for
+    /// `NVIDIA_API_KEY` (strips surrounding quotes if present).
+    internal static func readAPIKey(from path: String) -> String? {
+        guard let contents = try? String(contentsOfFile: path, encoding: .utf8) else {
+            return nil
+        }
+        for line in contents.components(separatedBy: .newlines) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.hasPrefix("#"), trimmed.hasPrefix("NVIDIA_API_KEY=") else { continue }
+            var value = String(trimmed.dropFirst("NVIDIA_API_KEY=".count))
+            if (value.hasPrefix("\"") && value.hasSuffix("\"")) ||
+               (value.hasPrefix("'") && value.hasSuffix("'")) {
+                value = String(value.dropFirst().dropLast())
+            }
+            return value.isEmpty ? nil : value
+        }
+        return nil
+    }
+}
+
+// MARK: - NvidiaAIService
+
+/// Thin wrapper around NVIDIA's OpenAI-compatible NIM API.
+/// All requests and errors are forwarded to `NvidiaAPILogger`.
+public class NvidiaAIService {
+
+    private static let baseURL = "https://integrate.api.nvidia.com/v1"
+    private static let chatEndpoint = "/chat/completions"
+
+    private let apiKey: String
+    private let model: String
+    private let logger: NvidiaAPILogger
+
+    public init(
+        apiKey: String? = nil,
+        model: String = "meta/llama-3.1-8b-instruct",
+        logger: NvidiaAPILogger = NvidiaAPILogger()
+    ) throws {
+        self.logger = logger
+        self.model = model
+
+        if let key = apiKey ?? logger.apiKey, !key.isEmpty {
+            self.apiKey = key
+        } else {
+            throw NvidiaAIError.missingAPIKey
+        }
+    }
+
+    /// Send a chat completion request to NVIDIA NIM and return the response text.
+    public func chatCompletion(
+        messages: [[String: String]],
+        maxTokens: Int = 1024,
+        temperature: Double = 0.7
+    ) async throws -> String {
+        guard let url = URL(string: Self.baseURL + Self.chatEndpoint) else {
+            throw NvidiaAIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "model": model,
+            "messages": messages,
+            "max_tokens": maxTokens,
+            "temperature": temperature
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let start = Date()
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let latencyMs = Date().timeIntervalSince(start) * 1000
+
+        guard let http = response as? HTTPURLResponse else {
+            logger.logError(endpoint: Self.chatEndpoint, model: model, error: "No HTTP response")
+            throw NvidiaAIError.invalidResponse
+        }
+
+        guard http.statusCode == 200 else {
+            let msg = extractErrorMessage(from: data) ?? "HTTP \(http.statusCode)"
+            logger.logError(endpoint: Self.chatEndpoint, model: model, error: msg)
+            throw NvidiaAIError.apiError(statusCode: http.statusCode, message: msg)
+        }
+
+        guard let rawJSON = try? JSONSerialization.jsonObject(with: data),
+              let json = rawJSON as? [String: Any],
+              let choices = json["choices"] as? [[String: Any]],
+              let first = choices.first,
+              let message = first["message"] as? [String: Any],
+              let content = message["content"] as? String else {
+            logger.logError(endpoint: Self.chatEndpoint, model: model, error: "Unexpected response shape")
+            throw NvidiaAIError.invalidResponseFormat
+        }
+
+        let usage = json["usage"] as? [String: Any]
+        let promptTokens = usage?["prompt_tokens"] as? Int ?? 0
+        let completionTokens = usage?["completion_tokens"] as? Int ?? 0
+
+        logger.log(
+            endpoint: Self.chatEndpoint,
+            model: model,
+            promptTokens: promptTokens,
+            completionTokens: completionTokens,
+            statusCode: http.statusCode,
+            latencyMs: latencyMs
+        )
+
+        return content
+    }
+
+    private func extractErrorMessage(from data: Data) -> String? {
+        guard let raw = try? JSONSerialization.jsonObject(with: data),
+              let dict = raw as? [String: Any],
+              let errObj = dict["error"] as? [String: Any],
+              let msg = errObj["message"] as? String else {
+            return nil
+        }
+        return msg
+    }
+}
+
+// MARK: - Errors
+
+public enum NvidiaAIError: LocalizedError {
+    case missingAPIKey
+    case invalidURL
+    case invalidResponse
+    case invalidResponseFormat
+    case apiError(statusCode: Int, message: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .missingAPIKey:
+            return "NVIDIA API key not found; set NVIDIA_API_KEY in ~/.local/share/claude-free/.env"
+        case .invalidURL:
+            return "Invalid NVIDIA API URL"
+        case .invalidResponse:
+            return "Invalid response from NVIDIA API"
+        case .invalidResponseFormat:
+            return "Could not parse NVIDIA API response"
+        case .apiError(let code, let msg):
+            return "NVIDIA API error (status \(code)): \(msg)"
+        }
+    }
+}

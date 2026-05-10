@@ -379,7 +379,8 @@ public class AIService {
     }
 
     private func parseErrorMessage(from data: Data) -> String? {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        guard let rawJSON = try? JSONSerialization.jsonObject(with: data),
+              let json = rawJSON as? [String: Any],
               let error = json["error"] as? [String: Any],
               let message = error["message"] as? String else {
             return nil

@@ -436,18 +436,19 @@ final class GiftCardBundleTests: XCTestCase {
         XCTAssertNotNil(retrieved?.redeemedAt)
     }
 
-    // MARK: - Expiration Days Boundary Tests (PR Change: > 0 → >= 0)
+    // MARK: - Expiration Days Boundary Tests (expirationDays must be > 0)
 
-    func testCreateBundleWithZeroExpirationDaysSucceeds() throws {
-        let bundle = try giftCardManager.createBundle(
-            name: "Zero Days",
-            description: "Expires immediately",
-            price: 10.0,
-            bundleType: .starter,
-            aiCredits: 50,
-            expirationDays: 0
+    func testCreateBundleWithZeroExpirationDaysThrows() {
+        XCTAssertThrowsError(
+            try giftCardManager.createBundle(
+                name: "Zero Days",
+                description: "Expires immediately",
+                price: 10.0,
+                bundleType: .starter,
+                aiCredits: 50,
+                expirationDays: 0
+            )
         )
-        XCTAssertEqual(bundle.expirationDays, 0)
     }
 
     func testCreateBundleWithOneExpirationDaySucceeds() throws {
@@ -552,18 +553,18 @@ final class GiftCardBundleTests: XCTestCase {
         XCTAssertEqual(bundle.expirationDays, 1)
     }
 
-    /// expirationDays=0 is valid (means expires immediately); must NOT throw.
-    func testCreateBundleWithExpirationDaysZeroThrowsInvalidInput() throws {
-        let bundle = try giftCardManager.createBundle(
-            name: "Zero Expiry",
-            description: "Zero days",
-            price: 5.0,
-            bundleType: .starter,
-            aiCredits: 10,
-            expirationDays: 0
+    /// expirationDays=0 must throw (expirationDays must be > 0).
+    func testCreateBundleWithExpirationDaysZeroThrowsInvalidInput() {
+        XCTAssertThrowsError(
+            try giftCardManager.createBundle(
+                name: "Zero Expiry",
+                description: "Zero days",
+                price: 5.0,
+                bundleType: .starter,
+                aiCredits: 10,
+                expirationDays: 0
+            )
         )
-        XCTAssertEqual(bundle.expirationDays, 0,
-            "expirationDays=0 is valid (>= 0) and must not throw")
     }
 
     /// Negative expirationDays must also be rejected.

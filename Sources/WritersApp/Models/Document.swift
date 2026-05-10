@@ -73,13 +73,6 @@ public struct Document: Codable, Identifiable, Hashable {
         return min(1.0, Double(wordCount) / Double(goal))
     }
 
-    public static func == (lhs: Document, rhs: Document) -> Bool {
-        lhs.id == rhs.id
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-    }
 }
 
 /// Metadata for documents
