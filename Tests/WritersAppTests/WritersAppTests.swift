@@ -53,18 +53,22 @@ final class WritersAppTests: XCTestCase {
     }
 
     func testDocumentHashable() {
-        let doc1 = Document(title: "A", content: "Hello", category: .article)
-        let doc2 = Document(title: "A", content: "Hello", category: .article)
-        // Same id ⇒ same hash
-        let sameId = Document(id: doc1.id, title: "A", content: "Hello", category: .article)
-        XCTAssertEqual(doc1.hashValue, sameId.hashValue)
+        let fixedMeta = DocumentMetadata(
+            created: Date(timeIntervalSince1970: 1_700_000_000),
+            modified: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let doc1 = Document(id: UUID(), title: "A", content: "Hello", category: .article, metadata: fixedMeta)
+        let doc2 = Document(id: UUID(), title: "A", content: "Hello", category: .article, metadata: fixedMeta)
+        // Identical content and same id ⇒ same hash
+        let exactCopy = Document(id: doc1.id, title: "A", content: "Hello", category: .article, metadata: fixedMeta)
+        XCTAssertEqual(doc1.hashValue, exactCopy.hashValue)
         // Documents can be stored in Sets
         var set = Set<Document>()
         set.insert(doc1)
         set.insert(doc2)
         XCTAssertEqual(set.count, 2)
-        set.insert(sameId)
-        XCTAssertEqual(set.count, 2, "Duplicate id should not increase set size")
+        set.insert(exactCopy)
+        XCTAssertEqual(set.count, 2, "Exact copy (all fields identical) should not increase set size")
     }
 
     func testDocumentReadingTimeNeverZero() {
