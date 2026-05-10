@@ -3,7 +3,7 @@ import XCTest
 
 // MARK: - AdvisorCategory Tests
 
-final class AdvisorCategoryTests: XCTestCase {
+final class AdvisorCategoryModelTests: XCTestCase {
 
     // MARK: - CaseIterable
 
@@ -71,7 +71,7 @@ final class AdvisorCategoryTests: XCTestCase {
 
 // MARK: - AdvisorPriority Tests
 
-final class AdvisorPriorityTests: XCTestCase {
+final class AdvisorPriorityModelTests: XCTestCase {
 
     // MARK: - CaseIterable
 
@@ -113,7 +113,7 @@ final class AdvisorPriorityTests: XCTestCase {
 
 // MARK: - AdvisorRecommendation Tests
 
-final class AdvisorRecommendationTests: XCTestCase {
+final class AdvisorRecommendationModelTests: XCTestCase {
 
     // MARK: - Initialization
 
@@ -296,7 +296,7 @@ final class AdvisorRecommendationTests: XCTestCase {
 
 // MARK: - WritingAdvisorReport Tests
 
-final class WritingAdvisorReportTests: XCTestCase {
+final class WritingAdvisorReportModelTests: XCTestCase {
 
     private func makeRecommendation(
         category: AdvisorCategory = .productivity,
@@ -428,7 +428,7 @@ final class WritingAdvisorReportTests: XCTestCase {
 
 // MARK: - AdvisorContext Tests
 
-final class AdvisorContextTests: XCTestCase {
+final class AdvisorContextModelTests: XCTestCase {
 
     // MARK: - Initialization
 
