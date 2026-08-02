@@ -263,7 +263,10 @@ public class AIService {
         return response.generatedContent
     }
 
-    // MARK: - API Communication
+    /// Sends the given prompt to the Anthropic API after validating and deduplicating in-flight requests, and returns the assistant's response text.
+    /// - Parameter prompt: The full prompt text to send to the model; must be non-empty and no more than 100,000 characters.
+    /// - Throws: `AIServiceError.emptyPrompt` if `prompt` is empty or whitespace, `AIServiceError.promptTooLarge` if `prompt` exceeds 100,000 characters, or other errors produced during request execution and retries.
+    /// - Returns: The assistant's generated text response.
 
     private func sendRequest(prompt: String) async throws -> String {
         guard !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -299,6 +302,12 @@ public class AIService {
         return try await task.value
     }
 
+    /// Sends the given prompt to the API, retrying up to the configured limit with exponential backoff on failures.
+    /// - Parameters:
+    ///   - prompt: The full prompt text to send to the API.
+    ///   - promptHash: A precomputed hash of the prompt used for deduplication tracking.
+    /// - Returns: The response text returned by the API.
+    /// - Throws: An `AIServiceError` describing the failure. If all retry attempts fail, throws the last encountered `AIServiceError` or a network error fallback.
     private func sendRequestWithRetry(prompt: String, promptHash: String) async throws -> String {
         var lastError: AIServiceError?
 
@@ -317,6 +326,16 @@ public class AIService {
         throw lastError ?? AIServiceError.networkError(NSError(domain: "AIService", code: -1, userInfo: nil))
     }
 
+    /// Sends the prompt to the Anthropic messages API once and returns the assistant's text reply.
+    /// - Returns: The assistant response text extracted from the API response.
+    /// - Throws:
+    ///   - `AIServiceError.invalidURL` if the configured API URL is invalid.
+    ///   - `AIServiceError.invalidResponse` if the HTTP response is missing or not an `HTTPURLResponse`.
+    ///   - `AIServiceError.rateLimited` if the API returns HTTP 429.
+    ///   - `AIServiceError.unauthorized` if the API returns HTTP 401 or 403.
+    ///   - `AIServiceError.serverError(statusCode:)` for HTTP 5xx responses.
+    ///   - `AIServiceError.apiError(statusCode:message:)` for other non-200 HTTP responses (includes parsed message when available).
+    ///   - `AIServiceError.invalidResponseFormat` if the response body cannot be parsed or does not contain extractable assistant text.
     private func sendRequestOnce(prompt: String) async throws -> String {
         guard let url = URL(string: apiURL) else {
             throw AIServiceError.invalidURL
@@ -362,10 +381,16 @@ public class AIService {
         return text
     }
 
+    /// Compute the exponential backoff delay for a given retry attempt.
+    /// - Parameter attempt: Zero-based retry attempt index (0 for first retry).
+    /// - Returns: Delay in seconds calculated as `initialBackoffSeconds * 2^attempt`, capped at 30 seconds.
     private func exponentialBackoff(attempt: Int) -> TimeInterval {
         min(initialBackoffSeconds * pow(2, Double(attempt)), 30)
     }
 
+    /// Computes a non-cryptographic 64-bit rolling hash for the given prompt.
+    /// - Parameter prompt: The input string to hash.
+    /// - Returns: A decimal `String` representation of the 64-bit rolling hash. This is not a cryptographic hash and is intended only for lightweight deduplication.
     private func hashPrompt(_ prompt: String) -> String {
         let data = prompt.data(using: .utf8) ?? Data()
         let digest = data.withUnsafeBytes { ptr in
@@ -378,6 +403,8 @@ public class AIService {
         return String(digest)
     }
 
+    /// Extracts an error message from a JSON API response body if one is present.
+    /// - Returns: `String` containing the API error message if found, `nil` otherwise.
     private func parseErrorMessage(from data: Data) -> String? {
         guard let rawJSON = try? JSONSerialization.jsonObject(with: data),
               let json = rawJSON as? [String: Any],
@@ -482,11 +509,7 @@ public class AIService {
 
             // If the model finished with a text response, extract and return it
             if stopReason == "end_turn" {
-                if let text = extractText(from: content) {
-                    return text
-                }
-                // If there's no text in the response, that's still valid (e.g., tool-only response)
-                return ""
+                return extractText(from: content) ?? ""
             }
 
             // If the model wants to use tools, execute them and continue the loop
@@ -551,7 +574,8 @@ public class AIService {
     /// Send a request with an explicit system prompt and user prompt.
     ///
     /// Used by `MultiAgentHarness` to give each agent (planner, generator, evaluator)
-    /// its own specialised system prompt without affecting general-purpose assistance.
+    /// its own specialised system prompt without affecting the general-purpose assistance
+    /// Sends a user prompt together with a system prompt to the Anthropic Messages API and returns the assistant's extracted text response.
     /// - Parameters:
     ///   - systemPrompt: System-level instructions to include in the request's `system` field.
     ///   - userPrompt: The user-facing prompt sent as the single user message.
@@ -596,8 +620,8 @@ public class AIService {
 
     /// Send an agent task with a dedicated system prompt AND tool loop support.
     ///
-    /// Combines the persona injection of `performAgentTask` with the iterative tool loop,
-    /// allowing the agent to invoke tools and use their results in reasoning.
+    /// Combines the persona injection of `performAgentTask` with the iterative
+    /// Performs an agent task that may use external tools and returns the assistant's final response.
     /// - Parameters:
     ///   - systemPrompt: Instructions injected as the system-level prompt for the agent.
     ///   - userPrompt: The user-facing prompt that starts the conversation.
@@ -622,13 +646,14 @@ public class AIService {
     }
 
     /// Extracts joined text from a list of content blocks.
+    /// Extracts and concatenated text blocks from a content array.
     /// - Returns: The joined text of all blocks where `"type" == "text"`, or `nil` if no text blocks are present.
     private func extractText(from content: [[String: Any]]) -> String? {
         let textParts = content.compactMap { block -> String? in
             guard block["type"] as? String == "text" else { return nil }
             return block["text"] as? String
         }
-        return textParts.isEmpty ? nil : textParts.joined(separator: " ")
+        return textParts.isEmpty ? nil : textParts.joined()
     }
 
     /// Executes all tool_use blocks found in an assistant response and returns their results.
