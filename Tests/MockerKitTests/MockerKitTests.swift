@@ -566,7 +566,7 @@ final class MockerKitTests: XCTestCase {
         let c1 = ContainerInfo(id: "aaaaaa111111222222", name: "web", image: "nginx")
         let c2 = ContainerInfo(id: "bbbbbb333333444444", name: "db", image: "postgres")
         let output = TableFormatter.formatPS([c1, c2], all: false, quiet: true, noTrunc: false)
-        let lines = output.split(separator: "\n").map(String.init)
+        let lines = output.split(separator: "\n").map { String($0) }
         XCTAssertEqual(lines.count, 2)
         XCTAssertEqual(lines[0], c1.shortId)
         XCTAssertEqual(lines[1], c2.shortId)
