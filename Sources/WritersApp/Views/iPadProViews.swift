@@ -389,11 +389,19 @@ struct AllSuggestionsView: View {
         NavigationStack {
             Group {
                 if viewModel.recentAISuggestions.isEmpty {
-                    ContentUnavailableView(
-                        "No Suggestions Yet",
-                        systemImage: "sparkles",
-                        description: Text("Use the AI assistant to generate writing suggestions.")
-                    )
+                    VStack(spacing: 16) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                        Text("No Suggestions Yet")
+                            .font(.headline)
+                        Text("Use the AI assistant to generate writing suggestions.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List(viewModel.recentAISuggestions, id: \.id) { suggestion in
                         VStack(alignment: .leading, spacing: 6) {
