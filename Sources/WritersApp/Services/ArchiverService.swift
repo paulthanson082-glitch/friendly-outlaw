@@ -222,7 +222,7 @@ public class ArchiverService {
                         text: prompt,
                         type: .custom("generate_tags")
                     )
-                    tags.append(contentsOf: aiTags.message
+                    tags.append(contentsOf: aiTags.generatedContent
                         .split(separator: ",")
                         .map { $0.trimmingCharacters(in: .whitespaces) }
                     )
