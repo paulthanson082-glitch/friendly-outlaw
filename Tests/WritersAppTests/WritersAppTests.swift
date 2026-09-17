@@ -118,9 +118,9 @@ final class WritersAppTests: XCTestCase {
     }
 
     func testStatistics() {
-        let doc1 = app.createBlankDocument(title: "Doc 1", category: .novel)
-        let doc2 = app.createBlankDocument(title: "Doc 2", category: .novel)
-        let doc3 = app.createBlankDocument(title: "Doc 3", category: .article)
+        _ = app.createBlankDocument(title: "Doc 1", category: .novel)
+        _ = app.createBlankDocument(title: "Doc 2", category: .novel)
+        _ = app.createBlankDocument(title: "Doc 3", category: .article)
 
         let stats = app.getStatistics()
         XCTAssertEqual(stats.totalDocuments, 3)
@@ -1144,7 +1144,7 @@ final class WritersAppTests: XCTestCase {
         }
 
         let doc1 = app.createBlankDocument(title: "Doc 1", category: .novel)
-        let doc2 = app.createBlankDocument(title: "Doc 2", category: .article)
+        _ = app.createBlankDocument(title: "Doc 2", category: .article)
 
         let context = ConversationContext(
             activeDocumentId: doc1.id,
@@ -1459,8 +1459,8 @@ final class WritersAppTests: XCTestCase {
     // MARK: - Hallucination Reduction Tests
 
     func testExtractQuotesReturnsQuoteBlocks() {
-        let app = WritersApp()
-        let text = """
+        _ = WritersApp()
+        _ = """
         The research shows that artificial intelligence has advanced significantly.
         "We have observed a 40% improvement in model accuracy," said Dr. Smith.
         This demonstrates the effectiveness of the new approach.
@@ -1472,7 +1472,7 @@ final class WritersAppTests: XCTestCase {
     }
 
     func testVerifyWithCitationsReturnsVerifiedClaims() {
-        let text = "The study demonstrates effectiveness through careful analysis."
+        _ = "The study demonstrates effectiveness through careful analysis."
         let claims: [VerifiedClaim] = []
         // Note: We test the response type structure, not API calls
         XCTAssertNotNil(claims, "verifyWithCitations should return [VerifiedClaim]")
