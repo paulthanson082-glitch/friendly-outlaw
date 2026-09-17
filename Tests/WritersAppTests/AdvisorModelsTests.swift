@@ -388,7 +388,7 @@ final class WritingAdvisorReportModelTests: XCTestCase {
         decoder.dateDecodingStrategy = .iso8601
 
         let data = try encoder.encode(original)
-        let decoded = try JSONDecoder().decode(WritingAdvisorReport.self, from: data)
+        let decoded = try decoder.decode(WritingAdvisorReport.self, from: data)
 
         XCTAssertEqual(decoded.overallAssessment, original.overallAssessment)
         XCTAssertEqual(decoded.focusArea, original.focusArea)
