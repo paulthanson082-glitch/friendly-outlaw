@@ -408,7 +408,7 @@ final class DoltVersionControlServiceTests: XCTestCase {
         try versionControl.initializeDefaultBranch()
 
         let doc1 = Document(id: UUID(), title: "Doc", content: "Version 1", category: .novel)
-        let commit1 = try versionControl.commit(message: "v1", documents: [doc1])
+        _ = try versionControl.commit(message: "v1", documents: [doc1])
 
         Thread.sleep(forTimeInterval: 0.1)
 
@@ -429,7 +429,7 @@ final class DoltVersionControlServiceTests: XCTestCase {
 
         let doc1 = Document(id: UUID(), title: "Doc1", content: "Old", category: .novel)
         let doc2 = Document(id: UUID(), title: "Doc2", content: "Old", category: .essay)
-        let commit1 = try versionControl.commit(message: "Initial", documents: [doc1, doc2])
+        _ = try versionControl.commit(message: "Initial", documents: [doc1, doc2])
 
         Thread.sleep(forTimeInterval: 0.1)
         let queryDate = Date()
@@ -785,7 +785,7 @@ final class DoltVersionControlServiceTests: XCTestCase {
 
         let longMessage = String(repeating: "A", count: 10000)
         let doc = Document(title: "Doc", content: "Content", category: .novel)
-        let commit = try versionControl.commit(message: longMessage, documents: [doc])
+        _ = try versionControl.commit(message: longMessage, documents: [doc])
 
         let log = try versionControl.log(branch: "main")
         XCTAssertEqual(log[0].message, longMessage)

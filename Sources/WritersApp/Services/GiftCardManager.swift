@@ -145,6 +145,7 @@ public class GiftCardManager {
 
     // MARK: - Redemption & Business Logic
 
+    @discardableResult
     public func redeemGiftCard(code: String, userId: UUID) throws -> GiftCardBundle {
         guard let giftCard = getGiftCardByCode(code) else {
             throw GiftCardError.invalidCode

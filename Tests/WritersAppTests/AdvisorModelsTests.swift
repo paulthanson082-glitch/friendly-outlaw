@@ -388,7 +388,7 @@ final class WritingAdvisorReportModelTests: XCTestCase {
         decoder.dateDecodingStrategy = .iso8601
 
         let data = try encoder.encode(original)
-        let decoded = try JSONDecoder().decode(WritingAdvisorReport.self, from: data)
+        let decoded = try decoder.decode(WritingAdvisorReport.self, from: data)
 
         XCTAssertEqual(decoded.overallAssessment, original.overallAssessment)
         XCTAssertEqual(decoded.focusArea, original.focusArea)
@@ -537,7 +537,7 @@ final class AdvisorContextModelTests: XCTestCase {
         )
         XCTAssertEqual(context.sessionStats?.totalSessions, 3)
         XCTAssertEqual(context.sessionStats?.totalDurationSeconds, 5400)
-        XCTAssertEqual(context.sessionStats?.averageDurationSeconds, 1800.0, accuracy: 0.001)
+        XCTAssertEqual(context.sessionStats?.averageDurationSeconds ?? 0, 1800.0, accuracy: 0.001)
     }
 
     // MARK: - Boundary
