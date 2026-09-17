@@ -481,7 +481,7 @@ final class DatabaseManagerAPIKeyPersistenceTests: XCTestCase {
             XCTAssertEqual(retrieved?.apiKey, apiKey, "API key must persist for model \(model)")
             XCTAssertEqual(retrieved?.model, model)
             XCTAssertEqual(retrieved?.maxTokens, 2048)
-            XCTAssertEqual(retrieved?.temperature, 0.5, accuracy: 0.001)
+            XCTAssertEqual(retrieved?.temperature ?? 0, 0.5, accuracy: 0.001)
         }
     }
 
@@ -530,7 +530,7 @@ final class DatabaseManagerAPIKeyPersistenceTests: XCTestCase {
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
         XCTAssertEqual(retrieved?.model, .claude3Opus)
         XCTAssertEqual(retrieved?.maxTokens, 8192)
-        XCTAssertEqual(retrieved?.temperature, 0.9, accuracy: 0.001)
+        XCTAssertEqual(retrieved?.temperature ?? 0, 0.9, accuracy: 0.001)
     }
 }
 
