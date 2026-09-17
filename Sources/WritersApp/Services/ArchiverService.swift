@@ -65,6 +65,7 @@ public class ArchiverService {
     ///   - theme: Optional visual theme identifier (default: "default").
     ///   - tags: Optional tags to categorize the collection.
     /// - Returns: The created `ArchiveCollection`.
+    @discardableResult
     public func createCollection(
         name: String,
         description: String = "",
@@ -141,6 +142,7 @@ public class ArchiverService {
     ///   - summary: AI-generated or manual summary of what was accomplished.
     ///   - tags: Optional tags for organizing the snapshot.
     /// - Returns: The created `ArchiveSnapshot`.
+    @discardableResult
     public func preserveMilestone(
         documentId: UUID,
         title: String,

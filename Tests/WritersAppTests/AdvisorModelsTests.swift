@@ -537,7 +537,7 @@ final class AdvisorContextModelTests: XCTestCase {
         )
         XCTAssertEqual(context.sessionStats?.totalSessions, 3)
         XCTAssertEqual(context.sessionStats?.totalDurationSeconds, 5400)
-        XCTAssertEqual(context.sessionStats?.averageDurationSeconds, 1800.0, accuracy: 0.001)
+        XCTAssertEqual(context.sessionStats?.averageDurationSeconds ?? 0, 1800.0, accuracy: 0.001)
     }
 
     // MARK: - Boundary
