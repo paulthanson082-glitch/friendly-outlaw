@@ -124,6 +124,7 @@ public class WritingGoalManager {
     // MARK: - Progress Tracking
 
     /// Records progress toward a goal
+    @discardableResult
     public func recordProgress(goalId: UUID, amount: Int, notes: String = "") -> WritingGoal? {
         guard var goal = goals[goalId] else { return nil }
 
@@ -144,6 +145,7 @@ public class WritingGoalManager {
     }
 
     /// Sets the current value for a goal directly
+    @discardableResult
     public func setProgress(goalId: UUID, current: Int) -> WritingGoal? {
         guard var goal = goals[goalId] else { return nil }
 
