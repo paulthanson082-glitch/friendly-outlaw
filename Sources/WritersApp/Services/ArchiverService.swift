@@ -263,7 +263,7 @@ public class ArchiverService {
                 text: prompt,
                 type: .summarize
             )
-            return response.message
+            return response.generatedContent
         } catch {
             return ""
         }
