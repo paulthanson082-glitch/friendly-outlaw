@@ -18,6 +18,7 @@ This setup makes sure Claude knows your patterns before writing anything.
 |----------|---------|
 | **workflow.md** | How the ask → plan → execute flow works (start here if new) |
 | **project.md** | Quick intro: what friendly-outlaw is, how to build/test/run |
+| **SKILLS_INDEX.md** | Complete guide to all available skills (project-specific and ecosystem-wide) |
 | **agents/** | Specialized workers (knowledge-advisor reads rules, swift-debugger fixes errors, etc.) |
 | **skills/** | Step-by-step workflows for common tasks (add template, add AI feature, etc.) |
 | **knowledge/** | Structured standards (Swift rules, architecture patterns, security, templates, testing) |
