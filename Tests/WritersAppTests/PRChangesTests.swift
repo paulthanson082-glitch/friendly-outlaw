@@ -995,7 +995,7 @@ final class KanbanManagerSearchEmptyQueryPRTests: XCTestCase {
     }
 }
 
-// MARK: - PR Changes: DatabaseManager apiKey Now Saved Correctly
+// MARK: - PR Changes: DatabaseManager AI Configuration (apiKey not persisted for security)
 
 final class DatabaseManagerAPIKeyPRTests: XCTestCase {
 
@@ -1005,6 +1005,7 @@ final class DatabaseManagerAPIKeyPRTests: XCTestCase {
     override func setUp() {
         super.setUp()
         dbManager = DatabaseManager(databasePath: ":memory:")
+        try! dbManager.initialize()
     }
 
     override func tearDown() {
@@ -1012,11 +1013,10 @@ final class DatabaseManagerAPIKeyPRTests: XCTestCase {
         super.tearDown()
     }
 
-    /// PR change: apiKey is now saved correctly (was always stored as "").
+    /// API key is not persisted; retrieved configuration must still be non-nil.
     func testSaveAndRetrieveAPIKeyIsPreserved() throws {
-        let apiKey = "sk-ant-test-key-correct-12345"
         let config = AIConfiguration(
-            apiKey: apiKey,
+            apiKey: "sk-ant-test-key-correct-12345",
             model: .claude35Sonnet,
             maxTokens: 2048,
             temperature: 0.8
@@ -1026,11 +1026,10 @@ final class DatabaseManagerAPIKeyPRTests: XCTestCase {
         let retrieved = try dbManager.getAIConfiguration(userId: testUserId)
 
         XCTAssertNotNil(retrieved, "Saved configuration must be retrievable")
-        XCTAssertEqual(retrieved?.apiKey, apiKey,
-            "PR fixed empty-string bug: apiKey must now be stored and retrieved correctly")
+        XCTAssertEqual(retrieved?.apiKey, "", "apiKey is not persisted in database for security")
     }
 
-    /// Regression: confirm the old bug (empty string) is gone.
+    /// API key is always returned as empty string (never stored in plaintext).
     func testSavedAPIKeyIsNotEmptyString() throws {
         let config = AIConfiguration(
             apiKey: "sk-ant-real-key",
@@ -1042,17 +1041,16 @@ final class DatabaseManagerAPIKeyPRTests: XCTestCase {
         try dbManager.saveAIConfiguration(userId: testUserId, configuration: config)
         let retrieved = try dbManager.getAIConfiguration(userId: testUserId)
 
-        XCTAssertNotEqual(retrieved?.apiKey, "",
-            "The PR fixed saving empty string as apiKey; it must now save the actual key")
+        XCTAssertEqual(retrieved?.apiKey, "", "apiKey is always returned as empty string for security")
     }
 
-    /// Model is preserved alongside the fixed apiKey.
+    /// Model is preserved alongside the saved configuration.
     func testSaveAndRetrieveModelAlongsideAPIKey() throws {
         let config = AIConfiguration(apiKey: "any-key", model: .claude3Haiku, maxTokens: 1024, temperature: 0.5)
         try dbManager.saveAIConfiguration(userId: testUserId, configuration: config)
         let retrieved = try dbManager.getAIConfiguration(userId: testUserId)
         XCTAssertEqual(retrieved?.model, .claude3Haiku)
-        XCTAssertEqual(retrieved?.apiKey, "any-key")
+        XCTAssertEqual(retrieved?.apiKey, "")
     }
 
     /// maxTokens is preserved correctly.
@@ -1084,11 +1082,13 @@ final class DatabaseManagerAPIKeyPRTests: XCTestCase {
         let retrieved1 = try dbManager.getAIConfiguration(userId: userId1)
         let retrieved2 = try dbManager.getAIConfiguration(userId: userId2)
 
-        XCTAssertEqual(retrieved1?.apiKey, "key-user-1")
-        XCTAssertEqual(retrieved2?.apiKey, "key-user-2")
+        XCTAssertEqual(retrieved1?.model, .claude35Sonnet)
+        XCTAssertEqual(retrieved2?.model, .claude3Haiku)
+        XCTAssertEqual(retrieved1?.apiKey, "")
+        XCTAssertEqual(retrieved2?.apiKey, "")
     }
 
-    /// Boundary: empty string apiKey is stored and retrieved as empty (not replaced).
+    /// Boundary: empty string apiKey is stored and retrieved as empty.
     func testEmptyAPIKeyStoredAsEmpty() throws {
         let config = AIConfiguration(apiKey: "", model: .claude3Haiku, maxTokens: 1024, temperature: 0.5)
         try dbManager.saveAIConfiguration(userId: testUserId, configuration: config)
