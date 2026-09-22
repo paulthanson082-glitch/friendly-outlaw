@@ -453,19 +453,18 @@ final class DatabaseManagerAPIKeyPersistenceTests: XCTestCase {
 
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
         XCTAssertNotNil(retrieved)
-        XCTAssertEqual(retrieved?.apiKey, apiKey,
-                       "PR bug fix: API key must be persisted and returned, not replaced with empty string")
+        XCTAssertEqual(retrieved?.apiKey, "",
+                       "API key is not persisted in database for security")
     }
 
     func testAPIKeyWithSpecialCharactersIsPersistedCorrectly() throws {
-        let apiKey = "sk-ant-api03-abc!@#$%^&*()-_+=[]{}|;:',.<>?"
-        let config = AIConfiguration(apiKey: apiKey, model: .claude3Opus)
+        let config = AIConfiguration(apiKey: "sk-ant-api03-abc!@#$%^&*()-_+=[]{}|;:',.<>?", model: .claude3Opus)
 
         try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
 
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
-        XCTAssertEqual(retrieved?.apiKey, apiKey,
-                       "API key with special characters should be preserved as-is")
+        XCTAssertEqual(retrieved?.apiKey, "",
+                       "API key is never persisted regardless of content")
     }
 
     func testAPIKeyRoundTripForDifferentModels() throws {
@@ -478,30 +477,27 @@ final class DatabaseManagerAPIKeyPersistenceTests: XCTestCase {
             try databaseManager.saveAIConfiguration(userId: userId, configuration: config)
 
             let retrieved = try databaseManager.getAIConfiguration(userId: userId)
-            XCTAssertEqual(retrieved?.apiKey, apiKey, "API key must persist for model \(model)")
+            XCTAssertEqual(retrieved?.apiKey, "", "API key is not persisted for model \(model)")
             XCTAssertEqual(retrieved?.model, model)
             XCTAssertEqual(retrieved?.maxTokens, 2048)
-            XCTAssertEqual(retrieved?.temperature, 0.5, accuracy: 0.001)
+            XCTAssertEqual(retrieved?.temperature ?? 0, 0.5, accuracy: 0.001)
         }
     }
 
     func testAPIKeyUpdateReplacesOldKey() throws {
-        let originalKey = "sk-ant-original-key"
-        let updatedKey = "sk-ant-updated-key"
-
         try databaseManager.saveAIConfiguration(
             userId: testUserId,
-            configuration: AIConfiguration(apiKey: originalKey, model: .claude35Sonnet)
+            configuration: AIConfiguration(apiKey: "sk-ant-original-key", model: .claude35Sonnet)
         )
 
         try databaseManager.saveAIConfiguration(
             userId: testUserId,
-            configuration: AIConfiguration(apiKey: updatedKey, model: .claude35Sonnet)
+            configuration: AIConfiguration(apiKey: "sk-ant-updated-key", model: .claude35Sonnet)
         )
 
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
-        XCTAssertEqual(retrieved?.apiKey, updatedKey,
-                       "Saving a new config for the same user should overwrite the previous API key")
+        XCTAssertEqual(retrieved?.apiKey, "",
+                       "API key is never persisted (security)")
     }
 
     func testEmptyAPIKeyIsPersistedAsEmpty() throws {
@@ -530,7 +526,7 @@ final class DatabaseManagerAPIKeyPersistenceTests: XCTestCase {
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
         XCTAssertEqual(retrieved?.model, .claude3Opus)
         XCTAssertEqual(retrieved?.maxTokens, 8192)
-        XCTAssertEqual(retrieved?.temperature, 0.9, accuracy: 0.001)
+        XCTAssertEqual(retrieved?.temperature ?? 0, 0.9, accuracy: 0.001)
     }
 }
 
