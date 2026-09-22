@@ -119,8 +119,8 @@ final class WritersAppTests: XCTestCase {
 
     func testStatistics() {
         let doc1 = app.createBlankDocument(title: "Doc 1", category: .novel)
-        let doc2 = app.createBlankDocument(title: "Doc 2", category: .novel)
-        let doc3 = app.createBlankDocument(title: "Doc 3", category: .article)
+        _ = app.createBlankDocument(title: "Doc 2", category: .novel)
+        _ = app.createBlankDocument(title: "Doc 3", category: .article)
 
         let stats = app.getStatistics()
         XCTAssertEqual(stats.totalDocuments, 3)
@@ -1144,7 +1144,7 @@ final class WritersAppTests: XCTestCase {
         }
 
         let doc1 = app.createBlankDocument(title: "Doc 1", category: .novel)
-        let doc2 = app.createBlankDocument(title: "Doc 2", category: .article)
+        _ = app.createBlankDocument(title: "Doc 2", category: .article)
 
         let context = ConversationContext(
             activeDocumentId: doc1.id,
@@ -1459,7 +1459,7 @@ final class WritersAppTests: XCTestCase {
     // MARK: - Hallucination Reduction Tests
 
     func testExtractQuotesReturnsQuoteBlocks() {
-        let app = WritersApp()
+        _ = WritersApp()
         let _ = """
         The research shows that artificial intelligence has advanced significantly.
         "We have observed a 40% improvement in model accuracy," said Dr. Smith.
