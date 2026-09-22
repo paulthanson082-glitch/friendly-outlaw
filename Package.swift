@@ -41,7 +41,10 @@ let package = Package(
             dependencies: ["WritersApp"]),
         .testTarget(
             name: "WritersAppTests",
-            dependencies: ["WritersApp"]),
+            dependencies: ["WritersApp"],
+            swiftSettings: [
+                .unsafeFlags(["-suppress-warnings"])
+            ]),
 
         // Mocker targets
         .target(
