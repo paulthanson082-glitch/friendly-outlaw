@@ -200,10 +200,10 @@ final class WritingGoalManagerTests: XCTestCase {
 
     func testGetActiveGoalsSortedByProgress() {
         let goal1 = manager.createGoal(name: "Goal 1", type: .daily, target: 100)
-        manager.recordProgress(goalId: goal1.id, amount: 50) // 50% progress
+        _ = manager.recordProgress(goalId: goal1.id, amount: 50) // 50% progress
 
         let goal2 = manager.createGoal(name: "Goal 2", type: .daily, target: 100)
-        manager.recordProgress(goalId: goal2.id, amount: 25) // 25% progress
+        _ = manager.recordProgress(goalId: goal2.id, amount: 25) // 25% progress
 
         let activeGoals = manager.getActiveGoals()
 
@@ -270,8 +270,8 @@ final class WritingGoalManagerTests: XCTestCase {
     func testRecordProgressMultipleTimes() {
         let goal = manager.createGoal(name: "Test", type: .daily, target: 500)
 
-        manager.recordProgress(goalId: goal.id, amount: 100)
-        manager.recordProgress(goalId: goal.id, amount: 150)
+        _ = manager.recordProgress(goalId: goal.id, amount: 100)
+        _ = manager.recordProgress(goalId: goal.id, amount: 150)
         let updated = manager.recordProgress(goalId: goal.id, amount: 50)
 
         XCTAssertEqual(updated?.current, 300)
@@ -289,7 +289,7 @@ final class WritingGoalManagerTests: XCTestCase {
     func testSetProgressCreatesHistoryEntry() {
         let goal = manager.createGoal(name: "Test", type: .daily, target: 500)
 
-        manager.setProgress(goalId: goal.id, current: 250)
+        _ = manager.setProgress(goalId: goal.id, current: 250)
 
         let history = manager.getProgressHistory(goalId: goal.id)
         XCTAssertEqual(history.count, 1)
@@ -299,8 +299,8 @@ final class WritingGoalManagerTests: XCTestCase {
     func testSetProgressWithSmallerValueNoHistory() {
         let goal = manager.createGoal(name: "Test", type: .daily, target: 500)
 
-        manager.setProgress(goalId: goal.id, current: 300)
-        manager.setProgress(goalId: goal.id, current: 200) // Smaller value
+        _ = manager.setProgress(goalId: goal.id, current: 300)
+        _ = manager.setProgress(goalId: goal.id, current: 200) // Smaller value
 
         let history = manager.getProgressHistory(goalId: goal.id)
         // Should only have one entry (the increase)
@@ -317,9 +317,9 @@ final class WritingGoalManagerTests: XCTestCase {
     func testGetProgressHistory() {
         let goal = manager.createGoal(name: "Test", type: .daily, target: 500)
 
-        manager.recordProgress(goalId: goal.id, amount: 100, notes: "Session 1")
-        manager.recordProgress(goalId: goal.id, amount: 150, notes: "Session 2")
-        manager.recordProgress(goalId: goal.id, amount: 50, notes: "Session 3")
+        _ = manager.recordProgress(goalId: goal.id, amount: 100, notes: "Session 1")
+        _ = manager.recordProgress(goalId: goal.id, amount: 150, notes: "Session 2")
+        _ = manager.recordProgress(goalId: goal.id, amount: 50, notes: "Session 3")
 
         let history = manager.getProgressHistory(goalId: goal.id)
 
@@ -339,8 +339,8 @@ final class WritingGoalManagerTests: XCTestCase {
     func testGetTodayProgress() {
         let goal = manager.createGoal(name: "Test", type: .daily, target: 500)
 
-        manager.recordProgress(goalId: goal.id, amount: 100)
-        manager.recordProgress(goalId: goal.id, amount: 150)
+        _ = manager.recordProgress(goalId: goal.id, amount: 100)
+        _ = manager.recordProgress(goalId: goal.id, amount: 150)
 
         let todayProgress = manager.getTodayProgress()
 
@@ -356,7 +356,7 @@ final class WritingGoalManagerTests: XCTestCase {
     func testGetProgressDateRange() {
         let goal = manager.createGoal(name: "Test", type: .weekly, target: 3000)
 
-        manager.recordProgress(goalId: goal.id, amount: 500)
+        _ = manager.recordProgress(goalId: goal.id, amount: 500)
 
         let calendar = Calendar.current
         let startDate = calendar.startOfDay(for: Date())
@@ -390,7 +390,7 @@ final class WritingGoalManagerTests: XCTestCase {
     func testStreakUpdatesOnProgress() {
         let goal = manager.createGoal(name: "Test", type: .daily, target: 500)
 
-        manager.recordProgress(goalId: goal.id, amount: 100)
+        _ = manager.recordProgress(goalId: goal.id, amount: 100)
 
         let streak = manager.getStreak()
 
@@ -403,9 +403,9 @@ final class WritingGoalManagerTests: XCTestCase {
     func testStreakDoesNotIncreaseOnSameDay() {
         let goal = manager.createGoal(name: "Test", type: .daily, target: 500)
 
-        manager.recordProgress(goalId: goal.id, amount: 100)
-        manager.recordProgress(goalId: goal.id, amount: 100)
-        manager.recordProgress(goalId: goal.id, amount: 100)
+        _ = manager.recordProgress(goalId: goal.id, amount: 100)
+        _ = manager.recordProgress(goalId: goal.id, amount: 100)
+        _ = manager.recordProgress(goalId: goal.id, amount: 100)
 
         let streak = manager.getStreak()
 
@@ -415,7 +415,7 @@ final class WritingGoalManagerTests: XCTestCase {
 
     func testCheckStreakStatus() {
         let goal = manager.createGoal(name: "Test", type: .daily, target: 500)
-        manager.recordProgress(goalId: goal.id, amount: 100)
+        _ = manager.recordProgress(goalId: goal.id, amount: 100)
 
         manager.checkStreakStatus()
 
@@ -428,7 +428,7 @@ final class WritingGoalManagerTests: XCTestCase {
 
     func testResetDailyGoals() {
         let daily = manager.createDailyWordGoal(target: 500)
-        manager.recordProgress(goalId: daily.id, amount: 300)
+        _ = manager.recordProgress(goalId: daily.id, amount: 300)
 
         manager.resetDailyGoals()
 
@@ -439,7 +439,7 @@ final class WritingGoalManagerTests: XCTestCase {
 
     func testResetWeeklyGoals() {
         let weekly = manager.createWeeklyWordGoal(target: 3000)
-        manager.recordProgress(goalId: weekly.id, amount: 1500)
+        _ = manager.recordProgress(goalId: weekly.id, amount: 1500)
 
         manager.resetWeeklyGoals()
 
@@ -449,7 +449,7 @@ final class WritingGoalManagerTests: XCTestCase {
 
     func testResetMonthlyGoals() {
         let monthly = manager.createGoal(name: "Monthly", type: .monthly, target: 10000)
-        manager.recordProgress(goalId: monthly.id, amount: 5000)
+        _ = manager.recordProgress(goalId: monthly.id, amount: 5000)
 
         manager.resetMonthlyGoals()
 
@@ -461,8 +461,8 @@ final class WritingGoalManagerTests: XCTestCase {
         let daily = manager.createDailyWordGoal(target: 500)
         let weekly = manager.createWeeklyWordGoal(target: 3000)
 
-        manager.recordProgress(goalId: daily.id, amount: 300)
-        manager.recordProgress(goalId: weekly.id, amount: 1500)
+        _ = manager.recordProgress(goalId: daily.id, amount: 300)
+        _ = manager.recordProgress(goalId: weekly.id, amount: 1500)
 
         manager.resetDailyGoals()
 
@@ -475,7 +475,7 @@ final class WritingGoalManagerTests: XCTestCase {
         daily.isActive = false
         manager.updateGoal(daily)
 
-        manager.recordProgress(goalId: daily.id, amount: 300)
+        _ = manager.recordProgress(goalId: daily.id, amount: 300)
 
         manager.resetDailyGoals()
 
@@ -487,10 +487,10 @@ final class WritingGoalManagerTests: XCTestCase {
 
     func testGetSummary() {
         let goal1 = manager.createGoal(name: "Goal 1", type: .daily, target: 100)
-        manager.recordProgress(goalId: goal1.id, amount: 50)
+        _ = manager.recordProgress(goalId: goal1.id, amount: 50)
 
         let goal2 = manager.createGoal(name: "Goal 2", type: .weekly, target: 500)
-        manager.recordProgress(goalId: goal2.id, amount: 500)
+        _ = manager.recordProgress(goalId: goal2.id, amount: 500)
 
         var goal3 = manager.createGoal(name: "Goal 3", type: .monthly, target: 1000)
         goal3.isActive = false
@@ -525,7 +525,7 @@ final class WritingGoalManagerTests: XCTestCase {
             startDate: tenDaysAgo,
             endDate: twoDaysFromNow
         )
-        manager.recordProgress(goalId: goal1.id, amount: 100) // 10% progress with 10/12 days elapsed
+        _ = manager.recordProgress(goalId: goal1.id, amount: 100) // 10% progress with 10/12 days elapsed
 
         let goal2 = manager.createGoal(
             name: "On Track",
@@ -534,7 +534,7 @@ final class WritingGoalManagerTests: XCTestCase {
             startDate: tenDaysAgo,
             endDate: twoDaysFromNow
         )
-        manager.recordProgress(goalId: goal2.id, amount: 90) // 90% progress
+        _ = manager.recordProgress(goalId: goal2.id, amount: 90) // 90% progress
 
         let needingAttention = manager.getGoalsNeedingAttention()
 
@@ -549,10 +549,10 @@ final class WritingGoalManagerTests: XCTestCase {
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date())!
 
         let goal1 = manager.createGoal(name: "More Behind", type: .custom, target: 1000, endDate: tomorrow)
-        manager.recordProgress(goalId: goal1.id, amount: 50) // 5% progress
+        _ = manager.recordProgress(goalId: goal1.id, amount: 50) // 5% progress
 
         let goal2 = manager.createGoal(name: "Less Behind", type: .custom, target: 1000, endDate: tomorrow)
-        manager.recordProgress(goalId: goal2.id, amount: 100) // 10% progress
+        _ = manager.recordProgress(goalId: goal2.id, amount: 100) // 10% progress
 
         let needingAttention = manager.getGoalsNeedingAttention()
 
@@ -566,7 +566,7 @@ final class WritingGoalManagerTests: XCTestCase {
 
     func testGoalProgress() {
         let goal = manager.createGoal(name: "Test", type: .daily, target: 100)
-        manager.recordProgress(goalId: goal.id, amount: 50)
+        _ = manager.recordProgress(goalId: goal.id, amount: 50)
 
         let retrieved = manager.getGoal(id: goal.id)!
         XCTAssertEqual(retrieved.progress, 0.5, accuracy: 0.01)
@@ -575,7 +575,7 @@ final class WritingGoalManagerTests: XCTestCase {
 
     func testGoalProgressOver100Percent() {
         let goal = manager.createGoal(name: "Test", type: .daily, target: 100)
-        manager.recordProgress(goalId: goal.id, amount: 150)
+        _ = manager.recordProgress(goalId: goal.id, amount: 150)
 
         let retrieved = manager.getGoal(id: goal.id)!
         XCTAssertEqual(retrieved.progress, 1.0, accuracy: 0.01) // Capped at 1.0
@@ -584,7 +584,7 @@ final class WritingGoalManagerTests: XCTestCase {
 
     func testGoalIsAchieved() {
         let goal = manager.createGoal(name: "Test", type: .daily, target: 100)
-        manager.recordProgress(goalId: goal.id, amount: 100)
+        _ = manager.recordProgress(goalId: goal.id, amount: 100)
 
         let retrieved = manager.getGoal(id: goal.id)!
         XCTAssertTrue(retrieved.isAchieved)
@@ -592,7 +592,7 @@ final class WritingGoalManagerTests: XCTestCase {
 
     func testGoalIsAchievedWithExcess() {
         let goal = manager.createGoal(name: "Test", type: .daily, target: 100)
-        manager.recordProgress(goalId: goal.id, amount: 150)
+        _ = manager.recordProgress(goalId: goal.id, amount: 150)
 
         let retrieved = manager.getGoal(id: goal.id)!
         XCTAssertTrue(retrieved.isAchieved)
@@ -600,7 +600,7 @@ final class WritingGoalManagerTests: XCTestCase {
 
     func testGoalIsNotAchieved() {
         let goal = manager.createGoal(name: "Test", type: .daily, target: 100)
-        manager.recordProgress(goalId: goal.id, amount: 99)
+        _ = manager.recordProgress(goalId: goal.id, amount: 99)
 
         let retrieved = manager.getGoal(id: goal.id)!
         XCTAssertFalse(retrieved.isAchieved)
@@ -608,7 +608,7 @@ final class WritingGoalManagerTests: XCTestCase {
 
     func testGoalRemaining() {
         let goal = manager.createGoal(name: "Test", type: .daily, target: 100)
-        manager.recordProgress(goalId: goal.id, amount: 40)
+        _ = manager.recordProgress(goalId: goal.id, amount: 40)
 
         let retrieved = manager.getGoal(id: goal.id)!
         XCTAssertEqual(retrieved.remaining, 60)
@@ -616,7 +616,7 @@ final class WritingGoalManagerTests: XCTestCase {
 
     func testGoalRemainingWhenAchieved() {
         let goal = manager.createGoal(name: "Test", type: .daily, target: 100)
-        manager.recordProgress(goalId: goal.id, amount: 100)
+        _ = manager.recordProgress(goalId: goal.id, amount: 100)
 
         let retrieved = manager.getGoal(id: goal.id)!
         XCTAssertEqual(retrieved.remaining, 0)
@@ -624,7 +624,7 @@ final class WritingGoalManagerTests: XCTestCase {
 
     func testGoalRemainingNeverNegative() {
         let goal = manager.createGoal(name: "Test", type: .daily, target: 100)
-        manager.recordProgress(goalId: goal.id, amount: 150)
+        _ = manager.recordProgress(goalId: goal.id, amount: 150)
 
         let retrieved = manager.getGoal(id: goal.id)!
         XCTAssertEqual(retrieved.remaining, 0)
@@ -707,7 +707,7 @@ final class WritingGoalManagerTests: XCTestCase {
             target: 1000,
             endDate: fiveDaysFromNow
         )
-        manager.recordProgress(goalId: goal.id, amount: 500)
+        _ = manager.recordProgress(goalId: goal.id, amount: 500)
 
         let retrieved = manager.getGoal(id: goal.id)!
         let required = retrieved.requiredDailyProgress
@@ -808,7 +808,7 @@ final class WritingGoalManagerTests: XCTestCase {
     func testRecordNegativeProgress() {
         let goal = manager.createGoal(name: "Test", type: .daily, target: 500)
 
-        manager.recordProgress(goalId: goal.id, amount: -100)
+        _ = manager.recordProgress(goalId: goal.id, amount: -100)
 
         let retrieved = manager.getGoal(id: goal.id)!
         // Current would be -100, which is allowed by the implementation
@@ -817,9 +817,9 @@ final class WritingGoalManagerTests: XCTestCase {
 
     func testSetProgressToZero() {
         let goal = manager.createGoal(name: "Test", type: .daily, target: 500)
-        manager.recordProgress(goalId: goal.id, amount: 300)
+        _ = manager.recordProgress(goalId: goal.id, amount: 300)
 
-        manager.setProgress(goalId: goal.id, current: 0)
+        _ = manager.setProgress(goalId: goal.id, current: 0)
 
         let retrieved = manager.getGoal(id: goal.id)!
         XCTAssertEqual(retrieved.current, 0)
@@ -829,8 +829,8 @@ final class WritingGoalManagerTests: XCTestCase {
         let goal1 = manager.createGoal(name: "Goal 1", type: .daily, target: 100)
         let goal2 = manager.createGoal(name: "Goal 2", type: .weekly, target: 500)
 
-        manager.recordProgress(goalId: goal1.id, amount: 50)
-        manager.recordProgress(goalId: goal2.id, amount: 200)
+        _ = manager.recordProgress(goalId: goal1.id, amount: 50)
+        _ = manager.recordProgress(goalId: goal2.id, amount: 200)
 
         XCTAssertEqual(manager.getGoal(id: goal1.id)?.current, 50)
         XCTAssertEqual(manager.getGoal(id: goal2.id)?.current, 200)
@@ -866,7 +866,7 @@ final class WritingGoalManagerTests: XCTestCase {
 
     func testWritingStreakProperties() {
         let goal = manager.createGoal(name: "Test", type: .daily, target: 500)
-        manager.recordProgress(goalId: goal.id, amount: 100)
+        _ = manager.recordProgress(goalId: goal.id, amount: 100)
 
         let streak = manager.getStreak()
 
