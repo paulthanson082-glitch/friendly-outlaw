@@ -41,10 +41,7 @@ let package = Package(
             dependencies: ["WritersApp"]),
         .testTarget(
             name: "WritersAppTests",
-            dependencies: ["WritersApp"],
-            swiftSettings: [
-                .unsafeFlags(["-w"])
-            ]),
+            dependencies: ["WritersApp"]),
 
         // Mocker targets
         .target(
@@ -60,10 +57,7 @@ let package = Package(
             ]),
         .testTarget(
             name: "MockerKitTests",
-            dependencies: ["MockerKit"],
-            swiftSettings: [
-                .unsafeFlags(["-w"])
-            ]),
+            dependencies: ["MockerKit"]),
 
         // ManpageOperator target
         .executableTarget(
