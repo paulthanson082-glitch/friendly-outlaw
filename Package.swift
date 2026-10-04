@@ -43,7 +43,7 @@ let package = Package(
             name: "WritersAppTests",
             dependencies: ["WritersApp"],
             swiftSettings: [
-                .unsafeFlags(["-suppress-warnings"])
+                .unsafeFlags(["-w"])
             ]),
 
         // Mocker targets
@@ -62,7 +62,7 @@ let package = Package(
             name: "MockerKitTests",
             dependencies: ["MockerKit"],
             swiftSettings: [
-                .unsafeFlags(["-suppress-warnings"])
+                .unsafeFlags(["-w"])
             ]),
 
         // ManpageOperator target
