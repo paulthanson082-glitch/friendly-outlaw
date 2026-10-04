@@ -60,7 +60,10 @@ let package = Package(
             ]),
         .testTarget(
             name: "MockerKitTests",
-            dependencies: ["MockerKit"]),
+            dependencies: ["MockerKit"],
+            swiftSettings: [
+                .unsafeFlags(["-suppress-warnings"])
+            ]),
 
         // ManpageOperator target
         .executableTarget(
