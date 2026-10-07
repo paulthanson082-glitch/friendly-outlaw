@@ -15,6 +15,7 @@ public class FocusSessionManager {
     // MARK: - Session Lifecycle
 
     /// Starts a new focus session
+    @discardableResult
     public func startSession(
         type: FocusSessionType,
         documentId: UUID? = nil,
@@ -44,6 +45,7 @@ public class FocusSessionManager {
     }
 
     /// Pauses the current session
+    @discardableResult
     public func pauseSession() -> FocusSession? {
         guard var session = currentSession, session.state == .active else {
             return nil
@@ -56,6 +58,7 @@ public class FocusSessionManager {
     }
 
     /// Resumes a paused session
+    @discardableResult
     public func resumeSession(pausedDuration: TimeInterval) -> FocusSession? {
         guard var session = currentSession, session.state == .paused else {
             return nil

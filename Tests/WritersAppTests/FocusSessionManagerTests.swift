@@ -188,13 +188,13 @@ final class FocusSessionManagerTests: XCTestCase {
             let newSession = manager.startSession(type: .pomodoro, currentWordCount: 100)
             // Force the session to be on target
             _ = manager.endSession(id: newSession.id, finalWordCount: 150, completed: false)
-            let targetReachedSession = manager.startSession(type: .pomodoro, currentWordCount: 150)
+            _ = manager.startSession(type: .pomodoro, currentWordCount: 150)
             _ = manager.pauseSession()
             _ = manager.resumeSession(pausedDuration: 0)
         }
 
         // Try with fresh session that has reached target
-        let newPomodoroSession = manager.startSession(type: .pomodoro, currentWordCount: 100)
+        _ = manager.startSession(type: .pomodoro, currentWordCount: 100)
 
         // Simulate time passing to reach target - need to get the session, modify it, then update
         Thread.sleep(forTimeInterval: 0.01)
@@ -224,7 +224,7 @@ final class FocusSessionManagerTests: XCTestCase {
     }
 
     func testEndBreakAndContinue() {
-        let session = manager.startSession(type: .pomodoro, currentWordCount: 100)
+        _ = manager.startSession(type: .pomodoro, currentWordCount: 100)
 
         // Force session into break state by directly manipulating it
         _ = manager.pauseSession()
@@ -501,7 +501,7 @@ final class FocusSessionManagerTests: XCTestCase {
     }
 
     func testSessionActualDurationCalculation() {
-        let session = manager.startSession(type: .pomodoro)
+        _ = manager.startSession(type: .pomodoro)
 
         Thread.sleep(forTimeInterval: 0.1)
 
@@ -511,7 +511,7 @@ final class FocusSessionManagerTests: XCTestCase {
     }
 
     func testPausedTimeExcludedFromActualDuration() {
-        let session = manager.startSession(type: .pomodoro)
+        _ = manager.startSession(type: .pomodoro)
 
         Thread.sleep(forTimeInterval: 0.05)
         manager.pauseSession()

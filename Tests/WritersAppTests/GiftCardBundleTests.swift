@@ -314,7 +314,7 @@ final class GiftCardBundleTests: XCTestCase {
         )
 
         let card1 = try giftCardManager.createGiftCard(bundleId: bundle.id)
-        let card2 = try giftCardManager.createGiftCard(bundleId: bundle.id)
+        _ = try giftCardManager.createGiftCard(bundleId: bundle.id)
 
         try giftCardManager.redeemGiftCard(code: card1.code, userId: UUID())
 
@@ -326,7 +326,7 @@ final class GiftCardBundleTests: XCTestCase {
     }
 
     func testBundleStats() throws {
-        let starterBundle = try giftCardManager.createBundle(
+        _ = try giftCardManager.createBundle(
             name: "Starter",
             description: "Starter",
             price: 29.99,
@@ -335,7 +335,7 @@ final class GiftCardBundleTests: XCTestCase {
             expirationDays: 365
         )
 
-        let proBundle = try giftCardManager.createBundle(
+        _ = try giftCardManager.createBundle(
             name: "Professional",
             description: "Professional",
             price: 99.99,
