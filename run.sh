@@ -29,6 +29,7 @@ show_help() {
     echo "  ./run.sh                                    # Run in debug mode (interactive)"
     echo "  ./run.sh --release                          # Run in release mode (interactive)"
     echo "  ./run.sh --list                             # List all documents"
+    echo "  ./run.sh --status                           # Show current session status"
     echo "  ./run.sh --open \"My Story\"                  # Open a document by title"
     echo "  ./run.sh --release --open <document-id>     # Open document in release mode"
     echo "  ./run.sh --run pomodoro                     # Start a 25-minute Pomodoro session"

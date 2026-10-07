@@ -501,7 +501,7 @@ describe('S24ToolsPage', () => {
     });
 
     it('handles localStorage returning null (first visit) without errors', () => {
-      localStorageMock.getItem.mockReturnValue(null);
+      localStorageMock.getItem.mockReturnValue(null as any);
       expect(() => render(<S24ToolsPage />)).not.toThrow();
       expect(screen.getByText('0/27')).toBeInTheDocument();
     });
@@ -628,6 +628,65 @@ describe('S24ToolsPage', () => {
       await waitFor(() => {
         expect(screen.getByText('0/27')).toBeInTheDocument();
       });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Label string exact-match regression tests (PR change: regex → exact string)
+  // -------------------------------------------------------------------------
+
+  describe('Checkbox label exact string matching', () => {
+    it('uses exact label "Mark complete" (not a partial regex match)', () => {
+      render(<S24ToolsPage />);
+      // getAllByLabelText with exact string should find checkboxes
+      const checkboxes = screen.getAllByLabelText('Mark complete');
+      expect(checkboxes.length).toBeGreaterThan(0);
+    });
+
+    it('label changes to exact string "Mark incomplete" after completing a task', async () => {
+      render(<S24ToolsPage />);
+      const checkbox = screen.getAllByLabelText('Mark complete')[0];
+      fireEvent.click(checkbox);
+
+      await waitFor(() => {
+        const incompleteBtn = screen.getByLabelText('Mark incomplete');
+        expect(incompleteBtn).toBeInTheDocument();
+      });
+    });
+
+    it('label reverts to exact string "Mark complete" after unchecking', async () => {
+      render(<S24ToolsPage />);
+      const checkbox = screen.getAllByLabelText('Mark complete')[0];
+      fireEvent.click(checkbox);
+
+      await waitFor(() =>
+        expect(screen.getByLabelText('Mark incomplete')).toBeInTheDocument()
+      );
+
+      fireEvent.click(screen.getByLabelText('Mark incomplete'));
+
+      await waitFor(() => {
+        // The "Mark incomplete" button is gone
+        expect(screen.queryByLabelText('Mark incomplete')).not.toBeInTheDocument();
+        // A "Mark complete" button exists again
+        expect(screen.getAllByLabelText('Mark complete').length).toBeGreaterThan(0);
+      });
+    });
+
+    it('no "Mark incomplete" buttons are present on initial render', () => {
+      render(<S24ToolsPage />);
+      expect(screen.queryByLabelText('Mark incomplete')).not.toBeInTheDocument();
+    });
+
+    it('each completed task produces exactly one "Mark incomplete" button', async () => {
+      render(<S24ToolsPage />);
+      const checkboxes = screen.getAllByLabelText('Mark complete');
+      fireEvent.click(checkboxes[0]);
+      fireEvent.click(checkboxes[1]);
+
+      await waitFor(() =>
+        expect(screen.getAllByLabelText('Mark incomplete')).toHaveLength(2)
+      );
     });
   });
 });

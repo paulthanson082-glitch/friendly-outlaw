@@ -138,14 +138,15 @@ public struct iPadProScreenSize: Codable {
         case .iPadPro11: return 17
         case .iPadPro13: return 18
         case .iPadProM4_11, .iPadProM4_13: return 18
+        case .iPadProM5_11, .iPadProM5_13: return 18
         }
     }
 
     /// Optimal editor width in points
     public var recommendedEditorWidth: Double {
         switch model {
-        case .iPadPro11, .iPadProM4_11: return 680
-        case .iPadPro13, .iPadProM4_13: return 780
+        case .iPadPro11, .iPadProM4_11, .iPadProM5_11: return 680
+        case .iPadPro13, .iPadProM4_13, .iPadProM5_13: return 780
         }
     }
 }
@@ -156,6 +157,8 @@ public enum iPadProModel: String, Codable, CaseIterable {
     case iPadPro13 = "iPad Pro 12.9-inch"
     case iPadProM4_11 = "iPad Pro 11-inch (M4)"
     case iPadProM4_13 = "iPad Pro 13-inch (M4)"
+    case iPadProM5_11 = "iPad Pro 11-inch (M5)"
+    case iPadProM5_13 = "iPad Pro 13-inch (M5)"
 
     public var displayName: String { rawValue }
 
@@ -190,6 +193,24 @@ public enum iPadProModel: String, Codable, CaseIterable {
                 supportsFaceID: true
             )
         case .iPadProM4_13:
+            return iPadProScreenSize(
+                model: self,
+                widthInches: 11.09, heightInches: 8.32,
+                ppi: 264,
+                supportsProMotion: true,
+                supportsApplePencil: .pro,
+                supportsFaceID: true
+            )
+        case .iPadProM5_11:
+            return iPadProScreenSize(
+                model: self,
+                widthInches: 8.46, heightInches: 5.80,
+                ppi: 264,
+                supportsProMotion: true,
+                supportsApplePencil: .pro,
+                supportsFaceID: true
+            )
+        case .iPadProM5_13:
             return iPadProScreenSize(
                 model: self,
                 widthInches: 11.09, heightInches: 8.32,

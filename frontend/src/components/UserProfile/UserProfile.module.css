@@ -1,0 +1,177 @@
+.container {
+  position: relative;
+}
+
+/* ── Trigger button ──────────────────────────────── */
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 6px;
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 24px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  color: #333;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.trigger:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.trigger:focus-visible {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.25);
+}
+
+/* ── Avatar ──────────────────────────────────────── */
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+
+.displayName {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.chevron {
+  font-size: 10px;
+  color: #666;
+  margin-left: 2px;
+}
+
+/* ── Dropdown menu ───────────────────────────────── */
+.menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  overflow: hidden;
+  animation: menuAppear 0.15s ease-out;
+}
+
+@keyframes menuAppear {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Menu header (user identity section) ─────────── */
+.menuHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+
+.menuAvatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+
+.menuUserInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.menuDisplayName {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menuEmail {
+  font-size: 12px;
+  color: #666;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Divider ─────────────────────────────────────── */
+.divider {
+  margin: 0;
+  border: none;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* ── Menu items ──────────────────────────────────── */
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: 14px;
+  color: #333;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s ease;
+}
+
+.menuItem:hover {
+  background: #f5f5f5;
+}
+
+.menuItem:focus-visible {
+  outline: none;
+  background: #efefef;
+  box-shadow: inset 0 0 0 2px #667eea;
+}
+
+/* ── Responsive ──────────────────────────────────── */
+@media (max-width: 480px) {
+  .displayName {
+    display: none;
+  }
+
+  .trigger {
+    padding: 6px;
+  }
+}

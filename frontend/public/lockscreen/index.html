@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skull Lock Screen</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #000;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    .lockscreen {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      background: radial-gradient(circle at center, #1a1a2e 0%, #000000 100%);
+      overflow: hidden;
+    }
+
+    /* Theme buttons */
+    .themes {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      gap: 10px;
+      z-index: 100;
+    }
+
+    .theme-btn {
+      width: 45px;
+      height: 45px;
+      border-radius: 50%;
+      border: 3px solid white;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .theme-btn:hover {
+      transform: scale(1.15);
+    }
+
+    .theme-btn.active {
+      border-width: 4px;
+      box-shadow: 0 0 25px currentColor;
+    }
+
+    .red { background: linear-gradient(135deg, #8b0000, #ff0000); }
+    .green { background: linear-gradient(135deg, #0a4d0a, #00ff00); }
+    .blue { background: linear-gradient(135deg, #001a4d, #00bfff); }
+    .purple { background: linear-gradient(135deg, #4d004d, #ff00ff); }
+    .yellow { background: linear-gradient(135deg, #4d4d00, #ffff00); }
+    .cyan { background: linear-gradient(135deg, #004d66, #00ffff); }
+
+    /* Smoke animation */
+    .smoke {
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      background: radial-gradient(circle, rgba(100, 100, 100, 0.4) 0%, transparent 70%);
+      border-radius: 50%;
+      filter: blur(30px);
+      animation: rise 12s infinite ease-in-out;
+      opacity: 0;
+    }
+
+    @keyframes rise {
+      0% {
+        transform: translateY(0) scale(0.8);
+        opacity: 0;
+      }
+      20% {
+        opacity: 0.5;
+      }
+      100% {
+        transform: translateY(-600px) scale(1.5);
+        opacity: 0;
+      }
+    }
+
+    /* Skull glow */
+    .glow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(139, 0, 0, 0.5) 0%, transparent 70%);
+      border-radius: 50%;
+      filter: blur(40px);
+      animation: pulse 3s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
+      50% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+    }
+
+    /* Skull */
+    .skull {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 180px;
+      filter: drop-shadow(0 0 40px rgba(139, 0, 0, 0.9));
+      animation: float 5s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+      50% { transform: translate(-50%, -50%) translateY(-15px); }
+    }
+
+    /* Time */
+    .time-box {
+      position: absolute;
+      top: 12%;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      color: white;
+    }
+
+    .time {
+      font-size: 80px;
+      font-weight: 200;
+      letter-spacing: 4px;
+      text-shadow: 0 0 25px rgba(139, 0, 0, 1);
+      margin-bottom: 8px;
+    }
+
+    .date {
+      font-size: 22px;
+      font-weight: 300;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      opacity: 0.9;
+      text-shadow: 0 0 15px rgba(139, 0, 0, 0.8);
+    }
+
+    /* Unlock */
+    .unlock {
+      position: absolute;
+      bottom: 8%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 85%;
+      max-width: 420px;
+    }
+
+    .unlock-text {
+      color: white;
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 18px;
+      letter-spacing: 3px;
+      opacity: 0.9;
+      text-shadow: 0 0 12px rgba(139, 0, 0, 0.7);
+      animation: blink 2s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+
+    .slider {
+      position: relative;
+      width: 100%;
+      height: 65px;
+      background: rgba(20, 20, 20, 0.6);
+      border: 3px solid rgba(139, 0, 0, 0.6);
+      border-radius: 35px;
+      overflow: hidden;
+      backdrop-filter: blur(15px);
+    }
+
+    .track {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      background: linear-gradient(90deg, rgba(139, 0, 0, 0.4) 0%, transparent 100%);
+      border-radius: 35px;
+      width: 0;
+    }
+
+    .button {
+      position: absolute;
+      left: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 53px;
+      height: 53px;
+      background: linear-gradient(135deg, #8b0000, #ff0000);
+      border-radius: 50%;
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 25px rgba(139, 0, 0, 1);
+      font-size: 28px;
+      color: white;
+      user-select: none;
+    }
+
+    .button:active {
+      cursor: grabbing;
+    }
+
+    .message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 56px;
+      font-weight: bold;
+      color: #ff0000;
+      text-shadow: 0 0 35px rgba(255, 0, 0, 1);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 200;
+    }
+
+    .message.show {
+      opacity: 1;
+      animation: pop 0.4s ease-in-out;
+    }
+
+    @keyframes pop {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); }
+      50% { transform: translate(-50%, -50%) scale(1.25); }
+    }
+
+    .particles {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .dot {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: rgba(139, 0, 0, 0.7);
+      border-radius: 50%;
+      animation: fly 9s infinite ease-in-out;
+    }
+
+    @keyframes fly {
+      0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
+      15% { opacity: 1; }
+      100% { transform: translateY(-550px) translateX(60px); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="lockscreen" id="screen">
+    <!-- Themes -->
+    <div class="themes">
+      <div class="theme-btn red active" onclick="setTheme('red')"></div>
+      <div class="theme-btn green" onclick="setTheme('green')"></div>
+      <div class="theme-btn blue" onclick="setTheme('blue')"></div>
+      <div class="theme-btn purple" onclick="setTheme('purple')"></div>
+      <div class="theme-btn yellow" onclick="setTheme('yellow')"></div>
+      <div class="theme-btn cyan" onclick="setTheme('cyan')"></div>
+    </div>
+
+    <!-- Glow -->
+    <div class="glow" id="glow"></div>
+
+    <!-- Skull -->
+    <div class="skull" id="skull">💀</div>
+
+    <!-- Time -->
+    <div class="time-box">
+      <div class="time" id="time">12:00</div>
+      <div class="date" id="date">MONDAY, JANUARY 1</div>
+    </div>
+
+    <!-- Unlock -->
+    <div class="unlock">
+      <div class="unlock-text">SLIDE TO UNLOCK</div>
+      <div class="slider" id="slider">
+        <div class="track" id="track"></div>
+        <div class="button" id="btn">→</div>
+      </div>
+    </div>
+
+    <!-- Message -->
+    <div class="message" id="msg">🔓 UNLOCKED</div>
+
+    <!-- Smoke -->
+    <div id="smokeBox"></div>
+
+    <!-- Particles -->
+    <div class="particles" id="particleBox"></div>
+  </div>
+
+  <script>
+    // Theme colors
+    const colors = {
+      red: { main: '#8b0000', bright: '#ff0000', glow: 'rgba(139, 0, 0, 0.5)' },
+      green: { main: '#0a4d0a', bright: '#00ff00', glow: 'rgba(0, 255, 0, 0.5)' },
+      blue: { main: '#001a4d', bright: '#00bfff', glow: 'rgba(0, 191, 255, 0.5)' },
+      purple: { main: '#4d004d', bright: '#ff00ff', glow: 'rgba(255, 0, 255, 0.5)' },
+      yellow: { main: '#4d4d00', bright: '#ffff00', glow: 'rgba(255, 255, 0, 0.5)' },
+      cyan: { main: '#004d66', bright: '#00ffff', glow: 'rgba(0, 255, 255, 0.5)' }
+    };
+
+    let current = 'red';
+
+    function setTheme(name) {
+      current = name;
+      const c = colors[name];
+
+      document.getElementById('glow').style.background = `radial-gradient(circle, ${c.glow} 0%, transparent 70%)`;
+      document.getElementById('skull').style.filter = `drop-shadow(0 0 40px ${c.glow})`;
+      document.getElementById('time').style.textShadow = `0 0 25px ${c.glow}`;
+      document.getElementById('date').style.textShadow = `0 0 15px ${c.glow}`;
+      document.querySelector('.unlock-text').style.textShadow = `0 0 12px ${c.glow}`;
+      document.getElementById('slider').style.borderColor = c.glow;
+      document.getElementById('track').style.background = `linear-gradient(90deg, ${c.glow} 0%, transparent 100%)`;
+      document.getElementById('btn').style.background = `linear-gradient(135deg, ${c.main}, ${c.bright})`;
+      document.getElementById('btn').style.boxShadow = `0 0 25px ${c.glow}`;
+      document.getElementById('msg').style.color = c.bright;
+      document.getElementById('msg').style.textShadow = `0 0 35px ${c.glow}`;
+
+      document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+      document.querySelector(`.${name}`).classList.add('active');
+
+      document.querySelectorAll('.dot').forEach(d => {
+        d.style.background = c.glow;
+      });
+    }
+
+    // Time
+    function updateTime() {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      document.getElementById('time').textContent = h + ':' + m;
+
+      const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+      const months = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
+
+      document.getElementById('date').textContent = days[now.getDay()] + ', ' + months[now.getMonth()] + ' ' + now.getDate();
+    }
+
+    updateTime();
+    setInterval(updateTime, 1000);
+
+    // Smoke
+    const smokeBox = document.getElementById('smokeBox');
+    for (let i = 0; i < 6; i++) {
+      const s = document.createElement('div');
+      s.className = 'smoke';
+      s.style.left = Math.random() * 100 + '%';
+      s.style.bottom = '-200px';
+      s.style.animationDelay = Math.random() * 8 + 's';
+      smokeBox.appendChild(s);
+    }
+
+    // Particles
+    const particleBox = document.getElementById('particleBox');
+    for (let i = 0; i < 25; i++) {
+      const d = document.createElement('div');
+      d.className = 'dot';
+      d.style.left = Math.random() * 100 + '%';
+      d.style.bottom = '-10px';
+      d.style.animationDelay = Math.random() * 7 + 's';
+      particleBox.appendChild(d);
+    }
+
+    // Slider
+    const btn = document.getElementById('btn');
+    const slider = document.getElementById('slider');
+    const track = document.getElementById('track');
+    const msg = document.getElementById('msg');
+    const screen = document.getElementById('screen');
+
+    let dragging = false;
+    let rect = null;
+    let start = 0;
+
+    btn.addEventListener('mousedown', e => {
+      e.preventDefault();
+      dragging = true;
+      rect = slider.getBoundingClientRect();
+      start = e.clientX - rect.left - 6;
+      btn.style.transition = 'none';
+      track.style.transition = 'none';
+    });
+
+    btn.addEventListener('touchstart', e => {
+      e.preventDefault();
+      dragging = true;
+      rect = slider.getBoundingClientRect();
+      start = e.touches[0].clientX - rect.left - 6;
+      btn.style.transition = 'none';
+      track.style.transition = 'none';
+    });
+
+    document.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      e.preventDefault();
+
+      const x = e.clientX - rect.left;
+      const dx = x - start;
+      const max = rect.width - 65;
+
+      let pos = Math.max(6, Math.min(dx, max));
+      btn.style.left = pos + 'px';
+      track.style.width = (pos + 27) + 'px';
+
+      if (pos >= max - 5) unlock();
+    });
+
+    document.addEventListener('touchmove', e => {
+      if (!dragging) return;
+      e.preventDefault();
+
+      const x = e.touches[0].clientX - rect.left;
+      const dx = x - start;
+      const max = rect.width - 65;
+
+      let pos = Math.max(6, Math.min(dx, max));
+      btn.style.left = pos + 'px';
+      track.style.width = (pos + 27) + 'px';
+
+      if (pos >= max - 5) unlock();
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      const pos = parseInt(btn.style.left) || 6;
+      const max = rect.width - 65;
+
+      if (pos < max - 5) {
+        btn.style.transition = 'left 0.3s';
+        track.style.transition = 'width 0.3s';
+        btn.style.left = '6px';
+        track.style.width = '0';
+      }
+    });
+
+    document.addEventListener('touchend', () => {
+      if (!dragging) return;
+      dragging = false;
+      const pos = parseInt(btn.style.left) || 6;
+      const max = rect.width - 65;
+
+      if (pos < max - 5) {
+        btn.style.transition = 'left 0.3s';
+        track.style.transition = 'width 0.3s';
+        btn.style.left = '6px';
+        track.style.width = '0';
+      }
+    });
+
+    function unlock() {
+      dragging = false;
+      msg.classList.add('show');
+      screen.style.opacity = '0.4';
+
+      setTimeout(() => {
+        msg.classList.remove('show');
+        screen.style.opacity = '1';
+        btn.style.transition = 'left 0.3s';
+        track.style.transition = 'width 0.3s';
+        btn.style.left = '6px';
+        track.style.width = '0';
+      }, 1800);
+    }
+  </script>
+</body>
+</html>

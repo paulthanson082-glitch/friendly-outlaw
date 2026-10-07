@@ -11,28 +11,43 @@ public class ProspectDatabase {
 
     public init() {}
 
-    // MARK: CRUD
+    /// Adds or replaces a prospect in the in-memory store keyed by its `id`.
+    /// - Parameter prospect: The `Prospect` to store; if an entry with the same `id` exists it will be overwritten.
 
     public func addProspect(_ prospect: Prospect) {
         prospects[prospect.id] = prospect
     }
 
+    /// Retrieves a prospect by its identifier.
+    /// - Parameter id: The UUID of the prospect to retrieve.
+    /// - Returns: The `Prospect` with the given identifier, or `nil` if no matching prospect exists.
     public func getProspect(id: UUID) -> Prospect? {
         return prospects[id]
     }
 
+    /// Retrieve all stored prospects sorted by creation date, newest first.
+    /// - Returns: An array of `Prospect` objects sorted by `createdAt` in descending order (newest first).
     public func getAllProspects() -> [Prospect] {
         return Array(prospects.values).sorted { $0.createdAt > $1.createdAt }
     }
 
+    /// Retrieve all prospects with the given status, sorted by creation date descending.
+    /// - Parameter status: The prospect status to filter by.
+    /// - Returns: An array of `Prospect` objects whose `status` equals `status`, ordered by `createdAt` descending.
     public func getProspects(withStatus status: ProspectStatus) -> [Prospect] {
         return getAllProspects().filter { $0.status == status }
     }
 
+    /// Inserts or replaces a prospect in the in-memory store using the prospect's `id`.
+    /// - Parameter prospect: The `Prospect` to store; if a prospect with the same `id` exists it will be overwritten.
     public func updateProspect(_ prospect: Prospect) {
         prospects[prospect.id] = prospect
     }
 
+    /// Update the status of the prospect identified by `id`.
+    /// 
+    /// If the new `status` is `.contacted`, `.replied`, or `.meeting`, the prospect's `lastContactedAt` is set to the current date. The updated prospect is written back to the in-memory store.
+    /// - Throws: `CoworkError.prospectNotFound(id)` if no prospect exists with the provided `id`.
     public func updateProspectStatus(id: UUID, status: ProspectStatus) throws {
         guard var prospect = prospects[id] else {
             throw CoworkError.prospectNotFound(id)
@@ -44,10 +59,16 @@ public class ProspectDatabase {
         prospects[id] = prospect
     }
 
+    /// Removes the prospect with the specified identifier from the in-memory store.
+    /// - Parameter id: The UUID of the prospect to remove.
     public func deleteProspect(id: UUID) {
         prospects.removeValue(forKey: id)
     }
 
+    /// Searches stored prospects for records matching the given query across name, email, company, notes, and tags.
+    /// - Parameters:
+    ///   - query: The search term matched case-insensitively against name, email, optional company, notes, and each tag.
+    /// - Returns: An array of `Prospect` objects whose fields contain `query` (case-insensitive). Results preserve the aggregate ordering from `getAllProspects()` (createdAt descending).
     public func searchProspects(query: String) -> [Prospect] {
         let q = query.lowercased()
         return getAllProspects().filter {
@@ -59,7 +80,8 @@ public class ProspectDatabase {
         }
     }
 
-    // MARK: Statistics
+    /// Computes the number of stored prospects grouped by their status.
+    /// - Returns: A dictionary mapping each `ProspectStatus` (every case from `ProspectStatus.allCases`) to the number of prospects currently in that status; statuses with no matching prospects have a value of `0`.
 
     public func getStats() -> [ProspectStatus: Int] {
         var counts: [ProspectStatus: Int] = [:]
@@ -90,14 +112,29 @@ public class GmailService {
     /// Fetch a list of messages from the inbox.
     /// - Parameters:
     ///   - maxResults: Maximum number of messages to fetch (default 20).
-    ///   - query: Optional Gmail search query (e.g. `"from:agent@example.com"`).
+    /// Fetches a list of Gmail messages from the authenticated user's mailbox.
+    /// - Parameters:
+    ///   - maxResults: Maximum number of message metadata entries to request (also bounds how many full messages are fetched).
+    ///   - query: Optional Gmail search query string (percent-encoded); when provided, the server filters messages by this query.
+    /// - Returns: An array of `GmailMessage` objects for messages found (up to `maxResults`); individual messages that fail to fetch are skipped.
+    /// Fetches message metadata from Gmail and returns the corresponding full messages in the same order as the list response.
+    /// 
+    /// Constructs a messages list request with `maxResults` and an optional Gmail `q` search string, then fetches each full message concurrently and returns them ordered to match the original list response.
+    /// - Parameters:
+    ///   - maxResults: Maximum number of messages to request and return.
+    ///   - query: Optional Gmail search query (the `q` parameter) to filter the listed messages.
+    /// - Returns: An array of `GmailMessage` objects ordered to match the server's list response (limited to `maxResults`).
+    /// - Throws: `CoworkError.invalidURL` if the request URL cannot be built; also propagates network, parsing, and message-fetching errors from the underlying requests.
     public func listMessages(maxResults: Int = 20, query: String? = nil) async throws -> [GmailMessage] {
-        var urlString = "\(baseURL)/messages?maxResults=\(maxResults)"
+        var components = URLComponents(string: "\(baseURL)/messages")
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "maxResults", value: String(maxResults))
+        ]
         if let q = query, !q.isEmpty {
-            let encoded = q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q
-            urlString += "&q=\(encoded)"
+            queryItems.append(URLQueryItem(name: "q", value: q))
         }
-        guard let url = URL(string: urlString) else { throw CoworkError.invalidURL }
+        components?.queryItems = queryItems
+        guard let url = components?.url else { throw CoworkError.invalidURL }
 
         let listData = try await performRequest(url: url, method: "GET")
         guard let json = try JSONSerialization.jsonObject(with: listData) as? [String: Any],
@@ -105,19 +142,33 @@ public class GmailService {
             return []
         }
 
-        var messages: [GmailMessage] = []
-        for item in messageList.prefix(maxResults) {
-            if let msgId = item["id"] as? String,
-               let msg = try? await getMessage(id: msgId) {
-                messages.append(msg)
+        let limitedMessages = Array(messageList.prefix(maxResults))
+        var messagesByIndex: [(Int, GmailMessage)] = []
+        messagesByIndex.reserveCapacity(limitedMessages.count)
+
+        try await withThrowingTaskGroup(of: (Int, GmailMessage).self) { group in
+            for (index, item) in limitedMessages.enumerated() {
+                guard let msgId = item["id"] as? String else { continue }
+                group.addTask {
+                    let message = try await self.getMessage(id: msgId)
+                    return (index, message)
+                }
+            }
+            for try await result in group {
+                messagesByIndex.append(result)
             }
         }
-        return messages
+
+        messagesByIndex.sort { $0.0 < $1.0 }
+        return messagesByIndex.map { $0.1 }
     }
 
     // MARK: Get single message
 
-    /// Fetch the full content of a specific message.
+    /// Fetches a full Gmail message for the given message ID and returns it as a parsed `GmailMessage`.
+    /// - Parameter id: The Gmail message identifier to retrieve.
+    /// - Returns: The parsed `GmailMessage` corresponding to `id`.
+    /// - Throws: `CoworkError.invalidURL` if the request URL cannot be constructed; `CoworkError.invalidOAuthToken` on a 401 response; `CoworkError.networkError` for other HTTP/network failures; or an error if the response cannot be parsed into a `GmailMessage`.
     public func getMessage(id: String) async throws -> GmailMessage {
         guard let url = URL(string: "\(baseURL)/messages/\(id)?format=full") else {
             throw CoworkError.invalidURL
@@ -130,7 +181,11 @@ public class GmailService {
 
     /// Send an email via Gmail.
     /// - Parameter draft: The composed email to send.
-    /// - Returns: The sent message ID.
+    /// Sends the provided draft via the Gmail API and returns the resulting message ID.
+    /// - Parameter draft: The `GmailDraft` to send. If `draft.inReplyTo` is set, the sent message will include that thread ID.
+    /// - Returns: The Gmail message ID of the sent message.
+    /// - Throws: `CoworkError.invalidURL` if the send endpoint URL cannot be constructed.
+    ///           `CoworkError.networkError` if the response format is unexpected or if the request fails with an HTTP/network error.
     @discardableResult
     public func sendMessage(draft: GmailDraft) async throws -> String {
         let rawMessage = buildRFC2822(draft: draft)
@@ -158,7 +213,10 @@ public class GmailService {
 
     // MARK: Mark as read
 
-    /// Mark a message as read by removing the UNREAD label.
+    /// Marks a Gmail message as read by removing the `UNREAD` label.
+    /// - Parameter id: The Gmail message identifier to mark as read.
+    /// - Throws: `CoworkError.invalidURL` if the modify endpoint URL cannot be constructed.
+    ///           Propagates errors from the network request (e.g., authentication failures or HTTP errors).
     public func markAsRead(id: String) async throws {
         guard let url = URL(string: "\(baseURL)/messages/\(id)/modify") else {
             throw CoworkError.invalidURL
@@ -167,7 +225,9 @@ public class GmailService {
         _ = try await performRequest(url: url, method: "POST", body: body)
     }
 
-    // MARK: - Private helpers
+    /// Constructs an RFC 2822-compliant message string from a `GmailDraft`.
+    /// - Parameter draft: The draft containing `to`, `subject`, `body`, and optional `inReplyTo` to include as reply headers.
+    /// - Returns: A CRLF-separated string containing the message headers followed by a blank line and the message body.
 
     private func buildRFC2822(draft: GmailDraft) -> String {
         var headers = [
@@ -182,6 +242,9 @@ public class GmailService {
         return (headers + ["", draft.body]).joined(separator: "\r\n")
     }
 
+    /// Parses Gmail message JSON data and constructs a `GmailMessage`.
+    /// - Returns: A `GmailMessage` populated from the JSON (id, threadId, subject, from, to, snippet, body, date, isRead, labels).
+    /// - Throws: `CoworkError.networkError` if the provided data is not valid message JSON.
     private func parseMessage(data: Data) throws -> GmailMessage {
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw CoworkError.networkError("Invalid message JSON")
@@ -231,6 +294,13 @@ public class GmailService {
         )
     }
 
+    /// Extracts the plain-text message body from a Gmail message payload dictionary.
+    /// 
+    /// Attempts to read and base64url-decode the top-level `body.data`. If that is absent,
+    /// iterates `parts` and returns the first part whose `mimeType` is `"text/plain"` and
+    /// contains decodable `body.data`. If no decodable plain-text body is found, returns an empty string.
+    /// - Parameter payload: A JSON-like payload dictionary from a Gmail message.
+    /// - Returns: The decoded plain-text body, or an empty string if none is available.
     private func extractBody(payload: [String: Any]) -> String {
         if let bodySection = payload["body"] as? [String: Any],
            let encoded = bodySection["data"] as? String,
@@ -251,6 +321,9 @@ public class GmailService {
         return ""
     }
 
+    /// Decodes a base64url-encoded string into a UTF-8 string.
+    /// - Parameter encoded: The input string using base64url encoding ( '-' and '_' variants, may be missing padding).
+    /// - Returns: The decoded UTF-8 string, or `nil` if the input is not valid base64url or cannot be decoded as UTF-8.
     private func decodeBase64URL(_ encoded: String) -> String? {
         var padded = encoded
             .replacingOccurrences(of: "-", with: "+")
@@ -263,6 +336,15 @@ public class GmailService {
         return String(data: data, encoding: .utf8)
     }
 
+    /// Sends an HTTP request with the stored OAuth bearer token and returns the raw response data.
+    /// - Parameters:
+    ///   - url: The destination URL for the request.
+    ///   - method: The HTTP method to use (for example, `"GET"` or `"POST"`).
+    ///   - body: Optional JSON-serializable dictionary to include as the request body.
+    /// - Returns: The response body as `Data`.
+    /// - Throws:
+    ///   - `CoworkError.invalidOAuthToken` if the server responds with HTTP 401.
+    ///   - `CoworkError.networkError` with a message describing HTTP status and response body for any status code >= 400.
     private func performRequest(
         url: URL,
         method: String,
@@ -301,7 +383,12 @@ public class BrowserService {
     // MARK: Fetch
 
     /// Fetch a URL and return its text content.
-    /// - Parameter urlString: The URL to fetch (must begin with http:// or https://).
+    /// Fetches a web page, extracts a readable title and plain-text content, and appends the result to the service history.
+    ///
+    /// The `urlString` must be a valid `http` or `https` URL. The response body is decoded into text (falling back from UTF-8 to ISO Latin-1 if needed), a title and stripped text content are produced, and a `BrowsedPage` is created and stored in `history`.
+    /// - Parameter urlString: The URL to fetch as a string; must use the `http` or `https` scheme.
+    /// - Returns: A `BrowsedPage` containing the requested URL, the extracted title, and the plain-text page content.
+    /// - Throws: `CoworkError.invalidURL` if `urlString` is not a valid `http`/`https` URL; `CoworkError.browserFetchFailed(_)` if the HTTP response indicates a failure (status code >= 400).
     public func fetch(urlString: String) async throws -> BrowsedPage {
         guard let url = URL(string: urlString),
               let scheme = url.scheme,
@@ -331,12 +418,14 @@ public class BrowserService {
         return page
     }
 
-    /// Clear the in-session browsing history.
+    /// Clears the service's browsing history by removing all stored entries from `history`.
     public func clearHistory() {
         history.removeAll()
     }
 
-    // MARK: - HTML parsing helpers
+    /// Extracts the content of the first <title>...</title> tag from the provided HTML string.
+    /// - Parameter html: The raw HTML to search for a <title> tag.
+    /// - Returns: The trimmed title text if found, otherwise "Untitled".
 
     private func extractHTMLTitle(from html: String) -> String {
         guard let titleStart = html.range(of: "<title", options: .caseInsensitive),
@@ -352,6 +441,13 @@ public class BrowserService {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Converts an HTML string into readable plain text by removing markup and normalizing whitespace.
+    /// 
+    /// The result preserves meaningful block breaks as newline-separated lines, decodes common HTML entities (e.g. `&amp;`, `&nbsp;`), and omits empty lines.
+    /// - Parameter html: The HTML input to convert.
+    /// Converts HTML into readable plain text by removing scripts, styles, and head sections, stripping HTML tags, decoding common entities, and preserving block-level breaks as line separators.
+    /// - Parameter html: The HTML source to convert.
+    /// - Returns: Plain-text content with block-level tags replaced by newlines, all other tags removed, common HTML entities decoded, and empty lines collapsed.
     private func stripHTML(_ html: String) -> String {
         var text = html
 
@@ -363,7 +459,7 @@ public class BrowserService {
                       options: .caseInsensitive,
                       range: start.lowerBound..<text.endIndex
                   ) {
-                text.removeSubrange(start.lowerBound...end.upperBound)
+                text.removeSubrange(start.lowerBound..<end.upperBound)
             }
         }
 

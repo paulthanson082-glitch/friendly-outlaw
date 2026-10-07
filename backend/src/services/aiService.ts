@@ -14,15 +14,21 @@ export interface StreamChunk {
 }
 
 export class AIService {
-  private client: Anthropic;
+  private client: Anthropic | null;
   private model = 'claude-3-5-sonnet-20241022';
   private maxTokens = 4096;
   private temperature = 0.7;
 
   constructor() {
-    this.client = new Anthropic({
-      apiKey: config.ANTHROPIC_API_KEY,
-    });
+    this.client = config.ANTHROPIC_API_KEY !== ''
+      ? new Anthropic({ apiKey: config.ANTHROPIC_API_KEY })
+      : null;
+
+    if (!this.client) {
+      logger.warn(
+        'ANTHROPIC_API_KEY is not set — AI features will be unavailable'
+      );
+    }
   }
 
   /**
@@ -33,6 +39,14 @@ export class AIService {
     conversationHistory: AIMessage[] = [],
     systemPrompt?: string
   ): AsyncGenerator<StreamChunk, void, unknown> {
+    if (!this.client) {
+      yield {
+        type: 'error',
+        content:
+          'AI features are unavailable: ANTHROPIC_API_KEY is not configured',
+      };
+      return;
+    }
     try {
       const messages: AIMessage[] = [
         ...conversationHistory,
@@ -78,6 +92,12 @@ export class AIService {
     conversationHistory: AIMessage[] = [],
     systemPrompt?: string
   ): Promise<string> {
+    if (!this.client) {
+      throw new AIServiceError(
+        new Error('ANTHROPIC_API_KEY is not configured'),
+        'AI features are unavailable: ANTHROPIC_API_KEY is not configured'
+      );
+    }
     try {
       const messages: AIMessage[] = [
         ...conversationHistory,

@@ -707,7 +707,9 @@ private struct AddContactSheet: View {
                 .scrollContentBackground(.hidden)
             }
             .navigationTitle("Add to Roster")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { isPresented = false }
@@ -779,14 +781,18 @@ private struct AddDealSheet: View {
                     }
                     Section(header: MetalTheme.sectionTitle("Value (optional)")) {
                         TextField("Contract value ($)", text: $valueText)
+                            #if os(iOS)
                             .keyboardType(.decimalPad)
+                            #endif
                             .foregroundColor(MetalTheme.chrome)
                     }
                 }
                 .scrollContentBackground(.hidden)
             }
             .navigationTitle("New Deal")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { isPresented = false }

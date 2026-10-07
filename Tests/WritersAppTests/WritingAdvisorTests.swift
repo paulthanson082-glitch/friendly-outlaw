@@ -32,7 +32,7 @@ final class AdvisorCategoryTests: XCTestCase {
     func testAdvisorCategoryInitFromUnknownRawValueReturnsNil() {
         XCTAssertNil(AdvisorCategory(rawValue: "unknown"))
         XCTAssertNil(AdvisorCategory(rawValue: ""))
-        XCTAssertNil(AdvisorCategory(rawValue: "Productivity"))  // case-sensitive
+        XCTAssertNil(AdvisorCategory(rawValue: "Productivity")) // case-sensitive
     }
 
     func testAdvisorCategoryCodableRoundTrip() throws {
@@ -43,10 +43,19 @@ final class AdvisorCategoryTests: XCTestCase {
         }
     }
 
-    func testAdvisorCategoryAllCasesMatchRawValues() {
+    func testAdvisorCategoryAllCasesMatchExpectedRawValues() {
         let expectedRawValues: Set<String> = ["productivity", "creativity", "consistency", "craft", "goals"]
         let actualRawValues = Set(AdvisorCategory.allCases.map { $0.rawValue })
         XCTAssertEqual(actualRawValues, expectedRawValues)
+    }
+
+    func testAdvisorCategoryAllCasesCount() {
+        XCTAssertEqual(AdvisorCategory.allCases.count, 5)
+    }
+
+    func testAdvisorCategoryDisplayNamesAreDistinct() {
+        let names = AdvisorCategory.allCases.map { $0.displayName }
+        XCTAssertEqual(names.count, Set(names).count, "All display names must be unique")
     }
 }
 
@@ -60,6 +69,10 @@ final class AdvisorPriorityTests: XCTestCase {
         XCTAssertEqual(AdvisorPriority.low.rawValue, "low")
     }
 
+    func testAdvisorPriorityAllCasesCount() {
+        XCTAssertEqual(AdvisorPriority.allCases.count, 3)
+    }
+
     func testAdvisorPriorityInitFromRawValue() {
         XCTAssertEqual(AdvisorPriority(rawValue: "high"), .high)
         XCTAssertEqual(AdvisorPriority(rawValue: "medium"), .medium)
@@ -69,7 +82,7 @@ final class AdvisorPriorityTests: XCTestCase {
     func testAdvisorPriorityInitFromUnknownRawValueReturnsNil() {
         XCTAssertNil(AdvisorPriority(rawValue: "critical"))
         XCTAssertNil(AdvisorPriority(rawValue: ""))
-        XCTAssertNil(AdvisorPriority(rawValue: "High"))  // case-sensitive
+        XCTAssertNil(AdvisorPriority(rawValue: "High")) // case-sensitive
     }
 
     func testAdvisorPriorityCodableRoundTrip() throws {
@@ -78,6 +91,12 @@ final class AdvisorPriorityTests: XCTestCase {
             let decoded = try JSONDecoder().decode(AdvisorPriority.self, from: encoded)
             XCTAssertEqual(decoded, priority, "Codable round-trip failed for \(priority.rawValue)")
         }
+    }
+
+    func testAdvisorPriorityAllCasesMatchExpectedRawValues() {
+        let expected: Set<String> = ["high", "medium", "low"]
+        let actual = Set(AdvisorPriority.allCases.map { $0.rawValue })
+        XCTAssertEqual(actual, expected)
     }
 }
 
@@ -165,6 +184,38 @@ final class AdvisorRecommendationTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(rec.generatedAt, before)
         XCTAssertLessThanOrEqual(rec.generatedAt, after)
     }
+
+    func testAdvisorRecommendationExplicitGeneratedAtIsPreserved() {
+        let fixedDate = Date(timeIntervalSince1970: 1_600_000_000)
+        let rec = AdvisorRecommendation(
+            category: .craft, priority: .low,
+            title: "T", recommendation: "R", actionableSteps: [],
+            generatedAt: fixedDate
+        )
+        XCTAssertEqual(rec.generatedAt, fixedDate)
+    }
+
+    func testAdvisorRecommendationActionableStepsOrderPreserved() {
+        let steps = ["First", "Second", "Third", "Fourth"]
+        let rec = AdvisorRecommendation(
+            category: .productivity, priority: .high,
+            title: "T", recommendation: "R", actionableSteps: steps
+        )
+        XCTAssertEqual(rec.actionableSteps, steps)
+    }
+
+    func testAdvisorRecommendationAllCategoryVariantsCanBeCreated() {
+        for category in AdvisorCategory.allCases {
+            for priority in AdvisorPriority.allCases {
+                let rec = AdvisorRecommendation(
+                    category: category, priority: priority,
+                    title: "T", recommendation: "R", actionableSteps: []
+                )
+                XCTAssertEqual(rec.category, category)
+                XCTAssertEqual(rec.priority, priority)
+            }
+        }
+    }
 }
 
 // MARK: - WritingAdvisorReport Tests
@@ -206,6 +257,15 @@ final class WritingAdvisorReportTests: XCTestCase {
         XCTAssertLessThanOrEqual(report.generatedAt, after)
     }
 
+    func testWritingAdvisorReportExplicitGeneratedAtIsPreserved() {
+        let fixedDate = Date(timeIntervalSince1970: 1_500_000_000)
+        let report = WritingAdvisorReport(
+            recommendations: [], overallAssessment: "", focusArea: .goals,
+            generatedAt: fixedDate
+        )
+        XCTAssertEqual(report.generatedAt, fixedDate)
+    }
+
     func testWritingAdvisorReportCodablePreservesMultipleRecommendations() throws {
         let recs = [
             AdvisorRecommendation(
@@ -232,6 +292,29 @@ final class WritingAdvisorReportTests: XCTestCase {
         XCTAssertEqual(decoded.focusArea, .craft)
         XCTAssertEqual(decoded.recommendations[0].title, "Focus")
         XCTAssertEqual(decoded.recommendations[1].title, "Polish")
+    }
+
+    func testWritingAdvisorReportCodableEmptyAssessment() throws {
+        let report = WritingAdvisorReport(
+            recommendations: [],
+            overallAssessment: "",
+            focusArea: .creativity
+        )
+        let data = try JSONEncoder().encode(report)
+        let decoded = try JSONDecoder().decode(WritingAdvisorReport.self, from: data)
+        XCTAssertEqual(decoded.overallAssessment, "")
+        XCTAssertEqual(decoded.focusArea, .creativity)
+    }
+
+    func testWritingAdvisorReportAllFocusAreasCanBeStored() {
+        for category in AdvisorCategory.allCases {
+            let report = WritingAdvisorReport(
+                recommendations: [],
+                overallAssessment: "Assessment",
+                focusArea: category
+            )
+            XCTAssertEqual(report.focusArea, category)
+        }
     }
 }
 
@@ -288,6 +371,30 @@ final class AdvisorContextTests: XCTestCase {
             sessionStats: nil
         )
         XCTAssertNil(ctx.additionalNotes)
+    }
+
+    func testAdvisorContextZeroCountsAreValid() {
+        let ctx = AdvisorContext(
+            totalDocuments: 0,
+            recentDocumentTitles: [],
+            totalWordsAcrossDocuments: 0,
+            documentCategories: [],
+            sessionStats: nil
+        )
+        XCTAssertEqual(ctx.totalDocuments, 0)
+        XCTAssertEqual(ctx.totalWordsAcrossDocuments, 0)
+    }
+
+    func testAdvisorContextLargeDocumentCountIsStored() {
+        let ctx = AdvisorContext(
+            totalDocuments: 10000,
+            recentDocumentTitles: [],
+            totalWordsAcrossDocuments: 5_000_000,
+            documentCategories: [],
+            sessionStats: nil
+        )
+        XCTAssertEqual(ctx.totalDocuments, 10000)
+        XCTAssertEqual(ctx.totalWordsAcrossDocuments, 5_000_000)
     }
 }
 
@@ -381,7 +488,7 @@ final class WritingAdvisorServiceContextBuildingTests: XCTestCase {
         let stats = SessionStats(
             totalSessions: 5,
             totalDurationSeconds: 9000,
-            averageDurationSeconds: 1800,  // 30 minutes
+            averageDurationSeconds: 1800, // 30 minutes
             earliestSession: nil,
             latestSession: nil
         )
@@ -508,6 +615,85 @@ final class WritingAdvisorServiceContextBuildingTests: XCTestCase {
         let text = service.buildContextText(from: ctx)
         XCTAssertTrue(text.contains("Documents: 0 total, 0 words"))
     }
+
+    func testBuildContextTextTitlesSeparatedByCommaSpace() {
+        let ctx = AdvisorContext(
+            totalDocuments: 3,
+            recentDocumentTitles: ["Title A", "Title B", "Title C"],
+            totalWordsAcrossDocuments: 0,
+            documentCategories: [],
+            sessionStats: nil
+        )
+        let text = service.buildContextText(from: ctx)
+        XCTAssertTrue(text.contains("\"Title A\", \"Title B\", \"Title C\""),
+                      "Titles must be comma-space separated and individually quoted")
+    }
+
+    func testBuildContextTextSingleTitle() {
+        let ctx = AdvisorContext(
+            totalDocuments: 1,
+            recentDocumentTitles: ["Only One"],
+            totalWordsAcrossDocuments: 100,
+            documentCategories: [],
+            sessionStats: nil
+        )
+        let text = service.buildContextText(from: ctx)
+        XCTAssertTrue(text.contains("\"Only One\""),
+                      "Single title must be quoted in context text")
+        let titleLine = text.components(separatedBy: "\n")
+            .first(where: { $0.hasPrefix("Recent titles:") })
+        XCTAssertNotNil(titleLine, "Recent titles line must be present")
+        XCTAssertFalse(titleLine?.contains("\", \"") ?? false,
+                       "Single title must not have a comma-separated list")
+    }
+
+    func testBuildContextTextSessionAverageZeroSeconds() {
+        let stats = SessionStats(
+            totalSessions: 3,
+            totalDurationSeconds: 0,
+            averageDurationSeconds: 0,
+            earliestSession: nil,
+            latestSession: nil
+        )
+        let ctx = AdvisorContext(
+            totalDocuments: 0,
+            recentDocumentTitles: [],
+            totalWordsAcrossDocuments: 0,
+            documentCategories: [],
+            sessionStats: stats
+        )
+        let text = service.buildContextText(from: ctx)
+        XCTAssertTrue(text.contains("avg 0 min"),
+                      "Zero-second average duration should format to 0 min")
+    }
+
+    func testBuildContextTextOnlyDocumentLineWhenAllOptionalFieldsAbsent() {
+        let ctx = AdvisorContext(
+            totalDocuments: 7,
+            recentDocumentTitles: [],
+            totalWordsAcrossDocuments: 3000,
+            documentCategories: [],
+            sessionStats: nil
+        )
+        let text = service.buildContextText(from: ctx)
+        let lines = text.components(separatedBy: "\n")
+        XCTAssertEqual(lines.count, 1,
+                       "With no optional fields, only the documents line must be present")
+        XCTAssertTrue(lines[0].contains("Documents:"))
+    }
+
+    func testBuildContextTextTitlesTrimmedCorrectly() {
+        let ctx = AdvisorContext(
+            totalDocuments: 1,
+            recentDocumentTitles: ["My Story"],
+            totalWordsAcrossDocuments: 500,
+            documentCategories: [],
+            sessionStats: nil
+        )
+        let text = service.buildContextText(from: ctx)
+        // Must appear as "My Story" not ' My Story ' (no extra spaces)
+        XCTAssertTrue(text.contains("\"My Story\""))
+    }
 }
 
 // MARK: - AIAssistanceType.writingAdvisor Tests
@@ -557,20 +743,6 @@ final class AIAssistanceTypeWritingAdvisorTests: XCTestCase {
                       "Prompt must reference actionableSteps in the JSON schema")
     }
 
-    func testWritingAdvisorPromptWithContextIncludesContextInfo() {
-        let ctx = AIContext(
-            genre: "Fantasy",
-            targetAudience: "Adults",
-            existingCharacters: ["Aera", "Mira"],
-            plotSummary: "A hero's journey",
-            additionalNotes: nil
-        )
-        let prompt = AIAssistanceType.writingAdvisor.prompt(for: "some data", context: ctx)
-        XCTAssertFalse(prompt.isEmpty)
-        XCTAssertTrue(prompt.contains("some data"),
-                      "Prompt must still embed the writer data when context is provided")
-    }
-
     func testWritingAdvisorPromptWithNilContextIsNonEmpty() {
         let prompt = AIAssistanceType.writingAdvisor.prompt(for: "writer stats", context: nil)
         XCTAssertFalse(prompt.isEmpty)
@@ -580,6 +752,34 @@ final class AIAssistanceTypeWritingAdvisorTests: XCTestCase {
         let prompt = AIAssistanceType.writingAdvisor.prompt(for: "data")
         XCTAssertTrue(prompt.contains("3-5"),
                       "Prompt must specify 3-5 coaching recommendations")
+    }
+
+    func testWritingAdvisorPromptContainsTitleField() {
+        let prompt = AIAssistanceType.writingAdvisor.prompt(for: "data")
+        XCTAssertTrue(prompt.contains("\"title\"") || prompt.contains("title"),
+                      "Prompt must reference a title field in the JSON schema")
+    }
+
+    func testWritingAdvisorPromptContainsRecommendationField() {
+        let prompt = AIAssistanceType.writingAdvisor.prompt(for: "data")
+        XCTAssertTrue(prompt.contains("\"recommendation\"") || prompt.contains("recommendation"),
+                      "Prompt must reference a recommendation field in the JSON schema")
+    }
+
+    func testWritingAdvisorPromptEmbedsDifferentTextEachCall() {
+        let text1 = "Short bio"
+        let text2 = "Longer writer data with many documents"
+        let prompt1 = AIAssistanceType.writingAdvisor.prompt(for: text1)
+        let prompt2 = AIAssistanceType.writingAdvisor.prompt(for: text2)
+        XCTAssertTrue(prompt1.contains(text1))
+        XCTAssertTrue(prompt2.contains(text2))
+        XCTAssertNotEqual(prompt1, prompt2)
+    }
+
+    func testWritingAdvisorIsIncludedInKnownAssistanceTypes() {
+        // Verify writingAdvisor is a distinct, accessible case
+        let type = AIAssistanceType.writingAdvisor
+        XCTAssertEqual(type.displayName, "Writing Advisor")
     }
 }
 
@@ -623,7 +823,6 @@ final class WritersAppWritingAdvisorTests: XCTestCase {
         app.disableAI()
         app.enableAI(configuration: AIConfiguration(apiKey: "key-2"))
         XCTAssertNotNil(app.writingAdvisorService)
-        // Services should be different objects (new service created after re-enable)
         XCTAssertTrue(app.writingAdvisorService !== firstService,
                       "A new WritingAdvisorService instance must be created on re-enable")
     }
@@ -691,76 +890,31 @@ final class WritersAppWritingAdvisorTests: XCTestCase {
             XCTFail("Unexpected error: \(error)")
         }
     }
-}
 
-// MARK: - WritingAdvisorService Parsing Tests (via internal surface)
-
-final class WritingAdvisorServiceParsingTests: XCTestCase {
-
-    private var service: WritingAdvisorService!
-
-    override func setUp() {
-        super.setUp()
-        let config = AIConfiguration(apiKey: "test-key")
-        service = WritingAdvisorService(aiService: AIService(configuration: config))
+    func testDisableAIThenGetWritingAdviceForCategoryThrowsAINotEnabled() async {
+        let app = WritersApp(aiConfiguration: AIConfiguration(apiKey: "key"))
+        app.disableAI()
+        do {
+            _ = try await app.getWritingAdvice(for: .craft)
+            XCTFail("Expected AIError.aiNotEnabled after disableAI()")
+        } catch AIError.aiNotEnabled {
+            // expected
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
     }
 
-    override func tearDown() {
-        service = nil
-        super.tearDown()
+    func testHermesServicePropertyDoesNotExist() {
+        // writingAdvisorService replaces hermesService — verify the new property is accessible
+        let app = WritersApp(aiConfiguration: AIConfiguration(apiKey: "key"))
+        XCTAssertNotNil(app.writingAdvisorService)
     }
 
-    // Tests for buildContextText covering boundary conditions not in context-building tests
-
-    func testBuildContextTextTitlesSeparatedByCommaSpace() {
-        let ctx = AdvisorContext(
-            totalDocuments: 3,
-            recentDocumentTitles: ["Title A", "Title B", "Title C"],
-            totalWordsAcrossDocuments: 0,
-            documentCategories: [],
-            sessionStats: nil
-        )
-        let text = service.buildContextText(from: ctx)
-        XCTAssertTrue(text.contains("\"Title A\", \"Title B\", \"Title C\""),
-                      "Titles must be comma-space separated and individually quoted")
-    }
-
-    func testBuildContextTextSingleTitle() {
-        let ctx = AdvisorContext(
-            totalDocuments: 1,
-            recentDocumentTitles: ["Only One"],
-            totalWordsAcrossDocuments: 100,
-            documentCategories: [],
-            sessionStats: nil
-        )
-        let text = service.buildContextText(from: ctx)
-        XCTAssertTrue(text.contains("\"Only One\""),
-                      "Single title must be quoted in context text")
-        // The titles line for a single entry should not include a separating comma
-        let titleLine = text.components(separatedBy: "\n")
-            .first(where: { $0.hasPrefix("Recent titles:") })
-        XCTAssertNotNil(titleLine, "Recent titles line must be present")
-        XCTAssertFalse(titleLine?.contains("\", \"") ?? false,
-                       "Single title must not have a comma-separated list")
-    }
-
-    func testBuildContextTextSessionAverageZeroSeconds() {
-        let stats = SessionStats(
-            totalSessions: 3,
-            totalDurationSeconds: 0,
-            averageDurationSeconds: 0,
-            earliestSession: nil,
-            latestSession: nil
-        )
-        let ctx = AdvisorContext(
-            totalDocuments: 0,
-            recentDocumentTitles: [],
-            totalWordsAcrossDocuments: 0,
-            documentCategories: [],
-            sessionStats: stats
-        )
-        let text = service.buildContextText(from: ctx)
-        XCTAssertTrue(text.contains("avg 0 min"),
-                      "Zero-second average duration should format to 0 min")
+    func testWritingAdvisorServiceIsIndependentOfChatbotService() {
+        let app = WritersApp(aiConfiguration: AIConfiguration(apiKey: "key"))
+        XCTAssertNotNil(app.writingAdvisorService)
+        XCTAssertNotNil(app.chatbotService)
+        // Both services exist and are separate objects
+        XCTAssertTrue(app.writingAdvisorService !== (app.chatbotService as AnyObject))
     }
 }

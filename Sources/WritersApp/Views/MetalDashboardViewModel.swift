@@ -49,7 +49,7 @@ public class MetalDashboardViewModel: ObservableObject {
 
     // MARK: - Init
 
-    nonisolated public init(
+    public init(
         app: WritersApp = WritersApp(),
         focusSessionManager: FocusSessionManager = FocusSessionManager(),
         goalManager: WritingGoalManager = WritingGoalManager()
@@ -79,10 +79,18 @@ public class MetalDashboardViewModel: ObservableObject {
         documentsByCategory = stats.documentsByCategory
     }
 
+    /// Loads the most recent documents and ensures a selection is available.
+    /// Fetches up to six recent documents and assigns them to `recentDocuments`. If `selectedDocument` is `nil`, sets it to the first document in `recentDocuments`.
     public func loadRecentDocuments() {
         recentDocuments = app.documentManager.getRecentDocuments(limit: 6)
+        if selectedDocument == nil {
+            selectedDocument = recentDocuments.first
+        }
     }
 
+    /// Refreshes the view model's goal-related state.
+    /// 
+    /// Updates `activeGoals`, `goalsSummary`, and `writingStreak` from the `WritingGoalManager`, then requests the manager to evaluate and update streak status.
     public func loadGoals() {
         activeGoals = goalManager.getActiveGoals()
         goalsSummary = goalManager.getSummary()

@@ -182,7 +182,45 @@ final class IssueManagementTests: XCTestCase {
         let allResults = app.searchIssues(query: "")
         XCTAssertEqual(allResults.count, 3)
     }
-    
+
+    func testSearchIssuesWhitespaceOnlyQueryReturnsAllIssues() {
+        _ = app.createIssue(documentId: testDocumentId, title: "Issue Alpha", description: "First issue")
+        _ = app.createIssue(documentId: testDocumentId, title: "Issue Beta", description: "Second issue")
+
+        let results = app.searchIssues(query: "   ")
+        XCTAssertEqual(results.count, 2)
+    }
+
+    func testSearchIssuesNewlineTabQueryReturnsAllIssues() {
+        _ = app.createIssue(documentId: testDocumentId, title: "Issue One", description: "Description one")
+        _ = app.createIssue(documentId: testDocumentId, title: "Issue Two", description: "Description two")
+
+        let results = app.searchIssues(query: "\n\t")
+        XCTAssertEqual(results.count, 2)
+    }
+
+    func testSearchIssuesEmptyQueryOnEmptyManagerReturnsEmpty() {
+        let results = app.searchIssues(query: "")
+        XCTAssertEqual(results.count, 0)
+    }
+
+    func testSearchIssuesNonMatchingQueryReturnsEmpty() {
+        _ = app.createIssue(documentId: testDocumentId, title: "Plot hole", description: "Fix the timeline")
+        _ = app.createIssue(documentId: testDocumentId, title: "Grammar error", description: "Passive voice overuse")
+
+        let results = app.searchIssues(query: "nonexistent_xyz_term")
+        XCTAssertEqual(results.count, 0)
+    }
+
+    func testSearchIssuesWhitespaceQueryIncludesAllIssuesAcrossDocuments() {
+        let doc2 = app.createBlankDocument(title: "Another Doc", category: .shortStory)
+        _ = app.createIssue(documentId: testDocumentId, title: "Issue in doc 1", description: "")
+        _ = app.createIssue(documentId: doc2.id, title: "Issue in doc 2", description: "")
+
+        let results = app.searchIssues(query: "  ")
+        XCTAssertEqual(results.count, 2)
+    }
+
     // MARK: - Issue Status Update Tests
     
     func testUpdateIssueStatus() {

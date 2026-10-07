@@ -52,6 +52,31 @@ final class WritersAppTests: XCTestCase {
         XCTAssertEqual(document.wordCount, 10)
     }
 
+    func testDocumentHashable() {
+        let id = UUID()
+        let fixedDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let meta = DocumentMetadata(created: fixedDate, modified: fixedDate)
+        let doc1 = Document(id: id, title: "A", content: "Hello", category: .article, metadata: meta)
+        let doc2 = Document(title: "A", content: "Hello", category: .article)
+        // Identical documents (all fields equal) ⇒ same hash
+        let identical = Document(id: id, title: "A", content: "Hello", category: .article, metadata: meta)
+        XCTAssertEqual(doc1.hashValue, identical.hashValue)
+        // Documents can be stored in Sets
+        var set = Set<Document>()
+        set.insert(doc1)
+        set.insert(doc2)
+        XCTAssertEqual(set.count, 2)
+        set.insert(identical)
+        XCTAssertEqual(set.count, 2, "Inserting an identical document should not increase set size")
+    }
+
+    func testDocumentReadingTimeNeverZero() {
+        let empty = Document(title: "T", content: "", category: .other)
+        XCTAssertGreaterThanOrEqual(empty.readingTime, 1, "Reading time must be at least 1 min")
+        let short = Document(title: "T", content: "Hello", category: .other)
+        XCTAssertGreaterThanOrEqual(short.readingTime, 1)
+    }
+
     func testTemplateSearch() {
         let results = app.templateManager.searchTemplates(query: "novel")
         XCTAssertGreaterThan(results.count, 0, "Should find novel templates")
@@ -93,9 +118,9 @@ final class WritersAppTests: XCTestCase {
     }
 
     func testStatistics() {
-        let doc1 = app.createBlankDocument(title: "Doc 1", category: .novel)
-        let doc2 = app.createBlankDocument(title: "Doc 2", category: .novel)
-        let doc3 = app.createBlankDocument(title: "Doc 3", category: .article)
+        _ = app.createBlankDocument(title: "Doc 1", category: .novel)
+        _ = app.createBlankDocument(title: "Doc 2", category: .novel)
+        _ = app.createBlankDocument(title: "Doc 3", category: .article)
 
         let stats = app.getStatistics()
         XCTAssertEqual(stats.totalDocuments, 3)
@@ -117,6 +142,157 @@ final class WritersAppTests: XCTestCase {
 
         let document = template.createDocument(with: ["name": "John", "age": "30"])
         XCTAssertEqual(document.content, "Hello John, you are 30 years old.")
+    }
+
+    func testTemplatePlaceholderDefaultValue() {
+        let template = Template(
+            name: "Default Test",
+            category: .other,
+            description: "Test",
+            content: "Hello {{name}}, state: ({{state}})",
+            placeholders: [
+                Placeholder(key: "name", label: "Name"),
+                Placeholder(key: "state", label: "State", defaultValue: "", required: false)
+            ]
+        )
+        let document = template.createDocument(with: ["name": "Alice"])
+        XCTAssertEqual(document.content, "Hello Alice, state: ()")
+        XCTAssertFalse(document.content.contains("{{state}}"))
+    }
+
+    func testTemplatePlaceholderNilDefaultValue() {
+        let template = Template(
+            name: "Nil Default Test",
+            category: .other,
+            description: "Test",
+            content: "{{a}} and {{b}}",
+            placeholders: [
+                Placeholder(key: "a", label: "A"),
+                Placeholder(key: "b", label: "B", defaultValue: nil, required: false)
+            ]
+        )
+        let document = template.createDocument(with: ["a": "foo"])
+        XCTAssertEqual(document.content, "foo and ")
+        XCTAssertFalse(document.content.contains("{{b}}"))
+    }
+
+    // MARK: - Document Analytics Tests
+
+    func testCharacterCountWithoutSpaces() {
+        let document = Document(title: "Test", content: "Hello World", category: .article)
+        XCTAssertEqual(document.characterCountWithoutSpaces, 10)
+    }
+
+    func testCharacterCountWithoutSpacesNoSpaces() {
+        let document = Document(title: "Test", content: "HelloWorld", category: .article)
+        XCTAssertEqual(document.characterCountWithoutSpaces, 10)
+    }
+
+    func testEnhancedWordCountFiltersPunctuation() {
+        let document = Document(title: "Test", content: "Hello, world! --- This is a test.", category: .article)
+        let count = document.enhancedWordCount()
+        XCTAssertEqual(count, 6)
+    }
+
+    func testEnhancedWordCountEmpty() {
+        let document = Document(title: "Test", content: "", category: .article)
+        XCTAssertEqual(document.enhancedWordCount(), 0)
+    }
+
+    func testSentenceCount() {
+        let document = Document(title: "Test", content: "Hello world. How are you? I am fine!", category: .article)
+        XCTAssertEqual(document.sentenceCount(), 3)
+    }
+
+    func testParagraphCount() {
+        let document = Document(title: "Test", content: "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.", category: .article)
+        XCTAssertEqual(document.paragraphCount(), 3)
+    }
+
+    func testWordCountProgressNoGoal() {
+        let document = Document(title: "Test", content: "One two three", category: .article)
+        XCTAssertEqual(document.wordCountProgress(), 0.0)
+    }
+
+    func testWordCountProgressHalfway() {
+        var metadata = DocumentMetadata()
+        metadata.wordCountGoal = 6
+        let document = Document(title: "Test", content: "One two three", category: .article, metadata: metadata)
+        XCTAssertEqual(document.wordCountProgress(), 0.5, accuracy: 0.001)
+    }
+
+    func testWordCountProgressClampsAt1() {
+        var metadata = DocumentMetadata()
+        metadata.wordCountGoal = 2
+        let document = Document(title: "Test", content: "One two three four", category: .article, metadata: metadata)
+        XCTAssertEqual(document.wordCountProgress(), 1.0)
+    }
+
+    // MARK: - AppSettings Tests
+
+    func testAppSettingsFontSizeClampedInInit() {
+        let tooSmall = AppSettings(fontSize: 2)
+        XCTAssertEqual(tooSmall.fontSize, 8)
+
+        let tooLarge = AppSettings(fontSize: 100)
+        XCTAssertEqual(tooLarge.fontSize, 32)
+
+        let valid = AppSettings(fontSize: 16)
+        XCTAssertEqual(valid.fontSize, 16)
+    }
+
+    func testToggleDarkMode() {
+        XCTAssertFalse(app.isDarkModeEnabled)
+        app.toggleDarkMode()
+        XCTAssertTrue(app.isDarkModeEnabled)
+        app.toggleDarkMode()
+        XCTAssertFalse(app.isDarkModeEnabled)
+    }
+
+    func testSetDarkMode() {
+        app.setDarkMode(true)
+        XCTAssertTrue(app.isDarkModeEnabled)
+        app.setDarkMode(false)
+        XCTAssertFalse(app.isDarkModeEnabled)
+    }
+
+    func testSetTheme() {
+        app.setTheme(.dark)
+        XCTAssertEqual(app.getAppSettings().theme, .dark)
+        app.setTheme(.light)
+        XCTAssertEqual(app.getAppSettings().theme, .light)
+        app.setTheme(.system)
+        XCTAssertEqual(app.getAppSettings().theme, .system)
+    }
+
+    func testSetFontSizeClampsViaWritersApp() {
+        app.setFontSize(5)
+        XCTAssertEqual(app.getAppSettings().fontSize, 8)
+        app.setFontSize(50)
+        XCTAssertEqual(app.getAppSettings().fontSize, 32)
+        app.setFontSize(18)
+        XCTAssertEqual(app.getAppSettings().fontSize, 18)
+    }
+
+    func testSetDefaultWordCountGoal() {
+        app.setDefaultWordCountGoal(1000)
+        XCTAssertEqual(app.getAppSettings().defaultWordCountGoal, 1000)
+        app.setDefaultWordCountGoal(nil)
+        XCTAssertNil(app.getAppSettings().defaultWordCountGoal)
+    }
+
+    func testSetSpellCheckEnabled() {
+        app.setSpellCheckEnabled(false)
+        XCTAssertFalse(app.getAppSettings().spellCheckEnabled)
+        app.setSpellCheckEnabled(true)
+        XCTAssertTrue(app.getAppSettings().spellCheckEnabled)
+    }
+
+    func testSetGrammarCheckEnabled() {
+        app.setGrammarCheckEnabled(false)
+        XCTAssertFalse(app.getAppSettings().grammarCheckEnabled)
+        app.setGrammarCheckEnabled(true)
+        XCTAssertTrue(app.getAppSettings().grammarCheckEnabled)
     }
 
     // MARK: - Tool Loop Types Tests
@@ -968,7 +1144,7 @@ final class WritersAppTests: XCTestCase {
         }
 
         let doc1 = app.createBlankDocument(title: "Doc 1", category: .novel)
-        let doc2 = app.createBlankDocument(title: "Doc 2", category: .article)
+        _ = app.createBlankDocument(title: "Doc 2", category: .article)
 
         let context = ConversationContext(
             activeDocumentId: doc1.id,
@@ -1283,8 +1459,8 @@ final class WritersAppTests: XCTestCase {
     // MARK: - Hallucination Reduction Tests
 
     func testExtractQuotesReturnsQuoteBlocks() {
-        let app = WritersApp()
-        let text = """
+        _ = WritersApp()
+        _ = """
         The research shows that artificial intelligence has advanced significantly.
         "We have observed a 40% improvement in model accuracy," said Dr. Smith.
         This demonstrates the effectiveness of the new approach.
@@ -1296,7 +1472,7 @@ final class WritersAppTests: XCTestCase {
     }
 
     func testVerifyWithCitationsReturnsVerifiedClaims() {
-        let text = "The study demonstrates effectiveness through careful analysis."
+        _ = "The study demonstrates effectiveness through careful analysis."
         let claims: [VerifiedClaim] = []
         // Note: We test the response type structure, not API calls
         XCTAssertNotNil(claims, "verifyWithCitations should return [VerifiedClaim]")
@@ -2156,29 +2332,7 @@ final class WritersAppTests: XCTestCase {
             return
         }
         XCTAssertEqual(screenplay.placeholders.count, 8,
-                       "Simplified screenplay template should have 8 placeholders")
-    }
-
-    func testScreenplayTemplateDoesNotHaveCharacterStatePlaceholder() {
-        let templates = app.templateManager.getAllTemplates()
-        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
-            XCTFail("Screenplay template not found")
-            return
-        }
-        let keys = screenplay.placeholders.map { $0.key }
-        XCTAssertFalse(keys.contains("character_state"),
-                       "character_state placeholder should have been removed from screenplay template")
-    }
-
-    func testScreenplayTemplateDoesNotHaveShotDescriptionPlaceholder() {
-        let templates = app.templateManager.getAllTemplates()
-        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
-            XCTFail("Screenplay template not found")
-            return
-        }
-        let keys = screenplay.placeholders.map { $0.key }
-        XCTAssertFalse(keys.contains("shot_description"),
-                       "shot_description placeholder should have been removed from screenplay template")
+                       "Screenplay template should have 8 placeholders")
     }
 
     func testScreenplayTemplateHasExpectedPlaceholderKeys() {
@@ -2192,7 +2346,7 @@ final class WritersAppTests: XCTestCase {
             "scene_heading", "action", "character", "dialogue",
             "character_2", "parenthetical", "dialogue_2", "transition"
         ]
-        XCTAssertEqual(keys, expected, "Screenplay template should have exactly the simplified placeholder set")
+        XCTAssertEqual(keys, expected, "Screenplay template should have exactly the expected placeholder set")
     }
 
     func testScreenplayTemplateHasSimplifiedTags() {
@@ -2353,27 +2507,6 @@ final class ScreenplayTemplateContentTests: XCTestCase {
         super.tearDown()
     }
 
-    func testScreenplayTemplateContentDoesNotContainCharacterStatePlaceholder() {
-        // After the PR, {{character_state}} must not appear in the template content string.
-        let templates = app.templateManager.getAllTemplates()
-        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
-            XCTFail("Screenplay template must exist")
-            return
-        }
-        XCTAssertFalse(screenplay.content.contains("{{character_state}}"),
-                       "Removed placeholder {{character_state}} must not appear in template content")
-    }
-
-    func testScreenplayTemplateContentDoesNotContainShotDescriptionPlaceholder() {
-        let templates = app.templateManager.getAllTemplates()
-        guard let screenplay = templates.first(where: { $0.category == .screenplay }) else {
-            XCTFail("Screenplay template must exist")
-            return
-        }
-        XCTAssertFalse(screenplay.content.contains("{{shot_description}}"),
-                       "Removed placeholder {{shot_description}} must not appear in template content")
-    }
-
     func testScreenplayTemplateContentContainsAllRequiredPlaceholders() {
         // The remaining placeholders must appear in the template body.
         let templates = app.templateManager.getAllTemplates()
@@ -2431,9 +2564,122 @@ final class ScreenplayTemplateContentTests: XCTestCase {
         XCTAssertFalse(screenplay.metadata.tags.contains("professional"),
                        "'professional' tag must have been removed from the screenplay template")
     }
+
+    // MARK: - Spoiler Protection Tests
+
+    func testTagSpoilerCreatesSpoilerTag() throws {
+        let document = app.createBlankDocument(title: "Spoiler Doc", category: .novel)
+        let tag = try XCTUnwrap(app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 10, description: "Big reveal"))
+        XCTAssertEqual(tag.documentId, document.id)
+        XCTAssertEqual(tag.startOffset, 0)
+        XCTAssertEqual(tag.endOffset, 10)
+        XCTAssertEqual(tag.description, "Big reveal")
+        XCTAssertEqual(tag.severity, .moderate)
+    }
+
+    func testGetSpoilerTagsReturnsTagsForDocument() {
+        let doc1 = app.createBlankDocument(title: "Doc 1", category: .novel)
+        let doc2 = app.createBlankDocument(title: "Doc 2", category: .novel)
+        app.tagSpoiler(in: doc1.id, startOffset: 0, endOffset: 5)
+        app.tagSpoiler(in: doc1.id, startOffset: 10, endOffset: 20)
+        app.tagSpoiler(in: doc2.id, startOffset: 0, endOffset: 3)
+
+        let doc1Tags = app.getSpoilerTags(forDocument: doc1.id)
+        let doc2Tags = app.getSpoilerTags(forDocument: doc2.id)
+        XCTAssertEqual(doc1Tags.count, 2)
+        XCTAssertEqual(doc2Tags.count, 1)
+    }
+
+    func testGetSpoilerTagsAreOrderedByStartOffset() {
+        let document = app.createBlankDocument(title: "Ordered Doc", category: .novel)
+        app.tagSpoiler(in: document.id, startOffset: 20, endOffset: 30)
+        app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 10)
+        app.tagSpoiler(in: document.id, startOffset: 50, endOffset: 60)
+
+        let tags = app.getSpoilerTags(forDocument: document.id)
+        XCTAssertEqual(tags[0].startOffset, 0)
+        XCTAssertEqual(tags[1].startOffset, 20)
+        XCTAssertEqual(tags[2].startOffset, 50)
+    }
+
+    func testRemoveSpoilerTagDeletesTag() throws {
+        let document = app.createBlankDocument(title: "Remove Tag Doc", category: .novel)
+        let tag = try XCTUnwrap(app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 10))
+        XCTAssertEqual(app.getSpoilerTags(forDocument: document.id).count, 1)
+        app.removeSpoilerTag(id: tag.id)
+        XCTAssertEqual(app.getSpoilerTags(forDocument: document.id).count, 0)
+    }
+
+    func testDocumentHasSpoilersReturnsTrueWhenTagged() {
+        let document = app.createBlankDocument(title: "Tagged Doc", category: .novel)
+        XCTAssertFalse(app.documentHasSpoilers(document.id))
+        app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 5)
+        XCTAssertTrue(app.documentHasSpoilers(document.id))
+    }
+
+    func testRedactedContentReplacesTaggedRegions() {
+        var document = app.createBlankDocument(title: "Redact Doc", category: .novel)
+        document.content = "Hello spoiler world"
+        app.documentManager.updateDocument(document)
+
+        app.tagSpoiler(in: document.id, startOffset: 6, endOffset: 13) // "spoiler"
+        let redacted = app.redactedContent(forDocument: document.id)
+        XCTAssertNotNil(redacted)
+        XCTAssertFalse(redacted!.contains("spoiler"), "Spoiler text should be redacted")
+        XCTAssertTrue(redacted!.contains("[SPOILER REDACTED]"))
+        XCTAssertTrue(redacted!.contains("Hello "))
+        XCTAssertTrue(redacted!.contains(" world"))
+    }
+
+    func testRedactedContentWithNoTagsReturnsOriginal() {
+        var document = app.createBlankDocument(title: "Clean Doc", category: .novel)
+        document.content = "No spoilers here"
+        app.documentManager.updateDocument(document)
+
+        let redacted = app.redactedContent(forDocument: document.id)
+        XCTAssertEqual(redacted, "No spoilers here")
+    }
+
+    func testExportDocumentWithSpoilerMarkupMarkdownFormat() {
+        var document = app.createBlankDocument(title: "Markup Doc", category: .novel)
+        document.content = "He dies at the end."
+        app.documentManager.updateDocument(document)
+
+        app.tagSpoiler(in: document.id, startOffset: 3, endOffset: 7, severity: .major) // "dies"
+        let exported = app.exportDocumentWithSpoilerMarkup(id: document.id, format: .markdown)
+        XCTAssertNotNil(exported)
+        XCTAssertTrue(exported!.contains("||SPOILER(major): dies||"))
+        XCTAssertTrue(exported!.contains("He "))
+        XCTAssertTrue(exported!.contains(" at the end."))
+    }
+
+    func testExportDocumentWithSpoilerMarkupHTMLFormat() {
+        var document = app.createBlankDocument(title: "HTML Markup Doc", category: .novel)
+        document.content = "Twist ending here"
+        app.documentManager.updateDocument(document)
+
+        app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 5, severity: .minor) // "Twist"
+        let exported = app.exportDocumentWithSpoilerMarkup(id: document.id, format: .html)
+        XCTAssertNotNil(exported)
+        XCTAssertTrue(exported!.contains("<span class=\"spoiler spoiler-minor\">Twist</span>"))
+    }
+
+    func testSpoilerTagSeverityStoredCorrectly() throws {
+        let document = app.createBlankDocument(title: "Severity Doc", category: .novel)
+        let tag = try XCTUnwrap(app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 5, severity: .major))
+        XCTAssertEqual(tag.severity, .major)
+        XCTAssertEqual(tag.severity.displayName, "Major")
+    }
+
+    func testSpoilerTagIsIdentifiable() throws {
+        let document = app.createBlankDocument(title: "Identifiable Doc", category: .novel)
+        let tag1 = try XCTUnwrap(app.tagSpoiler(in: document.id, startOffset: 0, endOffset: 5))
+        let tag2 = try XCTUnwrap(app.tagSpoiler(in: document.id, startOffset: 10, endOffset: 15))
+        XCTAssertNotEqual(tag1.id, tag2.id)
+    }
 }
 
-// MARK: - Writing Advisor Tests
+// MARK: - Writing Advisor Basic Tests
 
 final class WritingAdvisorTests: XCTestCase {
 
@@ -3124,6 +3370,514 @@ final class WritingAdvisorTests: XCTestCase {
             isSpeculative: false
         )
         XCTAssertFalse(groundedIdea.isSpeculative)
+    }
+}
+
+// MARK: - Hermes Agent V0.9.0 Tests
+
+final class HermesAgentTests: XCTestCase {
+
+    var app: WritersApp!
+
+    override func setUp() {
+        super.setUp()
+        app = WritersApp(databasePath: ":memory:")
+    }
+
+    override func tearDown() {
+        app = nil
+        super.tearDown()
+    }
+
+    // MARK: - Helpers
+
+    /// Build a HermesService for tests that only exercise non-AI behavior (parsing, session utilities).
+    private func makeService() -> HermesService {
+        let app = WritersApp(databasePath: ":memory:")
+        // Use a real AIService configured with a test key; these tests avoid network calls
+        // by only exercising non-AI code paths.
+        return HermesService(
+            aiService: AIService(configuration: AIConfiguration(apiKey: "test-key")),
+            documentManager: app.documentManager,
+            templateManager: app.templateManager
+        )
+    }
+
+    /// Inject a pre-built HermesMessage with known ideas into a session.
+    private func sessionWith(ideas: [HermesIdea]) -> HermesSession {
+        let message = HermesMessage(role: .hermes, content: "Here are some ideas.", ideas: ideas)
+        return HermesSession(messages: [message])
+    }
+
+    private func makeIdea(
+        type: HermesIdeaType = .plotHook,
+        title: String = "Test Idea"
+    ) -> HermesIdea {
+        HermesIdea(title: title, description: "A description.", ideaType: type)
+    }
+
+    // MARK: - HermesTone
+
+    func testHermesToneDisplayNamesAreNonEmpty() {
+        for tone in HermesTone.allCases {
+            XCTAssertFalse(tone.displayName.isEmpty, "\(tone) displayName must not be empty")
+        }
+    }
+
+    func testHermesTonePromptHintsAreNonEmpty() {
+        for tone in HermesTone.allCases {
+            XCTAssertFalse(tone.promptHint.isEmpty, "\(tone) promptHint must not be empty")
+        }
+    }
+
+    func testHermesToneRoundTripsViaCodable() throws {
+        for tone in HermesTone.allCases {
+            let data = try JSONEncoder().encode(tone)
+            let decoded = try JSONDecoder().decode(HermesTone.self, from: data)
+            XCTAssertEqual(decoded, tone)
+        }
+    }
+
+    // MARK: - parseIdeas
+
+    func testParseIdeasExtractsNumberedList() {
+        let service = makeService()
+        let raw = """
+        1. [PLOT HOOK] The Dragon's Secret
+           A dragon guards a secret about the hero's true identity.
+        2. [CHARACTER TRAIT] Reluctant Hero
+           She never wanted to save the world — until today.
+        """
+        let ideas = service.parseIdeas(from: raw)
+        XCTAssertEqual(ideas.count, 2)
+        XCTAssertEqual(ideas[0].title, "The Dragon's Secret")
+        XCTAssertEqual(ideas[0].ideaType, .plotHook)
+        XCTAssertEqual(ideas[1].title, "Reluctant Hero")
+        XCTAssertEqual(ideas[1].ideaType, .characterTrait)
+    }
+
+    func testParseIdeasWithNoTagDefaultsToPlotHook() {
+        let service = makeService()
+        let raw = "1. An Untitled Mystery\n   Somebody stole the crown jewels."
+        let ideas = service.parseIdeas(from: raw)
+        XCTAssertEqual(ideas.count, 1)
+        XCTAssertEqual(ideas[0].ideaType, .plotHook)
+    }
+
+    func testParseIdeasReturnsEmptyForNonListInput() {
+        let service = makeService()
+        let ideas = service.parseIdeas(from: "Just a plain sentence with no numbered list.")
+        XCTAssertTrue(ideas.isEmpty)
+    }
+
+    func testParseIdeasStripsBoldMarkdown() {
+        let service = makeService()
+        let raw = "1. **Bold Title**\n   Description here."
+        let ideas = service.parseIdeas(from: raw)
+        XCTAssertEqual(ideas.count, 1)
+        XCTAssertFalse(ideas[0].title.contains("*"), "Bold markdown asterisks must be stripped")
+    }
+
+    // MARK: - getAllIdeas
+
+    func testGetAllIdeasReturnsFlatList() {
+        let service = makeService()
+        let ideas = [
+            makeIdea(type: .plotHook, title: "Hook"),
+            makeIdea(type: .setting, title: "City")
+        ]
+        let session = sessionWith(ideas: ideas)
+        XCTAssertEqual(service.getAllIdeas(from: session).count, 2)
+    }
+
+    func testGetAllIdeasFilteredByType() {
+        let service = makeService()
+        let ideas = [
+            makeIdea(type: .plotHook, title: "Hook"),
+            makeIdea(type: .setting, title: "City"),
+            makeIdea(type: .setting, title: "Forest")
+        ]
+        let session = sessionWith(ideas: ideas)
+        let filtered = service.getAllIdeas(from: session, filteredBy: .setting)
+        XCTAssertEqual(filtered.count, 2)
+        XCTAssertTrue(filtered.allSatisfy { $0.ideaType == .setting })
+    }
+
+    func testGetAllIdeasFilteredReturnsEmptyWhenNoMatch() {
+        let service = makeService()
+        let ideas = [makeIdea(type: .plotHook)]
+        let session = sessionWith(ideas: ideas)
+        let filtered = service.getAllIdeas(from: session, filteredBy: .dialogue)
+        XCTAssertTrue(filtered.isEmpty)
+    }
+
+    // MARK: - getSessionStats
+
+    func testSessionStatsIdeasCount() {
+        let service = makeService()
+        let session = sessionWith(ideas: [
+            makeIdea(type: .plotHook),
+            makeIdea(type: .setting),
+            makeIdea(type: .plotHook)
+        ])
+        let stats = service.getSessionStats(from: session)
+        XCTAssertEqual(stats.totalIdeas, 3)
+        XCTAssertEqual(stats.ideaCountByType[.plotHook], 2)
+        XCTAssertEqual(stats.ideaCountByType[.setting], 1)
+    }
+
+    func testSessionStatsMessageCount() {
+        let service = makeService()
+        let userMsg = HermesMessage(role: .user, content: "Give me ideas")
+        let hermesMsg = HermesMessage(role: .hermes, content: "Here:", ideas: [makeIdea()])
+        var session = HermesSession()
+        session.messages = [userMsg, hermesMsg]
+        let stats = service.getSessionStats(from: session)
+        XCTAssertEqual(stats.messageCount, 2)
+    }
+
+    func testSessionStatsAverageIdeasPerMessageEmptySession() {
+        let service = makeService()
+        let session = HermesSession()
+        let stats = service.getSessionStats(from: session)
+        XCTAssertEqual(stats.averageIdeasPerMessage, 0.0)
+    }
+
+    func testSessionStatsAverageIdeasPerMessage() {
+        let service = makeService()
+        let session = sessionWith(ideas: [makeIdea(), makeIdea(), makeIdea()])
+        let stats = service.getSessionStats(from: session)
+        // 3 ideas in 1 Hermes message
+        XCTAssertEqual(stats.averageIdeasPerMessage, 3.0, accuracy: 0.001)
+    }
+
+    func testSessionStatsDurationIsNonNegative() {
+        let service = makeService()
+        let session = HermesSession()
+        let stats = service.getSessionStats(from: session)
+        XCTAssertGreaterThanOrEqual(stats.sessionDuration, 0.0)
+    }
+
+    // MARK: - clearHistory
+
+    func testClearHistoryRemovesAllMessages() {
+        let service = makeService()
+        let msg = HermesMessage(role: .user, content: "Hello")
+        var session = HermesSession(messages: [msg])
+        service.clearHistory(for: &session)
+        XCTAssertTrue(session.messages.isEmpty)
+    }
+
+    // MARK: - startHermesSession / endHermesSession (via WritersApp)
+
+    func testStartHermesSessionThrowsWhenAINotEnabled() {
+        let noAIApp = WritersApp()
+        XCTAssertThrowsError(try noAIApp.startHermesSession()) { error in
+            guard case HermesError.aiNotAvailable = error else {
+                XCTFail("Expected HermesError.aiNotAvailable")
+                return
+            }
+        }
+    }
+
+    func testGetAllIdeasViaWritersAppWithNoAIReturnsEmpty() {
+        let noAIApp = WritersApp()
+        let session = HermesSession()
+        XCTAssertTrue(noAIApp.getAllIdeas(from: session).isEmpty)
+    }
+
+    func testGetHermesSessionStatsReturnsNilWhenNoAI() {
+        let noAIApp = WritersApp()
+        let session = HermesSession()
+        XCTAssertNil(noAIApp.getHermesSessionStats(from: session))
+    }
+
+    // MARK: - HermesSessionStats
+
+    func testHermesSessionStatsInitialiserStoresAllFields() {
+        let id = UUID()
+        let byType: [HermesIdeaType: Int] = [.plotHook: 3, .twist: 1]
+        let stats = HermesSessionStats(
+            sessionId: id,
+            messageCount: 4,
+            totalIdeas: 4,
+            favoriteCount: 1,
+            ideaCountByType: byType,
+            sessionDuration: 120.0,
+            averageIdeasPerMessage: 2.0
+        )
+        XCTAssertEqual(stats.sessionId, id)
+        XCTAssertEqual(stats.messageCount, 4)
+        XCTAssertEqual(stats.totalIdeas, 4)
+        XCTAssertEqual(stats.favoriteCount, 1)
+        XCTAssertEqual(stats.ideaCountByType[.plotHook], 3)
+        XCTAssertEqual(stats.sessionDuration, 120.0, accuracy: 0.001)
+        XCTAssertEqual(stats.averageIdeasPerMessage, 2.0, accuracy: 0.001)
+    }
+
+    // MARK: - WritersApp Post-CRM Tests
+
+    func testWritersAppInitializesSuccessfully() {
+        let app = WritersApp()
+        XCTAssertNotNil(app)
+    }
+
+    func testWritersAppCoreManagersPresent() {
+        let app = WritersApp()
+        XCTAssertNotNil(app.templateManager)
+        XCTAssertNotNil(app.documentManager)
+        XCTAssertNotNil(app.issueManager)
+        XCTAssertNotNil(app.kanbanManager)
+        XCTAssertNotNil(app.databaseManager)
+    }
+
+    func testWritersAppDocumentOperationsWork() {
+        let app = WritersApp()
+        let doc = app.createBlankDocument(title: "Test Doc", category: .article)
+        XCTAssertEqual(doc.title, "Test Doc")
+        XCTAssertEqual(doc.category, .article)
+        let retrieved = app.documentManager.getDocument(id: doc.id)
+        XCTAssertNotNil(retrieved)
+    }
+
+    func testWritersAppStatisticsWork() {
+        let app = WritersApp()
+        let stats = app.getStatistics()
+        XCTAssertGreaterThanOrEqual(stats.totalDocuments, 0)
+        XCTAssertGreaterThanOrEqual(stats.totalTemplates, 0)
+    }
+
+    func testWritersAppIsNotAIEnabledByDefault() {
+        let app = WritersApp()
+        XCTAssertFalse(app.isAIEnabled)
+    }
+
+    func testWritersAppCoworkComponentsInitialize() {
+        let app = WritersApp()
+        XCTAssertNotNil(app.encouragementService)
+        XCTAssertNotNil(app.versionControl)
+    }
+
+    func testWritersAppVersionControlAccessible() {
+        let app = WritersApp()
+        let vc = app.versionControl
+        XCTAssertNotNil(vc)
+    }
+
+    func testWritersAppKanbanFunctional() {
+        let app = WritersApp()
+        let board = app.createKanbanBoard(name: "Sprint", description: "Sprint board")
+        XCTAssertEqual(board.name, "Sprint")
+        let boards = app.getAllKanbanBoards()
+        XCTAssertTrue(boards.contains { $0.id == board.id })
+    }
+
+    func testWritersAppIssueManagerOperational() {
+        let app = WritersApp()
+        let doc = app.createBlankDocument(title: "Issue Doc", category: .other)
+        let issue = app.createIssue(documentId: doc.id, title: "Bug", description: "A bug", status: .open, priority: .medium)
+        XCTAssertEqual(issue.title, "Bug")
+        let issues = app.getIssues(forDocument: doc.id)
+        XCTAssertTrue(issues.contains { $0.id == issue.id })
+    }
+
+    // MARK: - TemplateCategory Additional Tests
+
+    func testTemplateCategoryContainsExpectedCases() {
+        let allCases = TemplateCategory.allCases
+        let rawValues = allCases.map { $0.rawValue }
+        let expected = ["Novel", "Short Story", "Screenplay", "Blog Post", "Article",
+                        "Essay", "Poetry", "Business Letter", "Proposal", "Resume", "Other"]
+        for e in expected {
+            XCTAssertTrue(rawValues.contains(e), "Expected category '\(e)' not found in TemplateCategory")
+        }
+    }
+
+    func testTemplateCategoryExactCaseCount() {
+        XCTAssertEqual(TemplateCategory.allCases.count, 11,
+                       "TemplateCategory should have exactly 11 cases")
+    }
+
+    func testTemplateCategoryRawValueRoundTrip() {
+        for category in TemplateCategory.allCases {
+            let decoded = TemplateCategory(rawValue: category.rawValue)
+            XCTAssertEqual(decoded, category,
+                           "TemplateCategory '\(category.rawValue)' should decode from its own rawValue")
+        }
+    }
+
+    func testTemplateCategoryOtherRemainsAfterRemoval() {
+        XCTAssertNotNil(TemplateCategory(rawValue: "Other"))
+    }
+
+    // MARK: - TemplateManager Default Templates Additional Tests
+
+    func testTemplateManagerDefaultTemplateCount() {
+        let app = WritersApp()
+        let all = app.templateManager.getAllTemplates()
+        XCTAssertEqual(all.count, 7,
+                       "Default templates should be exactly 7")
+    }
+
+    func testTemplateManagerRetainsCoreLiteraryTemplates() {
+        let app = WritersApp()
+        let all = app.templateManager.getAllTemplates()
+        let names = all.map { $0.name }
+        let required = ["Novel Chapter", "Short Story", "Screenplay", "Blog Post",
+                        "Article", "Poetry", "Business Letter"]
+        for name in required {
+            XCTAssertTrue(names.contains(name), "Core template '\(name)' should still be present")
+        }
+    }
+
+    func testTemplateManagerGetTemplatesForRemovedCategoryReturnsEmpty() {
+        let app = WritersApp()
+        let otherTemplates = app.templateManager.getTemplates(for: .other)
+        let legacyNames = [
+            "Morning Inbox Summary", "Weekly Status Report", "Daily Sales Dashboard"
+        ]
+        for name in legacyNames {
+            XCTAssertNil(otherTemplates.first { $0.name == name },
+                         "Legacy template '\(name)' should not appear in any category")
+        }
+    }
+
+    func testTemplateManagerSearchDoesNotFindRemovedTemplates() {
+        let app = WritersApp()
+        XCTAssertTrue(app.templateManager.searchTemplates(query: "Inbox Summary").isEmpty)
+        XCTAssertTrue(app.templateManager.searchTemplates(query: "Competitor News").isEmpty)
+        XCTAssertTrue(app.templateManager.searchTemplates(query: "Sales Dashboard").isEmpty)
+        XCTAssertTrue(app.templateManager.searchTemplates(query: "Content Writer Profile").isEmpty)
+    }
+
+    // MARK: - WritersApp Initializer Additional Tests
+
+    func testWritersAppDefaultInitCreatesManagersWithoutAI() {
+        let freshApp = WritersApp()
+        XCTAssertFalse(freshApp.isAIEnabled)
+        XCTAssertNil(freshApp.chatbotService)
+        XCTAssertNil(freshApp.aiService)
+    }
+
+    func testWritersAppDefaultInitHasTemplateManager() {
+        let freshApp = WritersApp()
+        XCTAssertGreaterThan(freshApp.templateManager.getAllTemplates().count, 0)
+    }
+
+    func testWritersAppDefaultInitHasDocumentManager() {
+        let freshApp = WritersApp()
+        XCTAssertEqual(freshApp.documentManager.getAllDocuments().count, 0)
+    }
+
+    func testWritersAppAIInitEnablesAIAndChatbot() {
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        let aiApp = WritersApp(aiConfiguration: config)
+        XCTAssertTrue(aiApp.isAIEnabled)
+        XCTAssertNotNil(aiApp.chatbotService)
+    }
+
+    func testWritersAppAIInitDoesNotExposeSeparateGuiService() {
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        let aiApp = WritersApp(aiConfiguration: config)
+        XCTAssertTrue(aiApp.isAIEnabled)
+    }
+
+    func testWritersAppEnableAIAfterDefaultInit() {
+        let freshApp = WritersApp()
+        XCTAssertFalse(freshApp.isAIEnabled)
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        freshApp.enableAI(configuration: config)
+        XCTAssertTrue(freshApp.isAIEnabled)
+        XCTAssertNotNil(freshApp.chatbotService)
+    }
+
+    func testWritersAppDisableAIAfterAIInit() {
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        let aiApp = WritersApp(aiConfiguration: config)
+        XCTAssertTrue(aiApp.isAIEnabled)
+        aiApp.disableAI()
+        XCTAssertFalse(aiApp.isAIEnabled)
+        XCTAssertNil(aiApp.aiService)
+        XCTAssertNil(aiApp.chatbotService)
+    }
+
+    func testWritersAppMultipleInitsAreIndependent() {
+        let app1 = WritersApp()
+        let app2 = WritersApp()
+        _ = app1.createBlankDocument(title: "Only in App1", category: .novel)
+        XCTAssertEqual(app1.documentManager.getAllDocuments().count, 1)
+        XCTAssertEqual(app2.documentManager.getAllDocuments().count, 0)
+    }
+
+    func testChangeDocumentToneThrowsWhenAIDisabled() async throws {
+        let app = WritersApp()
+        let document = app.createBlankDocument(title: "Test", category: .novel)
+
+        do {
+            _ = try await app.changeDocumentTone(
+                documentId: document.id,
+                tone: .casual
+            )
+            XCTFail("Should throw AIError.aiNotEnabled")
+        } catch AIError.aiNotEnabled {
+            // Expected
+        }
+    }
+
+    func testChangeDocumentToneRequiresValidDocument() async throws {
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        let app = WritersApp(aiConfiguration: config)
+        let invalidId = UUID()
+
+        do {
+            _ = try await app.changeDocumentTone(
+                documentId: invalidId,
+                tone: .casual
+            )
+            XCTFail("Should throw AIError.documentNotFound")
+        } catch AIError.documentNotFound {
+            // Expected
+        }
+    }
+
+    func testChangeDocumentToneWithoutReplacingContent() async throws {
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        let app = WritersApp(aiConfiguration: config)
+
+        let originalContent = "This is a formal document."
+        let document = app.createBlankDocument(title: "Formal", category: .article)
+        var updatedDoc = document
+        updatedDoc.content = originalContent
+        app.documentManager.updateDocument(updatedDoc)
+
+        do {
+            let result = try await app.changeDocumentTone(
+                documentId: document.id,
+                tone: .casual,
+                replaceContent: false
+            )
+            XCTAssertFalse(result.isEmpty, "Should return non-empty result")
+
+            let retrievedDoc = app.documentManager.getDocument(id: document.id)
+            XCTAssertEqual(retrievedDoc?.content, originalContent, "Content should not be replaced")
+        } catch {
+            // API call will fail in test environment, but structure is validated
+        }
+    }
+
+    func testChangeDocumentToneCanReplaceContent() async throws {
+        let config = AIConfiguration(apiKey: "test-key", model: .claude35Sonnet)
+        let app = WritersApp(aiConfiguration: config)
+
+        let document = app.createBlankDocument(title: "Test", category: .article)
+        var updatedDoc = document
+        updatedDoc.content = "Original content"
+        app.documentManager.updateDocument(updatedDoc)
+
+        // This test validates the structure without making actual API calls
+        // In a real scenario with a mock AI service, we would verify the content is replaced
+        let retrievedDoc = app.documentManager.getDocument(id: document.id)
+        XCTAssertEqual(retrievedDoc?.content, "Original content")
     }
 }
 

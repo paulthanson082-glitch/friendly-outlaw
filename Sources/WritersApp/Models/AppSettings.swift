@@ -27,7 +27,7 @@ public struct AppSettings: Codable, Identifiable {
         self.isDarkModeEnabled = isDarkModeEnabled
         self.isAutoSaveEnabled = isAutoSaveEnabled
         self.autoSaveIntervalSeconds = autoSaveIntervalSeconds
-        self.fontSize = fontSize
+        self.fontSize = max(8, min(32, fontSize))
         self.defaultWordCountGoal = defaultWordCountGoal
         self.theme = theme
         self.spellCheckEnabled = spellCheckEnabled

@@ -95,7 +95,13 @@ struct WritersAppCLI {
     /// - Initializes WritersApp and global analytics.
     /// - Parses and handles command-line flags for help, listing, opening documents, running focus sessions, GUI exports, trace analysis, and playful actions.
     /// - Enables optional features based on environment variables (Anthropic/Clother AI, gui.new, Ragie) and attempts to initialize the Claude memory plugin.
-    /// - Enters an interactive menu loop presenting document, AI, memory, plugin, productivity, issue, hardware board, gui.new export, and Ragie operations; dispatches user choices to the appropriate handlers and shuts down plugins on exit.
+    /// Application entry point that initializes global services, processes command-line flags, and runs the interactive CLI menu.
+    /// 
+    /// Program entry point for the Writers CLI application.
+    /// 
+    /// Initializes application services, optionally handles one-off command-line actions (list, open, run, exports, trace analysis, dance), configures optional integrations (AI, gui.new, Ragie, Gmail, Claude memory plugin), and enters the interactive main menu loop until the user exits.
+    /// 
+    /// The CLI supports combined flags for non-interactive operations; when no terminating flag is provided the function starts the interactive UI that presents commands for templates, documents, AI features, focus sessions, plugins, Cowork mode, hardware boards, kanban boards, and various export and utility actions.
     static func main() async {
         let app = WritersApp()
         analyticsService = ProductivityAnalytics(focusManager: focusManager, goalManager: goalManager)
@@ -115,7 +121,8 @@ struct WritersAppCLI {
             var guiDocArg: String? = nil
             var guiStats = false
             var guiKanbanArg: String? = nil
-            
+            var shouldShowStatus = false
+
             var i = 1
             while i < arguments.count {
                 let arg = arguments[i]
@@ -144,6 +151,9 @@ struct WritersAppCLI {
                         runArg = "" // Empty string means freewrite (default)
                         i += 1
                     }
+                case "--status", "-s":
+                    shouldShowStatus = true
+                    i += 1
                 case "--analyze-traces":
                     analyzeTraces = true
                     i += 1
@@ -189,6 +199,11 @@ struct WritersAppCLI {
                 return
             }
 
+            if shouldShowStatus {
+                showRunStatus(app: app)
+                return
+            }
+
             if analyzeTraces {
                 runTraceAnalysis(app: app)
                 return
@@ -217,7 +232,7 @@ struct WritersAppCLI {
             
             // Handle --run alone
             if let runSessionArg = runArg {
-                startFocusSessionDirect(
+                await startFocusSessionDirect(
                     app: app,
                     sessionTypeName: runSessionArg.isEmpty ? nil : runSessionArg
                 )
@@ -419,10 +434,11 @@ struct WritersAppCLI {
             print("106. Prospect Pipeline Stats")
             if app.isGmailEnabled {
                 print("107. View Gmail Inbox")
-                print("108. Send Email")
+                print("108. Mark Email as Read")
+                print("109. Send Email")
             }
-            print("109. Research URL (Browser)")
-            print("110. View Browsing History")
+            print("110. Research URL (Browser)")
+            print("111. View Browsing History")
 
             print("\n0. Exit")
             print()
@@ -587,10 +603,12 @@ struct WritersAppCLI {
             case 107:
                 await viewGmailInbox(app: app)
             case 108:
-                await sendGmail(app: app)
+                await markGmailMessageAsRead(app: app)
             case 109:
-                await researchURL(app: app)
+                await sendGmail(app: app)
             case 110:
+                await researchURL(app: app)
+            case 111:
                 viewBrowsingHistory(app: app)
             case 0:
                 await app.shutdownPlugins()
@@ -1824,7 +1842,50 @@ func startFocusSession(app: WritersApp) {
     print("\nHappy writing! Use option 42 to end your session.\n")
 }
 
-func startFocusSessionDirect(app: WritersApp, sessionTypeName: String?) {
+func showRunStatus(app: WritersApp) {
+    print("\n=== Writers App Status ===\n")
+
+    if let session = focusManager.getCurrentSession() {
+        let elapsed: TimeInterval
+        let stateLabel: String
+        if session.state == .paused {
+            elapsed = Date().timeIntervalSince(session.startTime) - session.pausedTime
+            stateLabel = "⏸  Focus session paused"
+        } else {
+            elapsed = Date().timeIntervalSince(session.startTime) - session.pausedTime
+            stateLabel = "▶  Focus session active"
+        }
+        let elapsedStr = FocusSessionManager.formatTimeRemaining(elapsed)
+
+        print(stateLabel)
+        print("   Type:    \(session.type.displayName)")
+        print("   Elapsed: \(elapsedStr)")
+        if session.targetDuration > 0 {
+            let remaining = max(0, session.targetDuration - elapsed)
+            print("   Remaining: \(FocusSessionManager.formatTimeRemaining(remaining))")
+        }
+        if let docId = session.documentId,
+           let doc = app.documentManager.getDocument(id: docId) {
+            print("   Document: \(doc.title)")
+        }
+    } else {
+        print("○  No active focus session")
+        print("   Start one with: --run [type]")
+        print("   Session types: freewrite, pomodoro, sprint, deepwork, marathon")
+    }
+
+    let docs = app.documentManager.getAllDocuments()
+    print("\n   Documents: \(docs.count)")
+
+    let todaySessions = focusManager.getTodaySessions()
+    if !todaySessions.isEmpty {
+        print("   Sessions today: \(todaySessions.count)")
+    }
+
+    print()
+}
+
+func startFocusSessionDirect(app: WritersApp, sessionTypeName: String?) async {
     // Check if session is already active
     if focusManager.getCurrentSession() != nil {
         print("Error: A focus session is already active.")
@@ -1864,11 +1925,81 @@ func startFocusSessionDirect(app: WritersApp, sessionTypeName: String?) {
     
     print("\n✓ Focus session started!")
     print("  Type: \(session.type.displayName)")
+    
     if session.targetDuration > 0 {
+        // Timed session: run a live countdown timer
+        let totalSeconds = Int(session.targetDuration)
+        let oneSecondNs: UInt64 = 1_000_000_000
         print("  Duration: \(FocusSessionManager.formatTimeRemaining(session.targetDuration))")
+        print("\nPress Ctrl+C to stop early.\n")
+        print("  ⏱  Time remaining: \(formatCountdown(totalSeconds))", terminator: "")
+        fflush(stdout)
+        var interrupted = false
+        for elapsed in 1...totalSeconds {
+            do {
+                try await Task.sleep(nanoseconds: oneSecondNs)
+            } catch {
+                print("\r  ⚠️  Session interrupted.\u{1B}[K")
+                interrupted = true
+                break
+            }
+            let remaining = totalSeconds - elapsed
+            print("\r  ⏱  Time remaining: \(formatCountdown(remaining))\u{1B}[K", terminator: "")
+            fflush(stdout)
+        }
+        let timerCompleted = !interrupted
+        if timerCompleted {
+            print("\r  ✅ Time's up!\u{1B}[K")
+        }
+        let finalWordCount = promptForWordCount()
+        let ended = focusManager.endSession(id: session.id, finalWordCount: finalWordCount, completed: timerCompleted)
+        printSessionSummary(ended)
+    } else {
+        // Free write: block until user presses Enter
+        print("\n  Free write — no time limit.")
+        print("  Press Enter when you're done writing.\n")
+        _ = readLine()
+        let finalWordCount = promptForWordCount()
+        let ended = focusManager.endSession(id: session.id, finalWordCount: finalWordCount, completed: true)
+        printSessionSummary(ended)
     }
-    print("\nHappy writing! The session is now running in the background.")
-    print("Run 'WritersAppCLI' in interactive mode to view or end your session.\n")
+}
+
+/// Prompts the user for words written this session and returns a validated count.
+func promptForWordCount() -> Int {
+    print("\nWords written during this session (press Enter to skip): ", terminator: "")
+    fflush(stdout)
+    if let input = readLine(), let count = Int(input.trimmingCharacters(in: .whitespaces)) {
+        if count < 0 {
+            print("Word count cannot be negative. Recording 0 words instead.")
+            return 0
+        }
+        return count
+    }
+    return 0
+}
+
+/// Prints the session-complete banner with key stats.
+func printSessionSummary(_ ended: FocusSession?) {
+    print()
+    print("╔═══════════════════════════════════════╗")
+    print("║         Session Complete! ✍️           ║")
+    print("╚═══════════════════════════════════════╝")
+    if let s = ended {
+        print("  Type     : \(s.type.displayName)")
+        print("  Duration : \(FocusSessionManager.formatDuration(s.actualDuration))")
+        if s.wordsWritten > 0 {
+            print("  Words    : \(s.wordsWritten)")
+        }
+    }
+    print()
+}
+
+/// Format a number of seconds as MM:SS for the countdown display.
+func formatCountdown(_ seconds: Int) -> String {
+    let m = seconds / 60
+    let s = seconds % 60
+    return String(format: "%02d:%02d", m, s)
 }
 
 func openDocumentAndStartSession(app: WritersApp, searchTerm: String, sessionTypeName: String?) async {
@@ -2427,6 +2558,7 @@ func showHelp() {
         --list, -l              List all documents
         --open, -o <id|title>   Open a document by ID or title
         --run, -r [type]        Start a focus session (types: freewrite, pomodoro, sprint, deepwork, marathon)
+        --status, -s            Show current focus session status and app overview
         --analyze-traces        Run trace analysis report (productivity by session length, tool usage)
         --dance                 Make Claude dance ♪
         --gui-stats             Export writing statistics dashboard to gui.new (prints shareable URL)
@@ -2440,6 +2572,7 @@ func showHelp() {
     EXAMPLES:
         WritersAppCLI                              # Start interactive mode
         WritersAppCLI --list                       # List all documents
+        WritersAppCLI --status                     # Show current session status
         WritersAppCLI --open "My Story"            # Open document by title
         WritersAppCLI --open <document-id>         # Open document by ID
         WritersAppCLI --run pomodoro               # Start a 25-minute Pomodoro session
@@ -3945,7 +4078,9 @@ func moveKanbanTaskCLI(app: WritersApp) {
     print("\n✓ Task '\(task.title)' moved to \(targetColumn.displayName)")
 }
 
-/// Deletes a Kanban board and all its tasks.
+/// Interactively prompts the user to select and delete a Kanban board from the application.
+/// 
+/// Lists all Kanban boards with their task counts, prompts for a selection number, and asks for an explicit `y` confirmation before deleting the chosen board and its tasks. If there are no boards, the selection is skipped. Invalid selection or any confirmation other than `y` cancels the operation and prints a corresponding message.
 func deleteKanbanBoardCLI(app: WritersApp) {
     print("\n=== Delete Kanban Board ===\n")
     let boards = app.getAllKanbanBoards()
@@ -3972,7 +4107,10 @@ func deleteKanbanBoardCLI(app: WritersApp) {
     print("\n✓ Kanban board '\(board.name)' deleted.")
 }
 
-// MARK: - Cowork Mode Handlers
+/// Starts a cowork session and displays its metadata and integration readiness.
+/// 
+/// Prints a short session identifier, the session start time, whether Gmail is enabled,
+/// and readiness indicators for prospects and browser integrations.
 
 func startCoworkSession(app: WritersApp) {
     let session = app.startCoworkSession()
@@ -3987,6 +4125,8 @@ func startCoworkSession(app: WritersApp) {
     print("Browser:   ready")
 }
 
+/// Ends the currently active cowork session (if any) and prints a concise summary to stdout.
+/// - Parameter app: The application instance used to end the session and retrieve the final session details.
 func endCoworkSession(app: WritersApp) {
     guard let session = app.endCoworkSession() else {
         print("\nNo active cowork session.")
@@ -4002,6 +4142,8 @@ func endCoworkSession(app: WritersApp) {
     print("\nSession ended. Great work!")
 }
 
+/// Prompts the user for prospect information (name, email, optional company, role, notes, and tags), validates required fields, creates the prospect via the provided app, and prints a confirmation or validation error.
+/// - Parameter app: The application instance used to persist the new prospect.
 func addProspect(app: WritersApp) {
     print("\n=== Add Prospect ===\n")
     print("Name: ", terminator: "")
@@ -4032,6 +4174,11 @@ func addProspect(app: WritersApp) {
     print("\n✓ Prospect '\(prospect.name)' added (ID: \(prospect.id.uuidString.prefix(8))...)")
 }
 
+/// Prints a formatted list of all prospects and their metadata to standard output.
+/// - Parameters:
+///   - app: The application instance used to retrieve prospect data. The function fetches all prospects from `app` and renders each prospect's name, company, role, email, status, optional notes, tags, and last-contacted date.
+/// 
+/// If no prospects exist, prints a short message indicating the database is empty and how to add a prospect; always prints a final total count.
 func listProspects(app: WritersApp) {
     print("\n=== Prospect Database ===\n")
     let prospects = app.getAllProspects()
@@ -4062,6 +4209,11 @@ func listProspects(app: WritersApp) {
     print("Total: \(prospects.count) prospect(s)")
 }
 
+/// Prompts the user for a search query and displays matching prospects.
+/// 
+/// Reads a line from standard input, validates it is non-empty, performs a search via the app's prospect index, and prints either a "no matches" message or a numbered summary of matching prospects (name, optional company, email, and status).
+/// 
+/// Side effects: reads from stdin and writes formatted results to stdout.
 func searchProspects(app: WritersApp) {
     print("\n=== Search Prospects ===\n")
     print("Search query: ", terminator: "")
@@ -4081,6 +4233,9 @@ func searchProspects(app: WritersApp) {
     }
 }
 
+/// Interactively update the status of a prospect selected from the application's prospect list.
+/// 
+/// Prompts the user to choose a prospect and a new status, applies the change via the provided application instance, and prints a success or error message.
 func updateProspectStatus(app: WritersApp) {
     print("\n=== Update Prospect Status ===\n")
     let prospects = app.getAllProspects()
@@ -4119,6 +4274,9 @@ func updateProspectStatus(app: WritersApp) {
     }
 }
 
+/// Prints a textual prospect pipeline summary to standard output.
+/// 
+/// The summary lists each prospect status with a fixed-width label, a three-digit count, an ASCII bar proportional to the count, and a final total count. The statuses are printed in the order defined by `ProspectStatus.allCases`.
 func viewProspectPipelineStats(app: WritersApp) {
     print("\n=== Prospect Pipeline ===\n")
     let stats = app.getProspectStats()
@@ -4136,15 +4294,29 @@ func viewProspectPipelineStats(app: WritersApp) {
     print("\nTotal: \(total) prospect(s)")
 }
 
+/// Displays an interactive Gmail inbox listing.
+///
+/// Displays the user's Gmail inbox in the CLI and prints a formatted list of messages.
+/// 
+/// Prompts for a maximum number of results (default 10, allowed range 1–100) and an optional Gmail query string. If Gmail is not enabled the function prints a message and returns. On success it prints each message with an unread marker, subject (or “(no subject)”), sender, short formatted date, and an 80-character snippet preview when available. On failure it prints a fetch error message.
 func viewGmailInbox(app: WritersApp) async {
     print("\n=== Gmail Inbox ===\n")
     guard app.isGmailEnabled else {
         print("Gmail is not enabled. Set GMAIL_OAUTH_TOKEN and restart.")
         return
     }
-    print("Max results (default 10): ", terminator: "")
+    print("Max results (default 10, range 1-100): ", terminator: "")
     let maxInput = readLine() ?? ""
-    let maxResults = Int(maxInput) ?? 10
+    let trimmedMaxInput = maxInput.trimmingCharacters(in: .whitespacesAndNewlines)
+    let maxResults: Int
+    if trimmedMaxInput.isEmpty {
+        maxResults = 10
+    } else if let value = Int(trimmedMaxInput), (1...100).contains(value) {
+        maxResults = value
+    } else {
+        print("Invalid max results. Please enter a number between 1 and 100.")
+        return
+    }
     print("Search query (optional, e.g. 'from:agent@example.com'): ", terminator: "")
     let query = readLine().flatMap { $0.isEmpty ? nil : $0 }
 
@@ -4174,6 +4346,34 @@ func viewGmailInbox(app: WritersApp) async {
     }
 }
 
+/// Prompts for a Gmail message ID and marks that message as read.
+/// 
+/// If Gmail is not enabled in the application, prints an informational message and returns.
+/// On success prints a shortened confirmation; on failure prints the error's localized description.
+func markGmailMessageAsRead(app: WritersApp) async {
+    print("\n=== Mark Email as Read ===\n")
+    guard app.isGmailEnabled else {
+        print("Gmail is not enabled. Set GMAIL_OAUTH_TOKEN and restart.")
+        return
+    }
+    print("Enter message ID to mark as read: ", terminator: "")
+    guard let msgId = readLine(), !msgId.isEmpty else {
+        print("Message ID cannot be empty.")
+        return
+    }
+    do {
+        try await app.markGmailAsRead(id: msgId)
+        print("\n✓ Message \(String(msgId.prefix(16)))... marked as read.")
+    } catch {
+        print("Error: \(error.localizedDescription)")
+    }
+}
+
+/// Presents an interactive CLI flow to compose and send an email through the app's Gmail integration.
+///
+/// Interactively composes and sends an email using the app's Gmail integration.
+/// 
+/// Prompts the user for recipient, subject, and a multi-line body (terminated by a line containing only `.`), then asks for confirmation before sending. Requires Gmail to be enabled in the app; validates that the recipient contains `@` and that the subject is non-empty. On success prints a shortened sent message ID; on failure prints an error message.
 func sendGmail(app: WritersApp) async {
     print("\n=== Send Email via Gmail ===\n")
     guard app.isGmailEnabled else {
@@ -4211,6 +4411,9 @@ func sendGmail(app: WritersApp) async {
     }
 }
 
+/// Fetches a web page, prints a short preview of its text content, and records the page in browsing history.
+/// 
+/// Prompts the user for a URL, retrieves the page via the app, prints the page title, URL, and up to the first 40 text lines, and reports that the page was saved to browsing history. Errors encountered during fetching are printed to standard output.
 func researchURL(app: WritersApp) async {
     print("\n=== Research URL ===\n")
     print("Enter URL to fetch (https://...): ", terminator: "")
@@ -4238,6 +4441,10 @@ func researchURL(app: WritersApp) async {
     }
 }
 
+/// Displays the current browsing history and prompts the user to optionally clear it.
+/// 
+/// Lists each visited page with its title, URL, fetched time, and character count, then shows the total number of pages. If the user confirms by entering `y`, the history is cleared.
+/// - Parameter app: The `WritersApp` instance used to retrieve and clear browsing history.
 func viewBrowsingHistory(app: WritersApp) {
     print("\n=== Browsing History ===\n")
     let history = app.getBrowsingHistory()

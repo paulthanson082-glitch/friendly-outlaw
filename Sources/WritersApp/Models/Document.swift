@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents a writing document created from a template or from scratch
-public struct Document: Codable, Identifiable {
+public struct Document: Codable, Identifiable, Hashable {
     public let id: UUID
     public var title: String
     public var content: String
@@ -47,7 +47,8 @@ public struct Document: Codable, Identifiable {
         return max(1, wordCount / wordsPerMinute)
     }
 
-    /// Enhanced word count with filtering for hyphenated words and special characters
+    /// Counts whitespace- and newline-separated tokens that contain at least one letter or digit.
+    /// - Returns: The number of tokens (excluding empty tokens and tokens made only of punctuation).
     public func enhancedWordCount() -> Int {
         let components = content.components(separatedBy: .whitespacesAndNewlines)
         return components.filter { word in
@@ -58,25 +59,24 @@ public struct Document: Codable, Identifiable {
 
     /// Count sentences in the document
     public func sentenceCount() -> Int {
-        let sentences = content.components(separatedBy: CharacterSet(charactersIn: ".!?"))
-        return sentences.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
+        return content.sentenceCount
     }
 
     /// Count paragraphs in the document
     public func paragraphCount() -> Int {
-        let paragraphs = content.components(separatedBy: "\n\n")
-        return paragraphs.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
+        return content.paragraphCount
     }
 
-    /// Progress towards word count goal as percentage
+    /// Progress towards word count goal as a fraction from 0.0 to 1.0 (clamped at 1.0)
     public func wordCountProgress() -> Double {
         guard let goal = metadata.wordCountGoal, goal > 0 else { return 0.0 }
         return min(1.0, Double(wordCount) / Double(goal))
     }
+
 }
 
 /// Metadata for documents
-public struct DocumentMetadata: Codable {
+public struct DocumentMetadata: Codable, Hashable {
     public var created: Date
     public var modified: Date
     public var lastOpened: Date?
@@ -98,5 +98,54 @@ public struct DocumentMetadata: Codable {
         self.wordCountGoal = wordCountGoal
         self.tags = tags
         self.notes = notes
+    }
+}
+
+// MARK: - Document Safety
+
+/// A snapshot of a document's content taken before a destructive operation.
+public struct DocumentBackup: Codable, Identifiable {
+    public let id: UUID
+    public let documentId: UUID
+    public let documentTitle: String
+    public let documentCategory: TemplateCategory
+    public let contentSnapshot: String
+    public let createdAt: Date
+    public let reason: String
+
+    public init(
+        id: UUID = UUID(),
+        documentId: UUID,
+        documentTitle: String,
+        documentCategory: TemplateCategory,
+        contentSnapshot: String,
+        createdAt: Date = Date(),
+        reason: String
+    ) {
+        self.id = id
+        self.documentId = documentId
+        self.documentTitle = documentTitle
+        self.documentCategory = documentCategory
+        self.contentSnapshot = contentSnapshot
+        self.createdAt = createdAt
+        self.reason = reason
+    }
+}
+
+/// Errors thrown by the document safety layer.
+public enum DocumentSafetyError: LocalizedError {
+    case writeProtected(documentId: UUID)
+    case backupNotFound(backupId: UUID)
+    case documentNotFound(documentId: UUID)
+
+    public var errorDescription: String? {
+        switch self {
+        case .writeProtected(let id):
+            return "Document \(id) is write-protected. Disable write protection before modifying or deleting it."
+        case .backupNotFound(let id):
+            return "No backup found with id \(id)."
+        case .documentNotFound(let id):
+            return "No document found with id \(id)."
+        }
     }
 }

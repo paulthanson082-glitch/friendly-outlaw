@@ -120,9 +120,9 @@ public class TemplateManager {
             metadata: TemplateMetadata(tags: ["fiction", "short-story"])
         )
 
-        // Screenplay Scene Template
+        // Screenplay Template
         let screenplayTemplate = Template(
-            name: "Screenplay Scene",
+            name: "Screenplay",
             category: .screenplay,
             description: "Standard screenplay scene format",
             content: """

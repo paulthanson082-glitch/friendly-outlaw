@@ -19,9 +19,17 @@ import Foundation
 /// ```
 public class HermesService {
 
+    // MARK: - Agent Profiles
+
+    public enum AgentProfile {
+        case hermes
+        case archiver
+    }
+
     // MARK: - Public Properties
 
     public var currentSession: HermesSession?
+    public var currentProfile: AgentProfile = .hermes
     public let maxHistoryMessages: Int
     public let maxPromptLength: Int
 
@@ -48,6 +56,22 @@ public class HermesService {
         when they are stuck — give them ideas worth stealing.
         """
 
+    private let archiverPersona = """
+        You are the Archiver, a wise and methodical curator of creative work. Your role is to \
+        preserve, organize, and illuminate the writer's journey. You excel at:
+        1. Organizing work into meaningful collections and themes
+        2. Summarizing the essence of completed projects
+        3. Identifying patterns and recurring elements across work
+        4. Surfacing forgotten ideas that connect to current projects
+        5. Celebrating milestones and preserving memorable moments
+
+        When summarizing, be concise but evocative. When tagging, be consistent and \
+        interconnected. When recommending archived material, show the relevance clearly. \
+        You are systematic, patient, and celebrate creative growth.
+
+        Format responses clearly with sections, bullet points, and structured organization.
+        """
+
     // MARK: - Initialization
 
     public init(
@@ -64,6 +88,22 @@ public class HermesService {
         )
         self.maxHistoryMessages = maxHistoryMessages
         self.maxPromptLength = maxPromptLength
+    }
+
+    // MARK: - Profile Management
+
+    /// Switches to a different agent profile (Hermes or Archiver).
+    /// Ends the current session when switching profiles.
+    /// - Parameter profile: The agent profile to activate.
+    public func switchProfile(_ profile: AgentProfile) {
+        currentProfile = profile
+        currentSession = nil
+    }
+
+    /// Returns the persona prompt for the current active profile.
+    /// - Returns: The system prompt string for the active agent.
+    private func getCurrentPersona() -> String {
+        return currentProfile == .archiver ? archiverPersona : hermesPersona
     }
 
     // MARK: - Session Lifecycle
@@ -103,11 +143,11 @@ public class HermesService {
         trimHistory(&session)
         let userPrompt = buildUserPrompt(userText: prompt, session: session)
 
-        // Call Claude with the Hermes persona as the system prompt and tool support
+        // Call Claude with the current persona as the system prompt and tool support
         let rawResponse: String
         do {
             rawResponse = try await aiService.performAgentTaskWithTools(
-                systemPrompt: hermesPersona,
+                systemPrompt: getCurrentPersona(),
                 userPrompt: userPrompt,
                 tools: WritingToolExecutor.tools,
                 toolExecutor: toolExecutor
@@ -158,6 +198,51 @@ public class HermesService {
             """
 
         return try await generateIdeas(expansionPrompt, in: &session)
+    }
+
+    // MARK: - Idea Queries
+
+    /// Returns every idea from all Hermes messages in the session, optionally filtered by type.
+    /// - Parameters:
+    ///   - session: The session to scan.
+    ///   - type: When non-nil, only ideas whose `ideaType` matches are included.
+    /// - Returns: A flat array of `HermesIdea` in chronological order.
+    public func getAllIdeas(from session: HermesSession, filteredBy type: HermesIdeaType? = nil) -> [HermesIdea] {
+        let all = session.messages
+            .filter { $0.role == .hermes }
+            .flatMap { $0.ideas }
+        guard let filter = type else { return all }
+        return all.filter { $0.ideaType == filter }
+    }
+
+    // MARK: - Session Statistics
+
+    /// Computes aggregated statistics for a Hermes session.
+    /// - Parameter session: The session to analyse.
+    /// - Returns: A `HermesSessionStats` value summarising the session.
+    public func getSessionStats(from session: HermesSession) -> HermesSessionStats {
+        let hermesMessages = session.messages.filter { $0.role == .hermes }
+        let allIdeas = hermesMessages.flatMap { $0.ideas }
+
+        var countByType: [HermesIdeaType: Int] = [:]
+        for idea in allIdeas {
+            countByType[idea.ideaType, default: 0] += 1
+        }
+
+        let duration = session.lastMessageAt.timeIntervalSince(session.startedAt)
+        let avgIdeas = hermesMessages.isEmpty
+            ? 0.0
+            : Double(allIdeas.count) / Double(hermesMessages.count)
+
+        return HermesSessionStats(
+            sessionId: session.id,
+            messageCount: session.messages.count,
+            totalIdeas: allIdeas.count,
+            favoriteCount: 0,
+            ideaCountByType: countByType,
+            sessionDuration: max(0, duration),
+            averageIdeasPerMessage: avgIdeas
+        )
     }
 
     // MARK: - History

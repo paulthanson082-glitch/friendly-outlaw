@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { readFileSync, mkdirSync } from 'fs';
+import { join, dirname } from 'path';
 import logger from '../utils/logger.js';
 
 let db: Database.Database | null = null;
@@ -9,6 +9,11 @@ export const initializeDatabase = (dbPath: string = ':memory:'): Database.Databa
   if (db) return db;
 
   try {
+    // Ensure the data directory exists for file-based databases
+    if (dbPath !== ':memory:') {
+      mkdirSync(dirname(dbPath), { recursive: true });
+    }
+
     db = new Database(dbPath);
     db.pragma('journal_mode = WAL');
 

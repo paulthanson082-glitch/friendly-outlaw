@@ -94,6 +94,13 @@ public enum AIAssistanceType {
         }
     }
 
+    /// Builds an instruction prompt for this assistance type using the provided text and optional context.
+    ///
+    /// The returned string embeds `context?.description` (when present) and the supplied `text` into the instruction template appropriate for the assistance case.
+    /// - Parameters:
+    ///   - text: The primary text or writer data to include in the prompt.
+    ///   - context: Optional additional context to prepend to the prompt; if `nil`, no context is included.
+    /// - Returns: A formatted prompt string containing instructions and the provided text for the selected assistance type.
     public func prompt(for text: String, context: AIContext? = nil) -> String {
         let contextInfo = context?.description ?? ""
 

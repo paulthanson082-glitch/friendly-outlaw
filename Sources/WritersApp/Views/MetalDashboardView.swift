@@ -18,9 +18,17 @@ public struct MetalDashboardView: View {
     @StateObject private var viewModel: MetalDashboardViewModel
 
 
+    // Two initializers are required instead of a single initializer with a default parameter
+    // because default parameter expressions for @MainActor-isolated types are evaluated in a
+    // nonisolated context, which causes a compile error in Swift's concurrency model.
     @MainActor
-    public init(viewModel: MetalDashboardViewModel = MetalDashboardViewModel()) {
+    public init(viewModel: MetalDashboardViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
+    }
+
+    @MainActor
+    public init() {
+        _viewModel = StateObject(wrappedValue: MetalDashboardViewModel())
     }
 
     public var body: some View {
