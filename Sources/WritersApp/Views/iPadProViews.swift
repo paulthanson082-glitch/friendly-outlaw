@@ -181,6 +181,9 @@ struct DocumentEditorView: View {
         .sheet(isPresented: $viewModel.showWordCountSheet) {
             WordCountDetailView(viewModel: viewModel)
         }
+        .sheet(isPresented: $viewModel.showDocumentInfoSheet) {
+            DocumentInfoView(viewModel: viewModel)
+        }
         .sheet(isPresented: $viewModel.showSpoilerPanel) {
             if let svm = viewModel.spoilerPanelVM {
                 SpoilerManagerView(viewModel: svm)
@@ -315,6 +318,127 @@ private struct StatRow: View {
             Text(value)
                 .foregroundColor(.secondary)
         }
+    }
+}
+
+// MARK: - Document Info View
+
+/// Sheet displaying metadata for the current document
+@available(iOS 16.0, macOS 13.0, *)
+struct DocumentInfoView: View {
+    @ObservedObject var viewModel: WritersAppViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .short
+        return f
+    }()
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Document") {
+                    StatRow(label: "Title", value: viewModel.currentDocumentTitle)
+                    StatRow(label: "Words", value: "\(viewModel.wordCount)")
+                    StatRow(label: "Characters", value: "\(viewModel.characterCount)")
+                    StatRow(label: "Reading Time", value: "\(viewModel.readingTime) min")
+                }
+
+                if let goal = viewModel.wordCountGoal {
+                    Section("Goal") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ProgressView(value: Double(min(viewModel.wordCount, goal)), total: Double(goal))
+                            HStack {
+                                Text("\(viewModel.wordCount) / \(goal) words")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                let pct = min(100, viewModel.wordCount * 100 / max(1, goal))
+                                Text("\(pct)%")
+                                    .font(.caption)
+                                    .foregroundColor(pct >= 100 ? .green : .secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+            .navigationTitle("Document Info")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+}
+
+// MARK: - All Suggestions View
+
+/// Sheet listing all recent AI suggestions for the current session
+@available(iOS 16.0, macOS 13.0, *)
+struct AllSuggestionsView: View {
+    @ObservedObject var viewModel: WritersAppViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if viewModel.recentAISuggestions.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                        Text("No Suggestions Yet")
+                            .font(.headline)
+                        Text("Use the AI assistant to generate writing suggestions.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List(viewModel.recentAISuggestions, id: \.id) { suggestion in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text(suggestion.toolUsed)
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.accentColor)
+                                Spacer()
+                                Text(relativeDate(suggestion.timestamp))
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                            Text(suggestion.response)
+                                .font(.body)
+                                .foregroundColor(.primary)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+            .navigationTitle("All Suggestions")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func relativeDate(_ date: Date) -> String {
+        let interval = Date().timeIntervalSince(date)
+        if interval < 60 { return "Just now" }
+        if interval < 3600 { return "\(Int(interval / 60))m ago" }
+        if interval < 86400 { return "\(Int(interval / 3600))h ago" }
+        return "\(Int(interval / 86400))d ago"
     }
 }
 
@@ -726,8 +850,11 @@ struct AISidebarView: View {
             }
         }
         .background(Color(uiColor: .systemBackground))
+        .sheet(isPresented: $viewModel.showAllSuggestionsSheet) {
+            AllSuggestionsView(viewModel: viewModel)
+        }
     }
-    
+
     private func formatSuggestionDate(_ date: Date) -> String {
         let now = Date()
         let interval = now.timeIntervalSince(date)
@@ -920,6 +1047,7 @@ public class WritersAppViewModel: ObservableObject {
     @Published public var recentAISuggestions: [AISuggestion] = []
     @Published public var toolUsageStats: [AIToolUsageStats] = []
     @Published public var currentSessionStats: SessionStats?
+    @Published public var showAllSuggestionsSheet: Bool = false
 
     // Layout
     @Published public var bodyFontSize: Double = 17
@@ -1504,8 +1632,8 @@ public class WritersAppViewModel: ObservableObject {
     }
     
     public func loadMoreSuggestions() {
-        // Navigate to a full view of all suggestions
-        // This would typically present a sheet or navigate to a new screen
+        loadRecentSuggestions()
+        showAllSuggestionsSheet = true
     }
 
     // MARK: - Multitasking
