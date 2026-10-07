@@ -119,9 +119,9 @@ final class WritersAppTests: XCTestCase {
     }
 
     func testStatistics() {
-        let doc1 = app.createBlankDocument(title: "Doc 1", category: .novel)
-        let doc2 = app.createBlankDocument(title: "Doc 2", category: .novel)
-        let doc3 = app.createBlankDocument(title: "Doc 3", category: .article)
+        _ = app.createBlankDocument(title: "Doc 1", category: .novel)
+        _ = app.createBlankDocument(title: "Doc 2", category: .novel)
+        _ = app.createBlankDocument(title: "Doc 3", category: .article)
 
         let stats = app.getStatistics()
         XCTAssertEqual(stats.totalDocuments, 3)

@@ -69,6 +69,7 @@ public class FocusSessionManager {
     }
 
     /// Ends the current session
+    @discardableResult
     public func endSession(id: UUID, finalWordCount: Int, completed: Bool = true) -> FocusSession? {
         guard var session = sessions[id] else { return nil }
 
