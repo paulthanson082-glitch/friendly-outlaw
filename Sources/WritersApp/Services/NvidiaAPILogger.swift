@@ -106,7 +106,9 @@ public final class NvidiaAPILogger {
         for line in contents.components(separatedBy: .newlines) {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             guard !trimmed.hasPrefix("#"), trimmed.hasPrefix("NVIDIA_API_KEY=") else { continue }
-            var value = String(trimmed.dropFirst("NVIDIA_API_KEY=".count))
+            // Extract value from the leading-whitespace-stripped line to preserve trailing whitespace
+            let leadingTrimmed = String(line.drop(while: { $0 == " " || $0 == "\t" }))
+            var value = String(leadingTrimmed.dropFirst("NVIDIA_API_KEY=".count))
             if (value.hasPrefix("\"") && value.hasSuffix("\"")) ||
                (value.hasPrefix("'") && value.hasSuffix("'")) {
                 value = String(value.dropFirst().dropLast())

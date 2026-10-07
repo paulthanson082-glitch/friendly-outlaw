@@ -370,8 +370,8 @@ final class ArchiverServiceTests: XCTestCase {
     func testArchiveSnapshotCodable() {
         let original = ArchiveSnapshot(
             documentId: UUID(),
-            title: "Milestone",
             wordCount: 5000,
+            title: "Milestone",
             summary: "Test summary",
             tags: ["test"]
         )
