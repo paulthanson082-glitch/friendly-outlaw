@@ -359,9 +359,7 @@ public class ArchiverService {
     /// - Returns: A dictionary of aggregate stats (collection count, snapshot count, etc.).
     public func getArchiveStats() -> [String: Any] {
         let allDocs = Set(profile.collections.flatMap { $0.documentIds })
-        let totalWords = allDocs
-            .compactMap { documentManager.getDocument(id: $0) }
-            .reduce(0) { $0 + $1.content.split(separator: " ").count }
+        let totalWords = profile.snapshots.reduce(0) { $0 + $1.wordCount }
 
         return [
             "collectionCount": profile.collections.count,
