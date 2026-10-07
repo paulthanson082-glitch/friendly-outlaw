@@ -429,7 +429,7 @@ final class DoltVersionControlServiceTests: XCTestCase {
 
         let doc1 = Document(id: UUID(), title: "Doc1", content: "Old", category: .novel)
         let doc2 = Document(id: UUID(), title: "Doc2", content: "Old", category: .essay)
-        let commit1 = try versionControl.commit(message: "Initial", documents: [doc1, doc2])
+        _ = try versionControl.commit(message: "Initial", documents: [doc1, doc2])
 
         Thread.sleep(forTimeInterval: 0.1)
         let queryDate = Date()

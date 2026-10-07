@@ -217,9 +217,9 @@ final class WritingGoalManagerTests: XCTestCase {
         let doc1 = UUID()
         let doc2 = UUID()
 
-        let goal1 = manager.createGoal(name: "Doc 1 Goal", type: .project, target: 1000, documentId: doc1)
-        let goal2 = manager.createGoal(name: "Doc 2 Goal", type: .project, target: 2000, documentId: doc2)
-        let goal3 = manager.createGoal(name: "Doc 1 Goal 2", type: .project, target: 1500, documentId: doc1)
+        _ = manager.createGoal(name: "Doc 1 Goal", type: .project, target: 1000, documentId: doc1)
+        _ = manager.createGoal(name: "Doc 2 Goal", type: .project, target: 2000, documentId: doc2)
+        _ = manager.createGoal(name: "Doc 1 Goal 2", type: .project, target: 1500, documentId: doc1)
 
         let doc1Goals = manager.getGoals(for: doc1)
 
@@ -228,9 +228,9 @@ final class WritingGoalManagerTests: XCTestCase {
     }
 
     func testGetDailyGoals() {
-        let daily1 = manager.createDailyWordGoal(target: 500)
-        let daily2 = manager.createDailyWordGoal(target: 1000)
-        let weekly = manager.createWeeklyWordGoal(target: 3000)
+        _ = manager.createDailyWordGoal(target: 500)
+        _ = manager.createDailyWordGoal(target: 1000)
+        _ = manager.createWeeklyWordGoal(target: 3000)
 
         let dailyGoals = manager.getDailyGoals()
 
