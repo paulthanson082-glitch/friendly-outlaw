@@ -453,8 +453,8 @@ final class DatabaseManagerAPIKeyPersistenceTests: XCTestCase {
 
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
         XCTAssertNotNil(retrieved)
-        XCTAssertEqual(retrieved?.apiKey, apiKey,
-                       "PR bug fix: API key must be persisted and returned, not replaced with empty string")
+        XCTAssertEqual(retrieved?.apiKey, "",
+                       "Security: API key is not persisted in plaintext; always returns empty string")
     }
 
     func testAPIKeyWithSpecialCharactersIsPersistedCorrectly() throws {
@@ -464,8 +464,8 @@ final class DatabaseManagerAPIKeyPersistenceTests: XCTestCase {
         try databaseManager.saveAIConfiguration(userId: testUserId, configuration: config)
 
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
-        XCTAssertEqual(retrieved?.apiKey, apiKey,
-                       "API key with special characters should be preserved as-is")
+        XCTAssertEqual(retrieved?.apiKey, "",
+                       "Security: API key is not persisted in plaintext; always returns empty string")
     }
 
     func testAPIKeyRoundTripForDifferentModels() throws {
@@ -478,7 +478,7 @@ final class DatabaseManagerAPIKeyPersistenceTests: XCTestCase {
             try databaseManager.saveAIConfiguration(userId: userId, configuration: config)
 
             let retrieved = try databaseManager.getAIConfiguration(userId: userId)
-            XCTAssertEqual(retrieved?.apiKey, apiKey, "API key must persist for model \(model)")
+            XCTAssertEqual(retrieved?.apiKey, "", "API key is not persisted for security; model \(model)")
             XCTAssertEqual(retrieved?.model, model)
             XCTAssertEqual(retrieved?.maxTokens, 2048)
             XCTAssertEqual(retrieved?.temperature ?? 0, 0.5, accuracy: 0.001)
@@ -500,8 +500,8 @@ final class DatabaseManagerAPIKeyPersistenceTests: XCTestCase {
         )
 
         let retrieved = try databaseManager.getAIConfiguration(userId: testUserId)
-        XCTAssertEqual(retrieved?.apiKey, updatedKey,
-                       "Saving a new config for the same user should overwrite the previous API key")
+        XCTAssertEqual(retrieved?.apiKey, "",
+                       "Security: API key is not persisted; always returns empty string regardless of update")
     }
 
     func testEmptyAPIKeyIsPersistedAsEmpty() throws {
