@@ -1631,20 +1631,15 @@ public class WritersApp {
         return prospectDatabase.searchProspects(query: query)
     }
 
-    /// Update the status of a prospect and, when applicable, increment the active cowork session's contacted count.
-    /// - Parameters:
-    ///   - id: The unique identifier of the prospect to update.
-    ///   - status: The new status to assign to the prospect.
-    /// - Throws: Any error produced while updating the prospect status in the prospect database.
-    /// Update a prospect's status and, if the status transitions into a contacted-like state (`.contacted`, `.replied`, or `.meeting`), increment the active cowork session's `prospectsContacted` counter.
+    /// Updates a prospect's status and, if the new status is `.contacted`, `.replied`, or `.meeting`,
+    /// increments `activeCoworkSession?.prospectsContacted` — unconditionally, regardless of the previous status.
     /// - Parameters:
     ///   - id: The UUID of the prospect to update.
     ///   - status: The new `ProspectStatus` to apply.
-    /// - Throws: Any error thrown by `prospectDatabase.updateProspectStatus(id:status:)`.
+    /// - Throws: `CoworkError.prospectNotFound` if no prospect exists with the given `id`.
     public func updateProspectStatus(id: UUID, status: ProspectStatus) throws {
-        let isContactStatus = status == .contacted || status == .replied || status == .meeting
         try prospectDatabase.updateProspectStatus(id: id, status: status)
-        if isContactStatus {
+        if status == .contacted || status == .replied || status == .meeting {
             activeCoworkSession?.prospectsContacted += 1
         }
     }

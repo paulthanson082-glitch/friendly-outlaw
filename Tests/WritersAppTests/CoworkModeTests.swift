@@ -158,11 +158,11 @@ final class CoworkModeTests: XCTestCase {
         try app.updateProspectStatus(id: prospect.id, status: .contacted)
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 1)
 
-        // contacted → contacted again: also increments (no transition guard)
+        // contacted → contacted again: still increments (new behaviour — no transition guard)
         try app.updateProspectStatus(id: prospect.id, status: .contacted)
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 2)
 
-        // contacted → replied (still a contact state): increments
+        // contacted → replied: increments
         try app.updateProspectStatus(id: prospect.id, status: .replied)
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 3)
 
@@ -170,7 +170,7 @@ final class CoworkModeTests: XCTestCase {
         try app.updateProspectStatus(id: prospect.id, status: .declined)
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 3)
 
-        // declined → meeting (contact state): increments
+        // declined → meeting: increments
         try app.updateProspectStatus(id: prospect.id, status: .meeting)
         XCTAssertEqual(app.activeCoworkSession?.prospectsContacted, 4)
     }

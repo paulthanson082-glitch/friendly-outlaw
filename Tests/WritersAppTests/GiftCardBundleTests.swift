@@ -436,7 +436,7 @@ final class GiftCardBundleTests: XCTestCase {
         XCTAssertNotNil(retrieved?.redeemedAt)
     }
 
-    // MARK: - Expiration Days Boundary Tests (PR Change: > 0 → >= 0)
+    // MARK: - Expiration Days Boundary Tests (expirationDays must be > 0)
 
     func testCreateBundleWithZeroExpirationDaysThrows() {
         XCTAssertThrowsError(
@@ -447,8 +447,7 @@ final class GiftCardBundleTests: XCTestCase {
                 bundleType: .starter,
                 aiCredits: 50,
                 expirationDays: 0
-            ),
-            "PR change: expirationDays=0 must now throw (validation changed from >= 0 to > 0)"
+            )
         )
     }
 
@@ -554,7 +553,7 @@ final class GiftCardBundleTests: XCTestCase {
         XCTAssertEqual(bundle.expirationDays, 1)
     }
 
-    /// PR change: expirationDays=0 must now throw (validation tightened from >= 0 to > 0).
+    /// expirationDays=0 must throw (expirationDays must be > 0).
     func testCreateBundleWithExpirationDaysZeroThrowsInvalidInput() {
         XCTAssertThrowsError(
             try giftCardManager.createBundle(
@@ -564,8 +563,7 @@ final class GiftCardBundleTests: XCTestCase {
                 bundleType: .starter,
                 aiCredits: 10,
                 expirationDays: 0
-            ),
-            "PR change: expirationDays=0 must now throw after validation was tightened to > 0"
+            )
         )
     }
 

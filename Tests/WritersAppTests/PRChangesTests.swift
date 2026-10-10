@@ -995,7 +995,7 @@ final class KanbanManagerSearchEmptyQueryPRTests: XCTestCase {
     }
 }
 
-// MARK: - PR Changes: DatabaseManager apiKey Now Saved Correctly
+// MARK: - PR Changes: DatabaseManager AI Configuration (apiKey not persisted for security)
 
 final class DatabaseManagerAPIKeyPRTests: XCTestCase {
 
@@ -1005,7 +1005,7 @@ final class DatabaseManagerAPIKeyPRTests: XCTestCase {
     override func setUp() {
         super.setUp()
         dbManager = DatabaseManager(databasePath: ":memory:")
-        try? dbManager.initialize()
+        try! dbManager.initialize()
     }
 
     override func tearDown() {
@@ -1013,7 +1013,7 @@ final class DatabaseManagerAPIKeyPRTests: XCTestCase {
         super.tearDown()
     }
 
-    /// Security: apiKey is never persisted in plaintext; always retrieved as "".
+    /// API key is not persisted; retrieved configuration must still be non-nil.
     func testSaveAndRetrieveAPIKeyIsPreserved() throws {
         let config = AIConfiguration(
             apiKey: "sk-ant-test-key-correct-12345",
@@ -1026,11 +1026,10 @@ final class DatabaseManagerAPIKeyPRTests: XCTestCase {
         let retrieved = try dbManager.getAIConfiguration(userId: testUserId)
 
         XCTAssertNotNil(retrieved, "Saved configuration must be retrievable")
-        XCTAssertEqual(retrieved?.apiKey, "",
-            "Security: apiKey is not persisted in plaintext; always returns empty string")
+        XCTAssertEqual(retrieved?.apiKey, "", "apiKey is not persisted in database for security")
     }
 
-    /// Security: retrieved apiKey is always empty string, never the original key.
+    /// API key is always returned as empty string (never stored in plaintext).
     func testSavedAPIKeyIsNotEmptyString() throws {
         let config = AIConfiguration(
             apiKey: "sk-ant-real-key",
@@ -1042,11 +1041,10 @@ final class DatabaseManagerAPIKeyPRTests: XCTestCase {
         try dbManager.saveAIConfiguration(userId: testUserId, configuration: config)
         let retrieved = try dbManager.getAIConfiguration(userId: testUserId)
 
-        XCTAssertEqual(retrieved?.apiKey, "",
-            "Security: API key is not persisted in plaintext; always returns empty string")
+        XCTAssertEqual(retrieved?.apiKey, "", "apiKey is always returned as empty string for security")
     }
 
-    /// Model is preserved; apiKey is always empty for security.
+    /// Model is preserved alongside the saved configuration.
     func testSaveAndRetrieveModelAlongsideAPIKey() throws {
         let config = AIConfiguration(apiKey: "any-key", model: .claude3Haiku, maxTokens: 1024, temperature: 0.5)
         try dbManager.saveAIConfiguration(userId: testUserId, configuration: config)
@@ -1084,11 +1082,13 @@ final class DatabaseManagerAPIKeyPRTests: XCTestCase {
         let retrieved1 = try dbManager.getAIConfiguration(userId: userId1)
         let retrieved2 = try dbManager.getAIConfiguration(userId: userId2)
 
+        XCTAssertEqual(retrieved1?.model, .claude35Sonnet)
+        XCTAssertEqual(retrieved2?.model, .claude3Haiku)
         XCTAssertEqual(retrieved1?.apiKey, "")
         XCTAssertEqual(retrieved2?.apiKey, "")
     }
 
-    /// Boundary: empty string apiKey is stored and retrieved as empty (not replaced).
+    /// Boundary: empty string apiKey is stored and retrieved as empty.
     func testEmptyAPIKeyStoredAsEmpty() throws {
         let config = AIConfiguration(apiKey: "", model: .claude3Haiku, maxTokens: 1024, temperature: 0.5)
         try dbManager.saveAIConfiguration(userId: testUserId, configuration: config)

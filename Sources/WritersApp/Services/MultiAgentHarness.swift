@@ -427,7 +427,8 @@ public class MultiAgentHarness {
     private func parsePlan(from rawResponse: String, originalPrompt: String) throws -> WritingPlan {
         let jsonString = extractJSON(from: rawResponse)
         guard let data = jsonString.data(using: .utf8),
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+              let rawRoot = try? JSONSerialization.jsonObject(with: data),
+              let root = rawRoot as? [String: Any] else {
             throw HarnessError.invalidPlanJSON("Could not parse JSON from planner response")
         }
 
@@ -479,7 +480,8 @@ public class MultiAgentHarness {
     private func parseContract(from rawResponse: String, sectionId: UUID) throws -> SectionContract {
         let jsonString = extractJSON(from: rawResponse)
         guard let data = jsonString.data(using: .utf8),
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+              let rawRoot = try? JSONSerialization.jsonObject(with: data),
+              let root = rawRoot as? [String: Any] else {
             // Fall back to a minimal default contract rather than failing hard
             return SectionContract(
                 sectionId: sectionId,
@@ -514,7 +516,8 @@ public class MultiAgentHarness {
     ) throws -> WritingSectionEvaluation {
         let jsonString = extractJSON(from: rawResponse)
         guard let data = jsonString.data(using: .utf8),
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+              let rawRoot = try? JSONSerialization.jsonObject(with: data),
+              let root = rawRoot as? [String: Any] else {
             throw HarnessError.invalidEvaluationJSON("Could not parse JSON from evaluator response")
         }
 

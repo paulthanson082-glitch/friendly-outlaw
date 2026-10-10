@@ -101,7 +101,8 @@ public class GuiNewService {
     /// Fetch metadata for an existing canvas (no HTML body returned).
     public func getCanvas(id: String) async throws -> [String: Any] {
         let data = try await request(method: "GET", path: "/api/canvas/\(id)")
-        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        guard let rawObj = try? JSONSerialization.jsonObject(with: data),
+              let obj = rawObj as? [String: Any] else {
             throw GuiNewError.decodingFailed
         }
         return obj
