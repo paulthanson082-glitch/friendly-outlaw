@@ -26,9 +26,9 @@
 ### Task 1: Create Data Models (AIAnalyticsModels.swift)
 - [x] Dispatch implementer (49e89a4)
 - [x] DONE_WITH_CONCERNS: Codable issue on AIGenerationRecord
-- [x] Fix round 1: Custom Codable implementation (dispatched, awaiting completion)
-- [ ] Review & approve fix
-- [ ] Complete
+- [x] Fix round 1: Custom Codable implementation (f02400f)
+- [x] Review & approve fix
+- [x] Complete (commits 49e89a4..f02400f)
 
 ### Task 2: Create AI Analytics Service
 - [ ] Dispatch implementer
@@ -59,7 +59,11 @@
 
 ## Rulings & Decisions
 
-(None yet)
+**Ruling 1: Task 1 - Codable Conformance**
+- Issue: AIGenerationRecord declared Codable but used AIAssistanceType with associated values (non-Codable)
+- Decision: Implement custom Codable extension with string-based serialization of assistanceType via analyticsKey
+- Fix: f02400f (custom Codable implementation)
+- Cost if wrong: JSON persistence in Task 2 would fail; minor impact since can be re-fixed in service layer
 
 ---
 
