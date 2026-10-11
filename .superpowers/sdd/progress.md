@@ -36,12 +36,12 @@
 - [x] Complete (commit 1921d7d)
 
 ### Task 3: Create Dashboard ViewModel
-- [x] Dispatch implementer (in progress)
-- [ ] Review & approve
-- [ ] Complete
+- [x] Dispatch implementer (ac4a587a4e0bf0d02)
+- [x] Review & approve
+- [x] Complete (commit c011ac2)
 
 ### Task 4: Create Dashboard Main View
-- [ ] Dispatch implementer
+- [x] Dispatch implementer (in progress)
 - [ ] Review & approve
 - [ ] Complete
 
