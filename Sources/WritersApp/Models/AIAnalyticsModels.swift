@@ -4,7 +4,7 @@ import Foundation
 // MARK: - AI Generation Record
 
 /// Single tracked AI generation event
-public struct AIGenerationRecord: Identifiable, Codable {
+public struct AIGenerationRecord: Identifiable {
     public let id: UUID
     public let timestamp: Date
     public let assistanceType: AIAssistanceType
@@ -33,6 +33,40 @@ public struct AIGenerationRecord: Identifiable, Codable {
         self.model = model
         self.status = status
         self.documentId = documentId
+    }
+}
+
+// MARK: - Custom Codable Conformance for AIGenerationRecord
+
+extension AIGenerationRecord: Codable {
+    enum CodingKeys: String, CodingKey {
+        case id, timestamp, assistanceTypeKey, inputTokens, outputTokens, model, status, documentId
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encode(assistanceType.analyticsKey, forKey: .assistanceTypeKey)
+        try container.encode(inputTokens, forKey: .inputTokens)
+        try container.encode(outputTokens, forKey: .outputTokens)
+        try container.encode(model, forKey: .model)
+        try container.encode(status, forKey: .status)
+        try container.encode(documentId, forKey: .documentId)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        timestamp = try container.decode(Date.self, forKey: .timestamp)
+        // Note: For now, decode as .custom("unknown") since AIAssistanceType can't fully round-trip
+        let keyStr = try container.decode(String.self, forKey: .assistanceTypeKey)
+        assistanceType = .custom(keyStr)
+        inputTokens = try container.decode(Int.self, forKey: .inputTokens)
+        outputTokens = try container.decode(Int.self, forKey: .outputTokens)
+        model = try container.decode(AIModel.self, forKey: .model)
+        status = try container.decode(GenerationStatus.self, forKey: .status)
+        documentId = try container.decode(UUID?.self, forKey: .documentId)
     }
 }
 
