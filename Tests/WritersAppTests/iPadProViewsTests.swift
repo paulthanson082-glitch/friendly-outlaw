@@ -3,7 +3,7 @@ import XCTest
 import SwiftUI
 @testable import WritersApp
 
-// MARK: - WritersAppViewModel Formatting Tests
+// MARK: - iPadProViewModel Formatting Tests
 // Tests for the simplified formatting methods changed in this PR:
 //   - toggleBold: always wraps with ** (removed toggle-off logic)
 //   - toggleItalic: always wraps with * (removed toggle-off logic)
@@ -13,7 +13,7 @@ import SwiftUI
 //   - toggleNumberedList: new algorithm using line index for numbering
 
 @available(iOS 16.0, macOS 13.0, *)
-final class WritersAppViewModelFormattingTests: XCTestCase {
+final class iPadProViewModelFormattingTests: XCTestCase {
 
     var viewModel: WritersAppViewModel!
 
