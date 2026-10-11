@@ -41,17 +41,17 @@
 - [x] Complete (commit c011ac2)
 
 ### Task 4: Create Dashboard Main View
+- [x] Dispatch implementer (aa02a0a7022cb2bb4)
+- [x] Review & approve
+- [x] Complete (commit cc2131f)
+
+### Task 5: Create History, Models, Trends Views
 - [x] Dispatch implementer (in progress)
 - [ ] Review & approve
 - [ ] Complete
 
-### Task 5: Create History, Models, Trends Views
-- [ ] Dispatch implementer
-- [ ] Review & approve
-- [ ] Complete
-
 ### Task 6: Integration with AIService
-- [ ] Dispatch implementer
+- [ ] Dispatch implementer (queued)
 - [ ] Review & approve
 - [ ] Complete
 
