@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "source": "backend/functions",
+    "runtime": "nodejs18",
+    "codebase": "default"
+  },
+  "firestore": {
+    "rules": "backend/functions/firestore.rules"
+  }
+}
