@@ -131,6 +131,7 @@ GET /jokes/my-favorites
 POST /chat
   Body: { message: string, conversationId?: string }
   Response: { reply: string, conversationId: string }
+  Note: Bot addresses user by their name (e.g., "Paul") in responses
 
 GET /chat/history
   Query: ?conversationId=<id>&limit=50
@@ -230,6 +231,7 @@ All errors return consistent JSON:
 ```json
 {
   "email": "user@example.com",
+  "name": "Paul",
   "username": "joke_lover",
   "createdAt": "2026-10-11T00:00:00Z",
   "updatedAt": "2026-10-11T00:00:00Z",
@@ -334,6 +336,7 @@ service cloud.firestore {
 - Model: `claude-3-5-sonnet`
 - Rate limit: 100 requests/minute (default)
 - Prompt: Conversational jokes + follow-ups
+- **Personalization:** System prompt includes user's name (e.g., "Paul") for natural conversation
 - Cost: **$5 free credits** (initial, ~$0.003 per request)
 
 **Phase 2: Self-hosted Ollama + Llama 2 (after credits exhaust)**
@@ -341,6 +344,7 @@ service cloud.firestore {
 - No API costs, just infrastructure
 - Trade-off: Response quality lower than Claude, but acceptable for jokes
 - Hosting: DigitalOcean ($4/month) or Render (free tier with limits)
+- **Personalization:** Bot addresses user by name in all responses
 - Cost: **$0-5/month**
 
 **Fallback:** Canned joke responses if both APIs unavailable
