@@ -6,7 +6,7 @@ import SwiftUI
 /// Full AI Content Generation dashboard with metal theme.
 /// Four sections: The Usage Snapshot (stats), The Chronicle (generation history),
 /// The Models (model breakdown), and The Trends (usage trends).
-@available(iOS 16.0, macOS 13.0, *)
+@available(iOS 16.0, macOS 14.0, *)
 public struct AIContentDashboardView: View {
     @StateObject private var viewModel: AIContentDashboardViewModel
     @State private var selectedTab: AIContentTab = .overview
@@ -121,7 +121,7 @@ public struct AIContentDashboardView: View {
 
 // MARK: - AIContentTab
 
-@available(iOS 16.0, macOS 13.0, *)
+@available(iOS 16.0, macOS 14.0, *)
 enum AIContentTab: CaseIterable {
     case overview, history, models, trends
 
@@ -146,7 +146,7 @@ enum AIContentTab: CaseIterable {
 
 // MARK: - Overview Section
 
-@available(iOS 16.0, macOS 13.0, *)
+@available(iOS 16.0, macOS 14.0, *)
 private struct AIOverviewSection: View {
     @ObservedObject var viewModel: AIContentDashboardViewModel
 
@@ -257,7 +257,7 @@ private struct AIOverviewSection: View {
 
 // MARK: - History Section
 
-@available(iOS 16.0, macOS 13.0, *)
+@available(iOS 16.0, macOS 14.0, *)
 private struct AIHistorySection: View {
     @ObservedObject var viewModel: AIContentDashboardViewModel
 
@@ -268,7 +268,7 @@ private struct AIHistorySection: View {
                 .padding(.horizontal, 16)
 
             if viewModel.recentRecords.isEmpty {
-                AIEmptyState(icon: "clock", message: "No generations logged yet.\nStart using AI features to track your usage.")
+                CRMEmptyState(icon: "clock", message: "No generations logged yet.\nStart using AI features to track your usage.")
             } else {
                 ScrollView {
                     LazyVStack(spacing: 8) {
@@ -287,7 +287,7 @@ private struct AIHistorySection: View {
 
 // MARK: - Models Section
 
-@available(iOS 16.0, macOS 13.0, *)
+@available(iOS 16.0, macOS 14.0, *)
 private struct AIModelsSection: View {
     @ObservedObject var viewModel: AIContentDashboardViewModel
 
@@ -298,7 +298,7 @@ private struct AIModelsSection: View {
                 .padding(.horizontal, 16)
 
             if viewModel.modelBreakdown.isEmpty {
-                AIEmptyState(icon: "cpu", message: "No model data available yet.\nStart using AI features to generate data.")
+                CRMEmptyState(icon: "cpu", message: "No model data available yet.\nStart using AI features to generate data.")
             } else {
                 ScrollView {
                     LazyVStack(spacing: 12) {
@@ -315,7 +315,7 @@ private struct AIModelsSection: View {
 
 // MARK: - Trends Section
 
-@available(iOS 16.0, macOS 13.0, *)
+@available(iOS 16.0, macOS 14.0, *)
 private struct AITrendsSection: View {
     @ObservedObject var viewModel: AIContentDashboardViewModel
 
@@ -326,7 +326,7 @@ private struct AITrendsSection: View {
                 .padding(.horizontal, 16)
 
             if viewModel.trends.isEmpty {
-                AIEmptyState(icon: "chart.line", message: "No trend data available yet.\nData will appear as you use AI features.")
+                CRMEmptyState(icon: "chart.line", message: "No trend data available yet.\nData will appear as you use AI features.")
             } else {
                 ScrollView {
                     VStack(spacing: 16) {
@@ -399,7 +399,7 @@ private struct AITrendsSection: View {
 
 // MARK: - AIMetricCard
 
-@available(iOS 16.0, macOS 13.0, *)
+@available(iOS 16.0, macOS 14.0, *)
 private struct AIMetricCard: View {
     let value: String
     let label: String
@@ -428,7 +428,7 @@ private struct AIMetricCard: View {
 
 // MARK: - GenerationRecordRow
 
-@available(iOS 16.0, macOS 13.0, *)
+@available(iOS 16.0, macOS 14.0, *)
 private struct GenerationRecordRow: View {
     let record: AIGenerationRecord
 
@@ -501,7 +501,7 @@ private struct GenerationRecordRow: View {
 
 // MARK: - ModelBreakdownCard
 
-@available(iOS 16.0, macOS 13.0, *)
+@available(iOS 16.0, macOS 14.0, *)
 private struct ModelBreakdownCard: View {
     let breakdown: ModelUsageBreakdown
 
@@ -568,7 +568,7 @@ private struct ModelBreakdownCard: View {
 
 // MARK: - TrendDayRow
 
-@available(iOS 16.0, macOS 13.0, *)
+@available(iOS 16.0, macOS 14.0, *)
 private struct TrendDayRow: View {
     let trend: DailyTrend
 
@@ -639,29 +639,6 @@ private struct TrendDayRow: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "E"
         return formatter.string(from: date)
-    }
-}
-
-// MARK: - AIEmptyState
-
-@available(iOS 16.0, macOS 13.0, *)
-private struct AIEmptyState: View {
-    let icon: String
-    let message: String
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: icon)
-                .font(.system(size: 48))
-                .foregroundColor(MetalTheme.chainLink)
-            Text(message)
-                .font(.system(size: 14))
-                .foregroundColor(MetalTheme.steel)
-                .multilineTextAlignment(.center)
-            Spacer()
-        }
-        .padding(40)
     }
 }
 

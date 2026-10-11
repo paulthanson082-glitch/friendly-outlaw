@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-@available(iOS 16.0, macOS 13.0, *)
+@available(iOS 16.0, macOS 14.0, *)
 @MainActor
 public class AIContentDashboardViewModel: ObservableObject {
     @Published var snapshot: AIAnalyticsSnapshot

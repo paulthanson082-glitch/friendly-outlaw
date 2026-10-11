@@ -4,7 +4,6 @@ import Foundation
 public class AIAnalyticsService {
     private var records: [AIGenerationRecord] = []
     private let fileManager = FileManager.default
-    private let queue = DispatchQueue(label: "com.writersapp.analytics", attributes: .concurrent)
     private var lock = NSLock()
 
     private let analyticsDirectory: URL = {
