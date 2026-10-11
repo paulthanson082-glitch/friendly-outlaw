@@ -46,12 +46,12 @@
 - [x] Complete (commit cc2131f)
 
 ### Task 5: Create History, Models, Trends Views
-- [x] Dispatch implementer (in progress)
-- [ ] Review & approve
-- [ ] Complete
+- [x] Dispatch implementer (a992f7f072dc22ba2)
+- [x] Review & approve
+- [x] Complete (commit db6bfa3)
 
 ### Task 6: Integration with AIService
-- [ ] Dispatch implementer (queued)
+- [x] Dispatch implementer (in progress)
 - [ ] Review & approve
 - [ ] Complete
 
