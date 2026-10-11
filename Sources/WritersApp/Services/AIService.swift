@@ -16,12 +16,26 @@ public class AIService {
     private var pendingRequests: [String: Task<String, Error>] = [:]
     private let lock = NSLock()
 
+    // MARK: - Analytics
+    private var analyticsService: AIAnalyticsService?
+    private let analyticsLock = NSLock()
+
     internal var currentModel: String { configuration.model.rawValue }
     internal var apiKey: String { configuration.apiKey }
     internal var maxTokens: Int { configuration.maxTokens }
 
     public init(configuration: AIConfiguration) {
         self.configuration = configuration
+    }
+
+    // MARK: - Analytics Setup
+
+    /// Enable analytics tracking for AI generations
+    /// - Parameter analyticsService: The analytics service instance to track generations
+    public func enableAnalytics(_ analyticsService: AIAnalyticsService) {
+        analyticsLock.lock()
+        defer { analyticsLock.unlock() }
+        self.analyticsService = analyticsService
     }
 
     // MARK: - Main Assistance Methods
@@ -33,7 +47,15 @@ public class AIService {
         context: AIContext? = nil
     ) async throws -> AIResponse {
         let prompt = type.prompt(for: text, context: context)
-        let generatedContent = try await sendRequest(prompt: prompt)
+        let (generatedContent, usage) = try await sendRequest(prompt: prompt)
+
+        // Track generation if analytics is enabled
+        trackGeneration(
+            assistanceType: type,
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            status: .completed
+        )
 
         return AIResponse(
             requestType: type,
@@ -266,9 +288,9 @@ public class AIService {
     /// Sends the given prompt to the Anthropic API after validating and deduplicating in-flight requests, and returns the assistant's response text.
     /// - Parameter prompt: The full prompt text to send to the model; must be non-empty and no more than 100,000 characters.
     /// - Throws: `AIServiceError.emptyPrompt` if `prompt` is empty or whitespace, `AIServiceError.promptTooLarge` if `prompt` exceeds 100,000 characters, or other errors produced during request execution and retries.
-    /// - Returns: The assistant's generated text response.
+    /// - Returns: A tuple of (responseText, TokenUsage)
 
-    private func sendRequest(prompt: String) async throws -> String {
+    private func sendRequest(prompt: String) async throws -> (String, TokenUsage) {
         guard !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw AIServiceError.emptyPrompt
         }
@@ -279,18 +301,18 @@ public class AIService {
 
         let promptHash = hashPrompt(prompt)
 
-        let task: Task<String, Error>
+        let task: Task<(String, TokenUsage), Error>
 
         lock.lock()
         if let existingTask = pendingRequests[promptHash] {
             lock.unlock()
-            return try await existingTask.value
+            return try await existingTask.value as! (String, TokenUsage)
         }
 
         task = Task {
             try await sendRequestWithRetry(prompt: prompt, promptHash: promptHash)
         }
-        pendingRequests[promptHash] = task
+        pendingRequests[promptHash] = task as? Task<String, Error>
         lock.unlock()
 
         defer {
@@ -306,9 +328,9 @@ public class AIService {
     /// - Parameters:
     ///   - prompt: The full prompt text to send to the API.
     ///   - promptHash: A precomputed hash of the prompt used for deduplication tracking.
-    /// - Returns: The response text returned by the API.
+    /// - Returns: A tuple of (responseText, TokenUsage)
     /// - Throws: An `AIServiceError` describing the failure. If all retry attempts fail, throws the last encountered `AIServiceError` or a network error fallback.
-    private func sendRequestWithRetry(prompt: String, promptHash: String) async throws -> String {
+    private func sendRequestWithRetry(prompt: String, promptHash: String) async throws -> (String, TokenUsage) {
         var lastError: AIServiceError?
 
         for attempt in 0..<maxRetries {
@@ -323,11 +345,21 @@ public class AIService {
             }
         }
 
+        // Track failed generation if analytics is enabled
+        if lastError != nil {
+            trackGeneration(
+                assistanceType: .custom("error"),
+                inputTokens: 0,
+                outputTokens: 0,
+                status: .failed
+            )
+        }
+
         throw lastError ?? AIServiceError.networkError(NSError(domain: "AIService", code: -1, userInfo: nil))
     }
 
-    /// Sends the prompt to the Anthropic messages API once and returns the assistant's text reply.
-    /// - Returns: The assistant response text extracted from the API response.
+    /// Sends the prompt to the Anthropic messages API once and returns the assistant's text reply with token usage.
+    /// - Returns: A tuple of (assistantText, TokenUsage)
     /// - Throws:
     ///   - `AIServiceError.invalidURL` if the configured API URL is invalid.
     ///   - `AIServiceError.invalidResponse` if the HTTP response is missing or not an `HTTPURLResponse`.
@@ -336,7 +368,7 @@ public class AIService {
     ///   - `AIServiceError.serverError(statusCode:)` for HTTP 5xx responses.
     ///   - `AIServiceError.apiError(statusCode:message:)` for other non-200 HTTP responses (includes parsed message when available).
     ///   - `AIServiceError.invalidResponseFormat` if the response body cannot be parsed or does not contain extractable assistant text.
-    private func sendRequestOnce(prompt: String) async throws -> String {
+    private func sendRequestOnce(prompt: String) async throws -> (String, TokenUsage) {
         guard let url = URL(string: apiURL) else {
             throw AIServiceError.invalidURL
         }
@@ -378,7 +410,10 @@ public class AIService {
             throw AIServiceError.invalidResponseFormat
         }
 
-        return text
+        // Extract token usage from response
+        let usage = extractTokenUsage(from: json)
+
+        return (text, usage)
     }
 
     /// Compute the exponential backoff delay for a given retry attempt.
@@ -415,6 +450,55 @@ public class AIService {
         return message
     }
 
+    /// Extracts token usage information from the API response JSON
+    /// - Parameter json: The parsed JSON response from the API
+    /// - Returns: TokenUsage struct with input and output token counts
+    private func extractTokenUsage(from json: [String: Any]) -> TokenUsage {
+        var inputTokens = 0
+        var outputTokens = 0
+
+        if let usage = json["usage"] as? [String: Any] {
+            if let input = usage["input_tokens"] as? Int {
+                inputTokens = input
+            }
+            if let output = usage["output_tokens"] as? Int {
+                outputTokens = output
+            }
+        }
+
+        return TokenUsage(inputTokens: inputTokens, outputTokens: outputTokens)
+    }
+
+    /// Tracks a generation to analytics if the service is enabled
+    /// - Parameters:
+    ///   - assistanceType: The type of assistance requested
+    ///   - inputTokens: Number of input tokens used
+    ///   - outputTokens: Number of output tokens used
+    ///   - status: The status of the generation (completed, failed, etc.)
+    private func trackGeneration(
+        assistanceType: AIAssistanceType,
+        inputTokens: Int,
+        outputTokens: Int,
+        status: GenerationStatus
+    ) {
+        analyticsLock.lock()
+        guard let analytics = analyticsService else {
+            analyticsLock.unlock()
+            return
+        }
+        analyticsLock.unlock()
+
+        let record = AIGenerationRecord(
+            assistanceType: assistanceType,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
+            model: configuration.model,
+            status: status
+        )
+
+        analytics.trackGeneration(record)
+    }
+
     // MARK: - Tool Loop
 
     /// Get AI assistance with tool support, implementing the client SDK tool loop pattern.
@@ -432,11 +516,19 @@ public class AIService {
         maxIterations: Int = 10
     ) async throws -> AIResponse {
         let prompt = type.prompt(for: text, context: context)
-        let generatedContent = try await sendRequestWithToolLoop(
+        let (generatedContent, usage) = try await sendRequestWithToolLoop(
             prompt: prompt,
             tools: tools,
             toolExecutor: toolExecutor,
             maxIterations: maxIterations
+        )
+
+        // Track generation if analytics is enabled
+        trackGeneration(
+            assistanceType: type,
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            status: .completed
         )
 
         return AIResponse(
@@ -456,7 +548,7 @@ public class AIService {
     ///     result = your_tool_executor(response.tool_use)
     ///     response = client.messages.create(tool_result=result, **params)
     /// Sends the prompt to the Anthropic messages API and runs an iterative tool-use loop until the model produces a final text response or the loop is exhausted.
-    /// 
+    ///
     /// The method posts the current conversation (including any tool results) to the API, handles `tool_use` responses by executing the requested tools via `toolExecutor`, and feeds tool outputs back into the conversation for further turns.
     /// - Parameters:
     ///   - prompt: The initial user prompt to send to the model.
@@ -464,7 +556,7 @@ public class AIService {
     ///   - toolExecutor: Executor used to run tool calls requested by the model and produce tool result payloads.
     ///   - maxIterations: Maximum number of request/response iterations to perform before aborting.
     ///   - systemPrompt: Optional system-level prompt to include in the request payload.
-    /// - Returns: The final text output produced by the model (possibly empty).
+    /// - Returns: A tuple of (finalText, TokenUsage)
     /// - Throws:
     ///   - `AIServiceError.invalidURL` if the configured API URL is invalid.
     ///   - `AIServiceError.invalidResponse` if the network response is not an HTTP response.
@@ -477,7 +569,7 @@ public class AIService {
         toolExecutor: AIToolExecutor,
         maxIterations: Int,
         systemPrompt: String? = nil
-    ) async throws -> String {
+    ) async throws -> (String, TokenUsage) {
         guard let url = URL(string: apiURL) else {
             throw AIServiceError.invalidURL
         }
@@ -487,6 +579,7 @@ public class AIService {
         ]
 
         let toolDefinitions = tools.map { $0.toDict() }
+        var totalUsage = TokenUsage(inputTokens: 0, outputTokens: 0)
 
         for _ in 0..<maxIterations {
             let request = try buildAPIURLRequest(url: url, messages: messages, toolDefinitions: toolDefinitions, systemPrompt: systemPrompt)
@@ -507,9 +600,14 @@ public class AIService {
                 throw AIServiceError.invalidResponseFormat
             }
 
+            // Accumulate token usage
+            let usage = extractTokenUsage(from: json)
+            totalUsage.inputTokens += usage.inputTokens
+            totalUsage.outputTokens += usage.outputTokens
+
             // If the model finished with a text response, extract and return it
             if stopReason == "end_turn" {
-                return extractText(from: content) ?? ""
+                return (extractText(from: content) ?? "", totalUsage)
             }
 
             // If the model wants to use tools, execute them and continue the loop
@@ -528,7 +626,7 @@ public class AIService {
 
             // Unknown stop reason — try to extract text if available
             if let text = extractText(from: content) {
-                return text
+                return (text, totalUsage)
             }
 
             throw AIServiceError.invalidResponseFormat
@@ -615,6 +713,15 @@ public class AIService {
             throw AIServiceError.invalidResponseFormat
         }
 
+        // Track generation for agent tasks if analytics is enabled
+        let usage = extractTokenUsage(from: json)
+        trackGeneration(
+            assistanceType: .custom("agent_task"),
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            status: .completed
+        )
+
         return text
     }
 
@@ -636,13 +743,23 @@ public class AIService {
         toolExecutor: AIToolExecutor,
         maxIterations: Int = 10
     ) async throws -> String {
-        return try await sendRequestWithToolLoop(
+        let (text, usage) = try await sendRequestWithToolLoop(
             prompt: userPrompt,
             tools: tools,
             toolExecutor: toolExecutor,
             maxIterations: maxIterations,
             systemPrompt: systemPrompt
         )
+
+        // Track generation for agent tasks with tools if analytics is enabled
+        trackGeneration(
+            assistanceType: .custom("agent_task_with_tools"),
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            status: .completed
+        )
+
+        return text
     }
 
     /// Extracts joined text from a list of content blocks.
@@ -835,6 +952,15 @@ public class AIService {
             throw AIServiceError.invalidResponseFormat
         }
 
+        // Track vision-based generation if analytics is enabled
+        let usage = extractTokenUsage(from: json)
+        trackGeneration(
+            assistanceType: .custom("vision"),
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            status: .completed
+        )
+
         return responseText
     }
 
@@ -882,7 +1008,15 @@ public class AIService {
         Provide the analysis in a structured format.
         """
 
-        let response = try await sendRequest(prompt: analysisPrompt)
+        let (response, usage) = try await sendRequest(prompt: analysisPrompt)
+
+        // Track document analysis if analytics is enabled
+        trackGeneration(
+            assistanceType: .custom("analyze_document"),
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            status: .completed
+        )
 
         return DocumentAnalysis(
             documentId: document.id,
@@ -909,7 +1043,15 @@ public class AIService {
         Provide specific metrics and observations.
         """
 
-        let response = try await sendRequest(prompt: insightsPrompt)
+        let (response, usage) = try await sendRequest(prompt: insightsPrompt)
+
+        // Track writing insights if analytics is enabled
+        trackGeneration(
+            assistanceType: .custom("writing_insights"),
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            status: .completed
+        )
 
         return WritingInsights(
             documentId: document.id,
@@ -1206,6 +1348,12 @@ public struct WritingInsights {
         self.insights = insights
         self.timestamp = timestamp
     }
+}
+
+/// Internal struct to track token usage across API responses
+internal struct TokenUsage {
+    var inputTokens: Int
+    var outputTokens: Int
 }
 
 // MARK: - Errors
