@@ -656,11 +656,16 @@ private struct CRMStatCard: View {
 // MARK: - CRMEmptyState
 
 @available(iOS 16.0, macOS 13.0, *)
-private struct CRMEmptyState: View {
+public struct CRMEmptyState: View {
     let icon: String
     let message: String
 
-    var body: some View {
+    public init(icon: String, message: String) {
+        self.icon = icon
+        self.message = message
+    }
+
+    public var body: some View {
         VStack(spacing: 16) {
             Spacer()
             Image(systemName: icon)
