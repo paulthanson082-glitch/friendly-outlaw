@@ -211,7 +211,7 @@ private struct AIOverviewSection: View {
             Spacer()
             Image(systemName: "chart.bar")
                 .font(.system(size: 40))
-                .foregroundColor(MetalTheme.forgeGradient)
+                .foregroundStyle(MetalTheme.forgeGradient)
         }
         .metalCard()
     }
