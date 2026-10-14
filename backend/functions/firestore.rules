@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can only read/write their own data
+    match /users/{userId} {
+      allow read, write: if request.auth.uid == userId;
+    }
+
+    // Jokes are public read-only
+    match /jokes/{jokeId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Favorites are user-scoped
+    match /favorites/{userId}/{jokeId} {
+      allow read, write: if request.auth.uid == userId;
+    }
+
+    // Conversations are user-scoped
+    match /conversations/{userId}/{conversationId} {
+      allow read, write: if request.auth.uid == userId;
+    }
+  }
+}
