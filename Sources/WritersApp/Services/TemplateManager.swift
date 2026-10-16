@@ -339,6 +339,46 @@ public class TemplateManager {
             metadata: TemplateMetadata(tags: ["business", "letter", "professional"])
         )
 
+        // Hanson Letter Template (Flexible - Formal & Personal)
+        let hansonLetterTemplate = Template(
+            name: "Hanson Letter",
+            category: .businessLetter,
+            description: "Flexible letter template for formal and personal correspondence",
+            content: """
+            {{sender_name}}
+            {{sender_address}}
+            {{date}}
+
+            {{recipient_name}}
+            {{recipient_address}}
+
+            {{salutation}},
+
+            {{opening}}
+
+            {{body}}
+
+            {{closing}}
+
+            {{sign_off}},
+
+            {{sender_name}}
+            """,
+            placeholders: [
+                Placeholder(key: "sender_name", label: "Your Name"),
+                Placeholder(key: "sender_address", label: "Your Address"),
+                Placeholder(key: "date", label: "Date"),
+                Placeholder(key: "recipient_name", label: "Recipient Name"),
+                Placeholder(key: "recipient_address", label: "Recipient Address"),
+                Placeholder(key: "salutation", label: "Salutation", defaultValue: "Dear"),
+                Placeholder(key: "opening", label: "Opening Paragraph"),
+                Placeholder(key: "body", label: "Body Content"),
+                Placeholder(key: "closing", label: "Closing Remarks"),
+                Placeholder(key: "sign_off", label: "Sign Off", defaultValue: "Sincerely")
+            ],
+            metadata: TemplateMetadata(tags: ["letter", "hanson"])
+        )
+
         // Add all templates
         addTemplate(novelTemplate)
         addTemplate(shortStoryTemplate)
@@ -347,5 +387,6 @@ public class TemplateManager {
         addTemplate(articleTemplate)
         addTemplate(poetryTemplate)
         addTemplate(businessLetterTemplate)
+        addTemplate(hansonLetterTemplate)
     }
 }
