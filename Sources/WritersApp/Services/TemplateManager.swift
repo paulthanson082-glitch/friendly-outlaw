@@ -339,6 +339,64 @@ public class TemplateManager {
             metadata: TemplateMetadata(tags: ["business", "letter", "professional"])
         )
 
+        // Hanson Letter Template (Flexible - Formal & Personal)
+        let hansonLetterTemplate = Template(
+            name: "Hanson Letter",
+            category: .businessLetter,
+            description: "Flexible letter template for formal and personal correspondence with tone options",
+            content: """
+            {{sender_name}}
+            {{sender_address}}
+            {{sender_contact}}
+
+            {{date}}
+
+            {{recipient_name}}
+            {{recipient_address}}
+
+            {{salutation}},
+
+            {{opening}}
+
+            {{section_1_title}}
+            {{section_1_content}}
+
+            {{section_2_title}}
+            {{section_2_content}}
+
+            {{section_3_title}}
+            {{section_3_content}}
+
+            {{closing}}
+
+            {{sign_off}},
+
+            {{sender_name}}
+            {{sender_title}}
+            """,
+            placeholders: [
+                Placeholder(key: "sender_name", label: "Your Name"),
+                Placeholder(key: "sender_address", label: "Your Address"),
+                Placeholder(key: "sender_contact", label: "Phone/Email"),
+                Placeholder(key: "date", label: "Date"),
+                Placeholder(key: "recipient_name", label: "Recipient Name"),
+                Placeholder(key: "recipient_address", label: "Recipient Address"),
+                Placeholder(key: "tone", label: "Tone (formal/personal)", defaultValue: "formal"),
+                Placeholder(key: "salutation", label: "Salutation", description: "Dear Sir/Madam (formal) or Hi (personal)", defaultValue: "Dear"),
+                Placeholder(key: "opening", label: "Opening Paragraph"),
+                Placeholder(key: "section_1_title", label: "First Point", description: "Main topic or idea"),
+                Placeholder(key: "section_1_content", label: "First Point Details"),
+                Placeholder(key: "section_2_title", label: "Second Point", required: false),
+                Placeholder(key: "section_2_content", label: "Second Point Details", required: false),
+                Placeholder(key: "section_3_title", label: "Third Point", required: false),
+                Placeholder(key: "section_3_content", label: "Third Point Details", required: false),
+                Placeholder(key: "closing", label: "Closing Remarks"),
+                Placeholder(key: "sign_off", label: "Sign Off", description: "Sincerely (formal) or Warm regards (personal)", defaultValue: "Sincerely"),
+                Placeholder(key: "sender_title", label: "Your Title/Role", required: false)
+            ],
+            metadata: TemplateMetadata(tags: ["letter", "hanson", "flexible", "formal", "personal"])
+        )
+
         // Add all templates
         addTemplate(novelTemplate)
         addTemplate(shortStoryTemplate)
@@ -347,5 +405,6 @@ public class TemplateManager {
         addTemplate(articleTemplate)
         addTemplate(poetryTemplate)
         addTemplate(businessLetterTemplate)
+        addTemplate(hansonLetterTemplate)
     }
 }
