@@ -1313,10 +1313,10 @@ final class WritersAppTests: XCTestCase {
 
     func testTemplateManagerLoadsSevenDefaultTemplates() {
         // After removing scheduledTask (7 templates) and contentProfile (3 templates),
-        // exactly 7 templates remain: novel, shortStory, screenplay, blog, article, poetry, businessLetter
+        // exactly 8 templates remain: novel, shortStory, screenplay, blog, article, poetry, businessLetter, hansonLetter
         let templates = app.templateManager.getAllTemplates()
-        XCTAssertEqual(templates.count, 7,
-                       "Expected 7 default templates after scheduledTask/contentProfile removal")
+        XCTAssertEqual(templates.count, 8,
+                       "Expected 8 default templates after scheduledTask/contentProfile removal and hansonLetter addition")
     }
 
     func testTemplateManagerHasNoScheduledTaskTemplates() {

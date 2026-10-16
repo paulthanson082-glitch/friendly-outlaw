@@ -54,8 +54,8 @@ final class MetalDashboardTests: XCTestCase {
         let vm = MetalDashboardViewModel(app: app)
         vm.loadDashboard()
 
-        // WritersApp loads 7 default templates
-        XCTAssertEqual(vm.totalTemplates, 7)
+        // WritersApp loads 8 default templates
+        XCTAssertEqual(vm.totalTemplates, 8)
     }
 
     func testViewModelLoadDashboardEmptyDocuments() {
@@ -129,7 +129,7 @@ final class MetalDashboardTests: XCTestCase {
         let vm = MetalDashboardViewModel(app: app)
         let templates = vm.getAllTemplates()
 
-        XCTAssertEqual(templates.count, 7)
+        XCTAssertEqual(templates.count, 8)
     }
 
     func testViewModelGetTemplatesByCategory() {
