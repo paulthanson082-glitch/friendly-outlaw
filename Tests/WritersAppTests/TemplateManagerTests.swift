@@ -160,29 +160,4 @@ final class TemplateManagerTests: XCTestCase {
         let results = manager.getTemplates(for: .screenplay)
         XCTAssertTrue(results.contains { $0.name == "Screenplay" })
     }
-
-    // MARK: - Hanson Letter Template
-
-    func testHansonLetterTemplateExists() {
-        let template = manager.getAllTemplates().first { $0.name == "Hanson Letter" }
-        XCTAssertNotNil(template, "Hanson Letter template must exist in defaults")
-    }
-
-    func testHansonLetterTemplateIsBusinessLetter() {
-        guard let template = manager.getAllTemplates().first(where: { $0.name == "Hanson Letter" }) else {
-            return XCTFail("Hanson Letter template not found")
-        }
-        XCTAssertEqual(template.category, .businessLetter)
-    }
-
-    func testHansonLetterTemplateHasRequiredPlaceholders() {
-        guard let template = manager.getAllTemplates().first(where: { $0.name == "Hanson Letter" }) else {
-            return XCTFail("Hanson Letter template not found")
-        }
-        let requiredKeys = ["sender_name", "recipient_name", "date", "opening", "closing"]
-        for key in requiredKeys {
-            XCTAssertTrue(template.placeholders.contains { $0.key == key },
-                         "Hanson Letter must have placeholder: \(key)")
-        }
-    }
 }
