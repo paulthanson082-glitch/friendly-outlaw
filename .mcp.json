@@ -2,7 +2,7 @@
   "mcpServers": {
     "openbrowser": {
       "command": "uvx",
-      "args": ["openbrowser-ai[mcp]", "--mcp"]
+      "args": ["--python", "3.12", "openbrowser-ai[mcp]", "--mcp"]
     },
     "gemini": {
       "command": "npx",
