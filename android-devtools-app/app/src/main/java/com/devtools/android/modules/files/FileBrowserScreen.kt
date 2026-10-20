@@ -45,7 +45,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.devtools.android.core.RootDetector
 import com.devtools.android.ui.components.ErrorCard
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -110,7 +112,9 @@ fun FileBrowserScreen(vm: FileBrowserViewModel = viewModel()) {
                         TextButton(onClick = {
                             scope.launch {
                                 try {
-                                    fileTextContent = File(entry.path).readText().take(4096)
+                                    fileTextContent = withContext(Dispatchers.IO) {
+                                        File(entry.path).readText().take(4096)
+                                    }
                                 } catch (e: Exception) {
                                     fileTextContent = "Error: ${e.message}"
                                 }

@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 data class FileEntry(
@@ -55,10 +56,10 @@ class FileBrowserViewModel : ViewModel() {
         navigate(parent)
     }
 
-    private fun navigateWithoutRoot(path: String) {
+    private suspend fun navigateWithoutRoot(path: String) {
         try {
             val dir = File(path)
-            val files = dir.listFiles()
+            val files = withContext(Dispatchers.IO) { dir.listFiles() }
             if (files == null) {
                 _error.value = "Cannot read directory: $path"
                 _entries.value = emptyList()

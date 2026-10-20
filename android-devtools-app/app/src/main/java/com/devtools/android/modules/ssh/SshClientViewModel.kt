@@ -10,6 +10,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -162,7 +163,9 @@ class SshClientViewModel(private val context: Context) : ViewModel() {
         super.onCleared()
         val current = _state.value
         if (current is SshState.Connected) {
-            try { current.session.disconnect() } catch (_: Exception) {}
+            CoroutineScope(Dispatchers.IO).launch {
+                try { current.session.disconnect() } catch (_: Exception) {}
+            }
         }
     }
 
