@@ -32,7 +32,7 @@ open class ShellTerminalViewModel : ViewModel() {
      * Appends `"$ $input"` to output lines, executes [input] via [ShellExecutor.exec],
      * and collects each output line into [outputLines] (capped at [MAX_LINES]).
      */
-    fun sendCommand(input: String) {
+    open fun sendCommand(input: String) {
         if (input.isBlank()) return
         _commandHistory.add(input)
         appendLine("$ $input")

@@ -23,6 +23,7 @@ import androidx.navigation.compose.rememberNavController
 import com.devtools.android.ui.apklogs.ApkLogsScreen
 import com.devtools.android.ui.navigation.Screen
 import com.devtools.android.ui.network.NetworkScreen
+import com.devtools.android.ui.security.SecurityScreen
 import com.devtools.android.ui.system.SystemScreen
 import com.devtools.android.ui.tools.ToolsScreen
 
@@ -93,6 +94,9 @@ fun MainScreen(isRooted: Boolean) {
             composable(Screen.Network.route) {
                 NetworkScreen()
             }
+            composable(Screen.Security.route) {
+                SecurityScreen(isRooted = isRooted)
+            }
             composable(Screen.ApkLogs.route) {
                 ApkLogsScreen()
             }
@@ -102,6 +106,7 @@ fun MainScreen(isRooted: Boolean) {
             screens.filter {
                 it != Screen.System &&
                     it != Screen.Network &&
+                    it != Screen.Security &&
                     it != Screen.ApkLogs &&
                     it != Screen.Tools
             }.forEach { screen ->
