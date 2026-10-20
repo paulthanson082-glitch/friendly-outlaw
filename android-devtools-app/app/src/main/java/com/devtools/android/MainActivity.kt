@@ -1,7 +1,7 @@
 package com.devtools.android
 
 import android.os.Bundle
-import android.widget.Toast
+import com.google.android.material.snackbar.Snackbar
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -21,10 +21,10 @@ class MainActivity : ComponentActivity() {
             lifecycleScope.launch {
                 val ok = BinaryManager.ensureBinaries(this@MainActivity)
                 if (!ok) {
-                    Toast.makeText(
-                        this@MainActivity,
+                    Snackbar.make(
+                        findViewById(android.R.id.content),
                         "Storage full — cannot extract tools",
-                        Toast.LENGTH_LONG
+                        Snackbar.LENGTH_LONG
                     ).show()
                 }
             }
