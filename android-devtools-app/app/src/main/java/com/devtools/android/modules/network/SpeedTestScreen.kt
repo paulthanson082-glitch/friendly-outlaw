@@ -37,6 +37,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.devtools.android.core.ShellExecutor
 import com.devtools.android.core.ShellResult
 import com.devtools.android.ui.components.ErrorCard
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -75,7 +76,7 @@ class SpeedTestViewModel : ViewModel() {
     fun runTest(host: String, port: Int, mode: SpeedTestMode) {
         _state.value = SpeedTestState.Running
 
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             when (mode) {
                 SpeedTestMode.Both -> runBothDirections(host, port)
                 else -> runSingleTest(host, port, mode.extraArgs)
