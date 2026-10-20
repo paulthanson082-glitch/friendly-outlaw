@@ -21,6 +21,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.devtools.android.ui.navigation.Screen
+import com.devtools.android.ui.system.SystemScreen
 
 @Composable
 fun MainScreen(isRooted: Boolean) {
@@ -83,7 +84,10 @@ fun MainScreen(isRooted: Boolean) {
             startDestination = Screen.System.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            screens.forEach { screen ->
+            composable(Screen.System.route) {
+                SystemScreen()
+            }
+            screens.filter { it != Screen.System }.forEach { screen ->
                 composable(screen.route) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
