@@ -5,6 +5,9 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.devtools.android.core.RootDetector
+import com.devtools.android.core.ShellExecutor
+import com.devtools.android.core.ShellResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -140,9 +143,29 @@ class PerformanceViewModel(private val context: Context) : ViewModel() {
         }
     }
 
-    private fun readTopProcesses(): List<ProcessInfo> {
+    private suspend fun readTopProcesses(): List<ProcessInfo> {
+        if (RootDetector.isRooted) {
+            // Root path: read /proc for full process list (not limited to own app)
+            val result = ShellExecutor.execCollect(
+                "ps -A -o NAME,RSS --sort=-RSS | head -11 | tail -10",
+                root = true
+            )
+            if (result is ShellResult.Success) {
+                return result.output.lines()
+                    .mapNotNull { line ->
+                        val parts = line.trim().split("\\s+".toRegex())
+                        if (parts.size >= 2) {
+                            val name = parts[0].take(30)
+                            val rssKb = parts[1].toIntOrNull()?.toLong() ?: return@mapNotNull null
+                            ProcessInfo(name = name, rssKb = rssKb)
+                        } else null
+                    }
+            }
+        }
+
         return try {
             val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            // API 26+: returns only own process; root path reads /proc for full list
             val running = activityManager.getRunningAppProcesses() ?: emptyList()
 
             running.mapNotNull { proc ->

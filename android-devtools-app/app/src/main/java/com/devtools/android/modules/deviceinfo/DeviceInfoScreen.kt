@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.devtools.android.ui.components.ErrorCard
 
 @Composable
 fun DeviceInfoScreen(
@@ -25,6 +26,12 @@ fun DeviceInfoScreen(
     )
 ) {
     val info by vm.deviceInfo.collectAsState()
+    val hasError by vm.hasError.collectAsState()
+
+    if (hasError) {
+        ErrorCard(message = "Failed to read device information", onRetry = null)
+        return
+    }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
 

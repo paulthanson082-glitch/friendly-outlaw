@@ -11,6 +11,7 @@ import android.os.StatFs
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.devtools.android.core.RootDetector
 import com.devtools.android.core.ShellExecutor
 import com.devtools.android.core.ShellResult
 import kotlinx.coroutines.Dispatchers
@@ -40,35 +41,42 @@ class DeviceInfoViewModel(private val context: Context) : ViewModel() {
     private val _deviceInfo = MutableStateFlow(DeviceInfo())
     val deviceInfo: StateFlow<DeviceInfo> = _deviceInfo.asStateFlow()
 
+    private val _hasError = MutableStateFlow(false)
+    val hasError: StateFlow<Boolean> = _hasError.asStateFlow()
+
     init {
         loadDeviceInfo()
     }
 
     private fun loadDeviceInfo() {
         viewModelScope.launch(Dispatchers.IO) {
-            val androidVersion = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
-            val buildFingerprint = Build.FINGERPRINT
-            val kernel = readKernel()
-            val (cpuHardware, cpuCores) = parseCpuInfo()
-            val (totalRamMb, availRamMb) = readRam()
-            val (batteryLevel, batteryTemp) = readBatteryInfo()
-            val (storageTotalGb, storageAvailGb) = readStorageInfo()
-            val gpuClockFreq = readGpuInfo()
+            try {
+                val androidVersion = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
+                val buildFingerprint = Build.FINGERPRINT
+                val kernel = readKernel()
+                val (cpuHardware, cpuCores) = parseCpuInfo()
+                val (totalRamMb, availRamMb) = readRam()
+                val (batteryLevel, batteryTemp) = readBatteryInfo()
+                val (storageTotalGb, storageAvailGb) = readStorageInfo()
+                val gpuClockFreq = readGpuInfo()
 
-            _deviceInfo.value = DeviceInfo(
-                androidVersion = androidVersion,
-                buildFingerprint = buildFingerprint,
-                kernel = kernel,
-                cpuHardware = cpuHardware,
-                cpuCores = cpuCores,
-                totalRamMb = totalRamMb,
-                availRamMb = availRamMb,
-                batteryLevel = batteryLevel,
-                batteryTemp = batteryTemp,
-                storageTotalGb = storageTotalGb,
-                storageAvailGb = storageAvailGb,
-                gpuClockFreq = gpuClockFreq
-            )
+                _deviceInfo.value = DeviceInfo(
+                    androidVersion = androidVersion,
+                    buildFingerprint = buildFingerprint,
+                    kernel = kernel,
+                    cpuHardware = cpuHardware,
+                    cpuCores = cpuCores,
+                    totalRamMb = totalRamMb,
+                    availRamMb = availRamMb,
+                    batteryLevel = batteryLevel,
+                    batteryTemp = batteryTemp,
+                    storageTotalGb = storageTotalGb,
+                    storageAvailGb = storageAvailGb,
+                    gpuClockFreq = gpuClockFreq
+                )
+            } catch (e: Exception) {
+                _hasError.value = true
+            }
         }
     }
 
@@ -135,6 +143,7 @@ class DeviceInfoViewModel(private val context: Context) : ViewModel() {
     }
 
     private suspend fun readGpuInfo(): String? {
+        if (!RootDetector.isRooted) return null
         return when (val result = ShellExecutor.execCollect(
             "cat /sys/class/kgsl/kgsl-3d0/gpu_clock_freq",
             root = true

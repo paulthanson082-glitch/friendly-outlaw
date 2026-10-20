@@ -14,7 +14,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -29,11 +29,11 @@ fun PerformanceScreen(
         factory = PerformanceViewModel.Factory(LocalContext.current)
     )
 ) {
-    val data by vm.performanceData.collectAsState()
-
-    DisposableEffect(Unit) {
-        onDispose { vm.stopMonitoring() }
+    LaunchedEffect(Unit) {
+        vm.startMonitoring()
     }
+
+    val data by vm.performanceData.collectAsState()
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
 
