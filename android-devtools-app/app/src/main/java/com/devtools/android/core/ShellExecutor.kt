@@ -1,8 +1,11 @@
 package com.devtools.android.core
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 /**
  * Executes shell commands, optionally using `su` for root commands.
@@ -67,17 +70,22 @@ object ShellExecutor {
 
         val process = Runtime.getRuntime().exec(command)
 
-        try {
-            process.inputStream.bufferedReader().useLines { lines ->
-                for (line in lines) {
-                    trySend(line)
+        val job = launch(Dispatchers.IO) {
+            try {
+                process.inputStream.bufferedReader().useLines { lines ->
+                    for (line in lines) {
+                        if (!isActive) break
+                        trySend(line)
+                    }
                 }
+            } finally {
+                close()
             }
-            process.waitFor()
-        } finally {
-            // Handled by awaitClose
         }
 
-        awaitClose { process.destroy() }
+        awaitClose {
+            job.cancel()
+            process.destroy()
+        }
     }
 }
