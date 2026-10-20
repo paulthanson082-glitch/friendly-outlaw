@@ -68,11 +68,12 @@ object ShellExecutor {
             arrayOf("sh", "-c", cmd)
         }
 
-        val process = Runtime.getRuntime().exec(command)
+        var process: Process? = null
 
         val job = launch(Dispatchers.IO) {
             try {
-                process.inputStream.bufferedReader().useLines { lines ->
+                process = Runtime.getRuntime().exec(command)
+                process!!.inputStream.bufferedReader().useLines { lines ->
                     for (line in lines) {
                         if (!isActive) break
                         trySend(line)
@@ -85,7 +86,7 @@ object ShellExecutor {
 
         awaitClose {
             job.cancel()
-            process.destroy()
+            process?.destroy()
         }
     }
 }

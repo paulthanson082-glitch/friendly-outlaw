@@ -105,7 +105,7 @@ class PortScannerViewModel(private val context: Context) : ViewModel() {
         _state.value = PortScanState.Scanning(0f, emptyList())
 
         scanJob = viewModelScope.launch {
-            when (val result = ShellExecutor.execCollect("nmap $args $target", root = true)) {
+            when (val result = withContext(Dispatchers.IO) { ShellExecutor.execCollect("nmap $args $target", root = true) }) {
                 is ShellResult.Success -> {
                     val open = Regex("""(\d+)/tcp\s+open""")
                         .findAll(result.output)

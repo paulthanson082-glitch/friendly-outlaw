@@ -86,7 +86,7 @@ class FileBrowserViewModel : ViewModel() {
     }
 
     private suspend fun navigateWithRoot(path: String) {
-        when (val result = ShellExecutor.execCollect("ls -la \"$path\"", root = true)) {
+        when (val result = withContext(Dispatchers.IO) { ShellExecutor.execCollect("ls -la \"$path\"", root = true) }) {
             is ShellResult.Success -> {
                 _entries.value = parseLsOutput(result.output, path)
             }
