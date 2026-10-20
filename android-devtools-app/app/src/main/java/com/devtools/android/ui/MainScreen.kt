@@ -1,9 +1,12 @@
 package com.devtools.android.ui
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Badge
@@ -86,7 +89,7 @@ fun MainScreen(
                     }
                 )
             } else {
-                val rootChipColor = if (isRooted) MaterialTheme.colorScheme.primary
+                val rootChipColor = if (isRooted) Color(0xFF4CAF50)
                                     else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 TopAppBar(
                     title = { Text("DevTools") },
@@ -123,7 +126,15 @@ fun MainScreen(
                             icon = {
                                 if (screen is Screen.Security && !isRooted) {
                                     // Lock badge on Security tab when not rooted
-                                    BadgedBox(badge = { Badge() }) {
+                                    BadgedBox(badge = {
+                                        Badge {
+                                            Icon(
+                                                imageVector = Icons.Default.Lock,
+                                                contentDescription = "Requires root",
+                                                modifier = Modifier.size(8.dp)
+                                            )
+                                        }
+                                    }) {
                                         Icon(
                                             imageVector = screen.icon,
                                             contentDescription = screen.label

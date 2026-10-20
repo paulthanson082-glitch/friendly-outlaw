@@ -54,9 +54,9 @@ class MainActivity : ComponentActivity() {
             val context = LocalContext.current
             val scope = rememberCoroutineScope()
 
-            // null = still loading from disk; false = not done; true = done
+            // null = still loading; false = first launch (key absent); true = done
             val onboardingDone by context.appPrefs.data
-                .map { it[AppPrefsKeys.ONBOARDING_DONE] }
+                .map { it[AppPrefsKeys.ONBOARDING_DONE] ?: false }
                 .collectAsState(initial = null)
 
             val themePref by context.appPrefs.data

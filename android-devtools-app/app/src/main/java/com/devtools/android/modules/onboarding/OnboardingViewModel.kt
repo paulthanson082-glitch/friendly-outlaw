@@ -51,7 +51,7 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
             is OnboardingStep.GrantUsageStats ->
                 if (RootDetector.isRooted) OnboardingStep.ExtractBinaries() else OnboardingStep.Done
             is OnboardingStep.ExtractBinaries ->
-                if (current.success == true) OnboardingStep.Done else current
+                if (current.inProgress) current else OnboardingStep.Done
             is OnboardingStep.Done ->
                 OnboardingStep.Done
         }
