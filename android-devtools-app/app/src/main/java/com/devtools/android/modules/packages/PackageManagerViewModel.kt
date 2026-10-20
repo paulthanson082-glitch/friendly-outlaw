@@ -169,7 +169,7 @@ class PackageManagerViewModel(private val context: Context) : ViewModel() {
     /**
      * Copies the APK for [info] to the public Downloads directory using [Files.copy].
      */
-    fun extractApk(info: AppInfo) {
+    fun extractApk(info: AppInfo, context: Context) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val downloadsDir = Environment.getExternalStoragePublicDirectory(

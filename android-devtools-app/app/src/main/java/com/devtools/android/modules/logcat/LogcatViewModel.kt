@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.devtools.android.core.ShellExecutor
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,6 +45,7 @@ class LogcatViewModel : ViewModel() {
      *               (e.g. `"*:E"` or `"MyTag:D"`).
      */
     fun startCapture(filter: String = "") {
+        captureJob?.cancel()
         if (_state.value is LogcatState.Running) return
         _state.value = LogcatState.Running
 
@@ -104,7 +106,7 @@ class LogcatViewModel : ViewModel() {
         val lines = _lines.value
         if (lines.isEmpty()) return
 
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 val downloadsDir = Environment.getExternalStoragePublicDirectory(
                     Environment.DIRECTORY_DOWNLOADS
