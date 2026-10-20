@@ -25,3 +25,9 @@
 -keep class com.hierynomus.** { *; }
 -dontwarn net.schmizz.**
 -dontwarn com.hierynomus.**
+
+# SSHJ + BouncyCastle keep rules
+-keep class net.schmizz.sshj.** { *; }
+-keep class org.bouncycastle.** { *; }
+-dontwarn net.schmizz.sshj.**
+-dontwarn org.bouncycastle.**
