@@ -24,6 +24,7 @@ import com.devtools.android.ui.apklogs.ApkLogsScreen
 import com.devtools.android.ui.navigation.Screen
 import com.devtools.android.ui.network.NetworkScreen
 import com.devtools.android.ui.system.SystemScreen
+import com.devtools.android.ui.tools.ToolsScreen
 
 @Composable
 fun MainScreen(isRooted: Boolean) {
@@ -95,8 +96,14 @@ fun MainScreen(isRooted: Boolean) {
             composable(Screen.ApkLogs.route) {
                 ApkLogsScreen()
             }
+            composable(Screen.Tools.route) {
+                ToolsScreen()
+            }
             screens.filter {
-                it != Screen.System && it != Screen.Network && it != Screen.ApkLogs
+                it != Screen.System &&
+                    it != Screen.Network &&
+                    it != Screen.ApkLogs &&
+                    it != Screen.Tools
             }.forEach { screen ->
                 composable(screen.route) {
                     Box(
