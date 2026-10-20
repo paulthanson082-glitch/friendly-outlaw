@@ -45,8 +45,8 @@ class LogcatViewModel : ViewModel() {
      *               (e.g. `"*:E"` or `"MyTag:D"`).
      */
     fun startCapture(filter: String = "") {
-        captureJob?.cancel()
         if (_state.value is LogcatState.Running) return
+        captureJob?.cancel()
         _state.value = LogcatState.Running
 
         var lineCount = 0

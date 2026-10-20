@@ -52,6 +52,7 @@ fun PackageManagerScreen(
         factory = PackageManagerViewModel.Factory(LocalContext.current)
     )
 ) {
+    val context = LocalContext.current
     val apps by vm.filteredApps.collectAsState()
     val pmState by vm.pmState.collectAsState()
     val operationResult by vm.operationResult.collectAsState()
@@ -119,7 +120,7 @@ fun PackageManagerScreen(
                                     onLaunch = { vm.launch(app.packageName) },
                                     onSettings = { vm.openSettings(app.packageName) },
                                     onForceStop = { vm.forceStop(app.packageName) },
-                                    onExtract = { vm.extractApk(app) },
+                                    onExtract = { vm.extractApk(app, context) },
                                     onUninstallSystem = { vm.uninstallSystem(app.packageName) }
                                 )
                                 HorizontalDivider()
