@@ -131,13 +131,16 @@ class FridaManagerViewModel : ViewModel() {
                     _injectLog.value = "Failed to write script: ${e.message}"
                     return@withContext
                 }
-                val scriptPath = scriptFile.absolutePath
-                val result = ShellExecutor.execCollect("frida -p $pid -l $scriptPath", root = true)
-                _injectLog.value = when (result) {
-                    is ShellResult.Success -> result.output.ifBlank { "Injection complete." }
-                    is ShellResult.Failed -> "Injection failed (exit ${result.exitCode}): ${result.stderr}"
-                    is ShellResult.BinaryMissing -> "frida CLI not found on PATH"
-                    ShellResult.RootRequired -> "Root access required"
+                try {
+                    val result = ShellExecutor.execCollect("frida -p $pid -l ${scriptFile.absolutePath}", root = true)
+                    _injectLog.value = when (result) {
+                        is ShellResult.Success -> result.output.ifBlank { "Injection complete." }
+                        is ShellResult.Failed -> "Injection failed (exit ${result.exitCode}): ${result.stderr}"
+                        is ShellResult.BinaryMissing -> "frida CLI not found on PATH"
+                        ShellResult.RootRequired -> "Root access required"
+                    }
+                } finally {
+                    scriptFile.delete()
                 }
             }
         }
