@@ -1136,13 +1136,67 @@ public class WritersApp {
         return try await ai.generateOutline(concept: concept, context: context)
     }
 
-    /// Develop a character concept
+    /// Generates a developed character description from a brief concept prompt.
+    /// - Parameters:
+    ///   - characterConcept: A short description or prompt describing the character to develop.
+    ///   - context: Optional AIContext with constraints, tone, or stylistic guidance for generation.
+    /// - Returns: A detailed character description or profile produced by the AI.
+    /// - Throws: `AIError.aiNotEnabled` if the AI service is not available.
     public func developCharacter(
         characterConcept: String,
         context: AIContext? = nil
     ) async throws -> String {
         guard let ai = aiService else { throw AIError.aiNotEnabled }
         return try await ai.developCharacter(characterConcept: characterConcept, context: context)
+    }
+
+    /// Change the tone of a document to the specified writing tone.
+    /// - Parameters:
+    ///   - documentId: The identifier of the document to modify.
+    ///   - tone: The desired writing tone (e.g., formal, casual, creative).
+    ///   - context: Optional AI context to guide the tone transformation.
+    ///   - replaceContent: If `true`, replaces the stored document content with the tone-shifted version.
+    /// - Returns: The document text rewritten in the specified tone.
+    /// Transforms a document's text to the specified writing tone using the AI service.
+    /// - Parameters:
+    ///   - documentId: The identifier of the document to transform.
+    ///   - tone: The target `WritingTone` to apply.
+    ///   - context: Optional `AIContext` to guide the transformation.
+    ///   - replaceContent: If `true`, replaces and persists the document's stored content with the transformed text.
+    /// - Returns: The transformed document text.
+    /// - Throws: `AIError.aiNotEnabled` if AI features are disabled; `AIError.documentNotFound` if the document cannot be located; or any error propagated from the AI service or persistence operations.
+    public func changeDocumentTone(
+        documentId: UUID,
+        tone: WritingTone,
+        context: AIContext? = nil,
+        replaceContent: Bool = false
+    ) async throws -> String {
+        let (ai, document) = try requireAIAndDocument(documentId: documentId)
+
+        let transformed = try await ai.changeTone(
+            text: document.content,
+            tone: tone,
+            context: context
+        )
+
+        if let userId = currentUserId {
+            let suggestion = AISuggestion(
+                userId: userId,
+                documentId: documentId,
+                toolUsed: "Change Tone to \(tone.displayName)",
+                prompt: document.content,
+                response: transformed
+            )
+            try? databaseManager.insertAISuggestion(suggestion)
+        }
+
+        if replaceContent {
+            var updatedDocument = document
+            updatedDocument.content = transformed
+            documentManager.updateDocument(updatedDocument)
+        }
+
+        return transformed
     }
 
     // MARK: - Writing Advisor
@@ -1577,22 +1631,15 @@ public class WritersApp {
         return prospectDatabase.searchProspects(query: query)
     }
 
-    /// Update the status of a prospect and, when applicable, increment the active cowork session's contacted count.
-    /// - Parameters:
-    ///   - id: The unique identifier of the prospect to update.
-    ///   - status: The new status to assign to the prospect.
-    /// - Throws: Any error produced while updating the prospect status in the prospect database.
-    /// Update a prospect's status and, if the status transitions into a contacted-like state (`.contacted`, `.replied`, or `.meeting`), increment the active cowork session's `prospectsContacted` counter.
+    /// Updates a prospect's status and, if the new status is `.contacted`, `.replied`, or `.meeting`,
+    /// increments `activeCoworkSession?.prospectsContacted` — unconditionally, regardless of the previous status.
     /// - Parameters:
     ///   - id: The UUID of the prospect to update.
     ///   - status: The new `ProspectStatus` to apply.
-    /// - Throws: Any error thrown by `prospectDatabase.updateProspectStatus(id:status:)`.
+    /// - Throws: `CoworkError.prospectNotFound` if no prospect exists with the given `id`.
     public func updateProspectStatus(id: UUID, status: ProspectStatus) throws {
-        let isContactStatus: (ProspectStatus) -> Bool = {
-            $0 == .contacted || $0 == .replied || $0 == .meeting
-        }
         try prospectDatabase.updateProspectStatus(id: id, status: status)
-        if isContactStatus(status) {
+        if status == .contacted || status == .replied || status == .meeting {
             activeCoworkSession?.prospectsContacted += 1
         }
     }

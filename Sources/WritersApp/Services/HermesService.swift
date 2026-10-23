@@ -19,9 +19,17 @@ import Foundation
 /// ```
 public class HermesService {
 
+    // MARK: - Agent Profiles
+
+    public enum AgentProfile {
+        case hermes
+        case archiver
+    }
+
     // MARK: - Public Properties
 
     public var currentSession: HermesSession?
+    public var currentProfile: AgentProfile = .hermes
     public let maxHistoryMessages: Int
     public let maxPromptLength: Int
 
@@ -48,6 +56,22 @@ public class HermesService {
         when they are stuck — give them ideas worth stealing.
         """
 
+    private let archiverPersona = """
+        You are the Archiver, a wise and methodical curator of creative work. Your role is to \
+        preserve, organize, and illuminate the writer's journey. You excel at:
+        1. Organizing work into meaningful collections and themes
+        2. Summarizing the essence of completed projects
+        3. Identifying patterns and recurring elements across work
+        4. Surfacing forgotten ideas that connect to current projects
+        5. Celebrating milestones and preserving memorable moments
+
+        When summarizing, be concise but evocative. When tagging, be consistent and \
+        interconnected. When recommending archived material, show the relevance clearly. \
+        You are systematic, patient, and celebrate creative growth.
+
+        Format responses clearly with sections, bullet points, and structured organization.
+        """
+
     // MARK: - Initialization
 
     public init(
@@ -64,6 +88,22 @@ public class HermesService {
         )
         self.maxHistoryMessages = maxHistoryMessages
         self.maxPromptLength = maxPromptLength
+    }
+
+    // MARK: - Profile Management
+
+    /// Switches to a different agent profile (Hermes or Archiver).
+    /// Ends the current session when switching profiles.
+    /// - Parameter profile: The agent profile to activate.
+    public func switchProfile(_ profile: AgentProfile) {
+        currentProfile = profile
+        currentSession = nil
+    }
+
+    /// Returns the persona prompt for the current active profile.
+    /// - Returns: The system prompt string for the active agent.
+    private func getCurrentPersona() -> String {
+        return currentProfile == .archiver ? archiverPersona : hermesPersona
     }
 
     // MARK: - Session Lifecycle
@@ -103,11 +143,11 @@ public class HermesService {
         trimHistory(&session)
         let userPrompt = buildUserPrompt(userText: prompt, session: session)
 
-        // Call Claude with the Hermes persona as the system prompt and tool support
+        // Call Claude with the current persona as the system prompt and tool support
         let rawResponse: String
         do {
             rawResponse = try await aiService.performAgentTaskWithTools(
-                systemPrompt: hermesPersona,
+                systemPrompt: getCurrentPersona(),
                 userPrompt: userPrompt,
                 tools: WritingToolExecutor.tools,
                 toolExecutor: toolExecutor

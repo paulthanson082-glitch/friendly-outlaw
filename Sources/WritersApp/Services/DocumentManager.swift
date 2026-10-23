@@ -19,6 +19,14 @@ public class DocumentManager {
         documents[document.id] = document
     }
 
+    /// Creates and stores a blank document with the given title and optional category.
+    @discardableResult
+    public func createBlankDocument(title: String, category: TemplateCategory = .article) -> Document {
+        let document = Document(title: title, content: "", category: category)
+        documents[document.id] = document
+        return document
+    }
+
     /// Retrieves a document by ID
     public func getDocument(id: UUID) -> Document? {
         return documents[id]
@@ -38,15 +46,12 @@ public class DocumentManager {
 
     /// Searches documents by title or content
     public func searchDocuments(query: String) -> [Document] {
-        // Return all documents if query is empty
-        if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return getAllDocuments()
-        }
-        
-        // Use localizedCaseInsensitiveContains which handles case conversion internally
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedQuery.isEmpty else { return getAllDocuments() }
+
         return documents.values.filter { doc in
-            doc.title.localizedCaseInsensitiveContains(query) ||
-            doc.content.localizedCaseInsensitiveContains(query)
+            doc.title.localizedCaseInsensitiveContains(trimmedQuery) ||
+            doc.content.localizedCaseInsensitiveContains(trimmedQuery)
         }.sorted { $0.metadata.modified > $1.metadata.modified }
     }
 

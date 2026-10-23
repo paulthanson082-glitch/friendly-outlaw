@@ -35,17 +35,12 @@ public struct ImageInfo: Codable, Sendable, Identifiable {
         self.os = os
     }
 
-    /// Returns a shortened image ID suitable for display:
-    /// - IDs in digest form `sha256:<hex>` strip the prefix and return the first 12 hex characters.
-    /// - IDs starting with `sha256` but without a colon (bare prefix) return the first 14 characters.
-    /// - All other IDs return the first 12 characters (Docker short-ID convention).
+    /// Returns a shortened image ID: first 12 characters (Docker short-ID convention).
+    /// IDs in digest form `sha256:<hex>` strip the prefix before taking the first 12 hex characters.
     public var shortId: String {
         let digestPrefix = "sha256:"
         if id.hasPrefix(digestPrefix) {
             return String(id.dropFirst(digestPrefix.count).prefix(12))
-        }
-        if id.hasPrefix("sha256") {
-            return String(id.prefix(14))
         }
         return String(id.prefix(12))
     }

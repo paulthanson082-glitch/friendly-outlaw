@@ -49,11 +49,6 @@ public class DoltVersionControlService {
     }
 
     /// Creates and/or switches to a branch, mirroring `dolt checkout [-b] <name>`.
-    ///
-    /// - Parameters:
-    ///   - name: Branch name.
-    ///   - createNew: When `true` a new branch is created; throws if it already exists.
-    /// Checks out the specified branch, activating it in the repository; optionally creates and activates a new branch with the same head as the current branch.
     /// - Parameters:
     ///   - name: The name of the branch to check out or create.
     ///   - createNew: If `true`, create a new branch with the given name and activate it; if `false`, activate an existing branch.
@@ -82,7 +77,6 @@ public class DoltVersionControlService {
         }
     }
 
-    /// Ensures the default "main" branch exists, creating it if needed.
     /// Ensures the default branch exists and is marked active, creating and checking it out if necessary.
     /// - Returns: The authoritative `VCBranch` for the repository's default branch (`defaultBranchName`).
     /// - Throws: Any error produced by database operations or by `checkoutBranch(name:createNew:)`.
@@ -99,14 +93,8 @@ public class DoltVersionControlService {
 
     // MARK: - Commit Operations
 
-    /// Records a snapshot of all provided documents on the active branch,
-    /// mirroring `dolt commit -am "<message>"`.
-    ///
-    /// - Parameters:
-    ///   - message: Human-readable description of the change.
-    ///   - documents: The current state of every document to capture.
-    ///   - authorId: Optional author identifier.
     /// Create a new commit on the currently active branch and record snapshots for the provided documents.
+    /// Mirrors `dolt commit -am "<message>"`.
     /// - Parameters:
     ///   - message: The commit message describing the change.
     ///   - documents: The documents to capture as snapshots for this commit.

@@ -335,7 +335,7 @@ final class ProductivityAnalyticsTests: XCTestCase {
     }
 
     func testGenerateInsightsWhenStreakAtRisk() {
-        let goal = goalManager.createDailyWordGoal(target: 100)
+        _ = goalManager.createDailyWordGoal(target: 100)
 
         // Simulate writing yesterday but not today
         // This is hard to test without mocking dates, so we just verify insights are generated
@@ -394,7 +394,7 @@ final class ProductivityAnalyticsTests: XCTestCase {
     }
 
     func testComparePeriodsWithNoData() {
-        let (current, previous, improvement) = analytics.comparePeriods(current: .lastWeek, previous: .lastMonth)
+        let (_, _, improvement) = analytics.comparePeriods(current: .lastWeek, previous: .lastMonth)
 
         XCTAssertEqual(improvement, 0, accuracy: 0.01)
     }
