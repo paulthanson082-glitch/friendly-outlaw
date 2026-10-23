@@ -59,6 +59,33 @@ public class TemplateManager {
         templates.removeValue(forKey: id)
     }
 
+    /// Recommends templates based on user intent using AI
+    /// - Parameter userIntent: User's description of what they want to write
+    /// - Returns: Array of TemplateRecommendation objects validated against system templates
+    /// - Throws: AIServiceError.noMatchingTemplates if AI returns no matches
+    public func recommendTemplates(userIntent: String) async throws -> [TemplateRecommendation] {
+        guard let aiService = aiService else {
+            throw AIServiceError.noMatchingTemplates
+        }
+
+        // Get recommendations from AI service
+        var recommendations = try await aiService.recommendTemplates(
+            userIntent: userIntent,
+            limit: 10
+        )
+
+        // Validate that recommended template IDs exist in the system
+        recommendations = recommendations.filter { recommendation in
+            getTemplate(id: recommendation.templateId) != nil
+        }
+
+        guard !recommendations.isEmpty else {
+            throw AIServiceError.noMatchingTemplates
+        }
+
+        return recommendations
+    }
+
     /// Creates a template from an AI-generated template structure
     /// - Parameter generated: The GeneratedTemplate returned from AIService
     /// - Returns: A Template ready for storage and use
