@@ -19,11 +19,11 @@ export type Environment = z.infer<typeof envSchema>;
 export function validateEnv(env: Record<string, string | undefined>): Environment {
   try {
     return envSchema.parse(env);
-  } catch (error) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
-      const missingVars = error.errors
-        .filter(e => e.code === 'invalid_type')
-        .map(e => e.path.join('.'))
+      const missingVars = error.issues
+        .filter((issue) => issue.code === 'invalid_type')
+        .map((issue) => issue.path.join('.'))
         .join(', ');
       throw new Error(`Invalid environment variables: ${missingVars}`);
     }

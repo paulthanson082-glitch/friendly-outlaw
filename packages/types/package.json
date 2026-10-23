@@ -19,6 +19,6 @@
     "dist"
   ],
   "devDependencies": {
-    "typescript": "catalog:"
+    "typescript": "^5"
   }
 }

@@ -57,10 +57,4 @@ export interface AIConfig {
   temperature: number;
 }
 
-// Export all types as namespace for convenience
-export namespace FriendlyOutlaw {
-  export type Document = Document;
-  export type Template = Template;
-  export type User = User;
-  export type AIConfig = AIConfig;
-}
+// Types are exported directly from root
