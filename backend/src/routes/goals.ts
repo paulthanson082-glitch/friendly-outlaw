@@ -1,11 +1,12 @@
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
+import type { Router as ExpressRouter } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { getDatabase } from '../db/connection.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { ValidationError, NotFoundError } from '../utils/errors.js';
 
-const router = Router();
+const router: ExpressRouter = Router();
 
 router.use(authMiddleware);
 
