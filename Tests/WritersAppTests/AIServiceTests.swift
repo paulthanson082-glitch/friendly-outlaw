@@ -844,4 +844,137 @@ final class AIServiceTests: XCTestCase {
 
         XCTAssertEqual(options.context, context)
     }
+
+    // MARK: - Template Generation Tests
+
+    func testGeneratedPlaceholderInitialization() {
+        let placeholder = GeneratedPlaceholder(
+            name: "OPENING_HOOK",
+            description: "Hook that captures reader attention",
+            exampleText: "The old lighthouse keeper had one secret..."
+        )
+
+        XCTAssertEqual(placeholder.name, "OPENING_HOOK")
+        XCTAssertEqual(placeholder.description, "Hook that captures reader attention")
+        XCTAssertEqual(placeholder.exampleText, "The old lighthouse keeper had one secret...")
+    }
+
+    func testGeneratedTemplateInitialization() {
+        let placeholders = [
+            GeneratedPlaceholder(name: "INTRO", description: "Introduction", exampleText: "Begin here"),
+            GeneratedPlaceholder(name: "BODY", description: "Main content", exampleText: "Content goes here")
+        ]
+
+        let template = GeneratedTemplate(
+            name: "Test Template",
+            category: "Fiction",
+            placeholders: placeholders,
+            structure: "# Intro\n{{INTRO}}\n\n# Body\n{{BODY}}"
+        )
+
+        XCTAssertEqual(template.name, "Test Template")
+        XCTAssertEqual(template.category, "Fiction")
+        XCTAssertEqual(template.placeholders.count, 2)
+        XCTAssertTrue(template.structure.contains("{{INTRO}}"))
+    }
+
+    func testGeneratedTemplateValidatePlaceholdersSuccess() {
+        let placeholders = [
+            GeneratedPlaceholder(name: "PLACEHOLDER_1", description: "First section", exampleText: "Example 1"),
+            GeneratedPlaceholder(name: "PLACEHOLDER_2", description: "Second section", exampleText: "Example 2")
+        ]
+
+        let template = GeneratedTemplate(
+            name: "Valid Template",
+            category: "Fiction",
+            placeholders: placeholders,
+            structure: "# Test\n{{PLACEHOLDER_1}}\n{{PLACEHOLDER_2}}"
+        )
+
+        // Should not throw
+        XCTAssertNoThrow {
+            try template.validatePlaceholders()
+        }
+    }
+
+    func testGeneratedTemplateValidatePlaceholdersMaxLimit() {
+        var placeholders: [GeneratedPlaceholder] = []
+        for i in 1...16 {
+            placeholders.append(
+                GeneratedPlaceholder(
+                    name: "PLACEHOLDER_\(i)",
+                    description: "Section \(i)",
+                    exampleText: "Example \(i)"
+                )
+            )
+        }
+
+        let template = GeneratedTemplate(
+            name: "Too Many Placeholders",
+            category: "Fiction",
+            placeholders: placeholders,
+            structure: "# Test"
+        )
+
+        // Should throw because > 15 placeholders
+        XCTAssertThrowsError(try template.validatePlaceholders())
+    }
+
+    func testGeneratedTemplateValidatePlaceholdersEmptyName() {
+        let placeholders = [
+            GeneratedPlaceholder(name: "", description: "Description", exampleText: "Example")
+        ]
+
+        let template = GeneratedTemplate(
+            name: "Invalid Template",
+            category: "Fiction",
+            placeholders: placeholders,
+            structure: "# Test"
+        )
+
+        // Should throw because empty name
+        XCTAssertThrowsError(try template.validatePlaceholders())
+    }
+
+    func testGeneratedTemplateValidatePlaceholdersEmptyDescription() {
+        let placeholders = [
+            GeneratedPlaceholder(name: "PLACEHOLDER", description: "", exampleText: "Example")
+        ]
+
+        let template = GeneratedTemplate(
+            name: "Invalid Template",
+            category: "Fiction",
+            placeholders: placeholders,
+            structure: "# Test"
+        )
+
+        // Should throw because empty description
+        XCTAssertThrowsError(try template.validatePlaceholders())
+    }
+
+    func testGeneratedTemplateCodable() {
+        let original = GeneratedTemplate(
+            name: "Codable Template",
+            category: "Article",
+            placeholders: [
+                GeneratedPlaceholder(name: "TITLE", description: "Article title", exampleText: "My Article")
+            ],
+            structure: "# {{TITLE}}"
+        )
+
+        // Encode and decode
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+
+        guard let encoded = try? encoder.encode(original),
+              let decoded = try? decoder.decode(GeneratedTemplate.self, from: encoded) else {
+            XCTFail("Failed to encode/decode GeneratedTemplate")
+            return
+        }
+
+        XCTAssertEqual(decoded.name, original.name)
+        XCTAssertEqual(decoded.category, original.category)
+        XCTAssertEqual(decoded.placeholders.count, original.placeholders.count)
+        XCTAssertEqual(decoded.placeholders[0].name, original.placeholders[0].name)
+    }
 }

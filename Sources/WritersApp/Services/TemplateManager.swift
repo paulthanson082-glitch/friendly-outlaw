@@ -3,10 +3,18 @@ import Foundation
 /// Manages template storage, retrieval, and operations
 public class TemplateManager {
     private var templates: [UUID: Template]
+    private weak var aiService: AIService?
 
     public init() {
         self.templates = [:]
+        self.aiService = nil
         loadDefaultTemplates()
+    }
+
+    /// Sets the AI service for template recommendations
+    /// - Parameter aiService: The AIService instance to use
+    public func setAIService(_ aiService: AIService) {
+        self.aiService = aiService
     }
 
     // MARK: - Template Management
@@ -51,8 +59,51 @@ public class TemplateManager {
         templates.removeValue(forKey: id)
     }
 
+    /// Creates a template from an AI-generated template structure
+    /// - Parameter generated: The GeneratedTemplate returned from AIService
+    /// - Returns: A Template ready for storage and use
+    /// - Throws: Error if category conversion fails or validation fails
+    public func createTemplateFromAI(generated: GeneratedTemplate) throws -> Template {
+        // Convert category string to TemplateCategory
+        let category = TemplateCategory(rawValue: generated.category) ?? .other
+
+        // Convert GeneratedPlaceholder to Placeholder
+        let placeholders = generated.placeholders.map { genPlaceholder in
+            Placeholder(
+                id: UUID(),
+                key: genPlaceholder.name.lowercased().replacingOccurrences(of: " ", with: "_"),
+                label: genPlaceholder.name,
+                description: genPlaceholder.description,
+                defaultValue: genPlaceholder.exampleText,
+                required: true
+            )
+        }
+
+        // Create the template
+        let template = Template(
+            id: UUID(),
+            name: generated.name,
+            category: category,
+            description: "Generated template for \(generated.name)",
+            content: generated.structure,
+            placeholders: placeholders,
+            metadata: TemplateMetadata(
+                created: Date(),
+                modified: Date(),
+                author: nil,
+                version: "1.0",
+                tags: ["ai-generated", category.rawValue.lowercased()]
+            )
+        )
+
+        // Store the template
+        addTemplate(template)
+
+        return template
+    }
+
     /// Register a collection of built-in templates into the manager's registry.
-    /// 
+    ///
     /// Creates and adds a set of predefined templates covering fiction (novel, short story, screenplay, poetry),
     /// non-fiction and editorial (blog post, article), business documents (business letter), scheduled tasks
     /// (daily/weekly/monthly reports, dashboards, trackers, content calendar), and content/profile instructions

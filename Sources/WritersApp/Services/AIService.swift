@@ -1112,6 +1112,61 @@ public class AIService {
         return responseText
     }
 
+    // MARK: - Template Generation
+
+    /// Generate a template from a user description
+    /// - Parameters:
+    ///   - description: User's description of the desired template
+    ///   - category: The template category/type
+    ///   - desiredLength: Approximate desired word count (default 5000)
+    /// - Returns: A GeneratedTemplate with structure and placeholders
+    /// - Throws: AIServiceError.invalidResponseFormat if generation or validation fails
+    public func generateTemplate(
+        description: String,
+        category: String,
+        desiredLength: Int = 5000
+    ) async throws -> GeneratedTemplate {
+        let prompt = """
+        Generate a creative writing template structure based on this description.
+        Return ONLY valid JSON, no additional text.
+
+        User Description: \(description)
+        Category: \(category)
+        Desired Length: ~\(desiredLength) words
+
+        Create a Markdown outline template with {{PLACEHOLDER_NAME}} markers (5-8 sections).
+        Each placeholder should be a key writing section where users fill in content.
+
+        Return JSON matching this exact schema:
+        {
+          "name": "Template Name",
+          "category": "\(category)",
+          "structure": "# Section 1\\n{{PLACEHOLDER_1}}\\n\\n# Section 2\\n{{PLACEHOLDER_2}}\\n...",
+          "placeholders": [
+            {"name": "PLACEHOLDER_1", "description": "Description of what goes here", "exampleText": "Example of what this section might contain"},
+            {"name": "PLACEHOLDER_2", "description": "Another section description", "exampleText": "Another example"}
+          ]
+        }
+
+        Important:
+        - All placeholder names must be in UPPERCASE with underscores
+        - Each placeholder must have a name, description, and exampleText
+        - Include 5-8 placeholders maximum
+        - The structure field should contain {{PLACEHOLDER_NAME}} markers matching placeholder names
+        - Return only the JSON object, no markdown code blocks or additional text
+        """
+
+        let (generatedContent, _) = try await sendRequest(prompt: prompt)
+
+        // Parse JSON response
+        let generatedTemplate = try decodeJSON(from: generatedContent, as: GeneratedTemplate.self)
+
+        // Validate the template
+        try generatedTemplate.validatePlaceholders()
+
+        return generatedTemplate
+    }
+
     // MARK: - Batch Operations
 
     /// Process multiple requests in batch
@@ -1206,6 +1261,92 @@ public class AIService {
             insights: response,
             timestamp: Date()
         )
+    }
+
+    // MARK: - Template Recommendations
+
+    /// Recommends templates based on user intent
+    /// - Parameters:
+    ///   - userIntent: User's description of what they want to write
+    ///   - category: Optional category to filter recommendations
+    ///   - limit: Maximum number of recommendations to return
+    /// - Returns: Array of TemplateRecommendation objects sorted by match score descending
+    /// - Throws: AIServiceError.invalidUserIntent if intent is empty or too vague
+    /// - Throws: AIServiceError.noMatchingTemplates if no suitable templates found
+    public func recommendTemplates(
+        userIntent: String,
+        category: WritingTemplateCategory? = nil,
+        limit: Int = 5
+    ) async throws -> [TemplateRecommendation] {
+        guard !userIntent.trimmingCharacters(in: .whitespaces).isEmpty else {
+            throw AIServiceError.invalidUserIntent
+        }
+
+        // Build list of available templates for Claude to choose from
+        // In a real implementation, this would get templates from TemplateManager
+        // For now, we'll create a representative list of template information
+        let templateDescriptions = """
+        Available Templates:
+        - Novel Chapter: For writing novel chapters with scene structure
+        - Short Story: Three-act structure for complete short stories
+        - Screenplay: Dialogue and scene format for scripts
+        - Blog Post: Modern blog post structure with sections
+        - Article: Long-form article with research and citations
+        - Essay: Academic or personal essay format
+        - Poetry: Poetry collection and individual poem structure
+        - Business Letter: Professional correspondence format
+        - Proposal: Project proposal with sections and timeline
+        - Resume: Professional resume format
+        """
+
+        let systemPrompt = """
+        You are a writing assistant that recommends templates to users.
+        Based on the user's intent, recommend the most suitable templates from the available list.
+
+        \(templateDescriptions)
+
+        For each recommendation, provide ONLY valid JSON in the following format:
+        {
+          "templateId": "UUID as string",
+          "name": "Template name",
+          "matchScore": 0.95,
+          "matchReason": "Why this template matches the user's intent",
+          "category": "category name from the list"
+        }
+
+        Return a JSON array of recommendations, sorted by matchScore in descending order.
+        Only return the JSON array, no other text.
+        """
+
+        let userPrompt = "Recommend templates for: \(userIntent)"
+
+        let response = try await sendRequest(prompt: userPrompt).0
+
+        // Parse JSON response
+        guard let jsonData = response.data(using: .utf8) else {
+            throw AIServiceError.invalidApiResponse
+        }
+
+        let decoder = JSONDecoder()
+        do {
+            // Decode as array of TemplateRecommendation objects
+            let recommendations = try decoder.decode([TemplateRecommendation].self, from: jsonData)
+
+            guard !recommendations.isEmpty else {
+                throw AIServiceError.noMatchingTemplates
+            }
+
+            // Filter by category if specified
+            var filtered = recommendations
+            if let category = category {
+                filtered = filtered.filter { $0.category == category }
+            }
+
+            // Return top results up to limit
+            return Array(filtered.prefix(limit))
+        } catch is DecodingError {
+            throw AIServiceError.invalidApiResponse
+        }
     }
 
     // MARK: - Hallucination Reduction Methods
@@ -1519,6 +1660,9 @@ public enum AIServiceError: LocalizedError {
     case rateLimited
     case unauthorized
     case serverError(statusCode: Int)
+    case invalidUserIntent
+    case noMatchingTemplates
+    case invalidApiResponse
 
     public var errorDescription: String? {
         switch self {
@@ -1546,6 +1690,12 @@ public enum AIServiceError: LocalizedError {
             return "Unauthorized API access (check API key)"
         case .serverError(let statusCode):
             return "Server error (status \(statusCode)), will retry"
+        case .invalidUserIntent:
+            return "Please be more specific (e.g., 'mystery novel')"
+        case .noMatchingTemplates:
+            return "No templates match. Try different category or intent."
+        case .invalidApiResponse:
+            return "AI response parsing failed. Try again."
         }
     }
 }
