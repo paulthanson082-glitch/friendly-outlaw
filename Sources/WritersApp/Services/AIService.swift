@@ -38,6 +38,62 @@ public class AIService {
         self.analyticsService = analyticsService
     }
 
+    // MARK: - Style Analysis
+
+    /// Analyzes the writing style of the given text
+    /// - Parameter text: The text to analyze
+    /// - Returns: A human-readable analysis of the document's style characteristics
+    private func analyzeDocumentStyle(_ text: String) -> String {
+        let sentences = text.split(separator: ".").map { String($0).trimmingCharacters(in: .whitespaces) }
+        let words = text.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+
+        // Calculate sentence length statistics
+        let sentenceLengths = sentences.map { $0.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.count }
+        let avgSentenceLength = sentenceLengths.isEmpty ? 0 : sentenceLengths.reduce(0, +) / sentenceLengths.count
+
+        // Determine perspective (first, second, or third person)
+        let text_lower = text.lowercased()
+        let firstPersonCount = text_lower.components(separatedBy: "i ").count + text_lower.components(separatedBy: " i ").count
+        let secondPersonCount = text_lower.components(separatedBy: "you").count
+        let perspective: String
+        if firstPersonCount > secondPersonCount {
+            perspective = "first person"
+        } else if secondPersonCount > firstPersonCount {
+            perspective = "second person"
+        } else {
+            perspective = "third person"
+        }
+
+        // Check for dialogue (quotation marks)
+        let quoteCount = text.filter { $0 == "\"" }.count
+
+        // Calculate sentence variety
+        let sentenceVariety: String
+        if sentenceLengths.count < 2 {
+            sentenceVariety = "limited (very few sentences)"
+        } else {
+            let minLen = sentenceLengths.min() ?? 0
+            let maxLen = sentenceLengths.max() ?? 0
+            let range = maxLen - minLen
+            if range < 5 {
+                sentenceVariety = "low (similar lengths)"
+            } else if range < 15 {
+                sentenceVariety = "moderate"
+            } else {
+                sentenceVariety = "high (diverse lengths)"
+            }
+        }
+
+        return """
+        Style Analysis:
+        - Perspective: \(perspective)
+        - Average sentence length: \(avgSentenceLength) words
+        - Sentence variety: \(sentenceVariety)
+        - Contains dialogue: \(quoteCount > 0 ? "yes" : "no")
+        - Text length: \(words.count) words
+        """
+    }
+
     // MARK: - Main Assistance Methods
 
     /// Get AI assistance for writing tasks
@@ -78,6 +134,52 @@ public class AIService {
         return response.generatedContent
     }
 
+    /// Continue a document with style-aware options
+    /// - Parameters:
+    ///   - text: The document text to continue from
+    ///   - options: Enhancement options including style preservation and tone override
+    ///   - context: Optional AI context for additional guidance
+    /// - Returns: Continuation of the document text
+    public func continueDocument(
+        text: String,
+        options: DocumentEnhancementOptions = .default,
+        context: AIContext? = nil
+    ) async throws -> String {
+        var combinedContext = context ?? AIContext()
+
+        // Analyze and inject style if requested
+        if options.preserveStyle {
+            let styleAnalysis = analyzeDocumentStyle(text)
+            let styleContext = "Maintain the following writing style:\n\(styleAnalysis)"
+            combinedContext = AIContext(
+                genre: combinedContext.genre,
+                targetAudience: combinedContext.targetAudience,
+                existingCharacters: combinedContext.existingCharacters,
+                plotSummary: combinedContext.plotSummary,
+                additionalNotes: [
+                    styleContext,
+                    options.context,
+                    combinedContext.additionalNotes
+                ].compactMap { $0 }.joined(separator: "\n\n")
+            )
+        }
+
+        // Apply tone override if specified
+        let assistanceType: AIAssistanceType
+        if let tone = options.targetTone {
+            assistanceType = .changetone(tone)
+        } else {
+            assistanceType = .continueWriting
+        }
+
+        let response = try await getAssistance(
+            text: text,
+            type: assistanceType,
+            context: combinedContext
+        )
+        return response.generatedContent
+    }
+
     /// Improve existing text
     public func improveText(
         text: String,
@@ -87,6 +189,52 @@ public class AIService {
             text: text,
             type: .improveText,
             context: context
+        )
+        return response.generatedContent
+    }
+
+    /// Improve a document with style-aware options
+    /// - Parameters:
+    ///   - text: The document text to improve
+    ///   - options: Enhancement options including style preservation and tone override
+    ///   - context: Optional AI context for additional guidance
+    /// - Returns: Improved version of the document text
+    public func improveDocument(
+        text: String,
+        options: DocumentEnhancementOptions = .default,
+        context: AIContext? = nil
+    ) async throws -> String {
+        var combinedContext = context ?? AIContext()
+
+        // Analyze and inject style if requested
+        if options.preserveStyle {
+            let styleAnalysis = analyzeDocumentStyle(text)
+            let styleContext = "Maintain the following writing style:\n\(styleAnalysis)"
+            combinedContext = AIContext(
+                genre: combinedContext.genre,
+                targetAudience: combinedContext.targetAudience,
+                existingCharacters: combinedContext.existingCharacters,
+                plotSummary: combinedContext.plotSummary,
+                additionalNotes: [
+                    styleContext,
+                    options.context,
+                    combinedContext.additionalNotes
+                ].compactMap { $0 }.joined(separator: "\n\n")
+            )
+        }
+
+        // Apply tone override if specified
+        let assistanceType: AIAssistanceType
+        if let tone = options.targetTone {
+            assistanceType = .changetone(tone)
+        } else {
+            assistanceType = .improveText
+        }
+
+        let response = try await getAssistance(
+            text: text,
+            type: assistanceType,
+            context: combinedContext
         )
         return response.generatedContent
     }

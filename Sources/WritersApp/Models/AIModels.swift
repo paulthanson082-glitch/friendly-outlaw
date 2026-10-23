@@ -683,6 +683,35 @@ public struct ReasoningStep: Codable {
     }
 }
 
+// MARK: - Document Enhancement Options
+
+/// Options for style-aware document enhancement
+public struct DocumentEnhancementOptions {
+    /// Whether to preserve the original document's style when generating content
+    public let preserveStyle: Bool
+    /// Optional tone override to apply to generated content
+    public let targetTone: WritingTone?
+    /// Additional context about the document or writing goal
+    public let context: String?
+
+    public init(
+        preserveStyle: Bool = true,
+        targetTone: WritingTone? = nil,
+        context: String? = nil
+    ) {
+        self.preserveStyle = preserveStyle
+        self.targetTone = targetTone
+        self.context = context
+    }
+
+    /// Default options with style preservation enabled and no tone override
+    public static let `default` = DocumentEnhancementOptions(
+        preserveStyle: true,
+        targetTone: nil,
+        context: nil
+    )
+}
+
 // MARK: - Brainstorm Ideas Categorization
 
 /// A single idea in a brainstorm result
