@@ -1,0 +1,26 @@
+packages:
+  - 'frontend'
+  - 'backend'
+  - 'mobile'
+  - 'packages/*'
+
+# Shared dependency versions across workspace
+catalog:
+  '@anthropic-ai/sdk': ^0.37.0
+  '@types/node': ^20
+  '@types/react': ^19
+  '@types/react-dom': ^19
+  'axios': ^1.7.2
+  'react': ^19.0.0
+  'react-dom': ^19.0.0
+  'typescript': ^5
+  'zod': ^4.3.6
+
+# Strict version enforcement
+engineStrict: true
+
+# No virtual store for monorepo
+enableGlobalVirtualStore: false
+
+# Update notification
+updateNotifier: false

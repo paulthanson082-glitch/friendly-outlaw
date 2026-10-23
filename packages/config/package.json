@@ -1,0 +1,30 @@
+{
+  "name": "@friendly-outlaw/config",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./eslint": "./dist/eslint.js",
+    "./tsconfig": "./tsconfig.json"
+  },
+  "files": [
+    "dist",
+    "tsconfig.json"
+  ],
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}
