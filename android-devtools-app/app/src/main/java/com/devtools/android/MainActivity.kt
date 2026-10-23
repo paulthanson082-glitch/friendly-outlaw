@@ -23,7 +23,7 @@ import com.devtools.android.core.appPrefs
 import com.devtools.android.modules.onboarding.OnboardingScreen
 import com.devtools.android.ui.MainScreen
 import com.devtools.android.ui.theme.DevToolsTheme
-import com.google.android.material.snackbar.Snackbar
+import android.widget.Toast
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -41,10 +41,10 @@ class MainActivity : ComponentActivity() {
             lifecycleScope.launch {
                 val ok = BinaryManager.ensureBinaries(this@MainActivity)
                 if (!ok) {
-                    Snackbar.make(
-                        findViewById(android.R.id.content),
+                    Toast.makeText(
+                        this@MainActivity,
                         "Storage full — cannot extract tools",
-                        Snackbar.LENGTH_LONG
+                        Toast.LENGTH_LONG
                     ).show()
                 }
             }
