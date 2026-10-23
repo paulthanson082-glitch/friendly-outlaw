@@ -63,7 +63,7 @@ User writes document → Selects "Continue" or "Improve" → AI analyzes style �
 **TemplateRecommendation** — Used in template search results
 ```swift
 struct TemplateRecommendation: Codable {
-    let templateId: String              // Unique identifier
+    let templateId: UUID                // Unique identifier (matches Template.id type)
     let name: String                     // "Mystery Novel Outline"
     let matchScore: Double              // 0.0-1.0 confidence score
     let matchReason: String             // "Matches your focus on plot structure"
@@ -77,7 +77,7 @@ struct GeneratedTemplate: Codable {
     let name: String
     let category: Category
     let placeholders: [Placeholder]     // User-editable sections
-    let structure: String               // Markdown outline with {{PLACEHOLDER}} markers
+    let structure: String               // Markdown outline with {{PLACEHOLDER_NAME}} markers
 }
 
 struct Placeholder: Codable {
@@ -90,9 +90,17 @@ struct Placeholder: Codable {
 **DocumentEnhancementOptions** — Configuration for AI editing
 ```swift
 struct DocumentEnhancementOptions: Codable {
-    let preserveStyle: Bool = true      // Analyze & match document tone/voice
+    let preserveStyle: Bool             // Analyze & match document tone/voice
     let targetTone: WritingTone?        // Optional: "confident", "creative", "formal", etc.
-    let context: String = ""            // User notes: "Make it more action-packed"
+    let context: String                 // User notes: "Make it more action-packed"
+    
+    init(preserveStyle: Bool = true, targetTone: WritingTone? = nil, context: String = "") {
+        self.preserveStyle = preserveStyle
+        self.targetTone = targetTone
+        self.context = context
+    }
+    
+    static let `default` = DocumentEnhancementOptions()
 }
 
 enum WritingTone: String, Codable {
@@ -157,26 +165,36 @@ func improveDocument(
 func recommendTemplates(userIntent: String) async throws -> [TemplateRecommendation]
 ```
 - Calls AIService.recommendTemplates()
-- Validates that recommended template IDs exist in system
-- Filters out archived/deleted templates
-- Returns only active templates
+- Validates that recommended template IDs resolve with `getTemplate(id:)`
+- Filters out any recommendations whose templateId cannot be resolved
+- Returns only validated recommendations (empty array if all are invalid)
+- Throws `AIServiceError.noMatchingTemplates` if Claude returns no matches
 
 ```swift
 func createTemplateFromAI(generated: GeneratedTemplate) throws -> Template
 ```
-- Converts `GeneratedTemplate` to persistable `Template`
-- Stores placeholder metadata
-- Generates unique template ID
-- Returns Template for immediate use
+- Converts `GeneratedTemplate` to persistable `Template` with mapping:
+  - `GeneratedTemplate.name` → `Template.name`
+  - `GeneratedTemplate.category` → `Template.category`
+  - `GeneratedTemplate.structure` → `Template.content` (markdown)
+  - `GeneratedTemplate.placeholders` → stored as `Template.placeholders` metadata
+  - Generates new UUID for `Template.id`
+  - Uses current date for `createdAt`
+  - Auto-derives description from first 200 chars of structure (or structure name)
+- Returns newly persisted Template for immediate use
 - Used after user approves AI-generated structure
 
 **DocumentManager.swift:**
 
 Enhanced `continueDocument()` and `improveDocument()` to:
 - Accept `DocumentEnhancementOptions`
-- Optionally fetch and analyze document style before calling AIService
-- Pass analyzed style as system context to Claude
-- Example style analysis: "tone: conversational, sentence length: short, uses dialogue"
+- Fetch document text from storage using documentId
+- Optionally analyze document style and pass to AIService via prompt context
+- Call existing AIService text-based methods, passing:
+  - Document text directly (not documentId)
+  - Analyzed style as system prompt context if `preserveStyle=true`
+  - Tone and user context from DocumentEnhancementOptions
+- Example style analysis injected into prompt: "tone: conversational, sentence length: short, uses dialogue"
 
 ---
 
@@ -197,11 +215,13 @@ Available templates:
 - script-dialogue: Screenplay/dialogue format
 [etc. - generated from available templates]
 
-For each recommendation, provide:
+For each recommendation, provide JSON with ALL required fields:
 {
-  "templateId": "fiction-short",
+  "templateId": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "Mystery Short Story",
   "matchScore": 0.92,
-  "matchReason": "Matches your short fiction intent with strong plot structure focus"
+  "matchReason": "Matches your short fiction intent with strong plot structure focus",
+  "category": "fiction"
 }
 Return array, highest scores first.
 ```
@@ -243,12 +263,13 @@ Template details:
 Provide a Markdown outline with {{PLACEHOLDER_NAME: description}} markers.
 Include 5-8 key sections with examples.
 
-Return JSON:
+Return JSON with ALL required fields:
 {
   "name": "Template Name",
-  "structure": "# Part 1: Setup\n{{HOOK: Attention-grabbing opening}}...",
+  "category": "fiction",
+  "structure": "# Part 1: Setup\n{{HOOK_OPENING: Attention-grabbing opening}}...",
   "placeholders": [
-    {"name": "HOOK", "description": "Opening that grabs reader", "exampleText": "..."}
+    {"name": "HOOK_OPENING", "description": "Opening that grabs reader", "exampleText": "The old lighthouse keeper had one secret..."}
   ]
 }
 ```
