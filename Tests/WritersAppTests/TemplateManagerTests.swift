@@ -160,4 +160,163 @@ final class TemplateManagerTests: XCTestCase {
         let results = manager.getTemplates(for: .screenplay)
         XCTAssertTrue(results.contains { $0.name == "Screenplay" })
     }
+
+    // MARK: - AI Template Generation Tests
+
+    func testCreateTemplateFromAIBasicConversion() {
+        let generated = GeneratedTemplate(
+            name: "Test Novel Outline",
+            category: "Novel",
+            placeholders: [
+                GeneratedPlaceholder(name: "SETUP", description: "Story setup", exampleText: "Once upon a time..."),
+                GeneratedPlaceholder(name: "CONFLICT", description: "Main conflict", exampleText: "But then...")
+            ],
+            structure: "# Setup\n{{SETUP}}\n\n# Conflict\n{{CONFLICT}}"
+        )
+
+        do {
+            let template = try manager.createTemplateFromAI(generated: generated)
+
+            XCTAssertEqual(template.name, "Test Novel Outline")
+            XCTAssertEqual(template.category, .novel)
+            XCTAssertEqual(template.placeholders.count, 2)
+            XCTAssertTrue(template.content.contains("{{SETUP}}"))
+            XCTAssertTrue(template.content.contains("{{CONFLICT}}"))
+        } catch {
+            XCTFail("Failed to create template from AI: \(error)")
+        }
+    }
+
+    func testCreateTemplateFromAIPreservesStructure() {
+        let testStructure = """
+        # Part 1: Introduction
+        {{INTRODUCTION}}
+
+        # Part 2: Development
+        {{DEVELOPMENT}}
+
+        # Part 3: Conclusion
+        {{CONCLUSION}}
+        """
+
+        let generated = GeneratedTemplate(
+            name: "Article Template",
+            category: "Article",
+            placeholders: [
+                GeneratedPlaceholder(name: "INTRODUCTION", description: "Opening", exampleText: "Start here"),
+                GeneratedPlaceholder(name: "DEVELOPMENT", description: "Main content", exampleText: "Content"),
+                GeneratedPlaceholder(name: "CONCLUSION", description: "Closing", exampleText: "End here")
+            ],
+            structure: testStructure
+        )
+
+        do {
+            let template = try manager.createTemplateFromAI(generated: generated)
+            XCTAssertEqual(template.content, testStructure)
+        } catch {
+            XCTFail("Failed to create template: \(error)")
+        }
+    }
+
+    func testCreateTemplateFromAIConvertsPlaceholders() {
+        let generated = GeneratedTemplate(
+            name: "Blog Post",
+            category: "Blog Post",
+            placeholders: [
+                GeneratedPlaceholder(name: "TITLE", description: "Post title", exampleText: "My Blog Post")
+            ],
+            structure: "# {{TITLE}}"
+        )
+
+        do {
+            let template = try manager.createTemplateFromAI(generated: generated)
+
+            // Check that placeholders were converted properly
+            XCTAssertEqual(template.placeholders.count, 1)
+            let placeholder = template.placeholders[0]
+            XCTAssertEqual(placeholder.key, "title") // Converted to lowercase
+            XCTAssertEqual(placeholder.label, "TITLE") // Original name
+            XCTAssertEqual(placeholder.description, "Post title")
+            XCTAssertEqual(placeholder.defaultValue, "My Blog Post") // exampleText becomes defaultValue
+        } catch {
+            XCTFail("Failed to create template: \(error)")
+        }
+    }
+
+    func testCreateTemplateFromAIGeneratesUniqueIds() {
+        let generated = GeneratedTemplate(
+            name: "Unique Template",
+            category: "Other",
+            placeholders: [],
+            structure: "# Template"
+        )
+
+        do {
+            let template1 = try manager.createTemplateFromAI(generated: generated)
+            let template2 = try manager.createTemplateFromAI(generated: generated)
+
+            // IDs should be different
+            XCTAssertNotEqual(template1.id, template2.id)
+            // Names should be the same
+            XCTAssertEqual(template1.name, template2.name)
+        } catch {
+            XCTFail("Failed to create templates: \(error)")
+        }
+    }
+
+    func testCreateTemplateFromAIStoresTemplate() {
+        let generated = GeneratedTemplate(
+            name: "Stored Template",
+            category: "Essay",
+            placeholders: [],
+            structure: "# Essay"
+        )
+
+        do {
+            let created = try manager.createTemplateFromAI(generated: generated)
+
+            // Template should be retrievable
+            let retrieved = manager.getTemplate(id: created.id)
+            XCTAssertNotNil(retrieved)
+            XCTAssertEqual(retrieved?.name, "Stored Template")
+        } catch {
+            XCTFail("Failed to create template: \(error)")
+        }
+    }
+
+    func testCreateTemplateFromAIAddsAIGeneratedTag() {
+        let generated = GeneratedTemplate(
+            name: "Tagged Template",
+            category: "Novel",
+            placeholders: [],
+            structure: "# Template"
+        )
+
+        do {
+            let template = try manager.createTemplateFromAI(generated: generated)
+
+            XCTAssertTrue(template.metadata.tags.contains("ai-generated"))
+            XCTAssertTrue(template.metadata.tags.contains("novel"))
+        } catch {
+            XCTFail("Failed to create template: \(error)")
+        }
+    }
+
+    func testCreateTemplateFromAIWithUnknownCategory() {
+        let generated = GeneratedTemplate(
+            name: "Unknown Category",
+            category: "UnknownType",
+            placeholders: [],
+            structure: "# Template"
+        )
+
+        do {
+            let template = try manager.createTemplateFromAI(generated: generated)
+
+            // Should default to .other category
+            XCTAssertEqual(template.category, .other)
+        } catch {
+            XCTFail("Failed to create template: \(error)")
+        }
+    }
 }

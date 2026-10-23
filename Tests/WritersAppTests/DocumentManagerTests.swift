@@ -431,4 +431,177 @@ final class DocumentManagerTests: XCTestCase {
 
         XCTAssertEqual(doc.id, customId)
     }
+
+    // MARK: - Document Enhancement Options Integration Tests
+
+    func testDocumentEnhancementOptionsWithDocument() {
+        let doc = Document(
+            title: "Test Article",
+            content: "This is a well-written article. It has multiple sentences. Each one is meaningful.",
+            category: .article
+        )
+        documentManager.createDocument(doc)
+
+        let retrievedDoc = documentManager.getDocument(id: doc.id)
+        XCTAssertNotNil(retrievedDoc)
+        XCTAssertEqual(retrievedDoc?.title, "Test Article")
+    }
+
+    func testContinueDocumentWithDefaultEnhancementOptions() {
+        let doc = Document(
+            title: "Novel Chapter",
+            content: "Chapter One: The Beginning. It was a dark and stormy night.",
+            category: .novel
+        )
+        documentManager.createDocument(doc)
+
+        let options = DocumentEnhancementOptions.default
+        XCTAssertTrue(options.preserveStyle)
+        XCTAssertNil(options.targetTone)
+        XCTAssertNil(options.context)
+    }
+
+    func testImproveDocumentWithEnhancementOptions() {
+        let doc = Document(
+            title: "Essay Draft",
+            content: "This essay discuss important topics. It explore various perspective.",
+            category: .essay
+        )
+        documentManager.createDocument(doc)
+
+        let options = DocumentEnhancementOptions(preserveStyle: true)
+        let retrievedDoc = documentManager.getDocument(id: doc.id)
+        XCTAssertNotNil(retrievedDoc)
+        XCTAssertTrue(options.preserveStyle)
+    }
+
+    func testEnhancementOptionsWithToneOverride() {
+        let doc = Document(
+            title: "Casual Blog Post",
+            content: "Hey folks, let's talk about coding!",
+            category: .article
+        )
+        documentManager.createDocument(doc)
+
+        let options = DocumentEnhancementOptions(
+            preserveStyle: true,
+            targetTone: .professional
+        )
+        XCTAssertEqual(options.targetTone, .professional)
+
+        let retrievedDoc = documentManager.getDocument(id: doc.id)
+        XCTAssertNotNil(retrievedDoc)
+    }
+
+    func testEnhancementOptionsWithContext() {
+        let doc = Document(
+            title: "Short Story",
+            content: "Once upon a time, there was a mysterious forest.",
+            category: .shortStory
+        )
+        documentManager.createDocument(doc)
+
+        let options = DocumentEnhancementOptions(
+            preserveStyle: true,
+            context: "Fantasy setting with mythical creatures"
+        )
+        XCTAssertEqual(options.context, "Fantasy setting with mythical creatures")
+
+        let retrievedDoc = documentManager.getDocument(id: doc.id)
+        XCTAssertNotNil(retrievedDoc)
+        XCTAssertEqual(retrievedDoc?.category, .shortStory)
+    }
+
+    func testEnhancementOptionsWithAllParameters() {
+        let doc = Document(
+            title: "Technical Documentation",
+            content: "This doc explain how to use the API.",
+            category: .article
+        )
+        documentManager.createDocument(doc)
+
+        let options = DocumentEnhancementOptions(
+            preserveStyle: true,
+            targetTone: .academic,
+            context: "API reference documentation for developers"
+        )
+
+        XCTAssertTrue(options.preserveStyle)
+        XCTAssertEqual(options.targetTone, .academic)
+        XCTAssertEqual(options.context, "API reference documentation for developers")
+
+        let retrievedDoc = documentManager.getDocument(id: doc.id)
+        XCTAssertNotNil(retrievedDoc)
+    }
+
+    func testEnhancementOptionsNoStylePreservation() {
+        let doc = Document(
+            title: "Journal Entry",
+            content: "Today was interesting.",
+            category: .article
+        )
+        documentManager.createDocument(doc)
+
+        let options = DocumentEnhancementOptions(
+            preserveStyle: false,
+            targetTone: .creative
+        )
+
+        XCTAssertFalse(options.preserveStyle)
+        XCTAssertEqual(options.targetTone, .creative)
+
+        let retrievedDoc = documentManager.getDocument(id: doc.id)
+        XCTAssertNotNil(retrievedDoc)
+    }
+
+    func testMultipleDocumentsWithDifferentEnhancementOptions() {
+        let doc1 = Document(
+            title: "Document 1",
+            content: "First document content.",
+            category: .article
+        )
+        let doc2 = Document(
+            title: "Document 2",
+            content: "Second document content.",
+            category: .novel
+        )
+
+        documentManager.createDocument(doc1)
+        documentManager.createDocument(doc2)
+
+        let options1 = DocumentEnhancementOptions(targetTone: .formal)
+        let options2 = DocumentEnhancementOptions(targetTone: .casual)
+
+        XCTAssertEqual(options1.targetTone, .formal)
+        XCTAssertEqual(options2.targetTone, .casual)
+
+        let retrieved1 = documentManager.getDocument(id: doc1.id)
+        let retrieved2 = documentManager.getDocument(id: doc2.id)
+
+        XCTAssertEqual(retrieved1?.title, "Document 1")
+        XCTAssertEqual(retrieved2?.title, "Document 2")
+    }
+
+    func testEnhancementOptionsPreserveAfterUpdate() {
+        let doc = Document(
+            title: "Original Title",
+            content: "Original content here.",
+            category: .article
+        )
+        documentManager.createDocument(doc)
+
+        var updatedDoc = doc
+        updatedDoc.content = "Updated content here."
+        documentManager.updateDocument(updatedDoc)
+
+        let options = DocumentEnhancementOptions(
+            preserveStyle: true,
+            targetTone: .professional
+        )
+
+        let retrieved = documentManager.getDocument(id: doc.id)
+        XCTAssertEqual(retrieved?.content, "Updated content here.")
+        XCTAssertTrue(options.preserveStyle)
+        XCTAssertEqual(options.targetTone, .professional)
+    }
 }
