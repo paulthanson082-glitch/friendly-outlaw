@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Wrench icon representing developer tools -->
+    <path
+        android:fillColor="#FF00C853"
+        android:pathData="M76.5,32.5 C72.3,28.3 66.5,26.5 60.8,27.5 L68.5,35.2 L62.5,41.2 L54.8,33.5 C53.8,39.2 55.5,45 59.7,49.2 C63.9,53.4 69.8,55.1 75.5,54.1 L86.5,65.1 C88.3,66.9 88.3,69.8 86.5,71.6 C84.7,73.4 81.8,73.4 80,71.6 L69,60.6 C63.3,61.6 57.4,59.9 53.2,55.7 C49,51.5 47.3,45.6 48.3,39.9 L40.6,47.6 L34.6,41.6 L42.3,33.9 C36.6,34.9 33.2,36.6 29,40.8 C21.1,48.7 21.1,61.3 29,69.2 C36.9,77.1 49.5,77.1 57.4,69.2 L75.7,87.5 C77.5,89.3 80.4,89.3 82.2,87.5 L87.5,82.2 C89.3,80.4 89.3,77.5 87.5,75.7 L69.2,57.4 C73.4,53.2 75.5,47.5 76.5,41.8" />
+</vector>
