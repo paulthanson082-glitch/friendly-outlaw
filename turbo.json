@@ -1,0 +1,73 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [
+    ".env",
+    ".env.local",
+    "tsconfig.json"
+  ],
+  "tasks": {
+    "dev": {
+      "cache": false,
+      "interactive": true,
+      "persistent": true
+    },
+    "build": {
+      "outputs": [
+        "dist/**",
+        ".next/**",
+        "build/**"
+      ],
+      "inputs": [
+        "src/**",
+        "tsconfig.json",
+        "package.json"
+      ],
+      "dependsOn": [
+        "^build"
+      ]
+    },
+    "test": {
+      "outputs": [
+        "coverage/**"
+      ],
+      "inputs": [
+        "src/**",
+        "test/**",
+        "jest.config.ts",
+        "tsconfig.json"
+      ]
+    },
+    "test:watch": {
+      "cache": false,
+      "interactive": true,
+      "persistent": true
+    },
+    "lint": {
+      "outputs": [],
+      "cache": false
+    },
+    "format": {
+      "cache": false
+    },
+    "type-check": {
+      "outputs": [],
+      "inputs": [
+        "src/**",
+        "tsconfig.json"
+      ]
+    },
+    "db:migrate": {
+      "cache": false,
+      "inputs": [
+        "src/db/**"
+      ]
+    },
+    "db:seed": {
+      "cache": false,
+      "inputs": [
+        "src/db/**"
+      ]
+    }
+  },
+  "ui": "tui"
+}

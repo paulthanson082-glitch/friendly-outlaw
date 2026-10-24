@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import type { Router as ExpressRouter } from 'express';
 import bcryptjs from 'bcryptjs';
 import { generateToken } from '../utils/jwt.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -6,7 +7,7 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 import { ValidationError, UnauthorizedError, ConflictError } from '../utils/errors.js';
 import { v4 as uuidv4 } from 'uuid';
 
-const router = Router();
+const router: ExpressRouter = Router();
 
 // In-memory user storage (replace with database in phase 2)
 interface User {

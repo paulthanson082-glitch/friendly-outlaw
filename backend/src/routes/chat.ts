@@ -1,11 +1,12 @@
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
+import type { Router as ExpressRouter } from 'express';
 import { chatService } from '../services/chatService.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { ValidationError } from '../utils/errors.js';
 import logger from '../utils/logger.js';
 
-const router = Router();
+const router: ExpressRouter = Router();
 
 // Require authentication for all chat routes
 router.use(authMiddleware);

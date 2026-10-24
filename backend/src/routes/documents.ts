@@ -1,10 +1,11 @@
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
+import type { Router as ExpressRouter } from 'express';
 import { documentService } from '../services/documentService.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
 import { ValidationError, NotFoundError } from '../utils/errors.js';
 
-const router = Router();
+const router: ExpressRouter = Router();
 
 // Require authentication for all document routes
 router.use(authMiddleware);
