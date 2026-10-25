@@ -92,10 +92,14 @@ public final class PiiDetector {
             severity: .medium,
             regex: compile(#"(?:\+?1[-. ]?)?\(?\d{3}\)?[-. ]?\d{3}[-. ]?\d{4}\b"#)
         ),
+        // Only flags a date that follows a birth keyword. Plain dates such as
+        // a letter dated 10/25/2026 are not personal data and must not block.
         PiiPattern(
             name: "date_of_birth",
             severity: .medium,
-            regex: compile(#"\b(?:0?[1-9]|1[0-2])[/-](?:0?[1-9]|[12]\d|3[01])[/-](?:19|20)\d{2}\b"#)
+            regex: compile(
+                #"(?i)\b(?:dob|date of birth|born(?: on)?)\W{0,3}(?:0?[1-9]|1[0-2])[/-](?:0?[1-9]|[12]\d|3[01])[/-](?:19|20)\d{2}\b"#
+            )
         )
     ]
 

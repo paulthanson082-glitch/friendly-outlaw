@@ -61,6 +61,12 @@ final class PiiDetectorTests: XCTestCase {
 
     func testDetectsDateOfBirth() {
         XCTAssertTrue(names("Born 04/12/1987 in Ohio").contains("date_of_birth"))
+        XCTAssertTrue(names("DOB: 4/12/1987").contains("date_of_birth"))
+    }
+
+    func testPlainDateIsNotDateOfBirth() {
+        // A dated letter in a manuscript is not personal data.
+        XCTAssertFalse(names("The letter is dated 10/25/2026.").contains("date_of_birth"))
     }
 
     // MARK: - Multiple Matches
