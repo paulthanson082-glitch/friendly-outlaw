@@ -1,6 +1,7 @@
 import XCTest
 @testable import WritersApp
 
+@MainActor
 class AIContentDashboardViewModelTests: XCTestCase {
     var viewModel: AIContentDashboardViewModel!
     var analyticsService: AIAnalyticsService!
