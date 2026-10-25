@@ -160,7 +160,8 @@ public class HermesService {
                 systemPrompt: getCurrentPersona(),
                 userPrompt: userPrompt,
                 tools: WritingToolExecutor.tools,
-                toolExecutor: toolExecutor
+                // Tool output (for example, stored document text) is scanned before the model sees it.
+                toolExecutor: PrivacyGuardedToolExecutor(inner: toolExecutor, router: privacyRouter)
             )
         } catch {
             throw HermesError.aiServiceFailed(error.localizedDescription)

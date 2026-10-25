@@ -79,7 +79,12 @@ public final class PiiDetector {
         PiiPattern(
             name: "credit_card",
             severity: .high,
-            regex: compile(#"\b(?:\d[ -]?){12,18}\d\b"#),
+            // Card-shaped groups only, anchored on digit boundaries. A greedy run match
+            // swallowed leading digits ("Order 124 4111 ..."), and testing every sub-window
+            // with Luhn gave false positives. Each group is Luhn-checked as a whole.
+            regex: compile(
+                #"(?<!\d)(?:\d{4}(?:[ -]?\d{4}){2}[ -]?\d{4}|\d{4}[ -]?\d{6}[ -]?\d{5})(?!\d)"#
+            ),
             validate: luhnValid
         ),
         PiiPattern(

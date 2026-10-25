@@ -46,6 +46,16 @@ final class PiiDetectorTests: XCTestCase {
         XCTAssertTrue(names("Card: 4111 1111 1111 1111").contains("credit_card"))
     }
 
+    func testDetectsFifteenDigitAmexCard() {
+        // 378282246310005 is a standard test number that passes Luhn.
+        XCTAssertTrue(names("Amex 3782 822463 10005").contains("credit_card"))
+    }
+
+    func testDetectsCardNumberAfterLeadingDigits() {
+        // Regression: a greedy match once swallowed "124" and failed Luhn on the whole run.
+        XCTAssertTrue(names("Order 124 4111 1111 1111 1111").contains("credit_card"))
+    }
+
     func testIgnoresDigitRunThatFailsLuhn() {
         // Same digits with the last one changed fail the Luhn check.
         XCTAssertFalse(names("Ref 4111 1111 1111 1112").contains("credit_card"))
