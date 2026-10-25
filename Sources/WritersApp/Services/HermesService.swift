@@ -36,6 +36,7 @@ public class HermesService {
     // MARK: - Private Properties
 
     private let aiService: AIService
+    private let privacyRouter: PrivacyRouter
     private let toolExecutor: WritingToolExecutor
 
     private let hermesPersona = """
@@ -79,9 +80,11 @@ public class HermesService {
         documentManager: DocumentManager,
         templateManager: TemplateManager,
         maxHistoryMessages: Int = 30,
-        maxPromptLength: Int = 4000
+        maxPromptLength: Int = 4000,
+        privacyRouter: PrivacyRouter = PrivacyRouter()
     ) {
         self.aiService = aiService
+        self.privacyRouter = privacyRouter
         self.toolExecutor = WritingToolExecutor(
             documentManager: documentManager,
             templateManager: templateManager
@@ -143,6 +146,13 @@ public class HermesService {
         trimHistory(&session)
         let userPrompt = buildUserPrompt(userText: prompt, session: session)
 
+        // Privacy gate: personal data must never reach a cloud model.
+        // Checked before the API call. Nothing is appended to the session on block,
+        // so a blocked request never enters the conversation history.
+        if case .blocked(let reason) = privacyRouter.route(userPrompt) {
+            throw HermesError.privacyBlocked(reason)
+        }
+
         // Call Claude with the current persona as the system prompt and tool support
         let rawResponse: String
         do {
@@ -150,7 +160,8 @@ public class HermesService {
                 systemPrompt: getCurrentPersona(),
                 userPrompt: userPrompt,
                 tools: WritingToolExecutor.tools,
-                toolExecutor: toolExecutor
+                // Tool output (for example, stored document text) is scanned before the model sees it.
+                toolExecutor: PrivacyGuardedToolExecutor(inner: toolExecutor, router: privacyRouter)
             )
         } catch {
             throw HermesError.aiServiceFailed(error.localizedDescription)
