@@ -315,6 +315,7 @@ public enum HermesError: LocalizedError {
     case aiNotAvailable
     case ideaNotFound(id: UUID)
     case aiServiceFailed(String)
+    case privacyBlocked(String)
 
     public var errorDescription: String? {
         switch self {
@@ -328,6 +329,8 @@ public enum HermesError: LocalizedError {
             return "Idea with ID \(id) was not found in this session."
         case .aiServiceFailed(let reason):
             return "Hermes AI error: \(reason)"
+        case .privacyBlocked(let reason):
+            return reason
         }
     }
 }
